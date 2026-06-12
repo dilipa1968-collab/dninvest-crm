@@ -1337,7 +1337,7 @@ function renderMfTable(){
   const rc=document.getElementById('mf-count');
   if(rc) rc.textContent=data.length+' investors';
 
-  const mfFieldMap = {0:'name',1:'mobile',2:'rm',3:'status',4:'aum',5:'sip_amount',6:'sip_count',7:'last_invest_date',8:'next_call',9:'followup_status'};
+  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'status',5:'aum',6:'sip_amount',7:'sip_count',8:'last_invest_date',9:'next_call',10:'followup_status'};
   if(mfSortField!==null){
     const field = mfFieldMap[mfSortField];
     data = data.slice().sort((a,b)=>{
@@ -1359,7 +1359,7 @@ function renderMfTable(){
   }
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
-  const cols=['Name','Mobile','MF RM','Status','AUM','SIP Amt','SIP Count','Last Invest','Next Call','Follow-up'];
+  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Last Invest','Next Call','Follow-up'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
@@ -1372,6 +1372,7 @@ function renderMfTable(){
     h+=`<tr class="row-mf">
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
       <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span>
         <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
@@ -2450,10 +2451,10 @@ async function doEqImport(){
       touched.push(ex);
       updated++;
     } else if(row.name){
-      // New client - RM is required. Staff can only add under their own name.
+      // New client - staff must use their own RM; admin can leave RM blank
+      // (to be assigned later) if not present in the Excel.
       let rm = row.rm || '';
       if(CU.role!=='admin') rm = CU.name;
-      if(!rm){ skipped++; return; }
       let id = uid();
       while(usedIds.has(id)) id = uid();
       usedIds.add(id);
@@ -2475,7 +2476,7 @@ async function doEqImport(){
   await DB.setClientsBulk('eq_clients', touched);
   closeModal('eqImportModal');
   let msg = `✅ Import done! ${updated} updated, ${added} new added`;
-  if(skipped) msg += `, ${skipped} skipped (no RM/name)`;
+  if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
 }
