@@ -30,17 +30,27 @@
     button { padding: 8px 16px; background: #2a5298; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
     button:hover { background: #1e3c72; }
     table { width: 100%; border-collapse: collapse; }
-    th { background: #f8f9fa; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: #7f8c8d; border-bottom: 1px solid #e0e0e0; }
+    th { background: #f8f9fa; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: #7f8c8d; border-bottom: 1px solid #e0e0e0; cursor: pointer; }
     td { padding: 12px 16px; border-bottom: 1px solid #f0f2f5; font-size: 14px; }
     tr:hover { background: #f8f9fa; }
     .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #d4edda; color: #155724; }
-    .sync-status { position: fixed; bottom: 24px; right: 24px; padding: 12px 16px; background: #27ae60; color: white; border-radius: 6px; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 12px; padding: 32px; max-width: 500px; width: 90%; }
+    .modal-header { font-size: 20px; font-weight: 700; margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    input, textarea, select { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 14px; font-family: inherit; }
+    .modal-footer { margin-top: 32px; display: flex; gap: 12px; justify-content: flex-end; }
+    .btn-secondary { background: #e0e0e0; color: #2c3e50; }
+    .btn-secondary:hover { background: #d0d0d0; }
+    .sync-status { position: fixed; bottom: 24px; right: 24px; padding: 12px 16px; background: #27ae60; color: white; border-radius: 6px; font-size: 12px; }
   </style>
 </head>
 <body>
   <div class="navbar">
     <div class="navbar-brand">DN<span>Invest</span> CRM</div>
-    <div style="color: white;">dilip@admin</div>
+    <div style="color: white;">Admin</div>
   </div>
   
   <div class="container">
@@ -56,6 +66,7 @@
       <div class="sidebar-section">
         <div class="sidebar-title">MUTUAL FUND</div>
         <div class="sidebar-item" onclick="showMF()">📈 Investors <span style="font-size: 12px; background: #f0f2f5; padding: 2px 8px; border-radius: 4px;" id="mfCount">0</span></div>
+        <div class="sidebar-item" onclick="showSIP()">💰 SIP <span style="font-size: 12px; background: #f0f2f5; padding: 2px 8px; border-radius: 4px;" id="sipCount">0</span></div>
       </div>
     </div>
     
@@ -77,4 +88,254 @@
           </div>
           <div class="stat-card">
             <div class="stat-label">Monthly SIP</div>
-            <div class="stat-value"
+            <div class="stat-value" id="sipTotal">₹0</div>
+          </div>
+        </div>
+        <div style="text-align: center; color: #7f8c8d; padding: 40px;">
+          <p>✓ All systems ready</p>
+          <p style="font-size: 12px; margin-top: 8px;">Import data to get started</p>
+        </div>
+      </div>
+      
+      <div id="equity" style="display: none;">
+        <div class="table-container">
+          <div class="table-header">
+            <div class="table-title">Equity Clients</div>
+            <div class="table-controls">
+              <input type="text" id="eqSearch" placeholder="Search..." onkeyup="renderEquity()">
+              <button onclick="showAddEquity()">+ Add</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Code</th><th>Name</th><th>Mobile</th><th>RM</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="eqTable"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div id="mf" style="display: none;">
+        <div class="table-container">
+          <div class="table-header">
+            <div class="table-title">MF Investors</div>
+            <div class="table-controls">
+              <input type="text" id="mfSearch" placeholder="Search..." onkeyup="renderMF()">
+              <button onclick="showAddMF()">+ Add</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Name</th><th>PAN</th><th>AUM</th><th>RM</th><th>SIP</th><th>Actions</th></tr></thead>
+            <tbody id="mfTable"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div id="sip" style="display: none;">
+        <div class="table-container">
+          <div class="table-header">
+            <div class="table-title">SIP Tracker</div>
+          </div>
+          <table>
+            <thead><tr><th>Name</th><th>Monthly SIP</th><th>Count</th><th>RM</th></tr></thead>
+            <tbody id="sipTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="modal" id="modal">
+    <div class="modal-content">
+      <div class="modal-header" id="modalTitle">Add</div>
+      <div id="modalBody"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+        <button onclick="saveData()">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="sync-status">✓ Ready</div>
+  
+  <script>
+    const DB = {
+      get: (key) => JSON.parse(localStorage.getItem('dn_' + key) || '[]'),
+      set: (key, data) => localStorage.setItem('dn_' + key, JSON.stringify(data))
+    };
+    
+    let editingData = null;
+    
+    function formatCurrency(num) {
+      if(num >= 10000000) return (num/10000000).toFixed(2) + 'Cr';
+      if(num >= 100000) return (num/100000).toFixed(2) + 'L';
+      return num.toLocaleString();
+    }
+    
+    function refreshDashboard() {
+      const eq = DB.get('eq_clients');
+      const mf = DB.get('mf_clients');
+      const sipTotal = mf.reduce((sum, c) => sum + (c.sip_amount || 0), 0);
+      const aumTotal = mf.reduce((sum, c) => sum + (c.aum || 0), 0);
+      document.getElementById('eqTotal').textContent = eq.length;
+      document.getElementById('mfTotal').textContent = mf.length;
+      document.getElementById('sipTotal').textContent = '₹' + formatCurrency(sipTotal);
+      document.getElementById('aumTotal').textContent = '₹' + formatCurrency(aumTotal);
+      document.getElementById('eqCount').textContent = eq.length;
+      document.getElementById('mfCount').textContent = mf.length;
+      document.getElementById('sipCount').textContent = mf.filter(c => c.sip_amount > 0).length;
+    }
+    
+    function showDashboard() {
+      document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+      document.getElementById('dashboard').style.display = 'block';
+      refreshDashboard();
+    }
+    
+    function showEquity() {
+      document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+      document.getElementById('equity').style.display = 'block';
+      renderEquity();
+    }
+    
+    function showMF() {
+      document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+      document.getElementById('mf').style.display = 'block';
+      renderMF();
+    }
+    
+    function showSIP() {
+      document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+      document.getElementById('sip').style.display = 'block';
+      renderSIP();
+    }
+    
+    function renderEquity() {
+      const eq = DB.get('eq_clients');
+      const search = document.getElementById('eqSearch')?.value || '';
+      const filtered = eq.filter(c => (c.name || '').toLowerCase().includes(search));
+      let html = '';
+      filtered.forEach(c => {
+        html += `<tr><td>${c.code || '—'}</td><td>${c.name}</td><td>${c.mobile || '—'}</td><td>${c.rm}</td><td><span class="badge">${c.status}</span></td><td><button onclick="editEquity('${c.id}')" style="padding: 4px 8px; font-size: 12px;">Edit</button></td></tr>`;
+      });
+      document.getElementById('eqTable').innerHTML = html || '<tr><td colspan="6" style="text-align: center;">No data</td></tr>';
+    }
+    
+    function renderMF() {
+      const mf = DB.get('mf_clients');
+      const search = document.getElementById('mfSearch')?.value || '';
+      const filtered = mf.filter(c => (c.name || '').toLowerCase().includes(search));
+      let html = '';
+      filtered.forEach(c => {
+        html += `<tr><td>${c.name}</td><td>${c.pan || '—'}</td><td>₹${formatCurrency(c.aum || 0)}</td><td>${c.rm}</td><td>₹${formatCurrency(c.sip_amount || 0)}</td><td><button onclick="editMF('${c.id}')" style="padding: 4px 8px; font-size: 12px;">Edit</button></td></tr>`;
+      });
+      document.getElementById('mfTable').innerHTML = html || '<tr><td colspan="6" style="text-align: center;">No data</td></tr>';
+    }
+    
+    function renderSIP() {
+      const mf = DB.get('mf_clients');
+      const sips = mf.filter(c => c.sip_amount > 0);
+      let html = '';
+      sips.forEach(c => {
+        html += `<tr><td>${c.name}</td><td>₹${formatCurrency(c.sip_amount)}</td><td>${c.sip_count || 0}</td><td>${c.rm}</td></tr>`;
+      });
+      document.getElementById('sipTable').innerHTML = html || '<tr><td colspan="4" style="text-align: center;">No SIPs</td></tr>';
+    }
+    
+    function showAddEquity() {
+      editingData = null;
+      document.getElementById('modalTitle').textContent = 'Add Equity Client';
+      document.getElementById('modalBody').innerHTML = `
+        <div class="form-group"><label>Code</label><input type="text" id="f-code"></div>
+        <div class="form-group"><label>Name *</label><input type="text" id="f-name" required></div>
+        <div class="form-group"><label>Mobile</label><input type="text" id="f-mobile"></div>
+        <div class="form-group"><label>PAN</label><input type="text" id="f-pan"></div>
+        <div class="form-group"><label>RM</label><select id="f-rm"><option value="dilip">dilip</option><option value="bharat">bharat</option><option value="puja">puja</option><option value="riya">riya</option><option value="rohit">rohit</option><option value="khokhan">khokhan</option><option value="raju">raju</option><option value="komal">komal</option><option value="megha">megha</option><option value="anjali">anjali</option></select></div>
+      `;
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function showAddMF() {
+      editingData = null;
+      document.getElementById('modalTitle').textContent = 'Add MF Investor';
+      document.getElementById('modalBody').innerHTML = `
+        <div class="form-group"><label>Name *</label><input type="text" id="f-name" required></div>
+        <div class="form-group"><label>PAN *</label><input type="text" id="f-pan" required></div>
+        <div class="form-group"><label>AUM (₹)</label><input type="number" id="f-aum"></div>
+        <div class="form-group"><label>SIP (₹)</label><input type="number" id="f-sip"></div>
+        <div class="form-group"><label>RM</label><select id="f-rm"><option value="dilip">dilip</option><option value="bharat">bharat</option><option value="puja">puja</option><option value="riya">riya</option><option value="rohit">rohit</option><option value="khokhan">khokhan</option><option value="raju">raju</option><option value="komal">komal</option><option value="megha">megha</option><option value="anjali">anjali</option></select></div>
+      `;
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+    
+    function saveData() {
+      const name = document.getElementById('f-name')?.value;
+      if(!name) { alert('Name required'); return; }
+      const eq = DB.get('eq_clients');
+      const mf = DB.get('mf_clients');
+      if(eq.length > 0 && eq[0].mobile) {
+        const id = editingData || Date.now().toString();
+        const idx = eq.findIndex(c => c.id === id);
+        const newClient = { id, code: document.getElementById('f-code')?.value || '', name, mobile: document.getElementById('f-mobile')?.value || '', pan: (document.getElementById('f-pan')?.value || '').toUpperCase(), rm: document.getElementById('f-rm')?.value || 'dilip', status: 'Active' };
+        if(idx >= 0) eq[idx] = { ...eq[idx], ...newClient };
+        else eq.push(newClient);
+        DB.set('eq_clients', eq);
+        renderEquity();
+      } else {
+        const id = editingData || Date.now().toString();
+        const idx = mf.findIndex(c => c.id === id);
+        const newClient = { id, name, pan: (document.getElementById('f-pan')?.value || '').toUpperCase(), aum: parseFloat(document.getElementById('f-aum')?.value) || 0, sip_amount: parseFloat(document.getElementById('f-sip')?.value) || 0, sip_count: 0, rm: document.getElementById('f-rm')?.value || 'dilip', status: 'Investor' };
+        if(idx >= 0) mf[idx] = { ...mf[idx], ...newClient };
+        else mf.push(newClient);
+        DB.set('mf_clients', mf);
+        renderMF();
+      }
+      closeModal();
+      refreshDashboard();
+    }
+    
+    function editEquity(id) {
+      const eq = DB.get('eq_clients');
+      const client = eq.find(c => c.id === id);
+      if(!client) return;
+      editingData = id;
+      document.getElementById('modalTitle').textContent = 'Edit Equity Client';
+      document.getElementById('modalBody').innerHTML = `
+        <div class="form-group"><label>Code</label><input type="text" id="f-code" value="${client.code || ''}"></div>
+        <div class="form-group"><label>Name *</label><input type="text" id="f-name" value="${client.name}" required></div>
+        <div class="form-group"><label>Mobile</label><input type="text" id="f-mobile" value="${client.mobile || ''}"></div>
+        <div class="form-group"><label>PAN</label><input type="text" id="f-pan" value="${client.pan || ''}"></div>
+        <div class="form-group"><label>RM (Protected)</label><input type="text" value="${client.rm}" disabled><input type="hidden" id="f-rm" value="${client.rm}"></div>
+      `;
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function editMF(id) {
+      const mf = DB.get('mf_clients');
+      const client = mf.find(c => c.id === id);
+      if(!client) return;
+      editingData = id;
+      document.getElementById('modalTitle').textContent = 'Edit MF Investor';
+      document.getElementById('modalBody').innerHTML = `
+        <div class="form-group"><label>Name *</label><input type="text" id="f-name" value="${client.name}" required></div>
+        <div class="form-group"><label>PAN *</label><input type="text" id="f-pan" value="${client.pan || ''}" required></div>
+        <div class="form-group"><label>AUM (₹)</label><input type="number" id="f-aum" value="${client.aum || ''}"></div>
+        <div class="form-group"><label>SIP (₹)</label><input type="number" id="f-sip" value="${client.sip_amount || ''}"></div>
+        <div class="form-group"><label>RM (Protected)</label><input type="text" value="${client.rm}" disabled><input type="hidden" id="f-rm" value="${client.rm}"></div>
+      `;
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    setInterval(() => {
+      if(document.getElementById('equity').style.display !== 'none') renderEquity();
+      else if(document.getElementById('mf').style.display !== 'none') renderMF();
+      else if(document.getElementById('sip').style.display !== 'none') renderSIP();
+      else refreshDashboard();
+    }, 5000);
+    
+    refreshDashboard();
+  </script>
+</body>
+</html>
