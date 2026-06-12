@@ -700,7 +700,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
 
       <div id="imp-contact" style="display:none">
         <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b>, <b>RM</b> columns ho. Matching <b>Name</b> (ya PAN) se hoga — existing investor ka Mobile/PAN/RM update ho jayega. Naye investor add nahi honge.
+          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b>, <b>RM</b> columns ho. Matching <b>Name</b> se existing investor ka Mobile/PAN/RM update hoga. Naya naam mile toh nayi investor entry add ho jayegi (AUM khali rahega).
         </p>
         <div class="import-zone" id="contact-zone" onclick="document.getElementById('contact-file').click()">
           📇 Contact Info Excel file yahan drag karo ya click karo
@@ -2524,7 +2524,7 @@ async function doContactImport(){
   const byName = {};
   existing.forEach(c=>{ if(c.name) byName[c.name.trim().toUpperCase()] = c; });
 
-  let updated=0, notFound=0;
+  let updated=0, added=0, notFound=0;
   const touched=[];
   // If multiple rows share the same name, keep the first mobile/pan/rm found
   const seen = new Set();
@@ -2542,6 +2542,21 @@ async function doContactImport(){
         seen.add(ex.id);
         updated++;
       }
+    } else if(!seen.has(key)){
+      // New client - no AUM record exists, create a fresh investor entry
+      const rec = {
+        id: uid(),
+        name: row.name, mobile: row.mobile||'', pan: row.pan||'', email:'',
+        rm: row.rm||'', status:'Investor',
+        aum:null, sip_amount:null, sip_count:null,
+        last_invest_date:'', last_call_date:'',
+        next_call:'', followup_status:'', remarks:'',
+        created: today(), updated: today()
+      };
+      touched.push(rec);
+      byName[key] = rec;
+      seen.add(key);
+      added++;
     } else {
       notFound++;
     }
@@ -2549,7 +2564,10 @@ async function doContactImport(){
 
   await DB.setClientsBulk('mf_clients', touched);
   closeModal('importModal');
-  toast(`✅ Contact info updated! ${updated} updated${notFound?`, ${notFound} not matched`:''}`, 'success');
+  let msg = `✅ Contact info updated! ${updated} updated`;
+  if(added) msg += `, ${added} new investor(s) added`;
+  if(notFound) msg += `, ${notFound} not matched`;
+  toast(msg, 'success');
   renderMfTable(); refreshDash(); updateBadges();
 }
 
