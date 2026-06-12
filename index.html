@@ -623,6 +623,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
         <div class="tab-item active" onclick="switchImportTab('aum')" id="imp-tab-aum">AUM Report</div>
         <div class="tab-item" onclick="switchImportTab('sip')" id="imp-tab-sip">SIP Report</div>
         <div class="tab-item" onclick="switchImportTab('both')" id="imp-tab-both">AUM + SIP (Recommended)</div>
+        <div class="tab-item" onclick="switchImportTab('contact')" id="imp-tab-contact">Mobile/PAN Update</div>
       </div>
       
       <div id="imp-aum">
@@ -662,6 +663,17 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           </div>
         </div>
         <div id="both-preview" style="margin-top:12px"></div>
+      </div>
+
+      <div id="imp-contact" style="display:none">
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b> columns ho. Matching <b>Name</b> (ya PAN) se hoga — existing investor ka Mobile/PAN update ho jayega. Naye investor add nahi honge.
+        </p>
+        <div class="import-zone" id="contact-zone" onclick="document.getElementById('contact-file').click()">
+          📇 Contact Info Excel file yahan drag karo ya click karo
+          <input type="file" id="contact-file" accept=".xlsx,.xls" style="display:none" onchange="handleContactFile(this)">
+        </div>
+        <div id="contact-preview" style="margin-top:12px"></div>
       </div>
       
     </div>
@@ -2131,16 +2143,16 @@ function toast(msg,type=''){
   toastTimer=setTimeout(()=>el.className='',3000);
 }
 // ══ IMPORT SYSTEM ══
-var importData = { aum: null, sip: null, activeTab: 'aum' };
+var importData = { aum: null, sip: null, contact: null, activeTab: 'aum' };
 
 function openImportModal(){
-  importData = { aum: null, sip: null, activeTab: 'aum' };
+  importData = { aum: null, sip: null, contact: null, activeTab: 'aum' };
   document.getElementById('importModal').classList.add('open');
 }
 
 function switchImportTab(tab){
   importData.activeTab = tab;
-  ['aum','sip','both'].forEach(t=>{
+  ['aum','sip','both','contact'].forEach(t=>{
     document.getElementById('imp-'+t).style.display = t===tab?'block':'none';
     document.getElementById('imp-tab-'+t).classList.toggle('active', t===tab);
   });
@@ -2153,6 +2165,7 @@ function checkImportReady(){
   if(tab==='aum' && importData.aum) btn.disabled=false;
   else if(tab==='sip' && importData.sip) btn.disabled=false;
   else if(tab==='both' && importData.aum && importData.sip) btn.disabled=false;
+  else if(tab==='contact' && importData.contact) btn.disabled=false;
   else btn.disabled=true;
 }
 
@@ -2258,7 +2271,93 @@ function handleBothFile(type, input){
   });
 }
 
+// Parse a simple Name/Mobile/PAN sheet (auto-detect header columns)
+function parseContactExcel(rows){
+  let hdrIdx=-1, colMap={};
+  const wanted = {
+    name: ['name','clientname','investorname'],
+    mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
+    pan: ['pan','pannumber','pancard']
+  };
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const row = rows[i];
+    const map = {};
+    row.forEach((cell,ci)=>{
+      const h = normHdr(cell);
+      for(const [field, variants] of Object.entries(wanted)){
+        if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+      }
+    });
+    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined)){
+      hdrIdx=i; colMap=map; break;
+    }
+  }
+  if(hdrIdx===-1) return null;
+  return rows.slice(hdrIdx+1)
+    .filter(r=>r.some(c=>c!==''))
+    .map(r=>({
+      name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
+      mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10) : '',
+      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : ''
+    }))
+    .filter(r=>r.name);
+}
+
+function handleContactFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    const data = parseContactExcel(rows);
+    if(!data){
+      toast('Header row nahi mil paya. Excel me Name aur Mobile/PAN columns hone chahiye.','error');
+      return;
+    }
+    importData.contact = data;
+    document.getElementById('contact-preview').innerHTML =
+      `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${data.length} rows found</div>`;
+    checkImportReady();
+  });
+}
+
+async function doContactImport(){
+  const data = importData.contact;
+  if(!data || !data.length) return;
+  const existing = DB.get('mf_clients')||[];
+  const byName = {};
+  existing.forEach(c=>{ if(c.name) byName[c.name.trim().toUpperCase()] = c; });
+
+  let updated=0, notFound=0;
+  const touched=[];
+  // If multiple rows share the same name, keep the first mobile/pan found
+  const seen = new Set();
+  data.forEach(row=>{
+    const key = row.name.trim().toUpperCase();
+    const ex = byName[key];
+    if(ex){
+      let changed=false;
+      if(row.mobile && ex.mobile!==row.mobile){ ex.mobile=row.mobile; changed=true; }
+      if(row.pan && ex.pan!==row.pan){ ex.pan=row.pan; changed=true; }
+      if(changed && !seen.has(ex.id)){
+        ex.updated = today();
+        touched.push(ex);
+        seen.add(ex.id);
+        updated++;
+      }
+    } else {
+      notFound++;
+    }
+  });
+
+  await DB.setClientsBulk('mf_clients', touched);
+  closeModal('importModal');
+  toast(`✅ Contact info updated! ${updated} updated${notFound?`, ${notFound} not matched`:''}`, 'success');
+  renderMfTable(); refreshDash(); updateBadges();
+}
+
 async function doImport(){
+  if(importData.activeTab==='contact'){ await doContactImport(); return; }
   const tab = importData.activeTab;
   const existing = DB.get('mf_clients')||[];
   
