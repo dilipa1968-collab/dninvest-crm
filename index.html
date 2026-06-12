@@ -125,8 +125,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 .btn-gold:hover{background:#b8963e;}
 .btn-teal{background:var(--teal);color:#fff;}
 .btn-teal:hover{background:#0771a0;}
-.btn-icon{padding:7px 10px;background:var(--bg);border:1.5px solid var(--border);
-  border-radius:8px;cursor:pointer;font-size:.85rem;transition:all .2s;}
+.btn-icon{padding:4px 7px;background:var(--bg);border:1.5px solid var(--border);
+  border-radius:7px;cursor:pointer;font-size:.78rem;transition:all .2s;}
 .btn-icon:hover{background:var(--border);}
 
 /* ── STATS ── */
@@ -156,8 +156,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 /* ── TABLE ── */
 .tbl-wrap{background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;}
 .tbl-scroll{overflow-x:auto;max-height:58vh;overflow-y:auto;}
-table{width:100%;border-collapse:collapse;font-size:.8rem;}
-thead th{background:var(--navy);color:#fff;padding:10px 12px;text-align:left;font-weight:700;
+table{width:100%;border-collapse:collapse;font-size:.74rem;}
+thead th{background:var(--navy);color:#fff;padding:7px 8px;text-align:left;font-weight:700;
   white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;}
 thead th:hover{background:var(--navy2);}
 thead th.sorted{background:#253f72;}
@@ -166,8 +166,8 @@ tbody tr:hover{background:var(--blue2)!important;}
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
-tbody td{padding:8px 12px;white-space:nowrap;}
-.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:.7rem;font-weight:700;letter-spacing:.3px;}
+tbody td{padding:5px 8px;white-space:nowrap;}
+.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.66rem;font-weight:700;letter-spacing:.3px;}
 .b-active{background:#d1fae5;color:#065f46;}
 .b-inactive{background:#fef3c7;color:#92400e;}
 .b-prospect{background:var(--purple2);color:var(--purple);}
@@ -853,6 +853,7 @@ const DEFAULT_USERS = [
 let CU = null; // current user
 const PG_SIZE = 50;
 let eqPage=1, mfPage=1;
+let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1;
 let eqFiltered=[], mfFiltered=[];
 let currentCallTarget = null;
 let currentEditId = null;
@@ -1190,6 +1191,12 @@ function updateBadges(){
 // EQUITY TABLE
 // ══════════════════════════════════════════
 function filterEq(){ eqPage=1; renderEqTable(); }
+function sortEqTable(colIndex){
+  if(eqSortField===colIndex) eqSortDir = -eqSortDir;
+  else { eqSortField=colIndex; eqSortDir=1; }
+  eqPage=1;
+  renderEqTable();
+}
 function resetFilters(t){
   ['search','status','rm','followup-filter'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
@@ -1216,9 +1223,36 @@ function renderEqTable(){
   const rc=document.getElementById('eq-count');
   if(rc) rc.textContent=data.length+' clients';
 
+  // Sort full filtered dataset (not just current page) by selected field
+  const eqFieldMap = {0:'code',1:'name',2:'mobile',3:'rm',4:'status',5:'asset_value',6:'last_call_date',7:'last_trade_date',8:'next_call',9:'followup_status',10:'remarks'};
+  if(eqSortField!==null){
+    const field = eqFieldMap[eqSortField];
+    data = data.slice().sort((a,b)=>{
+      let va=a[field], vb=b[field];
+      // numeric fields
+      if(['asset_value'].includes(field)){
+        va = parseFloat(va)||0; vb = parseFloat(vb)||0;
+        return eqSortDir*(va-vb);
+      }
+      // date fields (ISO strings sort correctly as strings, but blanks should go last)
+      if(['last_call_date','last_trade_date','next_call'].includes(field)){
+        va = va||''; vb = vb||'';
+        if(!va && !vb) return 0;
+        if(!va) return 1; if(!vb) return -1;
+        return eqSortDir*(va<vb?-1:va>vb?1:0);
+      }
+      va = (va||'').toString().toLowerCase(); vb=(vb||'').toString().toLowerCase();
+      return eqSortDir*va.localeCompare(vb, undefined, {numeric:true});
+    });
+    eqFiltered = data;
+  }
+
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
   const cols=['Code','Name','Mobile','RM','Status','Asset Value','Last Calling','Last Trade','Next Call','Follow-up','Remarks'];
-  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr>${cols.map((c,i)=>{
+    let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
+    return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
+  }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
   if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
@@ -1255,6 +1289,12 @@ function renderEqTable(){
 // MF TABLE
 // ══════════════════════════════════════════
 function filterMf(){ mfPage=1; renderMfTable(); }
+function sortMfTable(colIndex){
+  if(mfSortField===colIndex) mfSortDir = -mfSortDir;
+  else { mfSortField=colIndex; mfSortDir=1; }
+  mfPage=1;
+  renderMfTable();
+}
 
 function renderMfTable(){
   let data=getMyMfClients();
@@ -1276,9 +1316,33 @@ function renderMfTable(){
   const rc=document.getElementById('mf-count');
   if(rc) rc.textContent=data.length+' investors';
 
+  const mfFieldMap = {0:'name',1:'mobile',2:'rm',3:'status',4:'aum',5:'sip_amount',6:'sip_count',7:'last_invest_date',8:'next_call',9:'followup_status'};
+  if(mfSortField!==null){
+    const field = mfFieldMap[mfSortField];
+    data = data.slice().sort((a,b)=>{
+      let va=a[field], vb=b[field];
+      if(['aum','sip_amount','sip_count'].includes(field)){
+        va = parseFloat(va)||0; vb = parseFloat(vb)||0;
+        return mfSortDir*(va-vb);
+      }
+      if(['last_invest_date','next_call'].includes(field)){
+        va = va||''; vb = vb||'';
+        if(!va && !vb) return 0;
+        if(!va) return 1; if(!vb) return -1;
+        return mfSortDir*(va<vb?-1:va>vb?1:0);
+      }
+      va = (va||'').toString().toLowerCase(); vb=(vb||'').toString().toLowerCase();
+      return mfSortDir*va.localeCompare(vb, undefined, {numeric:true});
+    });
+    mfFiltered = data;
+  }
+
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
   const cols=['Name','Mobile','MF RM','Status','AUM','SIP Amt','SIP Count','Last Invest','Next Call','Follow-up'];
-  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr>${cols.map((c,i)=>{
+    let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
+    return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
+  }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
   if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
@@ -2446,17 +2510,9 @@ function makeSortable(tableSelector){
   });
 }
 
-// Re-apply sorting whenever a table is rendered
-const _origRenderEqTable = window.renderEqTable;
-window.renderEqTable = function(...args){
-  _origRenderEqTable.apply(this, args);
-  makeSortable('#eq-table table');
-};
-const _origRenderMfTable = window.renderMfTable;
-window.renderMfTable = function(...args){
-  _origRenderMfTable.apply(this, args);
-  makeSortable('#mf-table table');
-};
+// NOTE: eq-table and mf-table now use data-level sorting (sortEqTable/sortMfTable)
+// defined alongside their render functions, so the generic DOM-reorder
+// makeSortable() below is only applied to follow-up/no-trade/sip tables.
 
 // For follow-up / no-trade / sip tabs, hook into tab switching
 function sortAllVisibleTables(){
