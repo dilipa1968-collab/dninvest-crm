@@ -669,10 +669,10 @@ tbody td{padding:8px 12px;white-space:nowrap;}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga, existing client ka data update ho jayega (naye client add nahi honge).
+        Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega (RM column se).
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)
+        Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (naye clients ke liye zaroori), <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)
       </p>
       <div class="import-zone" id="eq-zone" onclick="document.getElementById('eq-file').click()">
         📊 Equity Excel file yahan drag karo ya click karo
@@ -2081,10 +2081,19 @@ function parseAumExcel(rows){
   // Find header row
   let hdrIdx = rows.findIndex(r => String(r[0]).includes('S.No') || String(r[1]).includes('Client Name'));
   if(hdrIdx < 0) hdrIdx = 7; // default
+  // try to find an RM column in the header row
+  let rmCol=-1;
+  if(hdrIdx>=0 && rows[hdrIdx]){
+    rows[hdrIdx].forEach((cell,ci)=>{
+      const h=normHdr(cell);
+      if(['rm','relationshipmanager','dealer','dealername','employeename'].includes(h)) rmCol=ci;
+    });
+  }
   const data = rows.slice(hdrIdx+1).filter(r => String(r[0]).match(/^\d+$/));
   return data.map(r => ({
     sno: r[0], name: String(r[1]||'').trim(), pan: String(r[2]||'').trim(),
-    inv_amt: parseFloat(r[3])||0, aum: parseFloat(r[6])||0
+    inv_amt: parseFloat(r[3])||0, aum: parseFloat(r[6])||0,
+    rm: rmCol>=0 ? String(r[rmCol]||'').trim() : ''
   })).filter(r => r.name);
 }
 
@@ -2188,9 +2197,11 @@ async function doImport(){
         updated++;
       } else {
         // Add new
+        let rm = row.rm || '';
+        if(CU.role!=='admin') rm = CU.name;
         newClients.push({
           id: uid(),
-          name: row.name, pan: row.pan, mobile:'', email:'', rm:'',
+          name: row.name, pan: row.pan, mobile:'', email:'', rm,
           status: 'Investor',
           aum: row.aum,
           sip_amount: sipInfo.sip_amount||null,
@@ -2212,7 +2223,7 @@ async function doImport(){
         updated++;
       } else {
         newClients.push({
-          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm:'',
+          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: CU.role!=='admin'?CU.name:'',
           status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created:today(), updated:today()
@@ -2274,6 +2285,7 @@ function handleEqFile(input){
       code: ['code','clientcode','clientid','ucccode','ucc'],
       mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
       name: ['name','clientname','investorname'],
+      rm: ['rm','relationshipmanager','dealer','dealername','employeename'],
       asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
       last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate']
     };
@@ -2300,10 +2312,11 @@ function handleEqFile(input){
         code: colMap.code!==undefined ? String(r[colMap.code]||'').trim() : '',
         mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').trim() : '',
         name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
+        rm: colMap.rm!==undefined ? String(r[colMap.rm]||'').trim() : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
         last_trade_date: colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : ''
       }))
-      .filter(r=>r.code||r.mobile);
+      .filter(r=>r.code||r.mobile||r.name);
 
     eqImportData = data;
     document.getElementById('eq-preview').innerHTML =
@@ -2321,8 +2334,10 @@ async function doEqImport(){
     if(c.code) byCode[String(c.code).trim()] = c;
     if(c.mobile) byMobile[String(c.mobile).trim()] = c;
   });
+  // ids already used (to avoid collision with new uids)
+  const usedIds = new Set(existing.map(c=>c.id));
 
-  let updated=0, notFound=0;
+  let updated=0, added=0, skipped=0;
   const touched = [];
   eqImportData.forEach(row=>{
     let ex = (row.code && byCode[row.code]) || (row.mobile && byMobile[row.mobile]);
@@ -2332,14 +2347,34 @@ async function doEqImport(){
       ex.updated = today();
       touched.push(ex);
       updated++;
+    } else if(row.name){
+      // New client - RM is required. Staff can only add under their own name.
+      let rm = row.rm || '';
+      if(CU.role!=='admin') rm = CU.name;
+      if(!rm){ skipped++; return; }
+      let id = uid();
+      while(usedIds.has(id)) id = uid();
+      usedIds.add(id);
+      const rec = {
+        id, code:row.code, name:row.name, mobile:row.mobile, email:'',
+        rm, status:'Active',
+        asset_value: row.asset_value, revenue:null,
+        last_trade_date: row.last_trade_date, last_trade_month:'',
+        last_call_date:'', next_call:'', followup_status:'', remarks:'',
+        created: today(), updated: today()
+      };
+      touched.push(rec);
+      added++;
     } else {
-      notFound++;
+      skipped++;
     }
   });
 
   await DB.setClientsBulk('eq_clients', touched);
   closeModal('eqImportModal');
-  toast(`✅ Import done! ${updated} updated${notFound?`, ${notFound} not matched`:''}`, 'success');
+  let msg = `✅ Import done! ${updated} updated, ${added} new added`;
+  if(skipped) msg += `, ${skipped} skipped (no RM/name)`;
+  toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
 }
 
