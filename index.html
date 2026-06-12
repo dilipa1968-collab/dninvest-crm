@@ -1934,8 +1934,6 @@ function renderReports(){
     {icon:'🔄',title:'SIP Report',desc:'SIP amount and count by RM',fn:'sipReport'},
     {icon:'🧲',title:'Investor vs Prospect',desc:'Status breakdown',fn:'statusMfReport'},
     {icon:'📞',title:'MF Follow-up Pending',desc:'MF clients with pending calls',fn:'fuPendingMf'},
-    {icon:'📅',title:'Last Investment Report',desc:'Clients by last investment date',fn:'lastInvestReport'},
-    {icon:'🆕',title:'New Investments (Month-wise)',desc:'New MF investments grouped by month',fn:'newInvestMonthlyReport'},
     {icon:'💼',title:'New Business (Month-wise)',desc:'Lumpsum/SIP/Switch/Resumption entries by month',fn:'newBusinessMonthlyReport'},
   ];
   const coCards=[
@@ -2051,40 +2049,16 @@ function fuPendingMf(){
   showReport('Follow-up Pending — MF',['RM','Name','Mobile','Last Call','Next Call','Status','Remarks'],rows);
 }
 
-function lastInvestReport(){
-  const rows=getMyMfClients().sort((a,b)=>(a.last_invest_date||'').localeCompare(b.last_invest_date||'')).map(c=>[c.rm,c.name,c.mobile||'',c.status,fmtDate(c.last_invest_date)||'Never',c.aum?'₹'+fmtNum(c.aum):'']);
-  showReport('Last Investment Report',['RM','Name','Mobile','Status','Last Investment','AUM'],rows);
-}
-
-function newInvestMonthlyReport(){
-  const mf = getMyMfClients().filter(c=>c.last_invest_date);
-  // Group by year-month (YYYY-MM)
-  const groups = {};
-  mf.forEach(c=>{
-    const ym = c.last_invest_date.slice(0,7); // 'YYYY-MM'
-    if(!groups[ym]) groups[ym]=[];
-    groups[ym].push(c);
-  });
-  // Sort months descending (most recent first)
-  const months = Object.keys(groups).sort().reverse();
-  const rows=[];
-  months.forEach(ym=>{
-    const [y,m]=ym.split('-');
-    const monthLabel = MN[parseInt(m)]+'-'+y;
-    groups[ym].sort((a,b)=>(b.last_invest_date||'').localeCompare(a.last_invest_date||''))
-      .forEach(c=>{
-        rows.push([monthLabel, c.rm, c.name, c.mobile||'', fmtDate(c.last_invest_date), c.aum?'₹'+fmtNum(c.aum):'', c.status]);
-      });
-  });
-  showReport('New Investments (Month-wise)',['Month','RM','Name','Mobile','Investment Date','AUM','Status'],rows);
-}
-
 function newBusinessMonthlyReport(){
   let entries = DB.get('mf_business')||[];
   // Staff sees only their own entries
   if(CU.role!=='admin'){
     const myNames = (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
     entries = entries.filter(e=>myNames.includes((e.rm||'').trim().toUpperCase()) || e.created_by===CU.name);
+  }
+  if(!entries.length){
+    showReport('New Business (Month-wise)',['Month','RM','Client','Date','Lumpsum','SIP','SIP Stop','Switch','Resumption','Remarks'],[]);
+    return;
   }
   const groups = {};
   entries.forEach(e=>{
@@ -2095,19 +2069,19 @@ function newBusinessMonthlyReport(){
   });
   const months = Object.keys(groups).sort().reverse();
   const rows=[];
+  const typeCol = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, Resumption:4};
   months.forEach(ym=>{
     const [y,m]=ym.split('-');
     const monthLabel = MN[parseInt(m)]+'-'+y;
     groups[ym].sort((a,b)=>(b.date||'').localeCompare(a.date||''))
       .forEach(e=>{
-        rows.push([monthLabel, e.rm||'—', e.client_name, e.type, '₹'+fmtNum(e.amount), fmtDate(e.date), e.remarks||'']);
+        const amts = ['','','','',''];
+        const idx = typeCol[e.type];
+        if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
+        rows.push([monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||'']);
       });
   });
-  if(!rows.length){
-    showReport('New Business (Month-wise)',['Month','RM','Client','Type','Amount','Date','Remarks'],[]);
-    return;
-  }
-  showReport('New Business (Month-wise)',['Month','RM','Client','Type','Amount','Date','Remarks'],rows);
+  showReport('New Business (Month-wise)',['Month','RM','Client','Date','Lumpsum','SIP','SIP Stop','Switch','Resumption','Remarks'],rows);
 }
 
 function rmPerf(){
