@@ -458,6 +458,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
+            ${CU.role==='admin'?`<button class="btn btn-outline" id="mfBulkDeleteBtn" style="color:var(--red);border-color:var(--red);display:none" onclick="bulkDeleteMf()">🗑️ Delete Selected (<span id="mfSelCount">0</span>)</button>`:''}
             <button class="btn btn-teal" onclick="openAddClient('mf')">+ Add Investor</button>
           </div>
         </div>
@@ -1405,16 +1406,17 @@ function renderMfTable(){
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
   const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Next Call','Follow-up'];
-  let h=`<table><thead><tr>${cols.map((c,i)=>{
+  let h=`<table><thead><tr>${CU.role==='admin'?'<th><input type="checkbox" id="mfSelectAll" onchange="toggleMfSelectAll(this)"></th>':''}${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">
+      ${CU.role==='admin'?`<td><input type="checkbox" class="mf-row-check" value="${c.id}" onchange="updateMfBulkBtn()"></td>`:''}
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
@@ -1471,6 +1473,31 @@ function confirmDeleteClient(id, seg, name){
   closeModal('viewModal');
   toast('Client deleted','success');
   if(seg==='equity') renderEqTable(); else renderMfTable();
+  refreshDash(); updateBadges();
+}
+
+function toggleMfSelectAll(src){
+  document.querySelectorAll('.mf-row-check').forEach(cb=>cb.checked=src.checked);
+  updateMfBulkBtn();
+}
+
+function updateMfBulkBtn(){
+  const checked = document.querySelectorAll('.mf-row-check:checked');
+  const btn = document.getElementById('mfBulkDeleteBtn');
+  const cnt = document.getElementById('mfSelCount');
+  if(!btn) return;
+  cnt.textContent = checked.length;
+  btn.style.display = checked.length>0 ? '' : 'none';
+}
+
+function bulkDeleteMf(){
+  if(CU.role!=='admin') return;
+  const checked = Array.from(document.querySelectorAll('.mf-row-check:checked')).map(cb=>cb.value);
+  if(!checked.length) return;
+  if(!confirm(`Delete ${checked.length} selected investor(s)? This cannot be undone.`)) return;
+  checked.forEach(id=>DB.deleteClient('mf_clients', id));
+  toast(`${checked.length} investor(s) deleted`,'success');
+  renderMfTable();
   refreshDash(); updateBadges();
 }
 
