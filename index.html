@@ -398,6 +398,7 @@ tbody td{padding:8px 12px;white-space:nowrap;}
           <div class="page-title">Equity Clients <span id="eq-total-label"></span></div>
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('equity')">⬇️ Export</button>
+            <button class="btn btn-outline" onclick="openEqImportModal()" id="eqImportBtn">📥 Import Excel</button>
             <button class="btn btn-primary" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
@@ -659,8 +660,36 @@ tbody td{padding:8px 12px;white-space:nowrap;}
   </div>
 </div>
 
+<!-- Equity Import Modal -->
+<div class="modal-overlay" id="eqImportModal" onclick="if(event.target===this)closeModal('eqImportModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>📥 Equity Excel Import</h3>
+      <button class="modal-close" onclick="closeModal('eqImportModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+        Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga, existing client ka data update ho jayega (naye client add nahi honge).
+      </p>
+      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
+        Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)
+      </p>
+      <div class="import-zone" id="eq-zone" onclick="document.getElementById('eq-file').click()">
+        📊 Equity Excel file yahan drag karo ya click karo
+        <input type="file" id="eq-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqFile(this)">
+      </div>
+      <div id="eq-preview" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('eqImportModal')">Cancel</button>
+      <button class="btn btn-teal" id="eqImportBtnGo" onclick="doEqImport()" disabled>Import to CRM</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
+
 
 <script>
 // ══════════════════════════════════════════
@@ -2200,6 +2229,118 @@ async function doImport(){
   closeModal('importModal');
   toast(`✅ Import done! ${updated} updated + ${added} new clients`, 'success');
   renderMfTable(); refreshDash(); updateBadges();
+}
+
+// ══════════════════════════════════════════
+// EQUITY IMPORT (Asset Value + Last Trade Date)
+// ══════════════════════════════════════════
+var eqImportData = null;
+
+function openEqImportModal(){
+  eqImportData = null;
+  document.getElementById('eq-preview').innerHTML='';
+  document.getElementById('eqImportBtnGo').disabled=true;
+  document.getElementById('eq-file').value='';
+  document.getElementById('eqImportModal').classList.add('open');
+}
+
+// Normalize a header string for flexible matching
+function normHdr(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+// Try to parse an Excel date value (could be Date object, serial number, or string)
+function parseExcelDate(val){
+  if(!val) return '';
+  if(val instanceof Date) return val.toISOString().split('T')[0];
+  if(typeof val === 'number'){
+    // Excel serial date
+    const d = new Date(Math.round((val - 25569)*86400*1000));
+    if(!isNaN(d)) return d.toISOString().split('T')[0];
+  }
+  const s = String(val).trim();
+  // Try dd-mmm-yyyy or dd/mm/yyyy or yyyy-mm-dd
+  const d = new Date(s);
+  if(!isNaN(d) && s.match(/\d{4}/)) return d.toISOString().split('T')[0];
+  return '';
+}
+
+function handleEqFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    // Find header row - look for a row containing recognizable column names
+    let hdrIdx = -1, colMap = {};
+    const wanted = {
+      code: ['code','clientcode','clientid','ucccode','ucc'],
+      mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
+      name: ['name','clientname','investorname'],
+      asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
+      last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate']
+    };
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const row = rows[i];
+      const map = {};
+      row.forEach((cell,ci)=>{
+        const h = normHdr(cell);
+        for(const [field, variants] of Object.entries(wanted)){
+          if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+        }
+      });
+      if(map.name!==undefined && (map.code!==undefined || map.mobile!==undefined)){
+        hdrIdx=i; colMap=map; break;
+      }
+    }
+    if(hdrIdx===-1){
+      toast('Header row nahi mil paya. Excel me Code/Mobile aur Name columns hone chahiye.','error');
+      return;
+    }
+    const data = rows.slice(hdrIdx+1)
+      .filter(r=>r.some(c=>c!==''))
+      .map(r=>({
+        code: colMap.code!==undefined ? String(r[colMap.code]||'').trim() : '',
+        mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').trim() : '',
+        name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
+        asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
+        last_trade_date: colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : ''
+      }))
+      .filter(r=>r.code||r.mobile);
+
+    eqImportData = data;
+    document.getElementById('eq-preview').innerHTML =
+      `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${data.length} rows found (matched by Code/Mobile)</div>`;
+    document.getElementById('eqImportBtnGo').disabled = data.length===0;
+  });
+}
+
+async function doEqImport(){
+  if(!eqImportData || !eqImportData.length) return;
+  const existing = DB.get('eq_clients')||[];
+  const byCode = {}, byMobile = {};
+  existing.forEach(c=>{
+    if(c.code) byCode[String(c.code).trim()] = c;
+    if(c.mobile) byMobile[String(c.mobile).trim()] = c;
+  });
+
+  let updated=0, notFound=0;
+  const touched = [];
+  eqImportData.forEach(row=>{
+    let ex = (row.code && byCode[row.code]) || (row.mobile && byMobile[row.mobile]);
+    if(ex){
+      if(row.asset_value!==null) ex.asset_value = row.asset_value;
+      if(row.last_trade_date) ex.last_trade_date = row.last_trade_date;
+      ex.updated = today();
+      touched.push(ex);
+      updated++;
+    } else {
+      notFound++;
+    }
+  });
+
+  await DB.setClientsBulk('eq_clients', touched);
+  closeModal('eqImportModal');
+  toast(`✅ Import done! ${updated} updated${notFound?`, ${notFound} not matched`:''}`, 'success');
+  renderEqTable(); refreshDash(); updateBadges();
 }
 
 
