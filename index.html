@@ -458,7 +458,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
-            ${CU.role==='admin'?`<button class="btn btn-outline" id="mfBulkDeleteBtn" style="color:var(--red);border-color:var(--red);display:none" onclick="bulkDeleteMf()">🗑️ Delete Selected (<span id="mfSelCount">0</span>)</button>`:''}
+            <button class="btn btn-outline" id="mfBulkDeleteBtn" style="color:var(--red);border-color:var(--red);display:none" onclick="bulkDeleteMf()">🗑️ Delete Selected (<span id="mfSelCount">0</span>)</button>
             <button class="btn btn-teal" onclick="openAddClient('mf')">+ Add Investor</button>
           </div>
         </div>
