@@ -1170,7 +1170,7 @@ function renderEqTable(){
   if(rc) rc.textContent=data.length+' clients';
 
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
-  const cols=['Code','Name','Mobile','RM','Status','Asset Value','Last Trade','Next Call','Follow-up','Remarks'];
+  const cols=['Code','Name','Mobile','RM','Status','Asset Value','Last Calling','Last Trade','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
 
   if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
@@ -1186,6 +1186,7 @@ function renderEqTable(){
       <td>${c.rm||'—'}</td>
       <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
+      <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
