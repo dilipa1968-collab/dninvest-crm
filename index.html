@@ -1382,7 +1382,7 @@ function renderMfTable(){
   const rc=document.getElementById('mf-count');
   if(rc) rc.textContent=data.length+' investors';
 
-  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'status',5:'aum',6:'sip_amount',7:'sip_count',8:'last_invest_date',9:'next_call',10:'followup_status'};
+  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'status',5:'aum',6:'sip_amount',7:'sip_count',8:'next_call',9:'followup_status'};
   if(mfSortField!==null){
     const field = mfFieldMap[mfSortField];
     data = data.slice().sort((a,b)=>{
@@ -1391,7 +1391,7 @@ function renderMfTable(){
         va = parseFloat(va)||0; vb = parseFloat(vb)||0;
         return mfSortDir*(va-vb);
       }
-      if(['last_invest_date','next_call'].includes(field)){
+      if(['next_call'].includes(field)){
         va = va||''; vb = vb||'';
         if(!va && !vb) return 0;
         if(!va) return 1; if(!vb) return -1;
@@ -1404,7 +1404,7 @@ function renderMfTable(){
   }
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
-  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Last Invest','Next Call','Follow-up'];
+  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Next Call','Follow-up'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
@@ -1424,7 +1424,6 @@ function renderMfTable(){
       <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
       <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
       <td>${c.sip_count||'—'}</td>
-      <td>${fmtDate(c.last_invest_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td>
@@ -1898,7 +1897,7 @@ function renderSip(){
     `<div class="stat-card"><div class="stat-n">${totalCount}</div><div class="stat-l">Total SIP Count</div></div>`+
     `<div class="stat-card purple"><div class="stat-n">₹${fmtNum(totalAUM)}</div><div class="stat-l">Total AUM</div></div>`;
 
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>MF RM</th><th>Status</th><th>AUM</th><th>SIP/mo</th><th>SIP Count</th><th>Last Invest</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>MF RM</th><th>Status</th><th>AUM</th><th>SIP/mo</th><th>SIP Count</th><th>Actions</th></tr></thead><tbody>`;
   sipClients.sort((a,b)=>(b.sip_amount||0)-(a.sip_amount||0)).forEach(c=>{
     h+=`<tr class="row-mf">
       <td style="font-weight:600">${c.name}</td>
@@ -1908,7 +1907,6 @@ function renderSip(){
       <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
       <td style="font-weight:700;color:var(--teal)">₹${fmtNum(c.sip_amount)}</td>
       <td>${c.sip_count||'—'}</td>
-      <td>${fmtDate(c.last_invest_date)||'—'}</td>
       <td><button class="btn-icon" onclick="viewClient('${c.id}','mf')">👁</button>
           <button class="btn-icon" onclick="editClient('${c.id}','mf')">✏️</button></td></tr>`;
   });
