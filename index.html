@@ -451,7 +451,7 @@ tbody td{padding:8px 12px;white-space:nowrap;}
           <div class="page-title">MF Investors <span id="mf-total-label"></span></div>
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
-            <button class="btn btn-outline" onclick="openImportModal()">📥 Import Excel</button>
+            <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
             <button class="btn btn-teal" onclick="openAddClient('mf')">+ Add Investor</button>
           </div>
         </div>
@@ -668,10 +668,10 @@ tbody td{padding:8px 12px;white-space:nowrap;}
       <button class="modal-close" onclick="closeModal('eqImportModal')">×</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega (RM column se).
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px" id="eqImportDesc1">
+        Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega.
       </p>
-      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
+      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px" id="eqImportDesc2">
         Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (naye clients ke liye zaroori), <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)
       </p>
       <div class="import-zone" id="eq-zone" onclick="document.getElementById('eq-file').click()">
@@ -984,6 +984,12 @@ function initApp(){
   if(adminSec) adminSec.style.display=CU.role==='admin'?'':'none';
   const adminNav=document.getElementById('nav-admin');
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
+
+  // Bulk Excel import is admin-only
+  const eqImportBtn=document.getElementById('eqImportBtn');
+  if(eqImportBtn) eqImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const mfImportBtn=document.getElementById('mfImportBtn');
+  if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -2252,6 +2258,17 @@ function openEqImportModal(){
   document.getElementById('eq-preview').innerHTML='';
   document.getElementById('eqImportBtnGo').disabled=true;
   document.getElementById('eq-file').value='';
+  if(CU.role!=='admin'){
+    document.getElementById('eqImportDesc1').innerHTML =
+      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to naya client <b>aapke naam (${CU.name}) ke RM</b> ke saath add ho jayega.`;
+    document.getElementById('eqImportDesc2').innerHTML =
+      `Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)`;
+  } else {
+    document.getElementById('eqImportDesc1').innerHTML =
+      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega.`;
+    document.getElementById('eqImportDesc2').innerHTML =
+      `Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (naye clients ke liye zaroori), <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)`;
+  }
   document.getElementById('eqImportModal').classList.add('open');
 }
 
@@ -2285,10 +2302,10 @@ function handleEqFile(input){
       code: ['code','clientcode','clientid','ucccode','ucc'],
       mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
       name: ['name','clientname','investorname'],
-      rm: ['rm','relationshipmanager','dealer','dealername','employeename'],
       asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
       last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate']
     };
+    if(CU.role==='admin') wanted.rm = ['rm','relationshipmanager','dealer','dealername','employeename'];
     for(let i=0;i<Math.min(rows.length,15);i++){
       const row = rows[i];
       const map = {};
