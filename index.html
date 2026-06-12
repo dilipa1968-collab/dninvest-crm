@@ -1756,9 +1756,11 @@ function saveCallLog(){
 // MF BUSINESS TRACKING (Lumpsum/SIP/Switch/Resumption/SIP Stop)
 // ══════════════════════════════════════════
 let currentBusinessTarget = null;
+let editingBusinessId = null;
 
 function openBusinessModal(clientId, clientName){
   currentBusinessTarget = {id: clientId, name: clientName};
+  editingBusinessId = null;
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
@@ -1777,11 +1779,28 @@ function saveBusinessEntry(){
   if(!amount || amount<=0){ toast('Amount daalein','error'); return; }
   if(!date){ toast('Date daalein','error'); return; }
 
+  const entries = DB.get('mf_business')||[];
+
+  if(editingBusinessId){
+    const idx = entries.findIndex(e=>e.id===editingBusinessId);
+    if(idx>=0){
+      entries[idx].type = type;
+      entries[idx].amount = amount;
+      entries[idx].date = date;
+      entries[idx].remarks = remarks;
+    }
+    DB.set('mf_business', entries);
+    closeModal('businessModal');
+    toast('Business entry updated!','success');
+    editingBusinessId = null;
+    if(document.getElementById('reportModal').classList.contains('open')) newBusinessMonthlyReport();
+    return;
+  }
+
   const mf = DB.get('mf_clients')||[];
   const client = mf.find(c=>c.id===currentBusinessTarget.id);
   const rm = client ? client.rm : (CU.role!=='admin'?CU.name:'');
 
-  const entries = DB.get('mf_business')||[];
   entries.push({
     id: uid(),
     client_id: currentBusinessTarget.id,
@@ -2056,32 +2075,74 @@ function newBusinessMonthlyReport(){
     const myNames = (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
     entries = entries.filter(e=>myNames.includes((e.rm||'').trim().toUpperCase()) || e.created_by===CU.name);
   }
-  if(!entries.length){
-    showReport('New Business (Month-wise)',['Month','RM','Client','Date','Lumpsum','SIP','SIP Stop','Switch','Resumption','Remarks'],[]);
-    return;
-  }
-  const groups = {};
-  entries.forEach(e=>{
-    const ym = (e.date||'').slice(0,7);
-    if(!ym) return;
-    if(!groups[ym]) groups[ym]=[];
-    groups[ym].push(e);
-  });
-  const months = Object.keys(groups).sort().reverse();
-  const rows=[];
+  const headers = ['Month','RM','Client','Date','Lumpsum','SIP','SIP Stop','Switch','Resumption','Remarks'];
   const typeCol = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, Resumption:4};
-  months.forEach(ym=>{
+
+  // Sort entries by date desc for both table and CSV
+  const sorted = entries.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  // Build CSV rows (no actions column)
+  const csvRows = sorted.map(e=>{
+    const amts = ['','','','',''];
+    const idx = typeCol[e.type];
+    if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
+    const ym = (e.date||'').slice(0,7);
     const [y,m]=ym.split('-');
-    const monthLabel = MN[parseInt(m)]+'-'+y;
-    groups[ym].sort((a,b)=>(b.date||'').localeCompare(a.date||''))
-      .forEach(e=>{
-        const amts = ['','','','',''];
-        const idx = typeCol[e.type];
-        if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
-        rows.push([monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||'']);
-      });
+    const monthLabel = m ? MN[parseInt(m)]+'-'+y : '';
+    return [monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||''];
   });
-  showReport('New Business (Month-wise)',['Month','RM','Client','Date','Lumpsum','SIP','SIP Stop','Switch','Resumption','Remarks'],rows);
+  currentReportData = {headers, rows: csvRows};
+
+  document.getElementById('reportModalTitle').textContent='New Business (Month-wise)';
+  let h=`<p style="color:var(--gray);font-size:.8rem;margin-bottom:12px">${entries.length} records</p>`;
+  const showActions = CU.role==='admin';
+  const tblHeaders = showActions ? [...headers,'Actions'] : headers;
+  h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${tblHeaders.map(hd=>`<th>${hd}</th>`).join('')}</tr></thead><tbody>`;
+  if(!sorted.length){
+    h+=`<tr><td colspan="${tblHeaders.length}" style="text-align:center;padding:24px;color:#bbb">No business entries yet</td></tr>`;
+  }
+  sorted.forEach((e,i)=>{
+    const amts = ['','','','',''];
+    const idx = typeCol[e.type];
+    if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
+    const ym = (e.date||'').slice(0,7);
+    const [y,m]=ym.split('-');
+    const monthLabel = m ? MN[parseInt(m)]+'-'+y : '';
+    const cells = [monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||''];
+    h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
+    if(showActions){
+      h+=`<td>
+        <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit">✏️</button>
+        <button class="btn-icon" onclick="deleteBusinessEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>
+      </td>`;
+    }
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';
+  document.getElementById('reportModalBody').innerHTML=h;
+  document.getElementById('reportModal').classList.add('open');
+}
+
+function editBusinessEntry(id){
+  const entries = DB.get('mf_business')||[];
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  currentBusinessTarget = {id: e.client_id, name: e.client_name};
+  editingBusinessId = id;
+  document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
+  document.getElementById('biz_type').value = e.type;
+  document.getElementById('biz_amount').value = e.amount;
+  document.getElementById('biz_date').value = e.date;
+  document.getElementById('biz_remarks').value = e.remarks||'';
+  document.getElementById('businessModal').classList.add('open');
+}
+
+function deleteBusinessEntry(id){
+  if(!confirm('Delete this business entry? This cannot be undone.')) return;
+  const entries = (DB.get('mf_business')||[]).filter(e=>e.id!==id);
+  DB.set('mf_business', entries);
+  toast('Entry deleted','success');
+  newBusinessMonthlyReport();
 }
 
 function rmPerf(){
