@@ -1283,8 +1283,20 @@ function editClient(id, seg){
   document.getElementById('clientModal').classList.add('open');
 }
 
+function rmFieldHtml(seg, c, label){
+  const rms = getSegRMs(seg);
+  if(CU.role!=='admin'){
+    // Staff: lock RM to their own name
+    const myName = CU.name;
+    return `<div class="form-field"><label>${label}</label>
+      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="f_rm" value="${myName}"></div>`;
+  }
+  const opts = rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
+  return `<div class="form-field"><label>${label}</label><select id="f_rm"><option value="">Select RM</option>${opts}</select></div>`;
+}
+
 function clientForm(seg, c){
-  const rms = getSegRMs(seg).map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
   if(seg==='equity'){
     return `
     <div class="form-section">Basic Information</div>
@@ -1295,7 +1307,7 @@ function clientForm(seg, c){
     </div>
     <div class="form-row">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
-      <div class="form-field"><label>Equity RM *</label><select id="f_rm"><option value="">Select RM</option>${rms}</select></div>
+      ${rmFieldHtml('equity', c, 'Equity RM *')}
     </div>
     <div class="form-section">Trading Info</div>
     <div class="form-row three">
@@ -1323,7 +1335,7 @@ function clientForm(seg, c){
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>MF RM *</label><select id="f_rm"><option value="">Select RM</option>${rms}</select></div>
+      ${rmFieldHtml('mf', c, 'MF RM *')}
       <div class="form-field"><label>Investor Status</label><select id="f_status"><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
     </div>
     <div class="form-section">Investment Details</div>
