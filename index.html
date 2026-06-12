@@ -825,7 +825,8 @@ function today(){ return new Date().toISOString().split('T')[0]; }
 function fmtDate(d){ if(!d) return ''; try{const dt=new Date(d); if(isNaN(dt)) return d; return dt.getDate()+'-'+MN[dt.getMonth()+1]+'-'+dt.getFullYear();}catch(e){return d||'';} }
 function daysDiff(d){ if(!d) return null; const diff=new Date()-new Date(d); return Math.floor(diff/(1000*60*60*24)); }
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).substr(2,5); }
+let _uidCounter=0;
+function uid(){ _uidCounter=(_uidCounter+1)%1000; return Date.now().toString(36)+'_'+_uidCounter.toString(36)+Math.random().toString(36).substr(2,6); }
 function v(x){ return (x!=null&&x!=='')?x:'—'; }
 
 // ══════════════════════════════════════════
@@ -1370,9 +1371,15 @@ function saveClient(){
   const gv2 = id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
 
   let rec;
+  let newId = currentEditId;
+  if(!newId){
+    newId = uid();
+    // safety: ensure no collision with existing client ids
+    while(clients.some(x=>x.id===newId)) newId = uid();
+  }
   if(seg==='equity'){
     rec={
-      id: currentEditId||uid(),
+      id: newId,
       code:gv2('f_code'), name, mobile:gv2('f_mobile'), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Active',
       asset_value:parseFloat(gv2('f_asset'))||null,
@@ -1384,7 +1391,7 @@ function saveClient(){
     };
   } else {
     rec={
-      id: currentEditId||uid(),
+      id: newId,
       name, mobile:gv2('f_mobile'), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Investor',
       aum:parseFloat(gv2('f_aum'))||null,
