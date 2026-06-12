@@ -580,6 +580,38 @@ tbody td{padding:5px 8px;white-space:nowrap;}
   </div>
 </div>
 
+<!-- Business Entry Modal -->
+<div class="modal-overlay" id="businessModal" onclick="if(event.target===this)closeModal('businessModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="businessModalTitle">Add Business</h3>
+      <button class="modal-close" onclick="closeModal('businessModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-field"><label>Type *</label>
+          <select id="biz_type">
+            <option value="Lumpsum">Lumpsum</option>
+            <option value="SIP">New SIP</option>
+            <option value="SIP Stop">SIP Stop</option>
+            <option value="Switch">Switch</option>
+            <option value="Resumption">Resumption</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Date *</label><input id="biz_date" type="date"></div>
+        <div class="form-field"><label>Remarks</label><input id="biz_remarks" placeholder="Optional notes"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('businessModal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveBusinessEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- User Modal -->
 <div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeModal('userModal')">
   <div class="modal">
@@ -797,6 +829,7 @@ const DB = {
   load(){
     if(!this.get('users')) this.set('users', DEFAULT_USERS);
     if(!this.get('call_logs')) this.set('call_logs', []);
+    if(!this.get('mf_business')) this.set('mf_business', []);
   },
   // One-time migration: if old single-doc array exists in crm_data but the
   // new per-doc collection is empty, push each record into its own doc.
@@ -838,7 +871,7 @@ const DB = {
     if(typeof fdb==='undefined') return;
     // Small array-based collections (users, call_logs)
     try{
-      for(const key of ['users','call_logs']){
+      for(const key of ['users','call_logs','mf_business']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && doc.data().data && doc.data().data.length > 0){
           localStorage.setItem('dninvest_'+key,JSON.stringify(doc.data().data));
@@ -936,7 +969,7 @@ function initApp(){
       if(getCurrentPageId()==='mf-clients') renderMfTable();
 
       // Real-time listeners for small array collections (users, call_logs)
-      ['call_logs','users'].forEach(key=>{
+      ['call_logs','users','mf_business'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
@@ -1397,6 +1430,7 @@ function renderMfTable(){
       <td>
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
         <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
+        <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td></tr>`;
@@ -1720,6 +1754,50 @@ function saveCallLog(){
 }
 
 // ══════════════════════════════════════════
+// MF BUSINESS TRACKING (Lumpsum/SIP/Switch/Resumption/SIP Stop)
+// ══════════════════════════════════════════
+let currentBusinessTarget = null;
+
+function openBusinessModal(clientId, clientName){
+  currentBusinessTarget = {id: clientId, name: clientName};
+  document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
+  document.getElementById('biz_type').value = 'Lumpsum';
+  document.getElementById('biz_amount').value = '';
+  document.getElementById('biz_date').value = today();
+  document.getElementById('biz_remarks').value = '';
+  document.getElementById('businessModal').classList.add('open');
+}
+
+function saveBusinessEntry(){
+  if(!currentBusinessTarget) return;
+  const type = document.getElementById('biz_type').value;
+  const amount = parseFloat(document.getElementById('biz_amount').value);
+  const date = document.getElementById('biz_date').value;
+  const remarks = document.getElementById('biz_remarks').value.trim();
+
+  if(!amount || amount<=0){ toast('Amount daalein','error'); return; }
+  if(!date){ toast('Date daalein','error'); return; }
+
+  const mf = DB.get('mf_clients')||[];
+  const client = mf.find(c=>c.id===currentBusinessTarget.id);
+  const rm = client ? client.rm : (CU.role!=='admin'?CU.name:'');
+
+  const entries = DB.get('mf_business')||[];
+  entries.push({
+    id: uid(),
+    client_id: currentBusinessTarget.id,
+    client_name: currentBusinessTarget.name,
+    rm,
+    type, amount, date, remarks,
+    created_by: CU.name,
+    created: today()
+  });
+  DB.set('mf_business', entries);
+  closeModal('businessModal');
+  toast('Business entry saved!','success');
+}
+
+// ══════════════════════════════════════════
 // FOLLOW-UP PAGES
 // ══════════════════════════════════════════
 function renderFollowup(group){
@@ -1860,6 +1938,7 @@ function renderReports(){
     {icon:'📞',title:'MF Follow-up Pending',desc:'MF clients with pending calls',fn:'fuPendingMf'},
     {icon:'📅',title:'Last Investment Report',desc:'Clients by last investment date',fn:'lastInvestReport'},
     {icon:'🆕',title:'New Investments (Month-wise)',desc:'New MF investments grouped by month',fn:'newInvestMonthlyReport'},
+    {icon:'💼',title:'New Business (Month-wise)',desc:'Lumpsum/SIP/Switch/Resumption entries by month',fn:'newBusinessMonthlyReport'},
   ];
   const coCards=[
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
@@ -2000,6 +2079,37 @@ function newInvestMonthlyReport(){
       });
   });
   showReport('New Investments (Month-wise)',['Month','RM','Name','Mobile','Investment Date','AUM','Status'],rows);
+}
+
+function newBusinessMonthlyReport(){
+  let entries = DB.get('mf_business')||[];
+  // Staff sees only their own entries
+  if(CU.role!=='admin'){
+    const myNames = (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    entries = entries.filter(e=>myNames.includes((e.rm||'').trim().toUpperCase()) || e.created_by===CU.name);
+  }
+  const groups = {};
+  entries.forEach(e=>{
+    const ym = (e.date||'').slice(0,7);
+    if(!ym) return;
+    if(!groups[ym]) groups[ym]=[];
+    groups[ym].push(e);
+  });
+  const months = Object.keys(groups).sort().reverse();
+  const rows=[];
+  months.forEach(ym=>{
+    const [y,m]=ym.split('-');
+    const monthLabel = MN[parseInt(m)]+'-'+y;
+    groups[ym].sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+      .forEach(e=>{
+        rows.push([monthLabel, e.rm||'—', e.client_name, e.type, '₹'+fmtNum(e.amount), fmtDate(e.date), e.remarks||'']);
+      });
+  });
+  if(!rows.length){
+    showReport('New Business (Month-wise)',['Month','RM','Client','Type','Amount','Date','Remarks'],[]);
+    return;
+  }
+  showReport('New Business (Month-wise)',['Month','RM','Client','Type','Amount','Date','Remarks'],rows);
 }
 
 function rmPerf(){
