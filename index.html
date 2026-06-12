@@ -410,6 +410,12 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
           <div class="filter-sep"></div>
+          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize">
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+            <option value="200">200 / page</option>
+            <option value="500">500 / page</option>
+          </select>
           <button class="btn btn-outline" onclick="resetFilters('eq')">✕ Reset</button>
           <span class="res-count" id="eq-count"></span>
         </div>
@@ -463,6 +469,12 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
           <div class="filter-sep"></div>
+          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize">
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+            <option value="200">200 / page</option>
+            <option value="500">500 / page</option>
+          </select>
           <button class="btn btn-outline" onclick="resetFilters('mf')">✕ Reset</button>
           <span class="res-count" id="mf-count"></span>
         </div>
@@ -851,7 +863,7 @@ const DEFAULT_USERS = [
 // STATE
 // ══════════════════════════════════════════
 let CU = null; // current user
-const PG_SIZE = 50;
+let PG_SIZE = 50;
 let eqPage=1, mfPage=1;
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1;
 let eqFiltered=[], mfFiltered=[];
@@ -1294,6 +1306,15 @@ function sortMfTable(colIndex){
   else { mfSortField=colIndex; mfSortDir=1; }
   mfPage=1;
   renderMfTable();
+}
+
+function changePageSize(tab, val){
+  PG_SIZE = parseInt(val)||50;
+  const eqSel=document.getElementById('eq-pagesize'), mfSel=document.getElementById('mf-pagesize');
+  if(eqSel) eqSel.value=val;
+  if(mfSel) mfSel.value=val;
+  if(tab==='eq'){ eqPage=1; renderEqTable(); }
+  else { mfPage=1; renderMfTable(); }
 }
 
 function renderMfTable(){
