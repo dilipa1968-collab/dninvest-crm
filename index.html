@@ -708,7 +708,18 @@ const DB = {
       }
     }catch(e){}
   },
-  // Bulk save (import) - writes each record as its own doc using a batch
+  // Delete a single client record
+  deleteClient(key, id){
+    const arr = (this.get(key)||[]).filter(c=>c.id!==id);
+    this.setLocal(key, arr);
+    try{
+      if(typeof fdb!=='undefined' && PER_DOC_COLLECTIONS[key]){
+        fdb.collection(PER_DOC_COLLECTIONS[key]).doc(id).delete()
+          .then(()=>console.log('Firebase doc deleted:',key,id))
+          .catch(e=>console.log('Firebase delete error:',e));
+      }
+    }catch(e){}
+  },
   async setClientsBulk(key, records){
     const arr = this.get(key)||[];
     const map = {}; arr.forEach(c=>map[c.id]=c);
@@ -1197,6 +1208,7 @@ function renderEqTable(){
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+        ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td></tr>`;
   });
   h+='</tbody></table>';
@@ -1253,6 +1265,7 @@ function renderMfTable(){
         <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+        ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td></tr>`;
   });
   h+='</tbody></table>';
@@ -1282,6 +1295,17 @@ function editClient(id, seg){
   document.getElementById('clientSaveBtn').dataset.seg=seg;
   document.getElementById('clientModalBody').innerHTML=clientForm(seg,c);
   document.getElementById('clientModal').classList.add('open');
+}
+
+function confirmDeleteClient(id, seg, name){
+  if(CU.role!=='admin') return;
+  if(!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const key = seg==='equity'?'eq_clients':'mf_clients';
+  DB.deleteClient(key, id);
+  closeModal('viewModal');
+  toast('Client deleted','success');
+  if(seg==='equity') renderEqTable(); else renderMfTable();
+  refreshDash(); updateBadges();
 }
 
 function rmFieldHtml(seg, c, label){
@@ -1333,10 +1357,13 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Investor Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
       <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
-      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
+      <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
     </div>
     <div class="form-row">
+      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       ${rmFieldHtml('mf', c, 'MF RM *')}
+    </div>
+    <div class="form-row">
       <div class="form-field"><label>Investor Status</label><select id="f_status"><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
     </div>
     <div class="form-section">Investment Details</div>
@@ -1370,6 +1397,24 @@ function saveClient(){
 
   const gv2 = id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
 
+  // Duplicate check (mobile / PAN) - only when adding a NEW record (not editing)
+  if(!currentEditId){
+    const mobile = gv2('f_mobile');
+    const pan = seg==='mf' ? (gv2('f_pan')||'') : '';
+    let dup=null;
+    if(mobile){
+      dup = clients.find(c=>c.mobile && c.mobile.trim()===mobile);
+    }
+    if(!dup && pan){
+      dup = clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan.toUpperCase());
+    }
+    if(dup){
+      const label = seg==='equity'?'Client':'Investor';
+      toast(`⚠️ ${label} already exists: "${dup.name}" (${dup.mobile||dup.pan||''}) - RM: ${dup.rm||'—'}`,'error');
+      return;
+    }
+  }
+
   let rec;
   let newId = currentEditId;
   if(!newId){
@@ -1392,7 +1437,7 @@ function saveClient(){
   } else {
     rec={
       id: newId,
-      name, mobile:gv2('f_mobile'), email:gv2('f_email'),
+      name, mobile:gv2('f_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Investor',
       aum:parseFloat(gv2('f_aum'))||null,
       sip_amount:parseFloat(gv2('f_sip'))||null,
