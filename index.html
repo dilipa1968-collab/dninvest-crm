@@ -2095,7 +2095,7 @@ function newBusinessMonthlyReport(){
 
   document.getElementById('reportModalTitle').textContent='New Business (Month-wise)';
   let h=`<p style="color:var(--gray);font-size:.8rem;margin-bottom:12px">${entries.length} records</p>`;
-  const showActions = CU.role==='admin';
+  const showActions = true;
   const tblHeaders = showActions ? [...headers,'Actions'] : headers;
   h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${tblHeaders.map(hd=>`<th>${hd}</th>`).join('')}</tr></thead><tbody>`;
   if(!sorted.length){
