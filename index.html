@@ -656,7 +656,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
         <div class="tab-item active" onclick="switchImportTab('aum')" id="imp-tab-aum">AUM Report</div>
         <div class="tab-item" onclick="switchImportTab('sip')" id="imp-tab-sip">SIP Report</div>
         <div class="tab-item" onclick="switchImportTab('both')" id="imp-tab-both">AUM + SIP (Recommended)</div>
-        <div class="tab-item" onclick="switchImportTab('contact')" id="imp-tab-contact">Mobile/PAN Update</div>
+        <div class="tab-item" onclick="switchImportTab('contact')" id="imp-tab-contact">Mobile/PAN/RM Update</div>
       </div>
       
       <div id="imp-aum">
@@ -700,7 +700,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
 
       <div id="imp-contact" style="display:none">
         <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b> columns ho. Matching <b>Name</b> (ya PAN) se hoga — existing investor ka Mobile/PAN update ho jayega. Naye investor add nahi honge.
+          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b>, <b>RM</b> columns ho. Matching <b>Name</b> (ya PAN) se hoga — existing investor ka Mobile/PAN/RM update ho jayega. Naye investor add nahi honge.
         </p>
         <div class="import-zone" id="contact-zone" onclick="document.getElementById('contact-file').click()">
           📇 Contact Info Excel file yahan drag karo ya click karo
@@ -2465,13 +2465,14 @@ function handleBothFile(type, input){
   });
 }
 
-// Parse a simple Name/Mobile/PAN sheet (auto-detect header columns)
+// Parse a simple Name/Mobile/PAN/RM sheet (auto-detect header columns)
 function parseContactExcel(rows){
   let hdrIdx=-1, colMap={};
   const wanted = {
     name: ['name','clientname','investorname'],
     mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
-    pan: ['pan','pannumber','pancard']
+    pan: ['pan','pannumber','pancard'],
+    rm: ['rm','mfrm','rmname','relationshipmanager']
   };
   for(let i=0;i<Math.min(rows.length,10);i++){
     const row = rows[i];
@@ -2482,7 +2483,7 @@ function parseContactExcel(rows){
         if(variants.includes(h) && map[field]===undefined) map[field]=ci;
       }
     });
-    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined)){
+    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined || map.rm!==undefined)){
       hdrIdx=i; colMap=map; break;
     }
   }
@@ -2492,7 +2493,8 @@ function parseContactExcel(rows){
     .map(r=>({
       name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
       mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10) : '',
-      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : ''
+      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : '',
+      rm: colMap.rm!==undefined ? String(r[colMap.rm]||'').trim() : ''
     }))
     .filter(r=>r.name);
 }
@@ -2524,7 +2526,7 @@ async function doContactImport(){
 
   let updated=0, notFound=0;
   const touched=[];
-  // If multiple rows share the same name, keep the first mobile/pan found
+  // If multiple rows share the same name, keep the first mobile/pan/rm found
   const seen = new Set();
   data.forEach(row=>{
     const key = row.name.trim().toUpperCase();
@@ -2533,6 +2535,7 @@ async function doContactImport(){
       let changed=false;
       if(row.mobile && ex.mobile!==row.mobile){ ex.mobile=row.mobile; changed=true; }
       if(row.pan && ex.pan!==row.pan){ ex.pan=row.pan; changed=true; }
+      if(row.rm && ex.rm!==row.rm){ ex.rm=row.rm; changed=true; }
       if(changed && !seen.has(ex.id)){
         ex.updated = today();
         touched.push(ex);
