@@ -1,1 +1,2115 @@
-file:///C:/Users/dnves/Downloads/DNInvest_CRM_V4%20(4).html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D N Investment — CRM</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
+  authDomain: "dninvest-crm.firebaseapp.com",
+  projectId: "dninvest-crm",
+  storageBucket: "dninvest-crm.firebasestorage.app",
+  messagingSenderId: "331999342266",
+  appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
+};
+try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
+</script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#1a2744;--navy2:#243356;--navy3:#2d4a8a;
+  --gold:#c9a84c;--gold2:#e8c97a;--gold3:#fef9ee;
+  --green:#1e7e4a;--green2:#e8f5ee;
+  --blue:#1e4db7;--blue2:#eef3fb;
+  --red:#c0392b;--red2:#fdf0ee;
+  --teal:#0891b2;--teal2:#e0f7fa;
+  --purple:#6d28d9;--purple2:#ede9fe;
+  --orange:#d97706;--orange2:#fff7ed;
+  --bg:#f4f6fb;--white:#fff;
+  --border:#dde3ee;--gray:#6b7280;
+  --shadow:0 2px 16px rgba(26,39,68,.10);
+  --shadow2:0 4px 24px rgba(26,39,68,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--navy);min-height:100vh;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:#f1f1f1;}
+::-webkit-scrollbar-thumb{background:#c5cde0;border-radius:3px;}
+
+/* ── LOGIN ── */
+#loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 60%,#1e4db7 100%);}
+.login-box{background:#fff;border-radius:20px;padding:48px 40px 40px;width:380px;
+  box-shadow:0 12px 48px rgba(0,0,0,.28);}
+.login-logo{text-align:center;margin-bottom:32px;}
+.login-logo .brand{font-size:2.2rem;font-weight:900;color:var(--navy);letter-spacing:2px;}
+.login-logo .brand span{color:var(--gold);}
+.login-logo .sub{color:var(--gray);font-size:.8rem;letter-spacing:3px;text-transform:uppercase;margin-top:4px;}
+.form-group{margin-bottom:16px;}
+.form-group label{display:block;font-size:.78rem;font-weight:700;color:var(--gray);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.form-group input,.form-group select{width:100%;padding:11px 14px;border:1.5px solid var(--border);
+  border-radius:10px;font-size:.92rem;outline:none;transition:border .2s,box-shadow .2s;}
+.form-group input:focus,.form-group select:focus{border-color:var(--navy);
+  box-shadow:0 0 0 3px rgba(26,39,68,.08);}
+.login-btn{width:100%;padding:13px;background:var(--navy);color:#fff;border:none;
+  border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:4px;}
+.login-btn:hover{background:var(--navy2);}
+.login-err{color:var(--red);font-size:.82rem;text-align:center;margin-top:10px;display:none;}
+.login-seg-btns{display:flex;gap:8px;margin-bottom:18px;}
+.seg-btn{flex:1;padding:10px;border:2px solid var(--border);background:#fff;border-radius:10px;
+  cursor:pointer;font-size:.85rem;font-weight:600;color:var(--gray);transition:all .2s;text-align:center;}
+.seg-btn.active{border-color:var(--navy);background:var(--navy);color:#fff;}
+
+/* ── LAYOUT ── */
+#app{display:none;}
+.topbar{background:var(--navy);color:#fff;padding:0 24px;display:flex;align-items:center;
+  justify-content:space-between;height:56px;position:sticky;top:0;z-index:200;box-shadow:var(--shadow2);}
+.topbar-brand{font-size:1.2rem;font-weight:900;letter-spacing:1px;}
+.topbar-brand span{color:var(--gold);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.user-pill{font-size:.78rem;background:rgba(255,255,255,.12);padding:5px 13px;border-radius:20px;}
+.user-pill b{color:var(--gold2);}
+.seg-indicator{font-size:.72rem;padding:3px 10px;border-radius:10px;font-weight:700;}
+.seg-eq{background:rgba(201,168,76,.2);color:var(--gold2);}
+.seg-mf{background:rgba(8,145,178,.2);color:#67e8f9;}
+.seg-both{background:rgba(255,255,255,.15);color:#fff;}
+.btn-sm{padding:5px 13px;border-radius:18px;cursor:pointer;font-size:.78rem;font-weight:600;
+  border:1.5px solid rgba(255,255,255,.3);color:#fff;background:none;transition:all .2s;}
+.btn-sm:hover{background:rgba(255,255,255,.1);}
+
+/* ── SIDEBAR + CONTENT ── */
+.app-body{display:flex;min-height:calc(100vh - 56px);}
+.sidebar{width:220px;background:var(--white);border-right:1px solid var(--border);
+  flex-shrink:0;padding:16px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
+.sidebar-section{padding:8px 16px 4px;font-size:.68rem;font-weight:800;color:var(--gray);
+  text-transform:uppercase;letter-spacing:1px;margin-top:8px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;
+  font-size:.85rem;font-weight:500;color:var(--gray);border-left:3px solid transparent;
+  transition:all .2s;}
+.nav-item:hover{background:var(--bg);color:var(--navy);}
+.nav-item.active{background:var(--blue2);color:var(--navy);font-weight:700;border-left-color:var(--navy);}
+.nav-item .icon{font-size:1rem;width:20px;text-align:center;}
+.nav-badge{margin-left:auto;background:var(--blue2);color:var(--navy);font-size:.68rem;
+  padding:2px 7px;border-radius:10px;font-weight:700;}
+.nav-badge.red{background:var(--red2);color:var(--red);}
+
+.content{flex:1;padding:24px;min-width:0;overflow-x:hidden;}
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── PAGE HEADER ── */
+.page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.page-title{font-size:1.3rem;font-weight:800;color:var(--navy);}
+.page-title span{color:var(--gray);font-size:.85rem;font-weight:500;margin-left:8px;}
+.hdr-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* ── BUTTONS ── */
+.btn{padding:9px 18px;border-radius:9px;cursor:pointer;font-size:.83rem;font-weight:700;
+  border:none;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy2);}
+.btn-success{background:var(--green);color:#fff;}
+.btn-success:hover{background:#155d37;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#a93226;}
+.btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--border);}
+.btn-outline:hover{background:var(--bg);}
+.btn-gold{background:var(--gold);color:#fff;}
+.btn-gold:hover{background:#b8963e;}
+.btn-teal{background:var(--teal);color:#fff;}
+.btn-teal:hover{background:#0771a0;}
+.btn-icon{padding:7px 10px;background:var(--bg);border:1.5px solid var(--border);
+  border-radius:8px;cursor:pointer;font-size:.85rem;transition:all .2s;}
+.btn-icon:hover{background:var(--border);}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:20px;}
+.stat-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);
+  border-top:4px solid var(--navy);cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow2);}
+.stat-card.green{border-top-color:var(--green);}
+.stat-card.red{border-top-color:var(--red);}
+.stat-card.gold{border-top-color:var(--gold);}
+.stat-card.teal{border-top-color:var(--teal);}
+.stat-card.purple{border-top-color:var(--purple);}
+.stat-card.orange{border-top-color:var(--orange);}
+.stat-n{font-size:1.9rem;font-weight:900;color:var(--navy);line-height:1;}
+.stat-l{font-size:.74rem;color:var(--gray);margin-top:5px;font-weight:600;}
+
+/* ── FILTERS ── */
+.filters{background:#fff;border-radius:12px;padding:14px 18px;display:flex;flex-wrap:wrap;
+  gap:8px;margin-bottom:14px;box-shadow:var(--shadow);align-items:center;}
+.filters input,.filters select{padding:7px 11px;border:1.5px solid var(--border);border-radius:8px;
+  font-size:.82rem;outline:none;background:var(--bg);transition:border .2s;}
+.filters input:focus,.filters select:focus{border-color:var(--navy);background:#fff;}
+.filters input[type=text]{min-width:200px;}
+.filter-sep{width:1px;height:24px;background:var(--border);}
+.res-count{font-size:.78rem;color:var(--gray);margin-left:auto;white-space:nowrap;}
+
+/* ── TABLE ── */
+.tbl-wrap{background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;}
+.tbl-scroll{overflow-x:auto;max-height:58vh;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:.8rem;}
+thead th{background:var(--navy);color:#fff;padding:10px 12px;text-align:left;font-weight:700;
+  white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;}
+thead th:hover{background:var(--navy2);}
+thead th.sorted{background:#253f72;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
+tbody tr:hover{background:var(--blue2)!important;}
+tbody tr.row-inactive{background:#fffbf0;}
+tbody tr.row-alert{background:var(--red2);}
+tbody tr.row-mf{background:var(--teal2);}
+tbody td{padding:8px 12px;white-space:nowrap;}
+.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:.7rem;font-weight:700;letter-spacing:.3px;}
+.b-active{background:#d1fae5;color:#065f46;}
+.b-inactive{background:#fef3c7;color:#92400e;}
+.b-prospect{background:var(--purple2);color:var(--purple);}
+.b-investor{background:var(--teal2);color:var(--teal);}
+.b-pending{background:var(--red2);color:var(--red);}
+.b-done{background:#d1fae5;color:#065f46;}
+.b-na{background:var(--bg);color:var(--gray);}
+.b-eq{background:var(--gold3);color:var(--orange);}
+.b-mf{background:var(--teal2);color:var(--teal);}
+
+/* ── FORMS / MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;
+  align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:16px;width:700px;max-width:100%;max-height:90vh;
+  overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal.wide{width:900px;}
+.modal-hdr{background:var(--navy);color:#fff;padding:18px 24px;display:flex;
+  justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1;
+  border-radius:16px 16px 0 0;}
+.modal-hdr h3{font-size:1rem;font-weight:800;}
+.modal-close{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;}
+.modal-body{padding:24px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}
+.form-row.full{grid-template-columns:1fr;}
+.form-row.three{grid-template-columns:1fr 1fr 1fr;}
+.form-field label{display:block;font-size:.73rem;font-weight:700;color:var(--gray);
+  text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+.form-field input,.form-field select,.form-field textarea{width:100%;padding:9px 12px;
+  border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;
+  background:#fff;transition:border .2s;font-family:inherit;}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--navy);}
+.form-field textarea{resize:vertical;min-height:72px;}
+.form-section{font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;
+  letter-spacing:1px;padding:14px 0 8px;border-bottom:1.5px solid var(--border);margin-bottom:14px;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;
+  justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px;}
+
+/* ── DASHBOARD ── */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:4px;}
+.dash-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
+.dash-card h3{font-size:.75rem;color:var(--gray);font-weight:800;text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:14px;}
+.bar-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f0f2f8;}
+.bar-row:last-child{border:none;}
+.bar-name{font-size:.8rem;font-weight:600;color:var(--navy);min-width:100px;max-width:120px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-wrap{flex:1;margin:0 10px;height:7px;background:var(--border);border-radius:4px;}
+.bar-fill{height:7px;border-radius:4px;background:var(--navy);transition:width .5s;}
+.bar-num{font-size:.75rem;color:var(--gray);width:35px;text-align:right;font-weight:600;}
+.alert-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;
+  border-radius:8px;margin-bottom:6px;font-size:.82rem;}
+.alert-row.r30{background:#fee2e2;color:#991b1b;}
+.alert-row.r60{background:#fef3c7;color:#92400e;}
+.alert-row.r90{background:#e0f2fe;color:#0369a1;}
+.alert-row.r180{background:#f3e8ff;color:#6d28d9;}
+
+/* ── TABS ── */
+.tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:18px;}
+.tab-item{padding:10px 18px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--gray);
+  border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s;}
+.tab-item:hover{color:var(--navy);}
+.tab-item.active{color:var(--navy);border-bottom-color:var(--gold);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ── CALLING LOG ── */
+.call-log-item{background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;
+  border-left:3px solid var(--border);}
+.call-log-item.eq{border-left-color:var(--gold);}
+.call-log-item.mf{border-left-color:var(--teal);}
+.call-date{font-size:.72rem;color:var(--gray);font-weight:600;}
+.call-note{font-size:.83rem;color:var(--navy);margin-top:3px;}
+.call-status{font-size:.7rem;}
+
+/* ── PAGINATION ── */
+.pagination{display:flex;align-items:center;justify-content:center;gap:5px;padding:12px;flex-wrap:wrap;}
+.pg-btn{padding:5px 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+  font-size:.78rem;background:#fff;color:var(--navy);font-weight:600;transition:all .15s;}
+.pg-btn:hover{background:var(--blue2);}
+.pg-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.pg-btn:disabled{opacity:.35;cursor:default;}
+.pg-info{font-size:.75rem;color:var(--gray);padding:0 6px;}
+
+/* ── IMPORT/EXPORT ── */
+.import-zone{border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;
+  color:var(--gray);font-size:.88rem;cursor:pointer;transition:all .2s;}
+.import-zone:hover,.import-zone.drag{border-color:var(--navy);background:var(--blue2);}
+
+/* ── REPORT CARD ── */
+.report-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:4px;}
+.report-card{background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);
+  cursor:pointer;transition:all .2s;border-top:4px solid var(--border);}
+.report-card:hover{transform:translateY(-2px);box-shadow:var(--shadow2);border-top-color:var(--navy);}
+.report-card .r-icon{font-size:1.8rem;margin-bottom:10px;}
+.report-card h4{font-size:.88rem;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.report-card p{font-size:.75rem;color:var(--gray);}
+
+/* ── ADMIN ── */
+.user-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.user-avatar{width:40px;height:40px;border-radius:50%;background:var(--navy);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;margin-right:12px;}
+.user-info{flex:1;}
+.user-name{font-weight:700;font-size:.92rem;color:var(--navy);}
+.user-role{font-size:.75rem;color:var(--gray);}
+.user-segs{display:flex;gap:6px;margin-top:4px;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 22px;
+  border-radius:12px;font-size:.85rem;font-weight:600;z-index:9999;
+  transform:translateY(80px);opacity:0;transition:all .35s;box-shadow:var(--shadow2);}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.success{background:var(--green);}
+#toast.error{background:var(--red);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:800px){
+  .sidebar{display:none;}
+  .dash-grid{grid-template-columns:1fr;}
+  .form-row{grid-template-columns:1fr;}
+  .form-row.three{grid-template-columns:1fr;}
+  .content{padding:14px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="brand">DN<span>Invest</span></div>
+      <div class="sub">Client CRM System</div>
+    </div>
+    <div class="form-group"><label>Username</label>
+      <input type="text" id="lusr" placeholder="Enter username" autocomplete="off">
+    </div>
+    <div class="form-group"><label>Password</label>
+      <input type="password" id="lpwd" placeholder="Enter password">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign In →</button>
+    <div class="login-err" id="lerr">Invalid username or password</div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">DN<span>Invest</span> CRM</div>
+    <div class="topbar-right">
+      <span class="seg-indicator" id="segBadge"></span>
+      <div class="user-pill">Hello, <b id="uLabel"></b></div>
+      <button class="btn-sm" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section">Main</div>
+      <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+        <span class="icon">📊</span> Dashboard
+      </div>
+
+      <div class="sidebar-section" id="eq-nav-section">Equity</div>
+      <div class="nav-item" onclick="showPage('eq-clients')" id="nav-eq-clients">
+        <span class="icon">👥</span> Clients
+        <span class="nav-badge" id="nb-eq">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('eq-followup')" id="nav-eq-followup">
+        <span class="icon">📞</span> Follow-ups
+        <span class="nav-badge red" id="nb-eqf">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('eq-notrade')" id="nav-eq-notrade">
+        <span class="icon">⚠️</span> No-Trade Alerts
+        <span class="nav-badge red" id="nb-eqnt">0</span>
+      </div>
+
+      <div class="sidebar-section" id="mf-nav-section">Mutual Fund</div>
+      <div class="nav-item" onclick="showPage('mf-clients')" id="nav-mf-clients">
+        <span class="icon">🏦</span> Investors
+        <span class="nav-badge" id="nb-mf">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('mf-followup')" id="nav-mf-followup">
+        <span class="icon">📞</span> Follow-ups
+        <span class="nav-badge red" id="nb-mff">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('mf-sip')" id="nav-mf-sip">
+        <span class="icon">🔄</span> SIP Tracker
+        <span class="nav-badge" id="nb-sip">0</span>
+      </div>
+
+      <div class="sidebar-section">Reports</div>
+      <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
+        <span class="icon">📋</span> Reports
+      </div>
+
+      <div class="sidebar-section" id="admin-nav-section">Admin</div>
+      <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
+        <span class="icon">⚙️</span> Users & Settings
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- ── DASHBOARD ── -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-hdr">
+          <div class="page-title">Dashboard <span id="dash-date"></span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="refreshDash()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="stats-row" id="dashStats"></div>
+        <div class="dash-grid">
+          <div class="dash-card" id="rmEqCard"><h3>Equity RM — Client Count</h3><div id="rmEqChart"></div></div>
+          <div class="dash-card" id="rmMfCard"><h3>MF RM — AUM Summary</h3><div id="rmMfChart"></div></div>
+          <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
+          <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
+        </div>
+      </div>
+
+      <!-- ── EQUITY CLIENTS ── -->
+      <div class="page" id="page-eq-clients">
+        <div class="page-hdr">
+          <div class="page-title">Equity Clients <span id="eq-total-label"></span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="exportCSV('equity')">⬇️ Export</button>
+            <button class="btn btn-primary" onclick="openAddClient('equity')">+ Add Client</button>
+          </div>
+        </div>
+        <div class="filters" id="eq-filters">
+          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search">
+          <select onchange="filterEq()" id="eq-status"><option value="">All Status</option>
+            <option>Active</option><option>Inactive</option></select>
+          <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
+          <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
+            <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
+          <div class="filter-sep"></div>
+          <button class="btn btn-outline" onclick="resetFilters('eq')">✕ Reset</button>
+          <span class="res-count" id="eq-count"></span>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="eq-table"></div></div>
+        <div class="pagination" id="eq-pg"></div>
+      </div>
+
+      <!-- ── EQUITY FOLLOW-UPS ── -->
+      <div class="page" id="page-eq-followup">
+        <div class="page-hdr">
+          <div class="page-title">Equity Follow-ups</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('eqf','today')">📅 Today</div>
+          <div class="tab-item" onclick="switchTab('eqf','overdue')">🔴 Overdue</div>
+          <div class="tab-item" onclick="switchTab('eqf','upcoming')">🔜 Upcoming (7d)</div>
+          <div class="tab-item" onclick="switchTab('eqf','all')">📋 All Pending</div>
+        </div>
+        <div id="eqf-content"></div>
+      </div>
+
+      <!-- ── NO-TRADE ALERTS ── -->
+      <div class="page" id="page-eq-notrade">
+        <div class="page-hdr">
+          <div class="page-title">No-Trade Alerts</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('nt','30')">🔴 30 Days</div>
+          <div class="tab-item" onclick="switchTab('nt','60')">🟠 60 Days</div>
+          <div class="tab-item" onclick="switchTab('nt','90')">🟡 90 Days</div>
+          <div class="tab-item" onclick="switchTab('nt','180')">⚫ 180+ Days</div>
+        </div>
+        <div id="nt-content"></div>
+      </div>
+
+      <!-- ── MF CLIENTS ── -->
+      <div class="page" id="page-mf-clients">
+        <div class="page-hdr">
+          <div class="page-title">MF Investors <span id="mf-total-label"></span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
+            <button class="btn btn-outline" onclick="openImportModal()">📥 Import Excel</button>
+            <button class="btn btn-teal" onclick="openAddClient('mf')">+ Add Investor</button>
+          </div>
+        </div>
+        <div class="filters">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search">
+          <select onchange="filterMf()" id="mf-status"><option value="">All Status</option>
+            <option>Investor</option><option>Prospect</option></select>
+          <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
+          <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
+            <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
+          <div class="filter-sep"></div>
+          <button class="btn btn-outline" onclick="resetFilters('mf')">✕ Reset</button>
+          <span class="res-count" id="mf-count"></span>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="mf-table"></div></div>
+        <div class="pagination" id="mf-pg"></div>
+      </div>
+
+      <!-- ── MF FOLLOW-UPS ── -->
+      <div class="page" id="page-mf-followup">
+        <div class="page-hdr"><div class="page-title">MF Follow-ups</div></div>
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('mff','today')">📅 Today</div>
+          <div class="tab-item" onclick="switchTab('mff','overdue')">🔴 Overdue</div>
+          <div class="tab-item" onclick="switchTab('mff','upcoming')">🔜 Upcoming (7d)</div>
+          <div class="tab-item" onclick="switchTab('mff','all')">📋 All Pending</div>
+        </div>
+        <div id="mff-content"></div>
+      </div>
+
+      <!-- ── SIP TRACKER ── -->
+      <div class="page" id="page-mf-sip">
+        <div class="page-hdr">
+          <div class="page-title">SIP Tracker</div>
+        </div>
+        <div class="stats-row" id="sipStats"></div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="sip-table"></div></div>
+      </div>
+
+      <!-- ── REPORTS ── -->
+      <div class="page" id="page-reports">
+        <div class="page-hdr"><div class="page-title">Reports</div></div>
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('rpt','equity')">📈 Equity</div>
+          <div class="tab-item" onclick="switchTab('rpt','mf')">🏦 Mutual Fund</div>
+          <div class="tab-item" onclick="switchTab('rpt','combined')">📊 Combined</div>
+        </div>
+        <div class="tab-panel active" id="rpt-equity">
+          <div class="report-grid" id="eq-reports"></div>
+        </div>
+        <div class="tab-panel" id="rpt-mf">
+          <div class="report-grid" id="mf-reports"></div>
+        </div>
+        <div class="tab-panel" id="rpt-combined">
+          <div class="report-grid" id="co-reports"></div>
+        </div>
+      </div>
+
+      <!-- ── ADMIN ── -->
+      <div class="page" id="page-admin">
+        <div class="page-hdr">
+          <div class="page-title">Users & Settings</div>
+          <div class="hdr-actions">
+            <button class="btn btn-primary" onclick="openAddUser()">+ Add User</button>
+          </div>
+        </div>
+        <div id="user-list"></div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /app-body -->
+</div><!-- /app -->
+
+<!-- ══ MODALS ══ -->
+
+<!-- Client Modal (Equity + MF) -->
+<div class="modal-overlay" id="clientModal" onclick="if(event.target===this)closeModal('clientModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="clientModalTitle">Add Client</h3>
+      <button class="modal-close" onclick="closeModal('clientModal')">×</button>
+    </div>
+    <div class="modal-body" id="clientModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('clientModal')">Cancel</button>
+      <button class="btn btn-primary" id="clientSaveBtn" onclick="saveClient()">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Client / Calling Log -->
+<div class="modal-overlay" id="viewModal" onclick="if(event.target===this)closeModal('viewModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="viewModalTitle">Client Detail</h3>
+      <button class="modal-close" onclick="closeModal('viewModal')">×</button>
+    </div>
+    <div class="modal-body" id="viewModalBody"></div>
+  </div>
+</div>
+
+<!-- Calling Log Modal -->
+<div class="modal-overlay" id="callModal" onclick="if(event.target===this)closeModal('callModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="callModalTitle">Log Call</h3>
+      <button class="modal-close" onclick="closeModal('callModal')">×</button>
+    </div>
+    <div class="modal-body" id="callModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('callModal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveCallLog()">Save Call Log</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeModal('userModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="userModalTitle">Add User</h3>
+      <button class="modal-close" onclick="closeModal('userModal')">×</button>
+    </div>
+    <div class="modal-body" id="userModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('userModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- Report View -->
+<div class="modal-overlay" id="reportModal" onclick="if(event.target===this)closeModal('reportModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="reportModalTitle">Report</h3>
+      <button class="modal-close" onclick="closeModal('reportModal')">×</button>
+    </div>
+    <div class="modal-body" id="reportModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('reportModal')">Close</button>
+      <button class="btn btn-success" onclick="exportReportCSV()">⬇️ Export CSV</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal" onclick="if(event.target===this)closeModal('importModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>📥 Excel Import</h3>
+      <button class="modal-close" onclick="closeModal('importModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-bar" style="margin-bottom:16px">
+        <div class="tab-item active" onclick="switchImportTab('aum')" id="imp-tab-aum">AUM Report</div>
+        <div class="tab-item" onclick="switchImportTab('sip')" id="imp-tab-sip">SIP Report</div>
+        <div class="tab-item" onclick="switchImportTab('both')" id="imp-tab-both">AUM + SIP (Recommended)</div>
+      </div>
+      
+      <div id="imp-aum">
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">Wealth Elite / CAMS se <b>AUM By Client</b> Excel upload karo</p>
+        <div class="import-zone" id="aum-zone" onclick="document.getElementById('aum-file').click()">
+          📊 AUM Excel file yahan drag karo ya click karo
+          <input type="file" id="aum-file" accept=".xlsx,.xls" style="display:none" onchange="handleAumFile(this)">
+        </div>
+        <div id="aum-preview" style="margin-top:12px"></div>
+      </div>
+      
+      <div id="imp-sip" style="display:none">
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">Wealth Elite se <b>Running SIP Report</b> Excel upload karo</p>
+        <div class="import-zone" id="sip-zone" onclick="document.getElementById('sip-file').click()">
+          🔄 SIP Excel file yahan drag karo ya click karo
+          <input type="file" id="sip-file" accept=".xlsx,.xls" style="display:none" onchange="handleSipFile(this)">
+        </div>
+        <div id="sip-preview" style="margin-top:12px"></div>
+      </div>
+      
+      <div id="imp-both" style="display:none">
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:16px">Dono files upload karo — AUM + SIP merge ho jayega</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:.78rem;font-weight:700;color:var(--gray);margin-bottom:6px">1. AUM Report</div>
+            <div class="import-zone" style="padding:16px;font-size:.8rem" onclick="document.getElementById('both-aum-file').click()">
+              📊 AUM Excel<br><small id="both-aum-name">Click to select</small>
+              <input type="file" id="both-aum-file" accept=".xlsx,.xls" style="display:none" onchange="handleBothFile('aum',this)">
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.78rem;font-weight:700;color:var(--gray);margin-bottom:6px">2. SIP Report</div>
+            <div class="import-zone" style="padding:16px;font-size:.8rem" onclick="document.getElementById('both-sip-file').click()">
+              🔄 SIP Excel<br><small id="both-sip-name">Click to select</small>
+              <input type="file" id="both-sip-file" accept=".xlsx,.xls" style="display:none" onchange="handleBothFile('sip',this)">
+            </div>
+          </div>
+        </div>
+        <div id="both-preview" style="margin-top:12px"></div>
+      </div>
+      
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-teal" id="importBtn" onclick="doImport()" disabled>Import to CRM</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// DATA STORE (localStorage + memory)
+// ══════════════════════════════════════════
+const DB = {
+  get(key){
+    try{ const v=localStorage.getItem('dninvest_'+key); return v?JSON.parse(v):null; }catch(e){return null;}
+  },
+  set(key,val){
+    try{
+      localStorage.setItem('dninvest_'+key,JSON.stringify(val));
+    }catch(e){}
+    // Always sync to Firebase
+    try{
+      if(typeof fdb!=='undefined'){
+        fdb.collection('crm_data').doc(key).set({data:val,updated:new Date().toISOString()})
+          .then(()=>console.log('Firebase synced:',key))
+          .catch(e=>console.log('Firebase error:',e));
+      }
+    }catch(e){}
+  },
+  load(){
+    if(!this.get('users')) this.set('users', DEFAULT_USERS);
+    if(!this.get('call_logs')) this.set('call_logs', []);
+  },
+  async syncFromFirebase(){
+    if(typeof fdb==='undefined') return;
+    try{
+      const keys=['eq_clients','mf_clients','users','call_logs'];
+      for(const key of keys){
+        const doc=await fdb.collection('crm_data').doc(key).get();
+        if(doc.exists && doc.data() && doc.data().data && doc.data().data.length > 0){
+          localStorage.setItem('dninvest_'+key,JSON.stringify(doc.data().data));
+          console.log('Loaded from Firebase:',key, doc.data().data.length,'records');
+        }
+      }
+    }catch(e){ console.log('Firebase sync error:',e); }
+  }
+};
+
+// ══════════════════════════════════════════
+// DEFAULT USERS
+// ══════════════════════════════════════════
+const DEFAULT_USERS = [
+  {id:'u1',username:'admin',password:'Admin@123',name:'Admin',role:'admin',segments:['equity','mf'],eq_dealers:[],mf_dealers:[],active:true},
+  {id:'u2',username:'dilip',password:'Dilip@123',name:'Dilip Sir',role:'admin',segments:['equity','mf'],eq_dealers:[],mf_dealers:[],active:true},
+  {id:'u3',username:'puja',password:'Puja@123',name:'Puja',role:'staff',segments:['equity','mf'],eq_dealers:['PUJA','PUJA '],mf_dealers:['PUJA MADAM','PUJA ','PUJA','PUJA/MEGHA'],active:true},
+  {id:'u4',username:'rohit',password:'Rohit@123',name:'Rohit',role:'staff',segments:['equity','mf'],eq_dealers:['ROHIT','ROHIT '],mf_dealers:['ROHIT BHAIYA','ROHIT ','ROHIT'],active:true},
+  {id:'u5',username:'raju',password:'Raju@123',name:'Raju',role:'staff',segments:['equity','mf'],eq_dealers:['RAJU','RAJU '],mf_dealers:['RAJU SIR','RAJU'],active:true},
+  {id:'u6',username:'komal',password:'Komal@123',name:'Komal',role:'staff',segments:['equity','mf'],eq_dealers:['KOMAL','KOMAL '],mf_dealers:['KOMAL','KOMAL (G)'],active:true},
+  {id:'u7',username:'riya',password:'Riya@123',name:'Riya',role:'staff',segments:['equity','mf'],eq_dealers:['RIYA','RIYA '],mf_dealers:['RIYA','RIYA '],active:true},
+  {id:'u8',username:'bharat',password:'Bharat@123',name:'Bharat',role:'staff',segments:['equity','mf'],eq_dealers:['BHARAT','BHARAT '],mf_dealers:['BHARAT BHAIYA','BHARAT'],active:true},
+  {id:'u9',username:'khokhan',password:'Khokhan@123',name:'Khokhan',role:'staff',segments:['equity','mf'],eq_dealers:['KHOKHAN','KHOKHAN '],mf_dealers:['KHOKHAN SIR','KHOKHAN'],active:true},
+  {id:'u10',username:'megha',password:'Megha@123',name:'Megha',role:'staff',segments:['mf'],eq_dealers:[],mf_dealers:['MEGHA','MEGHA '],active:true},
+  {id:'u11',username:'anjali',password:'Anjali@123',name:'Anjali',role:'staff',segments:['mf'],eq_dealers:[],mf_dealers:['ANJALI','ANJALI '],active:true},
+];
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let CU = null; // current user
+const PG_SIZE = 50;
+let eqPage=1, mfPage=1;
+let eqFiltered=[], mfFiltered=[];
+let currentCallTarget = null;
+let currentEditId = null;
+let currentReportData = [];
+let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='equity';
+
+const MN = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function today(){ return new Date().toISOString().split('T')[0]; }
+function fmtDate(d){ if(!d) return ''; try{const dt=new Date(d); if(isNaN(dt)) return d; return dt.getDate()+'-'+MN[dt.getMonth()+1]+'-'+dt.getFullYear();}catch(e){return d||'';} }
+function daysDiff(d){ if(!d) return null; const diff=new Date()-new Date(d); return Math.floor(diff/(1000*60*60*24)); }
+function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).substr(2,5); }
+function v(x){ return (x!=null&&x!=='')?x:'—'; }
+
+// ══════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════
+document.getElementById('lpwd').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('lusr').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('lpwd').focus(); });
+
+function doLogin(){
+  const u = document.getElementById('lusr').value.trim().toLowerCase();
+  const p = document.getElementById('lpwd').value;
+  const users = DB.get('users') || DEFAULT_USERS;
+  const user = users.find(x=>x.username===u && x.password===p && x.active!==false);
+  if(user){
+    CU = user;
+    document.getElementById('lerr').style.display='none';
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='block';
+    initApp();
+  } else {
+    document.getElementById('lerr').style.display='block';
+  }
+}
+
+function doLogout(){
+  CU=null;
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('lusr').value='';
+  document.getElementById('lpwd').value='';
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+function initApp(){
+  // Sync from Firebase first, then setup real-time listeners
+  if(typeof fdb!=='undefined'){
+    DB.syncFromFirebase().then(()=>{
+      refreshDash(); updateBadges(); populateRmDropdowns();
+      // Real-time listeners - update when any device changes data
+      ['eq_clients','mf_clients','call_logs','users'].forEach(key=>{
+        fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
+          if(doc.exists && doc.data() && doc.data().data && doc.data().data.length>0){
+            const newData = doc.data().data;
+            const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
+            // Only update if Firebase has newer/more data
+            if(JSON.stringify(newData) !== JSON.stringify(existing)){
+              localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
+              console.log('Real-time update:', key);
+              // Refresh current view
+              if(key==='eq_clients') renderEqTable();
+              if(key==='mf_clients') renderMfTable();
+              if(key==='call_logs') {}
+              refreshDash(); updateBadges();
+            }
+          }
+        });
+      });
+    }).catch(()=>{ refreshDash(); updateBadges(); populateRmDropdowns(); });
+  } else {
+    DB.load(); refreshDash(); updateBadges(); populateRmDropdowns();
+  }
+  DB.load();
+
+  const segs = CU.segments||[];
+  const hasEq = segs.includes('equity');
+  const hasMf = segs.includes('mf');
+
+  document.getElementById('uLabel').textContent = CU.name;
+  const si = document.getElementById('segBadge');
+  if(hasEq&&hasMf){si.textContent='Equity + MF';si.className='seg-indicator seg-both';}
+  else if(hasEq){si.textContent='Equity';si.className='seg-indicator seg-eq';}
+  else {si.textContent='MF';si.className='seg-indicator seg-mf';}
+
+  // Show/hide nav sections
+  const eqSec = document.getElementById('eq-nav-section');
+  const mfSec = document.getElementById('mf-nav-section');
+  const adminSec = document.getElementById('admin-nav-section');
+  ['eq-clients','eq-followup','eq-notrade'].forEach(id=>{
+    const el=document.getElementById('nav-'+id);
+    if(el) el.style.display=hasEq?'flex':'none';
+  });
+  if(eqSec) eqSec.style.display=hasEq?'':'none';
+  ['mf-clients','mf-followup','mf-sip'].forEach(id=>{
+    const el=document.getElementById('nav-'+id);
+    if(el) el.style.display=hasMf?'flex':'none';
+  });
+  if(mfSec) mfSec.style.display=hasMf?'':'none';
+  if(adminSec) adminSec.style.display=CU.role==='admin'?'':'none';
+  const adminNav=document.getElementById('nav-admin');
+  if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
+
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  populateRmDropdowns();
+  refreshDash();
+  updateBadges();
+}
+
+function getMyEqClients(){
+  const all = DB.get('eq_clients')||[];
+  if(CU.role==='admin') return all;
+  const dealers=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+  return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
+}
+function getMyMfClients(){
+  const all = DB.get('mf_clients')||[];
+  if(CU.role==='admin') return all;
+  const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+  return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
+}
+function getAllRMs(){
+  return (DB.get('users')||[]).filter(u=>u.active!==false).map(u=>u.name);
+}
+function getSegRMs(seg){
+  return (DB.get('users')||[]).filter(u=>u.active!==false&&(u.segments||[]).includes(seg)).map(u=>u.name);
+}
+
+function populateRmDropdowns(){
+  const eqRMs = getSegRMs('equity');
+  const mfRMs = getSegRMs('mf');
+  ['eq-rm'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.innerHTML='<option value="">All RMs</option>'+eqRMs.map(r=>`<option>${r}</option>`).join('');
+  });
+  ['mf-rm'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
+  });
+}
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const ni=document.getElementById('nav-'+id);
+  if(ni) ni.classList.add('active');
+
+  if(id==='eq-clients') renderEqTable();
+  else if(id==='mf-clients') renderMfTable();
+  else if(id==='eq-followup') renderFollowup('eqf');
+  else if(id==='mf-followup') renderFollowup('mff');
+  else if(id==='eq-notrade') renderNoTrade();
+  else if(id==='mf-sip') renderSip();
+  else if(id==='reports') renderReports();
+  else if(id==='admin') renderAdmin();
+  else if(id==='dashboard') refreshDash();
+}
+
+function switchTab(group, tab){
+  const tabBar = document.querySelector(`[onclick="showPage('${
+    group==='eqf'?'eq-followup':group==='mff'?'mf-followup':
+    group==='nt'?'eq-notrade':group==='rpt'?'reports':''
+  }')"]`)?.closest('.page')?.querySelector('.tab-bar');
+
+  // Generic tab switch
+  const container = document.getElementById(group+'-content') || document.getElementById('rpt-'+tab);
+  if(group==='eqf'){ activeEqfTab=tab; renderFollowup('eqf'); }
+  else if(group==='mff'){ activeMffTab=tab; renderFollowup('mff'); }
+  else if(group==='nt'){ activeNtTab=tab; renderNoTrade(); }
+  else if(group==='rpt'){
+    activeRptTab=tab;
+    document.querySelectorAll('#page-reports .tab-item').forEach((el,i)=>{
+      el.classList.toggle('active',['equity','mf','combined'][i]===tab);
+    });
+    document.querySelectorAll('#page-reports .tab-panel').forEach(p=>p.classList.remove('active'));
+    const tp=document.getElementById('rpt-'+tab);
+    if(tp) tp.classList.add('active');
+    return;
+  }
+
+  // Update tab highlight
+  const allTabs = document.querySelectorAll(`[onclick^="switchTab('${group}"]`);
+  allTabs.forEach(el=>el.classList.toggle('active', el.getAttribute('onclick').includes("'"+tab+"'")));
+}
+
+// ══════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════
+function refreshDash(){
+  const eq = getMyEqClients();
+  const mf = getMyMfClients();
+  const segs=CU.segments||[];
+  const hasEq=segs.includes('equity'), hasMf=segs.includes('mf');
+
+  const eqActive=eq.filter(c=>c.status==='Active').length;
+  const mfInv=mf.filter(c=>c.status==='Investor').length;
+  const totalAUM=mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
+  const totalSIP=mf.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0);
+  const pendEq=eq.filter(c=>c.next_call&&c.next_call<=today()).length;
+  const pendMf=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
+
+  let statsHtml='';
+  if(hasEq){
+    statsHtml+=sc(eq.length,'Total EQ Clients','','equity');
+    statsHtml+=sc(eqActive,'Active Clients','green','equity');
+  }
+  if(hasMf){
+    statsHtml+=sc(mf.length,'MF Investors','teal','mf');
+    statsHtml+=sc('₹'+fmtNum(totalAUM),'Total AUM','gold','mf');
+    statsHtml+=sc('₹'+fmtNum(totalSIP),'Monthly SIP','purple','mf');
+  }
+  if(hasEq||hasMf){
+    statsHtml+=sc(pendEq+pendMf,'Follow-ups Due','red','');
+  }
+  document.getElementById('dashStats').innerHTML=statsHtml;
+
+  // Equity RM chart
+  if(hasEq){
+    const rmC={};
+    eq.forEach(c=>{ rmC[c.rm]=(rmC[c.rm]||0)+1; });
+    const rs=Object.entries(rmC).sort((a,b)=>b[1]-a[1]);
+    const mx=rs[0]?.[1]||1;
+    document.getElementById('rmEqChart').innerHTML = rs.length
+      ? rs.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx*100).toFixed(0)}%"></div></div><span class="bar-num">${v}</span></div>`).join('')
+      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No equity clients yet</p>';
+    document.getElementById('rmEqCard').style.display=hasEq?'':'none';
+  }
+
+  // MF RM AUM chart
+  if(hasMf){
+    const rmA={};
+    mf.forEach(c=>{ rmA[c.rm]=(rmA[c.rm]||0)+(parseFloat(c.aum)||0); });
+    const rs2=Object.entries(rmA).sort((a,b)=>b[1]-a[1]);
+    const mx2=rs2[0]?.[1]||1;
+    document.getElementById('rmMfChart').innerHTML = rs2.length
+      ? rs2.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx2*100).toFixed(0)}%;background:var(--teal)"></div></div><span class="bar-num">₹${fmtNum(v)}</span></div>`).join('')
+      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No MF clients yet</p>';
+    document.getElementById('rmMfCard').style.display=hasMf?'':'none';
+  }
+
+  // No-trade alerts
+  const alerts = eq.map(c=>({...c,days:daysDiff(c.last_trade_date)}))
+    .filter(c=>c.days!==null&&c.days>30)
+    .sort((a,b)=>b.days-a.days).slice(0,8);
+  document.getElementById('noTradeAlert').innerHTML = alerts.length
+    ? alerts.map(c=>{
+        const cls=c.days>=180?'r180':c.days>=90?'r90':c.days>=60?'r60':'r30';
+        return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${c.days} days</span></div>`;
+      }).join('')
+    : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
+
+  // Today's follow-ups
+  const allClients=[
+    ...eq.filter(c=>c.next_call===today()).map(c=>({...c,seg:'Equity'})),
+    ...mf.filter(c=>c.next_call===today()).map(c=>({...c,seg:'MF'}))
+  ];
+  document.getElementById('todayFollowup').innerHTML = allClients.length
+    ? allClients.map(c=>`
+        <div class="bar-row">
+          <span class="bar-name">${c.name}</span>
+          <span class="badge ${c.seg==='Equity'?'b-eq':'b-mf'}" style="margin:0 8px">${c.seg}</span>
+          <span style="font-size:.75rem;color:var(--gray)">${c.rm}</span>
+        </div>`).join('')
+    : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No follow-ups scheduled for today</p>';
+
+  updateBadges();
+}
+
+function sc(n,l,cls,seg){
+  const segBadge=seg?`<span class="badge ${seg==='equity'?'b-eq':'b-mf'}" style="float:right;margin-top:2px">${seg==='equity'?'EQ':'MF'}</span>`:'';
+  return `<div class="stat-card ${cls}" onclick="showPage('${seg==='equity'?'eq-clients':seg==='mf'?'mf-clients':'eq-clients'}')">
+    ${segBadge}<div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`;
+}
+function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=100000) return (n/100000).toFixed(2)+'L'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return Math.round(n); }
+
+function updateBadges(){
+  const eq=getMyEqClients(), mf=getMyMfClients();
+  document.getElementById('nb-eq').textContent=eq.length;
+  document.getElementById('nb-mf').textContent=mf.length;
+  document.getElementById('nb-sip').textContent=mf.filter(c=>c.sip_amount>0).length;
+  const eqf=eq.filter(c=>c.next_call&&c.next_call<=today()).length;
+  const mff=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
+  document.getElementById('nb-eqf').textContent=eqf;
+  document.getElementById('nb-mff').textContent=mff;
+  document.getElementById('nb-eqnt').textContent=eq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
+}
+
+// ══════════════════════════════════════════
+// EQUITY TABLE
+// ══════════════════════════════════════════
+function filterEq(){ eqPage=1; renderEqTable(); }
+function resetFilters(t){
+  ['search','status','rm','followup-filter'].forEach(f=>{
+    const el=document.getElementById(t+'-'+f); if(el) el.value='';
+  }); filterEq(); if(t==='mf') filterMf();
+}
+
+function renderEqTable(){
+  let data = getMyEqClients();
+  const q=(document.getElementById('eq-search')||{value:''}).value.toLowerCase();
+  const st=(document.getElementById('eq-status')||{value:''}).value;
+  const rm=(document.getElementById('eq-rm')||{value:''}).value;
+  const fu=(document.getElementById('eq-followup-filter')||{value:''}).value;
+
+  if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
+  if(st) data=data.filter(c=>c.status===st);
+  if(rm) data=data.filter(c=>c.rm===rm);
+  if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
+  if(fu==='today') data=data.filter(c=>c.next_call===today());
+  if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+
+  eqFiltered=data;
+  const lbl=document.getElementById('eq-total-label');
+  if(lbl) lbl.textContent=`(${data.length})`;
+  const rc=document.getElementById('eq-count');
+  if(rc) rc.textContent=data.length+' clients';
+
+  const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
+  const cols=['Code','Name','Mobile','RM','Status','Asset Value','Last Trade','Next Call','Follow-up','Remarks'];
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
+
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+
+  rows.forEach(c=>{
+    const days=daysDiff(c.last_trade_date);
+    const rowCls=days>=90?'row-alert':c.status==='Inactive'?'row-inactive':'';
+    const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
+    h+=`<tr class="${rowCls}">
+      <td>${c.code||'—'}</td>
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
+      <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
+      <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
+      <td>${fmtDate(c.next_call)||'—'}</td>
+      <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td>
+        <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
+        <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
+        <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('eq-table').innerHTML=h;
+  renderPg('eq',data.length,eqPage);
+}
+
+// ══════════════════════════════════════════
+// MF TABLE
+// ══════════════════════════════════════════
+function filterMf(){ mfPage=1; renderMfTable(); }
+
+function renderMfTable(){
+  let data=getMyMfClients();
+  const q=(document.getElementById('mf-search')||{value:''}).value.toLowerCase();
+  const st=(document.getElementById('mf-status')||{value:''}).value;
+  const rm=(document.getElementById('mf-rm')||{value:''}).value;
+  const fu=(document.getElementById('mf-followup-filter')||{value:''}).value;
+
+  if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
+  if(st) data=data.filter(c=>c.status===st);
+  if(rm) data=data.filter(c=>c.rm===rm);
+  if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
+  if(fu==='today') data=data.filter(c=>c.next_call===today());
+  if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+
+  mfFiltered=data;
+  const lbl=document.getElementById('mf-total-label');
+  if(lbl) lbl.textContent=`(${data.length})`;
+  const rc=document.getElementById('mf-count');
+  if(rc) rc.textContent=data.length+' investors';
+
+  const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
+  const cols=['Name','Mobile','MF RM','Status','AUM','SIP Amt','SIP Count','Last Invest','Next Call','Follow-up'];
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Actions</th></tr></thead><tbody>`;
+
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+
+  rows.forEach(c=>{
+    const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
+    h+=`<tr class="row-mf">
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
+      <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
+      <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
+      <td>${c.sip_count||'—'}</td>
+      <td>${fmtDate(c.last_invest_date)||'—'}</td>
+      <td>${fmtDate(c.next_call)||'—'}</td>
+      <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
+      <td>
+        <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
+        <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
+        <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('mf-table').innerHTML=h;
+  renderPg('mf',data.length,mfPage);
+}
+
+// ══════════════════════════════════════════
+// ADD / EDIT CLIENT
+// ══════════════════════════════════════════
+function openAddClient(seg){
+  currentEditId=null;
+  document.getElementById('clientModalTitle').textContent = seg==='equity'?'Add Equity Client':'Add MF Investor';
+  document.getElementById('clientSaveBtn').textContent = seg==='equity'?'Save Client':'Save Investor';
+  document.getElementById('clientSaveBtn').dataset.seg = seg;
+  document.getElementById('clientModalBody').innerHTML = clientForm(seg, null);
+  document.getElementById('clientModal').classList.add('open');
+}
+
+function editClient(id, seg){
+  currentEditId=id;
+  const clients = DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
+  const c=clients.find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('clientModalTitle').textContent='Edit '+(seg==='equity'?'Equity Client':'MF Investor');
+  document.getElementById('clientSaveBtn').textContent='Update';
+  document.getElementById('clientSaveBtn').dataset.seg=seg;
+  document.getElementById('clientModalBody').innerHTML=clientForm(seg,c);
+  document.getElementById('clientModal').classList.add('open');
+}
+
+function clientForm(seg, c){
+  const rms = getSegRMs(seg).map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
+  if(seg==='equity'){
+    return `
+    <div class="form-section">Basic Information</div>
+    <div class="form-row three">
+      <div class="form-field"><label>Client Code</label><input id="f_code" value="${c?.code||''}" placeholder="e.g. 12345"></div>
+      <div class="form-field"><label>Client Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
+      <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
+      <div class="form-field"><label>Equity RM *</label><select id="f_rm"><option value="">Select RM</option>${rms}</select></div>
+    </div>
+    <div class="form-section">Trading Info</div>
+    <div class="form-row three">
+      <div class="form-field"><label>Trading Status</label><select id="f_status"><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option></select></div>
+      <div class="form-field"><label>Asset Value (₹)</label><input id="f_asset" type="number" value="${c?.asset_value||''}" placeholder="e.g. 500000"></div>
+      <div class="form-field"><label>Revenue/Brokerage (₹)</label><input id="f_revenue" type="number" value="${c?.revenue||''}" placeholder="e.g. 5000"></div>
+    </div>
+    <div class="form-row three">
+      <div class="form-field"><label>Last Trade Date</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}"></div>
+      <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"></div>
+    </div>
+    <div class="form-section">Follow-up</div>
+    <div class="form-row three">
+      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}"></div>
+      <div class="form-field"><label>Follow-up Status</label><select id="f_followup"><option value="">—</option><option ${c?.followup_status==='Pending'?'selected':''}>Pending</option><option ${c?.followup_status==='Done'?'selected':''}>Done</option><option ${c?.followup_status==='Not Required'?'selected':''}>Not Required</option></select></div>
+      <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
+    </div>`;
+  } else {
+    return `
+    <div class="form-section">Basic Information</div>
+    <div class="form-row three">
+      <div class="form-field"><label>Investor Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
+      <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
+      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>MF RM *</label><select id="f_rm"><option value="">Select RM</option>${rms}</select></div>
+      <div class="form-field"><label>Investor Status</label><select id="f_status"><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
+    </div>
+    <div class="form-section">Investment Details</div>
+    <div class="form-row three">
+      <div class="form-field"><label>AUM (₹)</label><input id="f_aum" type="number" value="${c?.aum||''}" placeholder="e.g. 1000000"></div>
+      <div class="form-field"><label>SIP Amount (₹/month)</label><input id="f_sip" type="number" value="${c?.sip_amount||''}" placeholder="e.g. 5000"></div>
+      <div class="form-field"><label>SIP Count</label><input id="f_sip_count" type="number" value="${c?.sip_count||''}" placeholder="No. of SIPs"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>Last Investment Date</label><input id="f_last_invest" type="date" value="${c?.last_invest_date||''}"></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"></div>
+    </div>
+    <div class="form-section">Follow-up</div>
+    <div class="form-row three">
+      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}"></div>
+      <div class="form-field"><label>Follow-up Status</label><select id="f_followup"><option value="">—</option><option ${c?.followup_status==='Pending'?'selected':''}>Pending</option><option ${c?.followup_status==='Done'?'selected':''}>Done</option><option ${c?.followup_status==='Not Required'?'selected':''}>Not Required</option></select></div>
+      <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
+    </div>`;
+  }
+}
+
+function saveClient(){
+  const seg = document.getElementById('clientSaveBtn').dataset.seg;
+  const name = (document.getElementById('f_name')||{value:''}).value.trim();
+  const rm = (document.getElementById('f_rm')||{value:''}).value.trim();
+  if(!name){ toast('Client name is required','error'); return; }
+  if(!rm){ toast('Please select RM','error'); return; }
+
+  const key = seg==='equity'?'eq_clients':'mf_clients';
+  const clients = DB.get(key)||[];
+
+  const gv2 = id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+
+  let rec;
+  if(seg==='equity'){
+    rec={
+      id: currentEditId||uid(),
+      code:gv2('f_code'), name, mobile:gv2('f_mobile'), email:gv2('f_email'),
+      rm, status:gv2('f_status')||'Active',
+      asset_value:parseFloat(gv2('f_asset'))||null,
+      revenue:parseFloat(gv2('f_revenue'))||null,
+      last_trade_date:gv2('f_last_trade'), last_trade_month:gv2('f_last_month'),
+      last_call_date:gv2('f_last_call'), next_call:gv2('f_next_call'),
+      followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
+      created:currentEditId?undefined:today(), updated:today()
+    };
+  } else {
+    rec={
+      id: currentEditId||uid(),
+      name, mobile:gv2('f_mobile'), email:gv2('f_email'),
+      rm, status:gv2('f_status')||'Investor',
+      aum:parseFloat(gv2('f_aum'))||null,
+      sip_amount:parseFloat(gv2('f_sip'))||null,
+      sip_count:parseInt(gv2('f_sip_count'))||null,
+      last_invest_date:gv2('f_last_invest'), last_call_date:gv2('f_last_call'),
+      next_call:gv2('f_next_call'), followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
+      created:currentEditId?undefined:today(), updated:today()
+    };
+  }
+
+  if(currentEditId){
+    const idx=clients.findIndex(x=>x.id===currentEditId);
+    if(idx>=0){ const old=clients[idx]; rec.created=old.created; clients[idx]=rec; }
+  } else {
+    clients.push(rec);
+  }
+  DB.set(key,clients);
+  closeModal('clientModal');
+  toast(currentEditId?'Client updated!':'Client added!','success');
+  if(seg==='equity') renderEqTable();
+  else renderMfTable();
+  refreshDash();
+  updateBadges();
+}
+
+// ══════════════════════════════════════════
+// VIEW CLIENT
+// ══════════════════════════════════════════
+function viewClient(id,seg){
+  const clients=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
+  const c=clients.find(x=>x.id===id);
+  if(!c) return;
+  const logs=(DB.get('call_logs')||[]).filter(l=>l.client_id===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const days=daysDiff(c.last_trade_date);
+
+  document.getElementById('viewModalTitle').textContent=c.name+(seg==='equity'?' — Equity Client':' — MF Investor');
+  const st=seg==='equity'?(c.status==='Active'?'b-active':'b-inactive'):(c.status==='Investor'?'b-investor':'b-prospect');
+
+  let body=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center">
+      <span class="badge ${st}" style="font-size:.82rem;padding:4px 12px">${c.status}</span>
+      ${c.mobile?`<a href="tel:${c.mobile}" class="btn btn-outline" style="padding:5px 14px">📞 ${c.mobile}</a>`:''}
+      ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px">💬 WhatsApp</a>`:''}
+      <button class="btn btn-primary" style="padding:5px 14px" onclick="closeModal('viewModal');editClient('${id}','${seg}')">✏️ Edit</button>
+      <button class="btn btn-gold" style="padding:5px 14px" onclick="closeModal('viewModal');logCall('${id}','${seg}')">📞 Log Call</button>
+    </div>`;
+
+  if(seg==='equity'){
+    body+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
+      ${di('Client Code',c.code)}${di('RM',c.rm)}${di('Email',c.email)}
+      ${di('Asset Value',c.asset_value?'₹'+fmtNum(c.asset_value):null)}
+      ${di('Revenue/Brokerage',c.revenue?'₹'+fmtNum(c.revenue):null)}
+      ${di('Last Trade Date',fmtDate(c.last_trade_date)+(days!==null?` <small>(${days} days ago)</small>`:''))}
+      ${di('Last Trade Month',c.last_trade_month)}
+      ${di('Last Calling Date',fmtDate(c.last_call_date))}
+      ${di('Next Calling Date',fmtDate(c.next_call))}
+      ${di('Follow-up Status',c.followup_status)}
+      ${di('Remarks',c.remarks)}
+    </div>`;
+  } else {
+    body+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
+      ${di('MF RM',c.rm)}${di('Email',c.email)}
+      ${di('AUM',c.aum?'₹'+fmtNum(c.aum):null)}
+      ${di('SIP Amount',c.sip_amount?'₹'+fmtNum(c.sip_amount)+'/mo':null)}
+      ${di('SIP Count',c.sip_count)}
+      ${di('Last Investment',fmtDate(c.last_invest_date))}
+      ${di('Last Calling Date',fmtDate(c.last_call_date))}
+      ${di('Next Calling Date',fmtDate(c.next_call))}
+      ${di('Follow-up Status',c.followup_status)}
+      ${di('Remarks',c.remarks)}
+    </div>`;
+  }
+
+  body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
+  if(logs.length){
+    body+=logs.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
+      <div class="call-date">${fmtDate(l.date)} — ${l.seg==='equity'?'Equity':'MF'}</div>
+      <div class="call-note">${l.note||'—'}</div>
+      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status}</span>
+        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
+      </div></div>`).join('');
+  } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
+
+  document.getElementById('viewModalBody').innerHTML=body;
+  document.getElementById('viewModal').classList.add('open');
+}
+
+function di(label,val){
+  return `<div class="form-field"><label>${label}</label><div class="dv" style="font-size:.88rem;font-weight:600;color:var(--navy);padding:4px 0">${val||'<span style="color:#ccc;font-style:italic;font-weight:400">—</span>'}</div></div>`;
+}
+
+// ══════════════════════════════════════════
+// CALL LOG
+// ══════════════════════════════════════════
+function logCall(id,seg){
+  currentCallTarget={id,seg};
+  const clients=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
+  const c=clients.find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('callModalTitle').textContent='Log Call — '+c.name;
+  document.getElementById('callModalBody').innerHTML=`
+    <div class="form-row">
+      <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${today()}"></div>
+      <div class="form-field"><label>Call Status</label><select id="cl_status">
+        <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option></select></div>
+    </div>
+    <div class="form-row full">
+      <div class="form-field"><label>Call Notes</label>
+        <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}"></div>
+      <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">
+        <option>Pending</option><option>Done</option><option>Not Required</option></select></div>
+    </div>`;
+  document.getElementById('callModal').classList.add('open');
+}
+
+function saveCallLog(){
+  if(!currentCallTarget) return;
+  const {id,seg}=currentCallTarget;
+  const date=document.getElementById('cl_date').value;
+  const status=document.getElementById('cl_status').value;
+  const note=document.getElementById('cl_note').value.trim();
+  const nextCall=document.getElementById('cl_next').value;
+  const fuStatus=document.getElementById('cl_followup').value;
+
+  const logs=DB.get('call_logs')||[];
+  logs.push({id:uid(),client_id:id,seg,date,status,note,next_call:nextCall,created:today()});
+  DB.set('call_logs',logs);
+
+  // Update client record
+  const key=seg==='equity'?'eq_clients':'mf_clients';
+  const clients=DB.get(key)||[];
+  const idx=clients.findIndex(x=>x.id===id);
+  if(idx>=0){
+    clients[idx].last_call_date=date;
+    clients[idx].next_call=nextCall;
+    clients[idx].followup_status=fuStatus;
+    if(note) clients[idx].remarks=note;
+  }
+  DB.set(key,clients);
+  closeModal('callModal');
+  toast('Call logged!','success');
+  if(seg==='equity') renderEqTable(); else renderMfTable();
+  refreshDash(); updateBadges();
+}
+
+// ══════════════════════════════════════════
+// FOLLOW-UP PAGES
+// ══════════════════════════════════════════
+function renderFollowup(group){
+  const seg=group==='eqf'?'equity':'mf';
+  const tab=group==='eqf'?activeEqfTab:activeMffTab;
+  const clients=group==='eqf'?getMyEqClients():getMyMfClients();
+  const t=today(), t7=addDays(t,7);
+
+  let data;
+  if(tab==='today') data=clients.filter(c=>c.next_call===t);
+  else if(tab==='overdue') data=clients.filter(c=>c.next_call&&c.next_call<t);
+  else if(tab==='upcoming') data=clients.filter(c=>c.next_call&&c.next_call>t&&c.next_call<=t7);
+  else data=clients.filter(c=>c.next_call||c.followup_status==='Pending');
+
+  const cont=document.getElementById(group+'-content');
+  if(!cont) return;
+
+  if(!data.length){
+    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--gray)">✅ No ${tab} follow-ups</div>`;
+    return;
+  }
+
+  let h=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
+    <th>Name</th><th>Mobile</th><th>RM</th><th>Next Call</th><th>Last Call</th><th>Status</th><th>Remarks</th><th>Actions</th>
+    </tr></thead><tbody>`;
+
+  data.forEach(c=>{
+    const isOver=c.next_call&&c.next_call<t;
+    h+=`<tr class="${isOver?'row-alert':''}">
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td style="color:${isOver?'var(--red)':'inherit'};font-weight:${isOver?700:400}">${fmtDate(c.next_call)||'—'}</td>
+      <td>${fmtDate(c.last_call_date)||'—'}</td>
+      <td><span class="badge ${c.followup_status==='Done'?'b-done':'b-pending'}">${c.followup_status||'—'}</span></td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${c.remarks||'—'}</td>
+      <td>
+        <button class="btn-icon" onclick="logCall('${c.id}','${seg}')">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon">💬</a>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  cont.innerHTML=h;
+}
+
+// ══════════════════════════════════════════
+// NO-TRADE ALERTS
+// ══════════════════════════════════════════
+function renderNoTrade(){
+  const days=parseInt(activeNtTab);
+  const eq=getMyEqClients();
+  const data=eq.filter(c=>daysDiff(c.last_trade_date)>=days)
+    .map(c=>({...c,daysAgo:daysDiff(c.last_trade_date)}))
+    .sort((a,b)=>b.daysAgo-a.daysAgo);
+
+  const cont=document.getElementById('nt-content');
+  if(!cont) return;
+  if(!data.length){
+    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No clients with ${days}+ days no-trade</div>`;
+    return;
+  }
+  let h=`<p style="margin-bottom:12px;color:var(--gray);font-size:.82rem">${data.length} clients with no trade in ${days}+ days</p>
+    <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
+    <th>Code</th><th>Name</th><th>Mobile</th><th>RM</th><th>Last Trade</th><th>Days Since</th><th>Asset Value</th><th>Actions</th>
+    </tr></thead><tbody>`;
+  data.forEach(c=>{
+    const cls=c.daysAgo>=180?'row-alert':c.daysAgo>=90?'row-inactive':'';
+    h+=`<tr class="${cls}">
+      <td>${c.code||'—'}</td>
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td>${fmtDate(c.last_trade_date)||'Never'}</td>
+      <td style="font-weight:700;color:${c.daysAgo>=180?'var(--red)':c.daysAgo>=90?'var(--orange)':'var(--gold)'}">${c.daysAgo}d</td>
+      <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
+      <td>
+        <button class="btn-icon" onclick="logCall('${c.id}','equity')">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon">💬</a>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  cont.innerHTML=h;
+}
+
+// ══════════════════════════════════════════
+// SIP TRACKER
+// ══════════════════════════════════════════
+function renderSip(){
+  const mf=getMyMfClients();
+  const sipClients=mf.filter(c=>c.sip_amount>0);
+  const totalAUM=mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
+  const totalSIP=sipClients.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0);
+  const totalCount=sipClients.reduce((s,c)=>s+(parseInt(c.sip_count)||0),0);
+
+  document.getElementById('sipStats').innerHTML=
+    `<div class="stat-card teal"><div class="stat-n">${sipClients.length}</div><div class="stat-l">SIP Clients</div></div>`+
+    `<div class="stat-card gold"><div class="stat-n">₹${fmtNum(totalSIP)}</div><div class="stat-l">Monthly SIP</div></div>`+
+    `<div class="stat-card"><div class="stat-n">${totalCount}</div><div class="stat-l">Total SIP Count</div></div>`+
+    `<div class="stat-card purple"><div class="stat-n">₹${fmtNum(totalAUM)}</div><div class="stat-l">Total AUM</div></div>`;
+
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>MF RM</th><th>Status</th><th>AUM</th><th>SIP/mo</th><th>SIP Count</th><th>Last Invest</th><th>Actions</th></tr></thead><tbody>`;
+  sipClients.sort((a,b)=>(b.sip_amount||0)-(a.sip_amount||0)).forEach(c=>{
+    h+=`<tr class="row-mf">
+      <td style="font-weight:600">${c.name}</td>
+      <td>${c.mobile||'—'}</td>
+      <td>${c.rm||'—'}</td>
+      <td><span class="badge b-investor">${c.status}</span></td>
+      <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
+      <td style="font-weight:700;color:var(--teal)">₹${fmtNum(c.sip_amount)}</td>
+      <td>${c.sip_count||'—'}</td>
+      <td>${fmtDate(c.last_invest_date)||'—'}</td>
+      <td><button class="btn-icon" onclick="viewClient('${c.id}','mf')">👁</button>
+          <button class="btn-icon" onclick="editClient('${c.id}','mf')">✏️</button></td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('sip-table').innerHTML=`<div class="tbl-wrap"><div class="tbl-scroll">${h}</div></div>`;
+}
+
+// ══════════════════════════════════════════
+// REPORTS
+// ══════════════════════════════════════════
+function renderReports(){
+  const eqCards=[
+    {icon:'👥',title:'RM-wise Client List',desc:'Clients grouped by Equity RM',fn:'rmEqReport'},
+    {icon:'✅',title:'Active/Inactive Report',desc:'Trading status breakdown',fn:'statusEqReport'},
+    {icon:'📅',title:'Last Trade Date Report',desc:'Clients sorted by last trade',fn:'lastTradeReport'},
+    {icon:'⚠️',title:'No Trade — 30 Days',desc:'Clients inactive 30+ days',fn:'noTrade30'},
+    {icon:'🔴',title:'No Trade — 60 Days',desc:'Clients inactive 60+ days',fn:'noTrade60'},
+    {icon:'⚫',title:'No Trade — 90/180 Days',desc:'Clients inactive 90/180+ days',fn:'noTrade90'},
+    {icon:'📞',title:'Follow-up Pending',desc:'Clients with pending follow-ups',fn:'fuPendingEq'},
+    {icon:'💰',title:'Revenue Report',desc:'RM-wise brokerage/revenue',fn:'revenueReport'},
+  ];
+  const mfCards=[
+    {icon:'🏦',title:'RM-wise Investor List',desc:'Investors grouped by MF RM',fn:'rmMfReport'},
+    {icon:'📈',title:'AUM Report',desc:'RM-wise AUM summary',fn:'aumReport'},
+    {icon:'🔄',title:'SIP Report',desc:'SIP amount and count by RM',fn:'sipReport'},
+    {icon:'🧲',title:'Investor vs Prospect',desc:'Status breakdown',fn:'statusMfReport'},
+    {icon:'📞',title:'MF Follow-up Pending',desc:'MF clients with pending calls',fn:'fuPendingMf'},
+    {icon:'📅',title:'Last Investment Report',desc:'Clients by last investment date',fn:'lastInvestReport'},
+  ];
+  const coCards=[
+    {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
+  ];
+  document.getElementById('eq-reports').innerHTML=eqCards.map(r=>reportCard(r)).join('');
+  document.getElementById('mf-reports').innerHTML=mfCards.map(r=>reportCard(r)).join('');
+  document.getElementById('co-reports').innerHTML=coCards.map(r=>reportCard(r)).join('');
+}
+
+function reportCard(r){
+  return `<div class="report-card" onclick="${r.fn}()">
+    <div class="r-icon">${r.icon}</div>
+    <h4>${r.title}</h4><p>${r.desc}</p></div>`;
+}
+
+function showReport(title, headers, rows){
+  currentReportData={headers,rows};
+  document.getElementById('reportModalTitle').textContent=title;
+  let h=`<p style="color:var(--gray);font-size:.8rem;margin-bottom:12px">${rows.length} records</p>`;
+  h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r=>{ h+=`<tr>${r.map(c=>`<td>${c!=null?c:'—'}</td>`).join('')}</tr>`; });
+  h+='</tbody></table></div></div>';
+  document.getElementById('reportModalBody').innerHTML=h;
+  document.getElementById('reportModal').classList.add('open');
+}
+
+function exportReportCSV(){
+  const {headers,rows}=currentReportData;
+  const csv=[headers,...rows].map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='report_'+Date.now()+'.csv'; a.click();
+}
+
+function rmEqReport(){
+  const eq=getMyEqClients();
+  const rms={};
+  eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]=[]; rms[c.rm].push(c); });
+  const rows=[];
+  Object.entries(rms).sort().forEach(([rm,cls])=>{
+    cls.forEach(c=>rows.push([rm,c.code||'',c.name,c.mobile||'',c.status,c.asset_value?'₹'+fmtNum(c.asset_value):'',fmtDate(c.last_trade_date)||'']));
+  });
+  showReport('RM-wise Equity Client List',['RM','Code','Name','Mobile','Status','Asset Value','Last Trade'],rows);
+}
+
+function statusEqReport(){
+  const eq=getMyEqClients();
+  const rows=eq.sort((a,b)=>a.status?.localeCompare(b.status)).map(c=>[c.rm,c.code||'',c.name,c.mobile||'',c.status,fmtDate(c.last_trade_date)||'',daysDiff(c.last_trade_date)||'']);
+  showReport('Active/Inactive Report',['RM','Code','Name','Mobile','Status','Last Trade','Days'],rows);
+}
+
+function lastTradeReport(){
+  const eq=getMyEqClients().filter(c=>c.last_trade_date).sort((a,b)=>a.last_trade_date.localeCompare(b.last_trade_date));
+  const rows=eq.map(c=>[c.rm,c.name,c.mobile||'',fmtDate(c.last_trade_date),daysDiff(c.last_trade_date),c.status,c.asset_value?'₹'+fmtNum(c.asset_value):'']);
+  showReport('Last Trade Date Report',['RM','Name','Mobile','Last Trade','Days Ago','Status','Asset'],rows);
+}
+
+function noTrade30(){ ntReport(30); }
+function noTrade60(){ ntReport(60); }
+function noTrade90(){ ntReport(90); }
+function ntReport(d){
+  const rows=getMyEqClients().filter(c=>daysDiff(c.last_trade_date)>=d)
+    .sort((a,b)=>daysDiff(b.last_trade_date)-daysDiff(a.last_trade_date))
+    .map(c=>[c.rm,c.code||'',c.name,c.mobile||'',fmtDate(c.last_trade_date)||'Never',daysDiff(c.last_trade_date)||'',c.asset_value?'₹'+fmtNum(c.asset_value):'']);
+  showReport(`No-Trade ${d}+ Days Report`,['RM','Code','Name','Mobile','Last Trade','Days','Asset Value'],rows);
+}
+
+function fuPendingEq(){
+  const rows=getMyEqClients().filter(c=>c.followup_status==='Pending'||c.next_call).sort((a,b)=>(a.next_call||'').localeCompare(b.next_call||''))
+    .map(c=>[c.rm,c.name,c.mobile||'',fmtDate(c.last_call_date)||'',fmtDate(c.next_call)||'',c.followup_status||'',c.remarks||'']);
+  showReport('Follow-up Pending — Equity',['RM','Name','Mobile','Last Call','Next Call','Status','Remarks'],rows);
+}
+
+function revenueReport(){
+  const eq=getMyEqClients();
+  const rms={};
+  eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,rev:0,aum:0}; rms[c.rm].count++; rms[c.rm].rev+=(c.revenue||0); rms[c.rm].aum+=(c.asset_value||0); });
+  const rows=Object.entries(rms).sort().map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.rev)]);
+  showReport('Revenue Report',['RM','Client Count','Total AUM','Total Revenue'],rows);
+}
+
+function rmMfReport(){
+  const mf=getMyMfClients();
+  const rows=mf.sort((a,b)=>a.rm?.localeCompare(b.rm)).map(c=>[c.rm,c.name,c.mobile||'',c.status,c.aum?'₹'+fmtNum(c.aum):'',c.sip_amount?'₹'+fmtNum(c.sip_amount):'',c.sip_count||'']);
+  showReport('RM-wise MF Investor List',['RM','Name','Mobile','Status','AUM','SIP/mo','SIP Count'],rows);
+}
+
+function aumReport(){
+  const mf=getMyMfClients();
+  const rms={};
+  mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,aum:0,inv:0}; rms[c.rm].count++; rms[c.rm].aum+=(c.aum||0); rms[c.rm].inv+=(c.status==='Investor'?1:0); });
+  const rows=Object.entries(rms).sort((a,b)=>b[1].aum-a[1].aum).map(([rm,d])=>[rm,d.count,d.inv,'₹'+fmtNum(d.aum)]);
+  showReport('AUM Report',['RM','Total Clients','Investors','Total AUM'],rows);
+}
+
+function sipReport(){
+  const mf=getMyMfClients();
+  const rms={};
+  mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,sip:0,sipC:0}; rms[c.rm].count++; rms[c.rm].sip+=(c.sip_amount||0); rms[c.rm].sipC+=(c.sip_count||0); });
+  const rows=Object.entries(rms).sort((a,b)=>b[1].sip-a[1].sip).map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.sip),d.sipC]);
+  showReport('SIP Report',['RM','Total Investors','Monthly SIP','Total SIP Count'],rows);
+}
+
+function statusMfReport(){
+  const rows=getMyMfClients().sort((a,b)=>a.status?.localeCompare(b.status)).map(c=>[c.rm,c.name,c.mobile||'',c.status,c.aum?'₹'+fmtNum(c.aum):'',c.sip_amount?'₹'+fmtNum(c.sip_amount):'']);
+  showReport('Investor vs Prospect',['RM','Name','Mobile','Status','AUM','SIP/mo'],rows);
+}
+
+function fuPendingMf(){
+  const rows=getMyMfClients().filter(c=>c.followup_status==='Pending'||c.next_call).sort((a,b)=>(a.next_call||'').localeCompare(b.next_call||''))
+    .map(c=>[c.rm,c.name,c.mobile||'',fmtDate(c.last_call_date)||'',fmtDate(c.next_call)||'',c.followup_status||'',c.remarks||'']);
+  showReport('Follow-up Pending — MF',['RM','Name','Mobile','Last Call','Next Call','Status','Remarks'],rows);
+}
+
+function lastInvestReport(){
+  const rows=getMyMfClients().sort((a,b)=>(a.last_invest_date||'').localeCompare(b.last_invest_date||'')).map(c=>[c.rm,c.name,c.mobile||'',c.status,fmtDate(c.last_invest_date)||'Never',c.aum?'₹'+fmtNum(c.aum):'']);
+  showReport('Last Investment Report',['RM','Name','Mobile','Status','Last Investment','AUM'],rows);
+}
+
+function rmPerf(){
+  const eq=getMyEqClients(), mf=getMyMfClients();
+  const rms={};
+  eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].eqC++; rms[c.rm].rev+=(c.revenue||0); });
+  mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].mfC++; rms[c.rm].aum+=(c.aum||0); rms[c.rm].sip+=(c.sip_amount||0); });
+  const rows=Object.entries(rms).sort().map(([rm,d])=>[rm,d.eqC,d.mfC,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.sip),'₹'+fmtNum(d.rev)]);
+  showReport('RM Performance Report',['RM','EQ Clients','MF Investors','Total AUM','Monthly SIP','Revenue'],rows);
+}
+
+// ══════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════
+function exportCSV(seg){
+  const clients=seg==='equity'?getMyEqClients():getMyMfClients();
+  if(!clients.length){ toast('No data to export','error'); return; }
+  const headers=seg==='equity'
+    ?['Code','Name','Mobile','Email','RM','Status','Asset Value','Revenue','Last Trade Date','Last Trade Month','Last Call Date','Next Call Date','Follow-up Status','Remarks']
+    :['Name','Mobile','Email','RM','Status','AUM','SIP Amount','SIP Count','Last Invest Date','Last Call Date','Next Call Date','Follow-up Status','Remarks'];
+  const rows=seg==='equity'
+    ?clients.map(c=>[c.code||'',c.name,c.mobile||'',c.email||'',c.rm,c.status,c.asset_value||'',c.revenue||'',c.last_trade_date||'',c.last_trade_month||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||''])
+    :clients.map(c=>[c.name,c.mobile||'',c.email||'',c.rm,c.status,c.aum||'',c.sip_amount||'',c.sip_count||'',c.last_invest_date||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
+  const csv=[headers,...rows].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download=(seg==='equity'?'equity_clients_':'mf_investors_')+today()+'.csv'; a.click();
+  toast('Export done!','success');
+}
+
+// ══════════════════════════════════════════
+// ADMIN
+// ══════════════════════════════════════════
+function renderAdmin(){
+  const users=DB.get('users')||[];
+  let h=users.map(u=>`
+    <div class="user-card">
+      <div class="user-avatar">${u.name[0].toUpperCase()}</div>
+      <div class="user-info">
+        <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}</div>
+        <div class="user-role">@${u.username} · ${u.role}</div>
+        <div class="user-segs">${(u.segments||[]).map(s=>`<span class="badge ${s==='equity'?'b-eq':'b-mf'}">${s==='equity'?'Equity':'MF'}</span>`).join('')}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="editUser('${u.id}')">Edit</button>
+        <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('user-list').innerHTML=h;
+}
+
+function openAddUser(){
+  document.getElementById('userModalTitle').textContent='Add User';
+  document.getElementById('userModalBody').innerHTML=userForm(null);
+  document.getElementById('userModal').classList.add('open');
+}
+
+function editUser(id){
+  const user=(DB.get('users')||[]).find(u=>u.id===id);
+  if(!user) return;
+  document.getElementById('userModalTitle').textContent='Edit User: '+user.name;
+  document.getElementById('userModalBody').innerHTML=userForm(user);
+  document.getElementById('userModal').classList.add('open');
+}
+
+function userForm(u){
+  return `
+    <div class="form-row">
+      <div class="form-field"><label>Full Name *</label><input id="uf_name" value="${u?.name||''}"></div>
+      <div class="form-field"><label>Username *</label><input id="uf_uname" value="${u?.username||''}" ${u?'readonly':''}></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>Password *</label><input id="uf_pwd" type="password" placeholder="${u?'Leave blank to keep current':'Enter password'}"></div>
+      <div class="form-field"><label>Role</label><select id="uf_role">
+        <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
+        <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
+      </select></div>
+    </div>
+    <div class="form-field"><label>Segments Access</label>
+      <div style="display:flex;gap:12px;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="uf_eq" ${(u?.segments||[]).includes('equity')||!u?'checked':''}>Equity</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="uf_mf" ${(u?.segments||[]).includes('mf')||!u?'checked':''}>Mutual Fund</label>
+      </div>
+    </div>
+    <input type="hidden" id="uf_id" value="${u?.id||''}">`;
+}
+
+function saveUser(){
+  const id=document.getElementById('uf_id').value;
+  const name=document.getElementById('uf_name').value.trim();
+  const uname=document.getElementById('uf_uname').value.trim().toLowerCase();
+  const pwd=document.getElementById('uf_pwd').value;
+  const role=document.getElementById('uf_role').value;
+  const segs=[];
+  if(document.getElementById('uf_eq').checked) segs.push('equity');
+  if(document.getElementById('uf_mf').checked) segs.push('mf');
+
+  if(!name||!uname){ toast('Name and username required','error'); return; }
+  if(!segs.length){ toast('Select at least one segment','error'); return; }
+
+  const users=DB.get('users')||[];
+  if(id){
+    const idx=users.findIndex(u=>u.id===id);
+    if(idx>=0){
+      users[idx]={...users[idx],name,role,segments:segs};
+      if(pwd) users[idx].password=pwd;
+    }
+  } else {
+    if(!pwd){ toast('Password required for new user','error'); return; }
+    if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
+    users.push({id:uid(),username:uname,password:pwd,name,role,segments:segs,active:true});
+  }
+  DB.set('users',users);
+  closeModal('userModal');
+  toast(id?'User updated!':'User added!','success');
+  renderAdmin();
+  populateRmDropdowns();
+}
+
+function toggleUser(id){
+  const users=DB.get('users')||[];
+  const idx=users.findIndex(u=>u.id===id);
+  if(idx>=0){ users[idx].active=!users[idx].active; DB.set('users',users); renderAdmin(); toast('User status updated!','success'); }
+}
+
+// ══════════════════════════════════════════
+// PAGINATION
+// ══════════════════════════════════════════
+function renderPg(tab,tot,cur){
+  const el=document.getElementById(tab+'-pg');
+  const pages=Math.ceil(tot/PG_SIZE);
+  if(!el||pages<=1){if(el)el.innerHTML='';return;}
+  let h=`<button class="pg-btn" onclick="gp('${tab}',${cur-1})" ${cur===1?'disabled':''}>‹</button>`;
+  let rng=[];
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-cur)<=2) rng.push(i);
+    else if(rng[rng.length-1]!=='...') rng.push('...');
+  }
+  rng.forEach(r=>{ if(r==='...') h+=`<span class="pg-info">…</span>`; else h+=`<button class="pg-btn ${r===cur?'active':''}" onclick="gp('${tab}',${r})">${r}</button>`; });
+  h+=`<button class="pg-btn" onclick="gp('${tab}',${cur+1})" ${cur===pages?'disabled':''}>›</button>`;
+  h+=`<span class="pg-info">${cur}/${pages} (${tot})</span>`;
+  el.innerHTML=h;
+}
+
+function gp(tab,p){
+  const tot=tab==='eq'?eqFiltered.length:mfFiltered.length;
+  const pages=Math.ceil(tot/PG_SIZE);
+  if(p<1||p>pages) return;
+  if(tab==='eq'){eqPage=p;renderEqTable();}
+  else{mfPage=p;renderMfTable();}
+}
+
+// ══════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+let toastTimer;
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='show '+(type||'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.className='',3000);
+}
+// ══ IMPORT SYSTEM ══
+var importData = { aum: null, sip: null, activeTab: 'aum' };
+
+function openImportModal(){
+  importData = { aum: null, sip: null, activeTab: 'aum' };
+  document.getElementById('importModal').classList.add('open');
+}
+
+function switchImportTab(tab){
+  importData.activeTab = tab;
+  ['aum','sip','both'].forEach(t=>{
+    document.getElementById('imp-'+t).style.display = t===tab?'block':'none';
+    document.getElementById('imp-tab-'+t).classList.toggle('active', t===tab);
+  });
+  checkImportReady();
+}
+
+function checkImportReady(){
+  const btn = document.getElementById('importBtn');
+  const tab = importData.activeTab;
+  if(tab==='aum' && importData.aum) btn.disabled=false;
+  else if(tab==='sip' && importData.sip) btn.disabled=false;
+  else if(tab==='both' && importData.aum && importData.sip) btn.disabled=false;
+  else btn.disabled=true;
+}
+
+function readExcel(file, cb){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      cb(null, rows);
+    }catch(err){ cb(err); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function parseAumExcel(rows){
+  // Find header row
+  let hdrIdx = rows.findIndex(r => String(r[0]).includes('S.No') || String(r[1]).includes('Client Name'));
+  if(hdrIdx < 0) hdrIdx = 7; // default
+  const data = rows.slice(hdrIdx+1).filter(r => String(r[0]).match(/^\d+$/));
+  return data.map(r => ({
+    sno: r[0], name: String(r[1]||'').trim(), pan: String(r[2]||'').trim(),
+    inv_amt: parseFloat(r[3])||0, aum: parseFloat(r[6])||0
+  })).filter(r => r.name);
+}
+
+function parseSipExcel(rows){
+  // Find header row - row 1 is header
+  const hdrIdx = rows.findIndex(r => String(r[0]).includes('S.No') || String(r[1]).includes('Name'));
+  const data = rows.slice(hdrIdx+1).filter(r => String(r[0]).match(/^\d+$/));
+  
+  // Extract name and PAN from "Name [PAN][Code]" format
+  const sipMap = {};
+  data.forEach(r => {
+    const nameRaw = String(r[1]||'');
+    const name = nameRaw.replace(/\[.*?\]/g,'').trim();
+    const panMatch = nameRaw.match(/\[([A-Z]{5}\d{4}[A-Z])\]/);
+    const pan = panMatch ? panMatch[1] : '';
+    const amt = parseFloat(r[6])||0;
+    const cnt = parseInt(r[7])||0;
+    const key = pan || name.toUpperCase();
+    if(!sipMap[key]){ sipMap[key] = {name, pan, sip_amount:0, sip_count:0}; }
+    sipMap[key].sip_amount += amt;
+    sipMap[key].sip_count += cnt;
+  });
+  return sipMap;
+}
+
+function handleAumFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('AUM file read error: '+err.message,'error'); return; }
+    importData.aum = parseAumExcel(rows);
+    document.getElementById('aum-preview').innerHTML = 
+      `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${importData.aum.length} clients found in AUM file</div>`;
+    checkImportReady();
+  });
+}
+
+function handleSipFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('SIP file read error: '+err.message,'error'); return; }
+    importData.sip = parseSipExcel(rows);
+    const cnt = Object.keys(importData.sip).length;
+    document.getElementById('sip-preview').innerHTML = 
+      `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${cnt} SIP clients found</div>`;
+    checkImportReady();
+  });
+}
+
+function handleBothFile(type, input){
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('both-'+type+'-name').textContent = file.name;
+  readExcel(file, function(err, rows){
+    if(err){ toast('Error: '+err.message,'error'); return; }
+    if(type==='aum'){
+      importData.aum = parseAumExcel(rows);
+      document.getElementById('both-preview').innerHTML += 
+        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${importData.aum.length} clients</div>`;
+    } else {
+      importData.sip = parseSipExcel(rows);
+      const cnt = Object.keys(importData.sip).length;
+      document.getElementById('both-preview').innerHTML += 
+        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ SIP: ${cnt} clients</div>`;
+    }
+    checkImportReady();
+  });
+}
+
+function doImport(){
+  const tab = importData.activeTab;
+  const existing = DB.get('mf_clients')||[];
+  
+  // Build lookup from existing clients
+  const existingMap = {};
+  existing.forEach(c => {
+    if(c.pan) existingMap[c.pan] = c;
+    if(c.name) existingMap[c.name.toUpperCase()] = c;
+  });
+  
+  let updated = 0, added = 0;
+  const newClients = [];
+  
+  if(importData.aum){
+    importData.aum.forEach(row => {
+      const key = row.pan || row.name.toUpperCase();
+      const sipInfo = importData.sip ? (importData.sip[row.pan] || importData.sip[row.name.toUpperCase()] || {}) : {};
+      const ex = existingMap[row.pan] || existingMap[row.name.toUpperCase()];
+      
+      if(ex){
+        // Update existing
+        ex.aum = row.aum || ex.aum;
+        ex.pan = row.pan || ex.pan;
+        if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
+        if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
+        ex.status = 'Investor';
+        newClients.push(ex);
+        updated++;
+      } else {
+        // Add new
+        newClients.push({
+          id: uid(),
+          name: row.name, pan: row.pan, mobile:'', email:'', rm:'',
+          status: 'Investor',
+          aum: row.aum,
+          sip_amount: sipInfo.sip_amount||null,
+          sip_count: sipInfo.sip_count||null,
+          last_invest_date:'', last_call_date:'', next_call:'',
+          followup_status:'', remarks:'', created: today(), updated: today()
+        });
+        added++;
+      }
+    });
+  } else if(importData.sip){
+    // SIP only
+    Object.values(importData.sip).forEach(row => {
+      const ex = existingMap[row.pan] || existingMap[row.name.toUpperCase()];
+      if(ex){
+        ex.sip_amount = row.sip_amount;
+        ex.sip_count = row.sip_count;
+        newClients.push(ex);
+        updated++;
+      } else {
+        newClients.push({
+          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm:'',
+          status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count,
+          last_invest_date:'', last_call_date:'', next_call:'',
+          followup_status:'', remarks:'', created:today(), updated:today()
+        });
+        added++;
+      }
+    });
+    // Add existing not in SIP
+    existing.forEach(c => {
+      const key = c.pan || (c.name||'').toUpperCase();
+      if(!importData.sip[key]) newClients.push(c);
+    });
+  }
+  
+  DB.set('mf_clients', newClients);
+  closeModal('importModal');
+  toast(`✅ Import done! ${updated} updated + ${added} new clients`, 'success');
+  renderMfTable(); refreshDash(); updateBadges();
+}
+
+
+// ══ TABLE SORTING (Universal) ══
+window._sortState = {};
+function makeSortable(tableSelector){
+  const tbl = document.querySelector(tableSelector);
+  if(!tbl) return;
+  const ths = tbl.querySelectorAll('thead th');
+  ths.forEach((th, i) => {
+    if(th.textContent.trim() === 'Actions') return;
+    th.style.cursor = 'pointer';
+    th.title = 'Click to sort';
+    th.onclick = () => {
+      const tbody = tbl.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const key = tableSelector + '-' + i;
+      const dir = window._sortState[key] === 1 ? -1 : 1;
+      window._sortState[key] = dir;
+      rows.sort((a, b) => {
+        let at = a.cells[i] ? a.cells[i].textContent.trim() : '';
+        let bt = b.cells[i] ? b.cells[i].textContent.trim() : '';
+        // Try date parse (dd-mmm-yyyy)
+        const da = Date.parse(at), db = Date.parse(bt);
+        if(!isNaN(da) && !isNaN(bt) && at.match(/\d{2}-[A-Za-z]{3}-\d{4}/) && bt.match(/\d{2}-[A-Za-z]{3}-\d{4}/)){
+          return dir * (da - db);
+        }
+        // Try numeric (strip currency symbols, commas, K/L/Cr)
+        const parseNum = (s) => {
+          s = s.replace(/[₹,\s]/g,'');
+          let mult = 1;
+          if(s.endsWith('Cr')){ mult=10000000; s=s.slice(0,-2); }
+          else if(s.endsWith('L')){ mult=100000; s=s.slice(0,-1); }
+          else if(s.endsWith('K')){ mult=1000; s=s.slice(0,-1); }
+          const n = parseFloat(s);
+          return isNaN(n) ? null : n*mult;
+        };
+        const na = parseNum(at), nb = parseNum(bt);
+        if(na !== null && nb !== null){
+          return dir * (na - nb);
+        }
+        return dir * at.localeCompare(bt, undefined, {numeric:true, sensitivity:'base'});
+      });
+      rows.forEach(r => tbody.appendChild(r));
+      // Update header arrows
+      ths.forEach((h, j) => {
+        h.textContent = h.textContent.replace(/ [▲▼]/g, '');
+        if(j === i) h.textContent += (dir === 1 ? ' ▲' : ' ▼');
+      });
+    };
+  });
+}
+
+// Re-apply sorting whenever a table is rendered
+const _origRenderEqTable = window.renderEqTable;
+window.renderEqTable = function(...args){
+  _origRenderEqTable.apply(this, args);
+  makeSortable('#eq-table table');
+};
+const _origRenderMfTable = window.renderMfTable;
+window.renderMfTable = function(...args){
+  _origRenderMfTable.apply(this, args);
+  makeSortable('#mf-table table');
+};
+
+// For follow-up / no-trade / sip tabs, hook into tab switching
+function sortAllVisibleTables(){
+  document.querySelectorAll('.page.active table, .tab-panel.active table, #eqf-content table, #mff-content table, #nt-content table, #sip-table table').forEach((tbl, idx) => {
+    let sel = null;
+    if(tbl.closest('#eqf-content')) sel = '#eqf-content table';
+    else if(tbl.closest('#mff-content')) sel = '#mff-content table';
+    else if(tbl.closest('#nt-content')) sel = '#nt-content table';
+    else if(tbl.closest('#sip-table')) sel = '#sip-table table';
+    if(sel) makeSortable(sel);
+  });
+}
+
+// Hook into tab clicks for follow-up/no-trade/sip pages
+document.addEventListener('click', function(e){
+  if(e.target.classList.contains('tab-item')){
+    setTimeout(sortAllVisibleTables, 100);
+  }
+  if(e.target.closest('.nav-item')){
+    setTimeout(sortAllVisibleTables, 150);
+  }
+});
+
+// Initial sort setup after page load
+setTimeout(sortAllVisibleTables, 1000);
+
+</script>
+</body>
+</html>
