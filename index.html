@@ -410,6 +410,13 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
           <div class="filter-sep"></div>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
+            <input type="date" onchange="filterEq()" id="eq-last-call-date" style="padding:6px;font-size:.78rem"></label>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
+            <input type="date" onchange="filterEq()" id="eq-next-call-date" style="padding:6px;font-size:.78rem"></label>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Trade:
+            <input type="date" onchange="filterEq()" id="eq-last-trade-date" style="padding:6px;font-size:.78rem"></label>
+          <div class="filter-sep"></div>
           <select onchange="changePageSize('eq',this.value)" id="eq-pagesize">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
@@ -468,6 +475,9 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
+          <div class="filter-sep"></div>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
+            <input type="date" onchange="filterMf()" id="mf-next-call-date" style="padding:6px;font-size:.78rem"></label>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('mf',this.value)" id="mf-pagesize">
             <option value="50">50 / page</option>
@@ -1249,7 +1259,7 @@ function sortEqTable(colIndex){
   renderEqTable();
 }
 function resetFilters(t){
-  ['search','status','rm','followup-filter'].forEach(f=>{
+  ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-date'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   }); filterEq(); if(t==='mf') filterMf();
 }
@@ -1260,6 +1270,9 @@ function renderEqTable(){
   const st=(document.getElementById('eq-status')||{value:''}).value;
   const rm=(document.getElementById('eq-rm')||{value:''}).value;
   const fu=(document.getElementById('eq-followup-filter')||{value:''}).value;
+  const lastCallDate=(document.getElementById('eq-last-call-date')||{value:''}).value;
+  const nextCallDate=(document.getElementById('eq-next-call-date')||{value:''}).value;
+  const lastTradeDate=(document.getElementById('eq-last-trade-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
@@ -1267,6 +1280,9 @@ function renderEqTable(){
   if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+  if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
+  if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
+  if(lastTradeDate) data=data.filter(c=>c.last_trade_date===lastTradeDate);
 
   eqFiltered=data;
   const lbl=document.getElementById('eq-total-label');
@@ -1362,6 +1378,7 @@ function renderMfTable(){
   const st=(document.getElementById('mf-status')||{value:''}).value;
   const rm=(document.getElementById('mf-rm')||{value:''}).value;
   const fu=(document.getElementById('mf-followup-filter')||{value:''}).value;
+  const nextCallDate=(document.getElementById('mf-next-call-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
@@ -1369,6 +1386,7 @@ function renderMfTable(){
   if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+  if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
 
   mfFiltered=data;
   const lbl=document.getElementById('mf-total-label');
