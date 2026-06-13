@@ -1301,7 +1301,7 @@ function renderEqTable(){
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
-  if(rm) data=data.filter(c=>c.rm===rm);
+  if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
@@ -1420,7 +1420,7 @@ function renderMfTable(){
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
-  if(rm) data=data.filter(c=>c.rm===rm);
+  if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
