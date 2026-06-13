@@ -1503,11 +1503,11 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Last Trade Date</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}"></div>
       <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
-      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" max="${today()}"></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
-      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}"></div>
+      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}"></div>
       <div class="form-field"><label>Follow-up Status</label><select id="f_followup"><option value="">—</option><option ${c?.followup_status==='Pending'?'selected':''}>Pending</option><option ${c?.followup_status==='Done'?'selected':''}>Done</option><option ${c?.followup_status==='Not Required'?'selected':''}>Not Required</option></select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>`;
@@ -1534,11 +1534,11 @@ function clientForm(seg, c){
     </div>
     <div class="form-row">
       <div class="form-field"><label>Last Investment Date</label><input id="f_last_invest" type="date" value="${c?.last_invest_date||''}"></div>
-      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" max="${today()}"></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
-      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}"></div>
+      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}"></div>
       <div class="form-field"><label>Follow-up Status</label><select id="f_followup"><option value="">—</option><option ${c?.followup_status==='Pending'?'selected':''}>Pending</option><option ${c?.followup_status==='Done'?'selected':''}>Done</option><option ${c?.followup_status==='Not Required'?'selected':''}>Not Required</option></select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>`;
@@ -1700,7 +1700,7 @@ function logCall(id,seg){
   document.getElementById('callModalTitle').textContent='Log Call — '+c.name;
   document.getElementById('callModalBody').innerHTML=`
     <div class="form-row">
-      <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${today()}"></div>
+      <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${today()}" max="${today()}"></div>
       <div class="form-field"><label>Call Status</label><select id="cl_status">
         <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option></select></div>
     </div>
@@ -1709,7 +1709,7 @@ function logCall(id,seg){
         <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}"></div>
+      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}" min="${today()}"></div>
       <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">
         <option>Pending</option><option>Done</option><option>Not Required</option></select></div>
     </div>`;
