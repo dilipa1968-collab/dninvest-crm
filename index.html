@@ -1126,7 +1126,7 @@ function doLogout(){
 }
 
 // Auto-login if session exists
-window.addEventListener('DOMContentLoaded', function(){
+function tryAutoLogin(){
   const saved = sessionStorage.getItem('dninvest_session');
   if(saved){
     try{
@@ -1143,7 +1143,8 @@ window.addEventListener('DOMContentLoaded', function(){
     }catch(e){}
     sessionStorage.removeItem('dninvest_session');
   }
-});
+}
+window.addEventListener('DOMContentLoaded', tryAutoLogin);
 
 // ══════════════════════════════════════════
 // INIT
@@ -3611,6 +3612,9 @@ document.addEventListener('click', function(e){
 
 // Initial sort setup after page load
 setTimeout(sortAllVisibleTables, 1000);
+
+// Auto-login on page load
+tryAutoLogin();
 
 </script>
 </body>
