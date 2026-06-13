@@ -1394,7 +1394,7 @@ function renderMfTable(){
   const rc=document.getElementById('mf-count');
   if(rc) rc.textContent=data.length+' investors';
 
-  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'status',5:'aum',6:'sip_amount',7:'sip_count',8:'next_call',9:'followup_status'};
+  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'status',5:'aum',6:'sip_amount',7:'sip_count',8:'last_call_date',9:'last_invest_date',10:'next_call',11:'followup_status',12:'remarks'};
   if(mfSortField!==null){
     const field = mfFieldMap[mfSortField];
     data = data.slice().sort((a,b)=>{
@@ -1403,7 +1403,7 @@ function renderMfTable(){
         va = parseFloat(va)||0; vb = parseFloat(vb)||0;
         return mfSortDir*(va-vb);
       }
-      if(['next_call'].includes(field)){
+      if(['next_call','last_call_date','last_invest_date'].includes(field)){
         va = va||''; vb = vb||'';
         if(!va && !vb) return 0;
         if(!va) return 1; if(!vb) return -1;
@@ -1416,7 +1416,7 @@ function renderMfTable(){
   }
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
-  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Next Call','Follow-up'];
+  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Last Calling','Last Investment','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
@@ -1436,8 +1436,11 @@ function renderMfTable(){
       <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
       <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
       <td>${c.sip_count||'—'}</td>
+      <td>${fmtDate(c.last_call_date)||'—'}</td>
+      <td>${fmtDate(c.last_invest_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
         <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
