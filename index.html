@@ -125,8 +125,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 .btn-gold:hover{background:#b8963e;}
 .btn-teal{background:var(--teal);color:#fff;}
 .btn-teal:hover{background:#0771a0;}
-.btn-icon{padding:4px 7px;background:var(--bg);border:1.5px solid var(--border);
-  border-radius:7px;cursor:pointer;font-size:.78rem;transition:all .2s;}
+.btn-icon{padding:2px 5px;background:var(--bg);border:1.5px solid var(--border);
+  border-radius:6px;cursor:pointer;font-size:.7rem;transition:all .2s;}
 .btn-icon:hover{background:var(--border);}
 
 /* ── STATS ── */
@@ -156,8 +156,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 /* ── TABLE ── */
 .tbl-wrap{background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;}
 .tbl-scroll{overflow-x:auto;max-height:58vh;overflow-y:auto;}
-table{width:100%;border-collapse:collapse;font-size:.74rem;}
-thead th{background:var(--navy);color:#fff;padding:7px 8px;text-align:left;font-weight:700;
+table{width:100%;border-collapse:collapse;font-size:.68rem;}
+thead th{background:var(--navy);color:#fff;padding:5px 5px;text-align:left;font-weight:700;
   white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;}
 thead th:hover{background:var(--navy2);}
 thead th.sorted{background:#253f72;}
@@ -166,7 +166,7 @@ tbody tr:hover{background:var(--blue2)!important;}
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
-tbody td{padding:5px 8px;white-space:nowrap;}
+tbody td{padding:4px 5px;white-space:nowrap;}
 .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.66rem;font-weight:700;letter-spacing:.3px;}
 .b-active{background:#d1fae5;color:#065f46;}
 .b-inactive{background:#fef3c7;color:#92400e;}
@@ -1416,7 +1416,7 @@ function renderEqTable(){
   }
 
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
-  const cols=['Code','Name','Mobile','RM','Status','Asset Value','Last Calling','Last Trade','Next Call','Follow-up','Remarks'];
+  const cols=['Code','Name','Mobile','RM','Status','Assets','Last Call','Last Trade','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
@@ -1543,7 +1543,7 @@ function renderMfTable(){
   }
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
-  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Last Calling','Last Investment','Next Call','Follow-up','Remarks'];
+  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Cnt','Last Call','Last Inv','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
