@@ -404,6 +404,7 @@ tbody td{padding:4px 5px;white-space:nowrap;}
         <div class="page-hdr">
           <div class="page-title">Leads <span id="leads-total-label"></span></div>
           <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="openLeadsImportModal()" id="leadsImportBtn">📥 Bulk Upload</button>
             <button class="btn btn-teal" onclick="openAddLead()">+ Add Lead</button>
           </div>
         </div>
@@ -611,6 +612,31 @@ tbody td{padding:4px 5px;white-space:nowrap;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('leadModal')">Cancel</button>
       <button class="btn btn-primary" id="leadSaveBtn" onclick="saveLead()">Save Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- Leads Bulk Import Modal -->
+<div class="modal-overlay" id="leadsImportModal" onclick="if(event.target===this)closeModal('leadsImportModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>📥 Bulk Upload Leads</h3>
+      <button class="modal-close" onclick="closeModal('leadsImportModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+        Excel upload karo jisme columns ho: <b>Name</b> (required), <b>Mobile</b>, <b>RM</b>, <b>Next Call</b> (date), <b>Follow-up Status</b>, <b>Remarks</b>.
+        Column naam alag-alag ho sakte hain (e.g. "Name"/"Lead Name", "Mobile"/"Phone", "RM"/"Assigned To").
+      </p>
+      <div class="import-zone" id="leads-zone" onclick="document.getElementById('leads-import-file').click()">
+        🧲 Leads Excel file yahan drag karo ya click karo
+        <input type="file" id="leads-import-file" accept=".xlsx,.xls" style="display:none" onchange="handleLeadsImportFile(this)">
+      </div>
+      <div id="leads-import-preview" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('leadsImportModal')">Cancel</button>
+      <button class="btn btn-teal" id="leadsImportBtn2" onclick="doLeadsImport()" disabled>Import Leads</button>
     </div>
   </div>
 </div>
@@ -1105,6 +1131,8 @@ function initApp(){
   if(eqImportBtn) eqImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
   if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const leadsImportBtn=document.getElementById('leadsImportBtn');
+  if(leadsImportBtn) leadsImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -1876,6 +1904,99 @@ async function convertLead(id,seg){
   renderLeadsTable();
   if(seg==='equity') renderEqTable(); else renderMfTable();
   refreshDash();
+  updateBadges();
+}
+
+// ══════════════════════════════════════════
+// LEADS BULK IMPORT
+// ══════════════════════════════════════════
+let leadsImportData = null;
+
+function openLeadsImportModal(){
+  leadsImportData = null;
+  document.getElementById('leads-import-preview').innerHTML='';
+  document.getElementById('leads-import-file').value='';
+  document.getElementById('leadsImportBtn2').disabled=true;
+  document.getElementById('leadsImportModal').classList.add('open');
+}
+
+function parseLeadsExcel(rows){
+  let hdrIdx=-1, colMap={};
+  const wanted = {
+    name: ['name','leadname','clientname','fullname'],
+    mobile: ['mobile','mobileno','phone','contactno','mobilenumber','phonenumber'],
+    rm: ['rm','assignedto','dealer','dealername','employeename','relationshipmanager'],
+    next_call: ['nextcall','nextcalldate','nextcallingdate','followupdate'],
+    followup_status: ['followupstatus','followup','status'],
+    remarks: ['remarks','remark','notes','comment','comments']
+  };
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const row=rows[i];
+    const map={};
+    row.forEach((cell,ci)=>{
+      const h=normHdr(cell);
+      for(const [field,variants] of Object.entries(wanted)){
+        if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+      }
+    });
+    if(map.name!==undefined){ hdrIdx=i; colMap=map; break; }
+  }
+  if(hdrIdx===-1) return null;
+  return rows.slice(hdrIdx+1)
+    .filter(r=>r.some(c=>c!==''))
+    .map(r=>({
+      name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
+      mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10) : '',
+      rm: colMap.rm!==undefined ? String(r[colMap.rm]||'').trim() : '',
+      next_call: colMap.next_call!==undefined ? parseExcelDate(r[colMap.next_call]) : '',
+      followup_status: colMap.followup_status!==undefined ? String(r[colMap.followup_status]||'').trim() : '',
+      remarks: colMap.remarks!==undefined ? String(r[colMap.remarks]||'').trim() : ''
+    }))
+    .filter(r=>r.name);
+}
+
+function handleLeadsImportFile(input){
+  const file=input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    const data=parseLeadsExcel(rows);
+    if(!data || !data.length){
+      toast('Header row nahi mil paya. Excel me kam se kam "Name" column hona chahiye.','error');
+      return;
+    }
+    leadsImportData=data;
+    document.getElementById('leads-import-preview').innerHTML=
+      `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${data.length} leads found</div>`;
+    document.getElementById('leadsImportBtn2').disabled=false;
+  });
+}
+
+async function doLeadsImport(){
+  if(!leadsImportData || !leadsImportData.length) return;
+  const existing=DB.get('leads')||[];
+  const existingMobiles=new Set(existing.filter(c=>c.mobile).map(c=>c.mobile.trim()));
+
+  let added=0, skipped=0;
+  const newRecords=[];
+  leadsImportData.forEach(row=>{
+    if(row.mobile && existingMobiles.has(row.mobile)){ skipped++; return; }
+    let newId=uid();
+    while(existing.some(x=>x.id===newId) || newRecords.some(x=>x.id===newId)) newId=uid();
+    newRecords.push({
+      id:newId, name:row.name, mobile:row.mobile, rm:row.rm||(CU.role!=='admin'?CU.name:''),
+      next_call:row.next_call||'', followup_status:row.followup_status||'', remarks:row.remarks||'',
+      created:today(), updated:today()
+    });
+    if(row.mobile) existingMobiles.add(row.mobile);
+    added++;
+  });
+
+  if(newRecords.length) await DB.setClientsBulk('leads', newRecords);
+  closeModal('leadsImportModal');
+  toast(`${added} leads imported${skipped?`, ${skipped} skipped (duplicate mobile)`:''}`,'success');
+  renderLeadsTable();
   updateBadges();
 }
 
