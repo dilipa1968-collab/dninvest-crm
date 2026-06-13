@@ -786,6 +786,9 @@ const DB = {
   // Merge-on-write: re-fetch latest array from Firestore, merge this one
   // record in, then write the merged array back. This avoids clobbering
   // other users' concurrent changes while keeping the proven array storage.
+  // Tracks keys with an in-flight Firestore write, so the real-time listener
+  // can avoid overwriting localStorage with a stale snapshot mid-write.
+  _writing: {},
   async setClient(key, rec){
     // update local copy immediately for responsiveness
     let arr = this.get(key)||[];
@@ -793,6 +796,7 @@ const DB = {
     if(idx>=0) arr[idx]=rec; else arr.push(rec);
     this.setLocal(key, arr);
 
+    this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
         const doc = await fdb.collection('crm_data').doc(key).get();
@@ -805,11 +809,13 @@ const DB = {
         console.log('Firebase merge-synced:',key,rec.id);
       }
     }catch(e){ console.log('setClient error:',e); toast('Sync error: '+e.message,'error'); }
+    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
   // Delete a single client record (merge-on-write delete)
   async deleteClient(key, id){
     let arr = (this.get(key)||[]).filter(c=>c.id!==id);
     this.setLocal(key, arr);
+    this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
         const doc = await fdb.collection('crm_data').doc(key).get();
@@ -819,6 +825,7 @@ const DB = {
         this.setLocal(key, latest);
       }
     }catch(e){ console.log('deleteClient error:',e); toast('Sync error: '+e.message,'error'); }
+    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
   // Bulk save (import) - merge multiple records into the latest array
   async setClientsBulk(key, records){
@@ -827,6 +834,7 @@ const DB = {
     records.forEach(r=>map[r.id]=r);
     let merged = Object.values(map);
     this.setLocal(key, merged);
+    this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
         const doc = await fdb.collection('crm_data').doc(key).get();
@@ -839,6 +847,7 @@ const DB = {
         console.log('Bulk merge-synced:',key,records.length);
       }
     }catch(e){ console.log('Bulk sync error:',e); toast('Sync error: '+e.message,'error'); }
+    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
   load(){
     if(!this.get('users')) this.set('users', DEFAULT_USERS);
@@ -958,10 +967,13 @@ function initApp(){
 
       // Real-time listeners for eq_clients/mf_clients arrays.
       // Skip updates that originate from this client's own pending (unconfirmed)
-      // write to avoid clobbering a just-saved record with a stale snapshot.
+      // write, AND skip while a setClient/deleteClient/setClientsBulk write is
+      // in flight (DB._writing[key] > 0) to avoid a stale Firestore snapshot
+      // overwriting localStorage between our read and our write.
       ['eq_clients','mf_clients'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
+          if(DB._writing[key]>0) return;
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
             const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
