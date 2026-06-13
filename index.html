@@ -83,6 +83,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 .btn-sm{padding:5px 13px;border-radius:18px;cursor:pointer;font-size:.78rem;font-weight:600;
   border:1.5px solid rgba(255,255,255,.3);color:#fff;background:none;transition:all .2s;}
 .btn-sm:hover{background:rgba(255,255,255,.1);}
+.hamburger-btn{display:none;background:none;border:none;color:#fff;font-size:1.3rem;
+  cursor:pointer;padding:4px 8px;border-radius:6px;}
+.hamburger-btn:hover{background:rgba(255,255,255,.1);}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150;}
+.sidebar-overlay.open{display:block;}
 
 /* ── SIDEBAR + CONTENT ── */
 .app-body{display:flex;min-height:calc(100vh - 56px);}
@@ -289,12 +294,30 @@ tbody td{padding:4px 5px;white-space:nowrap;}
 
 /* ── RESPONSIVE ── */
 @media(max-width:800px){
-  .sidebar{display:none;}
+  .hamburger-btn{display:inline-block;}
+  .topbar-brand{font-size:1rem;}
+  .user-pill{display:none;}
+  .sidebar{position:fixed;left:0;top:56px;height:calc(100vh - 56px);z-index:160;
+    transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow2);}
+  .sidebar.open{transform:translateX(0);}
+  .app-body{display:block;}
   .dash-grid{grid-template-columns:1fr;}
   .form-row{grid-template-columns:1fr;}
   .form-row.three{grid-template-columns:1fr;}
-  .content{padding:14px;}
+  .content{padding:10px;}
+  .page-title{font-size:1.1rem;}
+  .modal{width:100%;max-width:100%;border-radius:0;max-height:100vh;height:100vh;}
+  .modal.wide{width:100%;}
+  .filters{padding:10px;gap:6px;}
+  .filters input, .filters select{flex:1 1 100%;min-width:0;}
+  .filter-sep{display:none;}
+  .stats-row{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;}
+  .hdr-actions{width:100%;}
+  .hdr-actions .btn{flex:1;justify-content:center;}
+  table{font-size:.65rem;}
+  thead th, tbody td{padding:4px 4px;}
 }
+
 </style>
 </head>
 <body>
@@ -320,13 +343,18 @@ tbody td{padding:4px 5px;white-space:nowrap;}
 <!-- ══ APP ══ -->
 <div id="app">
   <div class="topbar">
-    <div class="topbar-brand">DN<span>Invest</span> CRM</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+      <div class="topbar-brand">DN<span>Invest</span> CRM</div>
+    </div>
     <div class="topbar-right">
       <span class="seg-indicator" id="segBadge"></span>
       <div class="user-pill">Hello, <b id="uLabel"></b></div>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
   </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <div class="app-body">
     <!-- SIDEBAR -->
@@ -353,6 +381,10 @@ tbody td{padding:4px 5px;white-space:nowrap;}
         <span class="icon">⚠️</span> No-Trade Alerts
         <span class="nav-badge red" id="nb-eqnt">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('eq-nocall')" id="nav-eq-nocall">
+        <span class="icon">📵</span> No-Call Alerts
+        <span class="nav-badge red" id="nb-eqnc">0</span>
+      </div>
 
       <div class="sidebar-section" id="mf-nav-section">Mutual Fund</div>
       <div class="nav-item" onclick="showPage('mf-clients')" id="nav-mf-clients">
@@ -366,6 +398,10 @@ tbody td{padding:4px 5px;white-space:nowrap;}
       <div class="nav-item" onclick="showPage('mf-sip')" id="nav-mf-sip">
         <span class="icon">🔄</span> SIP Tracker
         <span class="nav-badge" id="nb-sip">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('mf-nocall')" id="nav-mf-nocall">
+        <span class="icon">📵</span> No-Call Alerts
+        <span class="nav-badge red" id="nb-mfnc">0</span>
       </div>
 
       <div class="sidebar-section">Reports</div>
@@ -395,6 +431,8 @@ tbody td{padding:4px 5px;white-space:nowrap;}
           <div class="dash-card" id="rmEqCard"><h3>Equity RM — Client Count</h3><div id="rmEqChart"></div></div>
           <div class="dash-card" id="rmMfCard"><h3>MF RM — AUM Summary</h3><div id="rmMfChart"></div></div>
           <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
+          <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
+          <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
           <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
         </div>
       </div>
@@ -492,6 +530,19 @@ tbody td{padding:4px 5px;white-space:nowrap;}
         <div id="nt-content"></div>
       </div>
 
+      <!-- ── EQUITY NO-CALL ALERTS ── -->
+      <div class="page" id="page-eq-nocall">
+        <div class="page-hdr">
+          <div class="page-title">No-Call Alerts</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('eqnc','60')">🔴 60+ Days</div>
+          <div class="tab-item" onclick="switchTab('eqnc','90')">🟠 90+ Days</div>
+          <div class="tab-item" onclick="switchTab('eqnc','180')">⚫ 180+ Days</div>
+        </div>
+        <div id="eqnc-content"></div>
+      </div>
+
       <!-- ── MF CLIENTS ── -->
       <div class="page" id="page-mf-clients">
         <div class="page-hdr">
@@ -548,6 +599,19 @@ tbody td{padding:4px 5px;white-space:nowrap;}
         </div>
         <div class="stats-row" id="sipStats"></div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="sip-table"></div></div>
+      </div>
+
+      <!-- ── MF NO-CALL ALERTS ── -->
+      <div class="page" id="page-mf-nocall">
+        <div class="page-hdr">
+          <div class="page-title">No-Call Alerts</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('mfnc','60')">🔴 60+ Days</div>
+          <div class="tab-item" onclick="switchTab('mfnc','90')">🟠 90+ Days</div>
+          <div class="tab-item" onclick="switchTab('mfnc','180')">⚫ 180+ Days</div>
+        </div>
+        <div id="mfnc-content"></div>
       </div>
 
       <!-- ── REPORTS ── -->
@@ -999,7 +1063,7 @@ let currentCallTarget = null;
 let currentEditId = null;
 let currentEditLeadId = null;
 let currentReportData = [];
-let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='equity';
+let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='equity', activeEqncTab='60', activeMfncTab='60';
 
 const MN = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -1112,12 +1176,12 @@ function initApp(){
   const eqSec = document.getElementById('eq-nav-section');
   const mfSec = document.getElementById('mf-nav-section');
   const adminSec = document.getElementById('admin-nav-section');
-  ['eq-clients','eq-followup','eq-notrade'].forEach(id=>{
+  ['eq-clients','eq-followup','eq-notrade','eq-nocall'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.style.display=hasEq?'flex':'none';
   });
   if(eqSec) eqSec.style.display=hasEq?'':'none';
-  ['mf-clients','mf-followup','mf-sip'].forEach(id=>{
+  ['mf-clients','mf-followup','mf-sip','mf-nocall'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.style.display=hasMf?'flex':'none';
   });
@@ -1214,10 +1278,23 @@ function showPage(id){
   else if(id==='eq-followup') renderFollowup('eqf');
   else if(id==='mf-followup') renderFollowup('mff');
   else if(id==='eq-notrade') renderNoTrade();
+  else if(id==='eq-nocall') renderNoCall('equity');
+  else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
   else if(id==='reports') renderReports();
   else if(id==='admin') renderAdmin();
   else if(id==='dashboard') refreshDash();
+
+  closeSidebar();
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
 }
 
 function switchTab(group, tab){
@@ -1231,6 +1308,8 @@ function switchTab(group, tab){
   if(group==='eqf'){ activeEqfTab=tab; renderFollowup('eqf'); }
   else if(group==='mff'){ activeMffTab=tab; renderFollowup('mff'); }
   else if(group==='nt'){ activeNtTab=tab; renderNoTrade(); }
+  else if(group==='eqnc'){ activeEqncTab=tab; renderNoCall('equity'); }
+  else if(group==='mfnc'){ activeMfncTab=tab; renderNoCall('mf'); }
   else if(group==='rpt'){
     activeRptTab=tab;
     document.querySelectorAll('#page-reports .tab-item').forEach((el,i)=>{
@@ -1313,6 +1392,32 @@ function refreshDash(){
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
 
+  // No-call alerts (Equity)
+  const noCallEq = eq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
+    .filter(c=>c.days===null||c.days>=60)
+    .sort((a,b)=>{const av=a.days===null?Infinity:a.days, bv=b.days===null?Infinity:b.days; return bv-av;})
+    .slice(0,8);
+  document.getElementById('noCallEqAlert').innerHTML = noCallEq.length
+    ? noCallEq.map(c=>{
+        const cls=c.days===null||c.days>=180?'r180':c.days>=90?'r90':'r60';
+        const label=c.days===null?'Never':c.days+' days';
+        return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${label}</span></div>`;
+      }).join('')
+    : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
+
+  // No-call alerts (MF)
+  const noCallMf = mf.map(c=>({...c,days:daysDiff(c.last_call_date)}))
+    .filter(c=>c.days===null||c.days>=60)
+    .sort((a,b)=>{const av=a.days===null?Infinity:a.days, bv=b.days===null?Infinity:b.days; return bv-av;})
+    .slice(0,8);
+  document.getElementById('noCallMfAlert').innerHTML = noCallMf.length
+    ? noCallMf.map(c=>{
+        const cls=c.days===null||c.days>=180?'r180':c.days>=90?'r90':'r60';
+        const label=c.days===null?'Never':c.days+' days';
+        return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${label}</span></div>`;
+      }).join('')
+    : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
+
   // Today's follow-ups
   const allClients=[
     ...eq.filter(c=>c.next_call===today()).map(c=>({...c,seg:'Equity'})),
@@ -1348,6 +1453,8 @@ function updateBadges(){
   document.getElementById('nb-eqf').textContent=eqf;
   document.getElementById('nb-mff').textContent=mff;
   document.getElementById('nb-eqnt').textContent=eq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
+  document.getElementById('nb-eqnc').textContent=eq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
+  document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
 }
 
 // ══════════════════════════════════════════
@@ -2490,8 +2597,56 @@ function renderNoTrade(){
 }
 
 // ══════════════════════════════════════════
-// SIP TRACKER
+// NO-CALL ALERTS (last_call_date not updated)
 // ══════════════════════════════════════════
+function renderNoCall(seg){
+  const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
+  const clients = seg==='equity'?getMyEqClients():getMyMfClients();
+  const data = clients.filter(c=>{
+    const d = daysDiff(c.last_call_date);
+    return d===null || d>=days; // never called, or not called in N+ days
+  }).map(c=>({...c,daysAgo:daysDiff(c.last_call_date)}))
+    .sort((a,b)=>{
+      const av=a.daysAgo===null?Infinity:a.daysAgo, bv=b.daysAgo===null?Infinity:b.daysAgo;
+      return bv-av;
+    });
+
+  const contId = seg==='equity'?'eqnc-content':'mfnc-content';
+  const cont=document.getElementById(contId);
+  if(!cont) return;
+  if(!data.length){
+    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No ${seg==='equity'?'clients':'investors'} with ${days}+ days since last call</div>`;
+    return;
+  }
+  const label = seg==='equity'?'clients':'investors';
+  const idLabel = seg==='equity'?'Code':'PAN';
+  let h=`<p style="margin-bottom:12px;color:var(--gray);font-size:.82rem">${data.length} ${label} with no call in ${days}+ days (or never called)</p>
+    <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
+    <th>${idLabel}</th><th>Name</th><th>Mobile</th><th>RM</th><th>Last Call</th><th>Days Since</th><th>Next Call</th><th>Actions</th>
+    </tr></thead><tbody>`;
+  data.forEach(c=>{
+    const d=c.daysAgo;
+    const cls = d===null||d>=180 ? 'row-alert' : d>=90 ? 'row-inactive' : '';
+    const dayLabel = d===null ? 'Never' : d+'d';
+    const dayColor = d===null||d>=180 ? 'var(--red)' : d>=90 ? 'var(--orange)' : 'var(--gold)';
+    h+=`<tr class="${cls}">
+      <td>${(seg==='equity'?c.code:c.pan)||'—'}</td>
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td>${fmtDate(c.last_call_date)||'Never'}</td>
+      <td style="font-weight:700;color:${dayColor}">${dayLabel}</td>
+      <td>${fmtDate(c.next_call)||'—'}</td>
+      <td>
+        <button class="btn-icon" onclick="logCall('${c.id}','${seg}')">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon">💬</a>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  cont.innerHTML=h;
+}
+
+
 function renderSip(){
   const mf=getMyMfClients();
   const sipClients=mf.filter(c=>c.sip_amount>0);
