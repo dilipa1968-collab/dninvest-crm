@@ -458,7 +458,6 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
-            <button class="btn btn-outline" id="mfBulkDeleteBtn" style="color:var(--red);border-color:var(--red);display:none" onclick="bulkDeleteMf()">🗑️ Delete Selected (<span id="mfSelCount">0</span>)</button>
             <button class="btn btn-teal" onclick="openAddClient('mf')">+ Add Investor</button>
           </div>
         </div>
@@ -656,7 +655,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
         <div class="tab-item active" onclick="switchImportTab('aum')" id="imp-tab-aum">AUM Report</div>
         <div class="tab-item" onclick="switchImportTab('sip')" id="imp-tab-sip">SIP Report</div>
         <div class="tab-item" onclick="switchImportTab('both')" id="imp-tab-both">AUM + SIP (Recommended)</div>
-        <div class="tab-item" onclick="switchImportTab('contact')" id="imp-tab-contact">Mobile/PAN/RM Update</div>
+        <div class="tab-item" onclick="switchImportTab('contact')" id="imp-tab-contact">Mobile/PAN Update</div>
       </div>
       
       <div id="imp-aum">
@@ -700,7 +699,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
 
       <div id="imp-contact" style="display:none">
         <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b>, <b>RM</b> columns ho. Matching <b>Name</b> se existing investor ka Mobile/PAN/RM update hoga. Naya naam mile toh nayi investor entry add ho jayegi (AUM khali rahega).
+          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b> columns ho. Matching <b>Name</b> (ya PAN) se hoga — existing investor ka Mobile/PAN update ho jayega. Naye investor add nahi honge.
         </p>
         <div class="import-zone" id="contact-zone" onclick="document.getElementById('contact-file').click()">
           📇 Contact Info Excel file yahan drag karo ya click karo
@@ -785,14 +784,16 @@ const DB = {
     const idx = arr.findIndex(c=>c.id===rec.id);
     if(idx>=0) arr[idx]=rec; else arr.push(rec);
     this.setLocal(key, arr);
-    // write single doc to Firebase
+    // write single doc to Firebase - strip undefined values (Firestore rejects them)
     try{
       if(typeof fdb!=='undefined' && PER_DOC_COLLECTIONS[key]){
-        fdb.collection(PER_DOC_COLLECTIONS[key]).doc(rec.id).set(rec)
+        const clean = {};
+        Object.keys(rec).forEach(k=>{ if(rec[k]!==undefined) clean[k]=rec[k]; });
+        fdb.collection(PER_DOC_COLLECTIONS[key]).doc(rec.id).set(clean)
           .then(()=>console.log('Firebase doc synced:',key,rec.id))
-          .catch(e=>console.log('Firebase doc error:',e));
+          .catch(e=>{ console.log('Firebase doc error:',e); toast('Sync error: '+e.message,'error'); });
       }
-    }catch(e){}
+    }catch(e){ console.log('setClient error:',e); }
   },
   // Delete a single client record
   deleteClient(key, id){
@@ -987,12 +988,17 @@ function initApp(){
 
       // Real-time per-document listeners for clients - merge individual
       // doc changes into the local array instead of overwriting everything.
+      // Skip the very first snapshot (initial load already done via loadPerDoc)
+      // and ignore changes that originated from this client's own pending writes.
       Object.keys(PER_DOC_COLLECTIONS).forEach(key=>{
+        let firstSnapshot = true;
         fdb.collection(PER_DOC_COLLECTIONS[key]).onSnapshot(snap=>{
+          if(firstSnapshot){ firstSnapshot=false; return; }
           let changed=false;
           const arr = DB.get(key)||[];
           const map = {}; arr.forEach(c=>map[c.id]=c);
           snap.docChanges().forEach(change=>{
+            if(change.doc.metadata.hasPendingWrites) return; // ignore own unconfirmed writes
             const rec = change.doc.data();
             if(change.type==='removed'){
               if(map[rec.id]){ delete map[rec.id]; changed=true; }
@@ -1406,17 +1412,16 @@ function renderMfTable(){
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
   const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Next Call','Follow-up'];
-  let h=`<table><thead><tr>${CU.role==='admin'?'<th><input type="checkbox" id="mfSelectAll" onchange="toggleMfSelectAll(this)"></th>':''}${cols.map((c,i)=>{
+  let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">
-      ${CU.role==='admin'?`<td><input type="checkbox" class="mf-row-check" value="${c.id}" onchange="updateMfBulkBtn()"></td>`:''}
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
@@ -1473,31 +1478,6 @@ function confirmDeleteClient(id, seg, name){
   closeModal('viewModal');
   toast('Client deleted','success');
   if(seg==='equity') renderEqTable(); else renderMfTable();
-  refreshDash(); updateBadges();
-}
-
-function toggleMfSelectAll(src){
-  document.querySelectorAll('.mf-row-check').forEach(cb=>cb.checked=src.checked);
-  updateMfBulkBtn();
-}
-
-function updateMfBulkBtn(){
-  const checked = document.querySelectorAll('.mf-row-check:checked');
-  const btn = document.getElementById('mfBulkDeleteBtn');
-  const cnt = document.getElementById('mfSelCount');
-  if(!btn) return;
-  cnt.textContent = checked.length;
-  btn.style.display = checked.length>0 ? '' : 'none';
-}
-
-function bulkDeleteMf(){
-  if(CU.role!=='admin') return;
-  const checked = Array.from(document.querySelectorAll('.mf-row-check:checked')).map(cb=>cb.value);
-  if(!checked.length) return;
-  if(!confirm(`Delete ${checked.length} selected investor(s)? This cannot be undone.`)) return;
-  checked.forEach(id=>DB.deleteClient('mf_clients', id));
-  toast(`${checked.length} investor(s) deleted`,'success');
-  renderMfTable();
   refreshDash(); updateBadges();
 }
 
@@ -1767,10 +1747,12 @@ function saveCallLog(){
   const clients=DB.get(key)||[];
   const idx=clients.findIndex(x=>x.id===id);
   if(idx>=0){
+    const rm = clients[idx].rm; // preserve RM explicitly - never let it change here
     clients[idx].last_call_date=date;
     clients[idx].next_call=nextCall;
     clients[idx].followup_status=fuStatus;
     if(note) clients[idx].remarks=note;
+    clients[idx].rm = rm;
     DB.setClient(key, clients[idx]);
   }
   closeModal('callModal');
@@ -2465,14 +2447,13 @@ function handleBothFile(type, input){
   });
 }
 
-// Parse a simple Name/Mobile/PAN/RM sheet (auto-detect header columns)
+// Parse a simple Name/Mobile/PAN sheet (auto-detect header columns)
 function parseContactExcel(rows){
   let hdrIdx=-1, colMap={};
   const wanted = {
     name: ['name','clientname','investorname'],
     mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
-    pan: ['pan','pannumber','pancard'],
-    rm: ['rm','mfrm','rmname','relationshipmanager']
+    pan: ['pan','pannumber','pancard']
   };
   for(let i=0;i<Math.min(rows.length,10);i++){
     const row = rows[i];
@@ -2483,7 +2464,7 @@ function parseContactExcel(rows){
         if(variants.includes(h) && map[field]===undefined) map[field]=ci;
       }
     });
-    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined || map.rm!==undefined)){
+    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined)){
       hdrIdx=i; colMap=map; break;
     }
   }
@@ -2493,8 +2474,7 @@ function parseContactExcel(rows){
     .map(r=>({
       name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
       mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10) : '',
-      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : '',
-      rm: colMap.rm!==undefined ? String(r[colMap.rm]||'').trim() : ''
+      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : ''
     }))
     .filter(r=>r.name);
 }
@@ -2524,9 +2504,9 @@ async function doContactImport(){
   const byName = {};
   existing.forEach(c=>{ if(c.name) byName[c.name.trim().toUpperCase()] = c; });
 
-  let updated=0, added=0, notFound=0;
+  let updated=0, notFound=0;
   const touched=[];
-  // If multiple rows share the same name, keep the first mobile/pan/rm found
+  // If multiple rows share the same name, keep the first mobile/pan found
   const seen = new Set();
   data.forEach(row=>{
     const key = row.name.trim().toUpperCase();
@@ -2535,28 +2515,12 @@ async function doContactImport(){
       let changed=false;
       if(row.mobile && ex.mobile!==row.mobile){ ex.mobile=row.mobile; changed=true; }
       if(row.pan && ex.pan!==row.pan){ ex.pan=row.pan; changed=true; }
-      if(row.rm && ex.rm!==row.rm){ ex.rm=row.rm; changed=true; }
       if(changed && !seen.has(ex.id)){
         ex.updated = today();
         touched.push(ex);
         seen.add(ex.id);
         updated++;
       }
-    } else if(!seen.has(key)){
-      // New client - no AUM record exists, create a fresh investor entry
-      const rec = {
-        id: uid(),
-        name: row.name, mobile: row.mobile||'', pan: row.pan||'', email:'',
-        rm: row.rm||'', status:'Investor',
-        aum:null, sip_amount:null, sip_count:null,
-        last_invest_date:'', last_call_date:'',
-        next_call:'', followup_status:'', remarks:'',
-        created: today(), updated: today()
-      };
-      touched.push(rec);
-      byName[key] = rec;
-      seen.add(key);
-      added++;
     } else {
       notFound++;
     }
@@ -2564,10 +2528,7 @@ async function doContactImport(){
 
   await DB.setClientsBulk('mf_clients', touched);
   closeModal('importModal');
-  let msg = `✅ Contact info updated! ${updated} updated`;
-  if(added) msg += `, ${added} new investor(s) added`;
-  if(notFound) msg += `, ${notFound} not matched`;
-  toast(msg, 'success');
+  toast(`✅ Contact info updated! ${updated} updated${notFound?`, ${notFound} not matched`:''}`, 'success');
   renderMfTable(); refreshDash(); updateBadges();
 }
 
