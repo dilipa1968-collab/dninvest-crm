@@ -173,7 +173,7 @@ tbody td{padding:5px 8px;white-space:nowrap;}
 .b-prospect{background:var(--purple2);color:var(--purple);}
 .b-investor{background:var(--teal2);color:var(--teal);}
 .b-pending{background:var(--red2);color:var(--red);}
-.fu-filter-menu{position:absolute;top:100%;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);min-width:120px;z-index:50;font-weight:400;text-align:left;font-size:.78rem;}
+.fu-filter-menu{position:absolute;top:100%;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);min-width:120px;z-index:1000;font-weight:400;text-align:left;font-size:.78rem;}
 .fu-filter-menu div{padding:7px 12px;color:#333;white-space:nowrap;}
 .fu-filter-menu div:hover{background:var(--gray2,#f0f2f5);}
 .b-done{background:#d1fae5;color:#065f46;}
@@ -411,7 +411,8 @@ tbody td{padding:5px 8px;white-space:nowrap;}
             <option>Active</option><option>Inactive</option></select>
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
-            <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
+            <option value="pending">Pending (with Next Call)</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
+            <option value="Pending">Status: Pending</option><option value="Done">Done</option><option value="Not Required">Not Required</option><option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Trade">Trade</option><option value="Interested in Other Product">Interested in Other Product</option><option value="Positive">Positive</option><option value="Wrong Number">Wrong Number</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterEq()" id="eq-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -477,7 +478,8 @@ tbody td{padding:5px 8px;white-space:nowrap;}
             <option>Investor</option><option>Prospect</option></select>
           <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
-            <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
+            <option value="pending">Pending (with Next Call)</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
+            <option value="Pending">Status: Pending</option><option value="Done">Done</option><option value="Not Required">Not Required</option><option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Interested In SIP">Interested In SIP</option><option value="Interested In Lumpsum">Interested In Lumpsum</option><option value="Interested In Other Product">Interested In Other Product</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterMf()" id="mf-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -1262,14 +1264,22 @@ function toggleFuFilterMenu(seg){
   if(!menu) return;
   const isOpen = menu.style.display==='block';
   document.querySelectorAll('.fu-filter-menu').forEach(m=>m.style.display='none');
-  menu.style.display = isOpen?'none':'block';
   if(!isOpen){
+    const anchor = menu.parentElement;
+    const r = anchor.getBoundingClientRect();
+    menu.style.position='fixed';
+    menu.style.top=(r.bottom)+'px';
+    menu.style.left='auto';
+    menu.style.right=(window.innerWidth-r.right)+'px';
+    menu.style.display='block';
     setTimeout(()=>{
       document.addEventListener('click', function closeMenu(){
         menu.style.display='none';
         document.removeEventListener('click', closeMenu);
       }, {once:true});
     },0);
+  } else {
+    menu.style.display='none';
   }
 }
 function setFuFilter(seg,val){
@@ -1307,6 +1317,7 @@ function renderEqTable(){
   if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>c.followup_status===fu);
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(lastTradeDate) data=data.filter(c=>c.last_trade_date===lastTradeDate);
@@ -1351,9 +1362,19 @@ function renderEqTable(){
         <span onclick="event.stopPropagation();toggleFuFilterMenu('eq')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
           <div id="eq-fu-menu" class="fu-filter-menu" style="display:none">
             <div onclick="event.stopPropagation();setFuFilter('eq','')">All Follow-ups</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','pending')">Pending</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','today')">Due Today</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','overdue')">Overdue</div>
+            <div style="border-top:1px solid #eee;margin:4px 0"></div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Pending')">Pending</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Done')">Done</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Not Required')">Not Required</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Not Interested')">Not Interested</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Call Not Received')">Call Not Received</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Call After Some Time')">Call After Some Time</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Trade')">Trade</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Interested in Other Product')">Interested in Other Product</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Positive')">Positive</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','Wrong Number')">Wrong Number</div>
           </div>
         </span>
       </th>`;
@@ -1427,6 +1448,7 @@ function renderMfTable(){
   if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>c.followup_status===fu);
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
 
@@ -1467,9 +1489,18 @@ function renderMfTable(){
         <span onclick="event.stopPropagation();toggleFuFilterMenu('mf')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
           <div id="mf-fu-menu" class="fu-filter-menu" style="display:none">
             <div onclick="event.stopPropagation();setFuFilter('mf','')">All Follow-ups</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','pending')">Pending</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','today')">Due Today</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','overdue')">Overdue</div>
+            <div style="border-top:1px solid #eee;margin:4px 0"></div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Pending')">Pending</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Done')">Done</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Not Required')">Not Required</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Not Interested')">Not Interested</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Call Not Received')">Call Not Received</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Call After Some Time')">Call After Some Time</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Interested In SIP')">Interested In SIP</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Interested In Lumpsum')">Interested In Lumpsum</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','Interested In Other Product')">Interested In Other Product</div>
           </div>
         </span>
       </th>`;
