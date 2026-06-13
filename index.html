@@ -1139,23 +1139,30 @@ function getSegRMs(seg){
 }
 
 function populateRmDropdowns(){
-  const eqRMs = getSegRMs('equity');
-  const mfRMs = getSegRMs('mf');
+  let eqRMs = getSegRMs('equity');
+  let mfRMs = getSegRMs('mf');
+  if(CU.role!=='admin'){
+    eqRMs = [CU.name];
+    mfRMs = [CU.name];
+  }
   ['eq-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
     el.innerHTML='<option value="">All RMs</option>'+eqRMs.map(r=>`<option>${r}</option>`).join('');
+    if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
   });
   ['mf-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
     el.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
+    if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
   });
   ['leads-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
     const allRMs=[...new Set([...eqRMs,...mfRMs])];
     el.innerHTML='<option value="">All RMs</option>'+allRMs.map(r=>`<option>${r}</option>`).join('');
+    if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
   });
 }
 
