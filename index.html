@@ -799,14 +799,19 @@ const DB = {
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
-        const doc = await fdb.collection('crm_data').doc(key).get();
-        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
-        const lidx = latest.findIndex(c=>c.id===rec.id);
-        if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
-        await fdb.collection('crm_data').doc(key).set({data:latest, updated:new Date().toISOString()});
+        const docRef = fdb.collection('crm_data').doc(key);
+        let finalData = null;
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(docRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
+          const lidx = latest.findIndex(c=>c.id===rec.id);
+          if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          finalData = latest;
+        });
         // adopt the merged result locally too, in case other records changed
-        this.setLocal(key, latest);
-        console.log('Firebase merge-synced:',key,rec.id);
+        if(finalData) this.setLocal(key, finalData);
+        console.log('Firebase transaction-synced:',key,rec.id);
       }
     }catch(e){ console.log('setClient error:',e); toast('Sync error: '+e.message,'error'); }
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
@@ -818,11 +823,16 @@ const DB = {
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
-        const doc = await fdb.collection('crm_data').doc(key).get();
-        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
-        latest = latest.filter(c=>c.id!==id);
-        await fdb.collection('crm_data').doc(key).set({data:latest, updated:new Date().toISOString()});
-        this.setLocal(key, latest);
+        const docRef = fdb.collection('crm_data').doc(key);
+        let finalData = null;
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(docRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
+          latest = latest.filter(c=>c.id!==id);
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          finalData = latest;
+        });
+        if(finalData) this.setLocal(key, finalData);
       }
     }catch(e){ console.log('deleteClient error:',e); toast('Sync error: '+e.message,'error'); }
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
@@ -837,14 +847,19 @@ const DB = {
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
-        const doc = await fdb.collection('crm_data').doc(key).get();
-        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : merged;
-        let lmap = {}; latest.forEach(c=>lmap[c.id]=c);
-        records.forEach(r=>lmap[r.id]=r);
-        latest = Object.values(lmap);
-        await fdb.collection('crm_data').doc(key).set({data:latest, updated:new Date().toISOString()});
-        this.setLocal(key, latest);
-        console.log('Bulk merge-synced:',key,records.length);
+        const docRef = fdb.collection('crm_data').doc(key);
+        let finalData = null;
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(docRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : merged;
+          let lmap = {}; latest.forEach(c=>lmap[c.id]=c);
+          records.forEach(r=>lmap[r.id]=r);
+          latest = Object.values(lmap);
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          finalData = latest;
+        });
+        if(finalData) this.setLocal(key, finalData);
+        console.log('Bulk transaction-synced:',key,records.length);
       }
     }catch(e){ console.log('Bulk sync error:',e); toast('Sync error: '+e.message,'error'); }
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
