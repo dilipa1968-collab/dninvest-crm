@@ -173,6 +173,9 @@ tbody td{padding:5px 8px;white-space:nowrap;}
 .b-prospect{background:var(--purple2);color:var(--purple);}
 .b-investor{background:var(--teal2);color:var(--teal);}
 .b-pending{background:var(--red2);color:var(--red);}
+.fu-filter-menu{position:absolute;top:100%;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);min-width:120px;z-index:50;font-weight:400;text-align:left;font-size:.78rem;}
+.fu-filter-menu div{padding:7px 12px;color:#333;white-space:nowrap;}
+.fu-filter-menu div:hover{background:var(--gray2,#f0f2f5);}
 .b-done{background:#d1fae5;color:#065f46;}
 .b-na{background:var(--bg);color:var(--gray);}
 .b-eq{background:var(--gold3);color:var(--orange);}
@@ -1252,6 +1255,28 @@ function updateBadges(){
 // EQUITY TABLE
 // ══════════════════════════════════════════
 function filterEq(){ eqPage=1; renderEqTable(); }
+function toggleFuFilterMenu(seg){
+  const menu = document.getElementById(seg+'-fu-menu');
+  if(!menu) return;
+  const isOpen = menu.style.display==='block';
+  document.querySelectorAll('.fu-filter-menu').forEach(m=>m.style.display='none');
+  menu.style.display = isOpen?'none':'block';
+  if(!isOpen){
+    setTimeout(()=>{
+      document.addEventListener('click', function closeMenu(){
+        menu.style.display='none';
+        document.removeEventListener('click', closeMenu);
+      }, {once:true});
+    },0);
+  }
+}
+function setFuFilter(seg,val){
+  const sel = document.getElementById(seg+'-followup-filter');
+  if(sel){ sel.value = val; }
+  const menu = document.getElementById(seg+'-fu-menu');
+  if(menu) menu.style.display='none';
+  if(seg==='eq') filterEq(); else filterMf();
+}
 function sortEqTable(colIndex){
   if(eqSortField===colIndex) eqSortDir = -eqSortDir;
   else { eqSortField=colIndex; eqSortDir=1; }
@@ -1318,6 +1343,19 @@ function renderEqTable(){
   const cols=['Code','Name','Mobile','RM','Status','Asset Value','Last Calling','Last Trade','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
+    if(c==='Follow-up'){
+      return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
+        <span onclick="sortEqTable(${i})">${c}${arrow}</span>
+        <span onclick="event.stopPropagation();toggleFuFilterMenu('eq')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
+          <div id="eq-fu-menu" class="fu-filter-menu" style="display:none">
+            <div onclick="event.stopPropagation();setFuFilter('eq','')">All Follow-ups</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','pending')">Pending</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','today')">Due Today</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','overdue')">Overdue</div>
+          </div>
+        </span>
+      </th>`;
+    }
     return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
@@ -1419,6 +1457,19 @@ function renderMfTable(){
   const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Count','Last Calling','Last Investment','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
+    if(c==='Follow-up'){
+      return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
+        <span onclick="sortMfTable(${i})">${c}${arrow}</span>
+        <span onclick="event.stopPropagation();toggleFuFilterMenu('mf')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
+          <div id="mf-fu-menu" class="fu-filter-menu" style="display:none">
+            <div onclick="event.stopPropagation();setFuFilter('mf','')">All Follow-ups</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','pending')">Pending</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','today')">Due Today</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','overdue')">Overdue</div>
+          </div>
+        </span>
+      </th>`;
+    }
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
