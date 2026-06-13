@@ -751,16 +751,21 @@ tbody td{padding:5px 8px;white-space:nowrap;}
 // ══════════════════════════════════════════
 // DATA STORE (localStorage + memory)
 // ══════════════════════════════════════════
-// Collections that use per-document storage (one Firestore doc per record)
-// instead of one giant array document. This avoids huge array overwrites
-// and race conditions when multiple staff edit simultaneously.
-const PER_DOC_COLLECTIONS = {eq_clients:'eq_clients_v2', mf_clients:'mf_clients_v2'};
+// Previously we used per-document Firestore collections (eq_clients_v2,
+// mf_clients_v2) for eq/mf clients to avoid huge array rewrites. However,
+// these new collections may not be covered by existing Firestore security
+// rules, causing silent write/read failures (records "disappear" after
+// refresh). We've reverted to the proven-working single-array-document
+// storage in 'crm_data', but use a merge-on-write strategy: before writing
+// a single record's change, re-fetch the latest array from Firestore and
+// merge the change in, minimizing data loss from concurrent edits.
+const PER_DOC_COLLECTIONS = {}; // no longer used, kept for compatibility
 
 const DB = {
   get(key){
     try{ const v=localStorage.getItem('dninvest_'+key); return v?JSON.parse(v):null; }catch(e){return null;}
   },
-  // Generic set for small/array data (users, call_logs)
+  // Generic set for small/array data (users, call_logs, mf_business)
   set(key,val){
     try{
       localStorage.setItem('dninvest_'+key,JSON.stringify(val));
@@ -769,111 +774,81 @@ const DB = {
       if(typeof fdb!=='undefined'){
         fdb.collection('crm_data').doc(key).set({data:val,updated:new Date().toISOString()})
           .then(()=>console.log('Firebase synced:',key))
-          .catch(e=>console.log('Firebase error:',e));
+          .catch(e=>{ console.log('Firebase error:',e); toast('Sync error: '+e.message,'error'); });
       }
     }catch(e){}
   },
-  // Set just the local copy (used after merging per-doc updates) - no Firebase write
+  // Set just the local copy without writing to Firebase
   setLocal(key,val){
     try{ localStorage.setItem('dninvest_'+key,JSON.stringify(val)); }catch(e){}
   },
-  // Save/update a single client record (eq_clients or mf_clients) as its own Firestore doc
-  setClient(key, rec){
-    // update local array copy
-    const arr = this.get(key)||[];
-    const idx = arr.findIndex(c=>c.id===rec.id);
+  // Save/update a single client record (eq_clients or mf_clients).
+  // Merge-on-write: re-fetch latest array from Firestore, merge this one
+  // record in, then write the merged array back. This avoids clobbering
+  // other users' concurrent changes while keeping the proven array storage.
+  async setClient(key, rec){
+    // update local copy immediately for responsiveness
+    let arr = this.get(key)||[];
+    let idx = arr.findIndex(c=>c.id===rec.id);
     if(idx>=0) arr[idx]=rec; else arr.push(rec);
     this.setLocal(key, arr);
-    // write single doc to Firebase - strip undefined values (Firestore rejects them)
+
     try{
-      if(typeof fdb!=='undefined' && PER_DOC_COLLECTIONS[key]){
-        const clean = {};
-        Object.keys(rec).forEach(k=>{ if(rec[k]!==undefined) clean[k]=rec[k]; });
-        fdb.collection(PER_DOC_COLLECTIONS[key]).doc(rec.id).set(clean)
-          .then(()=>console.log('Firebase doc synced:',key,rec.id))
-          .catch(e=>{ console.log('Firebase doc error:',e); toast('Sync error: '+e.message,'error'); });
+      if(typeof fdb!=='undefined'){
+        const doc = await fdb.collection('crm_data').doc(key).get();
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
+        const lidx = latest.findIndex(c=>c.id===rec.id);
+        if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
+        await fdb.collection('crm_data').doc(key).set({data:latest, updated:new Date().toISOString()});
+        // adopt the merged result locally too, in case other records changed
+        this.setLocal(key, latest);
+        console.log('Firebase merge-synced:',key,rec.id);
       }
-    }catch(e){ console.log('setClient error:',e); }
+    }catch(e){ console.log('setClient error:',e); toast('Sync error: '+e.message,'error'); }
   },
-  // Delete a single client record
-  deleteClient(key, id){
-    const arr = (this.get(key)||[]).filter(c=>c.id!==id);
+  // Delete a single client record (merge-on-write delete)
+  async deleteClient(key, id){
+    let arr = (this.get(key)||[]).filter(c=>c.id!==id);
     this.setLocal(key, arr);
     try{
-      if(typeof fdb!=='undefined' && PER_DOC_COLLECTIONS[key]){
-        fdb.collection(PER_DOC_COLLECTIONS[key]).doc(id).delete()
-          .then(()=>console.log('Firebase doc deleted:',key,id))
-          .catch(e=>console.log('Firebase delete error:',e));
+      if(typeof fdb!=='undefined'){
+        const doc = await fdb.collection('crm_data').doc(key).get();
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
+        latest = latest.filter(c=>c.id!==id);
+        await fdb.collection('crm_data').doc(key).set({data:latest, updated:new Date().toISOString()});
+        this.setLocal(key, latest);
       }
-    }catch(e){}
+    }catch(e){ console.log('deleteClient error:',e); toast('Sync error: '+e.message,'error'); }
   },
+  // Bulk save (import) - merge multiple records into the latest array
   async setClientsBulk(key, records){
-    const arr = this.get(key)||[];
-    const map = {}; arr.forEach(c=>map[c.id]=c);
+    let arr = this.get(key)||[];
+    let map = {}; arr.forEach(c=>map[c.id]=c);
     records.forEach(r=>map[r.id]=r);
-    const merged = Object.values(map);
+    let merged = Object.values(map);
     this.setLocal(key, merged);
     try{
-      if(typeof fdb!=='undefined' && PER_DOC_COLLECTIONS[key]){
-        const col = fdb.collection(PER_DOC_COLLECTIONS[key]);
-        let batch = fdb.batch();
-        let count=0;
-        for(const r of records){
-          batch.set(col.doc(r.id), r);
-          count++;
-          if(count===450){ await batch.commit(); batch=fdb.batch(); count=0; }
-        }
-        if(count>0) await batch.commit();
-        console.log('Bulk synced:',key,records.length);
+      if(typeof fdb!=='undefined'){
+        const doc = await fdb.collection('crm_data').doc(key).get();
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : merged;
+        let lmap = {}; latest.forEach(c=>lmap[c.id]=c);
+        records.forEach(r=>lmap[r.id]=r);
+        latest = Object.values(lmap);
+        await fdb.collection('crm_data').doc(key).set({data:latest, updated:new Date().toISOString()});
+        this.setLocal(key, latest);
+        console.log('Bulk merge-synced:',key,records.length);
       }
-    }catch(e){ console.log('Bulk sync error:',e); }
+    }catch(e){ console.log('Bulk sync error:',e); toast('Sync error: '+e.message,'error'); }
   },
   load(){
     if(!this.get('users')) this.set('users', DEFAULT_USERS);
     if(!this.get('call_logs')) this.set('call_logs', []);
     if(!this.get('mf_business')) this.set('mf_business', []);
   },
-  // One-time migration: if old single-doc array exists in crm_data but the
-  // new per-doc collection is empty, push each record into its own doc.
-  async migrateToPerDoc(key){
-    if(typeof fdb==='undefined' || !PER_DOC_COLLECTIONS[key]) return false;
-    try{
-      const col = fdb.collection(PER_DOC_COLLECTIONS[key]);
-      const check = await col.limit(1).get();
-      if(!check.empty) return false; // already migrated
-      const oldDoc = await fdb.collection('crm_data').doc(key).get();
-      if(!oldDoc.exists) return false;
-      const arr = (oldDoc.data()||{}).data||[];
-      if(!arr.length) return false;
-      console.log('Migrating',key,'to per-doc collection:',arr.length,'records');
-      let batch = fdb.batch(); let count=0;
-      for(const r of arr){
-        if(!r.id) r.id = uid();
-        batch.set(col.doc(r.id), r);
-        count++;
-        if(count===450){ await batch.commit(); batch=fdb.batch(); count=0; }
-      }
-      if(count>0) await batch.commit();
-      console.log('Migration done for',key);
-      return true;
-    }catch(e){ console.log('Migration error:',key,e); return false; }
-  },
-  // Load a per-doc collection fully into local array
-  async loadPerDoc(key){
-    if(typeof fdb==='undefined' || !PER_DOC_COLLECTIONS[key]) return;
-    try{
-      const snap = await fdb.collection(PER_DOC_COLLECTIONS[key]).get();
-      const arr=[];
-      snap.forEach(doc=>arr.push(doc.data()));
-      if(arr.length) this.setLocal(key, arr);
-      console.log('Loaded per-doc:',key,arr.length,'records');
-    }catch(e){ console.log('loadPerDoc error:',key,e); }
-  },
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
-    // Small array-based collections (users, call_logs)
     try{
-      for(const key of ['users','call_logs','mf_business']){
+      for(const key of ['eq_clients','mf_clients','users','call_logs','mf_business']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && doc.data().data && doc.data().data.length > 0){
           localStorage.setItem('dninvest_'+key,JSON.stringify(doc.data().data));
@@ -881,11 +856,6 @@ const DB = {
         }
       }
     }catch(e){ console.log('Firebase sync error:',e); }
-    // Per-doc collections (eq_clients, mf_clients): migrate if needed, then load
-    for(const key of Object.keys(PER_DOC_COLLECTIONS)){
-      await this.migrateToPerDoc(key);
-      await this.loadPerDoc(key);
-    }
   }
 };
 
@@ -970,7 +940,7 @@ function initApp(){
       if(getCurrentPageId()==='eq-clients') renderEqTable();
       if(getCurrentPageId()==='mf-clients') renderMfTable();
 
-      // Real-time listeners for small array collections (users, call_logs)
+      // Real-time listeners for small array collections (users, call_logs, mf_business)
       ['call_logs','users','mf_business'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
@@ -986,33 +956,23 @@ function initApp(){
         });
       });
 
-      // Real-time per-document listeners for clients - merge individual
-      // doc changes into the local array instead of overwriting everything.
-      // Skip the very first snapshot (initial load already done via loadPerDoc)
-      // and ignore changes that originated from this client's own pending writes.
-      Object.keys(PER_DOC_COLLECTIONS).forEach(key=>{
-        let firstSnapshot = true;
-        fdb.collection(PER_DOC_COLLECTIONS[key]).onSnapshot(snap=>{
-          if(firstSnapshot){ firstSnapshot=false; return; }
-          let changed=false;
-          const arr = DB.get(key)||[];
-          const map = {}; arr.forEach(c=>map[c.id]=c);
-          snap.docChanges().forEach(change=>{
-            if(change.doc.metadata.hasPendingWrites) return; // ignore own unconfirmed writes
-            const rec = change.doc.data();
-            if(change.type==='removed'){
-              if(map[rec.id]){ delete map[rec.id]; changed=true; }
-            } else {
-              if(JSON.stringify(map[rec.id])!==JSON.stringify(rec)){ map[rec.id]=rec; changed=true; }
+      // Real-time listeners for eq_clients/mf_clients arrays.
+      // Skip updates that originate from this client's own pending (unconfirmed)
+      // write to avoid clobbering a just-saved record with a stale snapshot.
+      ['eq_clients','mf_clients'].forEach(key=>{
+        fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
+          if(doc.metadata.hasPendingWrites) return;
+          if(doc.exists && doc.data() && doc.data().data){
+            const newData = doc.data().data;
+            const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
+            if(JSON.stringify(newData) !== JSON.stringify(existing)){
+              localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
+              console.log('Real-time update:', key);
+              if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
+              if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
+              if(getCurrentPageId()==='dashboard') refreshDash();
+              updateBadges();
             }
-          });
-          if(changed){
-            DB.setLocal(key, Object.values(map));
-            console.log('Real-time merge update:', key);
-            if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
-            if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
-            if(getCurrentPageId()==='dashboard') refreshDash();
-            updateBadges();
           }
         });
       });
@@ -1470,11 +1430,11 @@ function editClient(id, seg){
   document.getElementById('clientModal').classList.add('open');
 }
 
-function confirmDeleteClient(id, seg, name){
+async function confirmDeleteClient(id, seg, name){
   if(CU.role!=='admin') return;
   if(!confirm(`Delete "${name}"? This cannot be undone.`)) return;
   const key = seg==='equity'?'eq_clients':'mf_clients';
-  DB.deleteClient(key, id);
+  await DB.deleteClient(key, id);
   closeModal('viewModal');
   toast('Client deleted','success');
   if(seg==='equity') renderEqTable(); else renderMfTable();
@@ -1558,7 +1518,7 @@ function clientForm(seg, c){
   }
 }
 
-function saveClient(){
+async function saveClient(){
   const seg = document.getElementById('clientSaveBtn').dataset.seg;
   const name = (document.getElementById('f_name')||{value:''}).value.trim();
   const rm = (document.getElementById('f_rm')||{value:''}).value.trim();
@@ -1627,7 +1587,7 @@ function saveClient(){
   } else {
     rec.created=today();
   }
-  DB.setClient(key,rec);
+  await DB.setClient(key,rec);
   closeModal('clientModal');
   toast(currentEditId?'Client updated!':'Client added!','success');
   if(seg==='equity') renderEqTable();
@@ -1729,7 +1689,7 @@ function logCall(id,seg){
   document.getElementById('callModal').classList.add('open');
 }
 
-function saveCallLog(){
+async function saveCallLog(){
   if(!currentCallTarget) return;
   const {id,seg}=currentCallTarget;
   const date=document.getElementById('cl_date').value;
@@ -1753,7 +1713,7 @@ function saveCallLog(){
     clients[idx].followup_status=fuStatus;
     if(note) clients[idx].remarks=note;
     clients[idx].rm = rm;
-    DB.setClient(key, clients[idx]);
+    await DB.setClient(key, clients[idx]);
   }
   closeModal('callModal');
   toast('Call logged!','success');
