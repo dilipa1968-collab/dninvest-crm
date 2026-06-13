@@ -479,6 +479,8 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Pending</option><option value="today">Due Today</option><option value="overdue">Overdue</option></select>
           <div class="filter-sep"></div>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
+            <input type="date" onchange="filterMf()" id="mf-last-call-date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
             <input type="date" onchange="filterMf()" id="mf-next-call-date" style="padding:6px;font-size:.78rem"></label>
           <div class="filter-sep"></div>
@@ -1417,6 +1419,7 @@ function renderMfTable(){
   const rm=(document.getElementById('mf-rm')||{value:''}).value;
   const fu=(document.getElementById('mf-followup-filter')||{value:''}).value;
   const nextCallDate=(document.getElementById('mf-next-call-date')||{value:''}).value;
+  const lastCallDate=(document.getElementById('mf-last-call-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
@@ -1425,6 +1428,7 @@ function renderMfTable(){
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
+  if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
 
   mfFiltered=data;
   const lbl=document.getElementById('mf-total-label');
