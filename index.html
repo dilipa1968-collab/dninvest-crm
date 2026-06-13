@@ -335,6 +335,10 @@ tbody td{padding:5px 8px;white-space:nowrap;}
       <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
         <span class="icon">📊</span> Dashboard
       </div>
+      <div class="nav-item" onclick="showPage('leads')" id="nav-leads">
+        <span class="icon">🧲</span> Leads
+        <span class="nav-badge" id="nb-leads">0</span>
+      </div>
 
       <div class="sidebar-section" id="eq-nav-section">Equity</div>
       <div class="nav-item" onclick="showPage('eq-clients')" id="nav-eq-clients">
@@ -393,6 +397,31 @@ tbody td{padding:5px 8px;white-space:nowrap;}
           <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
           <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
         </div>
+      </div>
+
+      <!-- ── LEADS ── -->
+      <div class="page" id="page-leads">
+        <div class="page-hdr">
+          <div class="page-title">Leads <span id="leads-total-label"></span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-teal" onclick="openAddLead()">+ Add Lead</button>
+          </div>
+        </div>
+        <div class="filters">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterLeads()" id="leads-search">
+          <select onchange="filterLeads()" id="leads-rm"><option value="">All RMs</option></select>
+          <select onchange="filterLeads()" id="leads-followup-filter"><option value="">All Follow-ups</option>
+            <option value="today">Due Today</option><option value="overdue">Overdue</option>
+            <option value="Pending">Pending</option><option value="Done">Done</option><option value="Not Required">Not Required</option><option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Interested In SIP">Interested In SIP</option><option value="Interested In Lumpsum">Interested In Lumpsum</option><option value="Interested In Other Product">Interested In Other Product</option></select>
+          <div class="filter-sep"></div>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
+            <input type="date" onchange="filterLeads()" id="leads-next-call-date" style="padding:6px;font-size:.78rem"></label>
+          <div class="filter-sep"></div>
+          <button class="btn btn-outline" onclick="resetFilters('leads')">✕ Reset</button>
+          <span class="res-count" id="leads-count"></span>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="leads-table"></div></div>
+        <div class="pagination" id="leads-pg"></div>
       </div>
 
       <!-- ── EQUITY CLIENTS ── -->
@@ -567,6 +596,21 @@ tbody td{padding:5px 8px;white-space:nowrap;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('clientModal')">Cancel</button>
       <button class="btn btn-primary" id="clientSaveBtn" onclick="saveClient()">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lead Modal -->
+<div class="modal-overlay" id="leadModal" onclick="if(event.target===this)closeModal('leadModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="leadModalTitle">Add Lead</h3>
+      <button class="modal-close" onclick="closeModal('leadModal')">×</button>
+    </div>
+    <div class="modal-body" id="leadModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('leadModal')">Cancel</button>
+      <button class="btn btn-primary" id="leadSaveBtn" onclick="saveLead()">Save Lead</button>
     </div>
   </div>
 </div>
@@ -889,7 +933,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','users','call_logs','mf_business']){
+      for(const key of ['eq_clients','mf_clients','leads','users','call_logs','mf_business']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && doc.data().data && doc.data().data.length > 0){
           localStorage.setItem('dninvest_'+key,JSON.stringify(doc.data().data));
@@ -922,11 +966,12 @@ const DEFAULT_USERS = [
 // ══════════════════════════════════════════
 let CU = null; // current user
 let PG_SIZE = 50;
-let eqPage=1, mfPage=1;
-let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1;
-let eqFiltered=[], mfFiltered=[];
+let eqPage=1, mfPage=1, leadsPage=1;
+let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
+let eqFiltered=[], mfFiltered=[], leadsFiltered=[];
 let currentCallTarget = null;
 let currentEditId = null;
+let currentEditLeadId = null;
 let currentReportData = [];
 let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='equity';
 
@@ -1002,7 +1047,7 @@ function initApp(){
       // write, AND skip while a setClient/deleteClient/setClientsBulk write is
       // in flight (DB._writing[key] > 0) to avoid a stale Firestore snapshot
       // overwriting localStorage between our read and our write.
-      ['eq_clients','mf_clients'].forEach(key=>{
+      ['eq_clients','mf_clients','leads'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
           if(DB._writing[key]>0) return;
@@ -1014,6 +1059,7 @@ function initApp(){
               console.log('Real-time update:', key);
               if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
               if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
+              if(key==='leads' && getCurrentPageId()==='leads') renderLeadsTable();
               if(getCurrentPageId()==='dashboard') refreshDash();
               updateBadges();
             }
@@ -1079,6 +1125,12 @@ function getMyMfClients(){
   const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
   return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
 }
+function getMyLeads(){
+  const all = DB.get('leads')||[];
+  if(CU.role==='admin') return all;
+  const dealers=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])])].map(d=>d.trim().toUpperCase());
+  return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
+}
 function getAllRMs(){
   return (DB.get('users')||[]).filter(u=>u.active!==false).map(u=>u.name);
 }
@@ -1099,6 +1151,12 @@ function populateRmDropdowns(){
     if(!el) return;
     el.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
   });
+  ['leads-rm'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    const allRMs=[...new Set([...eqRMs,...mfRMs])];
+    el.innerHTML='<option value="">All RMs</option>'+allRMs.map(r=>`<option>${r}</option>`).join('');
+  });
 }
 
 // ══════════════════════════════════════════
@@ -1117,6 +1175,7 @@ function showPage(id){
 
   if(id==='eq-clients') renderEqTable();
   else if(id==='mf-clients') renderMfTable();
+  else if(id==='leads') renderLeadsTable();
   else if(id==='eq-followup') renderFollowup('eqf');
   else if(id==='mf-followup') renderFollowup('mff');
   else if(id==='eq-notrade') renderNoTrade();
@@ -1245,6 +1304,7 @@ function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=1
 
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
+  document.getElementById('nb-leads').textContent=getMyLeads().length;
   document.getElementById('nb-eq').textContent=eq.length;
   document.getElementById('nb-mf').textContent=mf.length;
   document.getElementById('nb-sip').textContent=mf.filter(c=>c.sip_amount>0).length;
@@ -1298,7 +1358,10 @@ function sortEqTable(colIndex){
 function resetFilters(t){
   ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-date'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
-  }); filterEq(); if(t==='mf') filterMf();
+  });
+  if(t==='eq') filterEq();
+  else if(t==='mf') filterMf();
+  else if(t==='leads') filterLeads();
 }
 
 function renderEqTable(){
@@ -1541,8 +1604,258 @@ function renderMfTable(){
 }
 
 // ══════════════════════════════════════════
-// ADD / EDIT CLIENT
+// LEADS
 // ══════════════════════════════════════════
+function filterLeads(){ leadsPage=1; renderLeadsTable(); }
+
+function sortLeadsTable(colIndex){
+  if(leadsSortField===colIndex) leadsSortDir=-leadsSortDir;
+  else { leadsSortField=colIndex; leadsSortDir=1; }
+  renderLeadsTable();
+}
+
+function renderLeadsTable(){
+  let data=getMyLeads();
+  const q=(document.getElementById('leads-search')||{value:''}).value.toLowerCase();
+  const rm=(document.getElementById('leads-rm')||{value:''}).value;
+  const fu=(document.getElementById('leads-followup-filter')||{value:''}).value;
+  const nextCallDate=(document.getElementById('leads-next-call-date')||{value:''}).value;
+
+  if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
+  if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  if(fu==='today') data=data.filter(c=>c.next_call===today());
+  if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
+  if(fu&&!['today','overdue'].includes(fu)) data=data.filter(c=>c.followup_status===fu);
+  if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
+
+  leadsFiltered=data;
+  const lbl=document.getElementById('leads-total-label');
+  if(lbl) lbl.textContent=`(${data.length})`;
+  const rc=document.getElementById('leads-count');
+  if(rc) rc.textContent=data.length+' leads';
+
+  const leadsFieldMap={0:'name',1:'mobile',2:'rm',3:'next_call',4:'followup_status',5:'remarks'};
+  if(leadsSortField!==null){
+    const field=leadsFieldMap[leadsSortField];
+    data=data.slice().sort((a,b)=>{
+      let va=a[field], vb=b[field];
+      if(field==='next_call'){
+        va=va||''; vb=vb||'';
+        if(!va && !vb) return 0;
+        if(!va) return 1; if(!vb) return -1;
+        return leadsSortDir*(va<vb?-1:va>vb?1:0);
+      }
+      va=(va||'').toString().toLowerCase(); vb=(vb||'').toString().toLowerCase();
+      return leadsSortDir*va.localeCompare(vb,undefined,{numeric:true});
+    });
+    leadsFiltered=data;
+  }
+
+  const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
+  const cols=['Name','Mobile','RM','Next Call','Follow-up','Remarks'];
+  let h=`<table><thead><tr>${cols.map((c,i)=>{
+    let arrow = leadsSortField===i ? (leadsSortDir===1?' ▲':' ▼') : '';
+    if(c==='Follow-up'){
+      return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
+        <span onclick="sortLeadsTable(${i})">${c}${arrow}</span>
+        <span onclick="event.stopPropagation();toggleFuFilterMenu('leads')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
+          <div id="leads-fu-menu" class="fu-filter-menu" style="display:none">
+            <div onclick="event.stopPropagation();setFuFilter('leads','')">All Follow-ups</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','today')">Due Today</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','overdue')">Overdue</div>
+            <div style="border-top:1px solid #eee;margin:4px 0"></div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Pending')">Pending</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Done')">Done</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Not Required')">Not Required</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Not Interested')">Not Interested</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Call Not Received')">Call Not Received</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Call After Some Time')">Call After Some Time</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Interested In SIP')">Interested In SIP</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Interested In Lumpsum')">Interested In Lumpsum</div>
+            <div onclick="event.stopPropagation();setFuFilter('leads','Interested In Other Product')">Interested In Other Product</div>
+          </div>
+        </span>
+      </th>`;
+    }
+    return `<th onclick="sortLeadsTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
+  }).join('')}<th>Actions</th></tr></thead><tbody>`;
+
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
+
+  rows.forEach(c=>{
+    const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
+    h+=`<tr class="row-leads">
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td>${fmtDate(c.next_call)||'—'}</td>
+      <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td>
+        <button class="btn-icon" onclick="editLead('${c.id}')" title="Edit">✏️</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+        <button class="btn-icon" onclick="convertLead('${c.id}','equity')" title="Convert to Equity Client" style="color:var(--orange)">📈</button>
+        <button class="btn-icon" onclick="convertLead('${c.id}','mf')" title="Convert to MF Investor" style="color:var(--teal)">🏦</button>
+        ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteLead('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('leads-table').innerHTML=h;
+  renderPg('leads',data.length,leadsPage);
+}
+
+function leadForm(c){
+  return `
+  <div class="form-section">Lead Information</div>
+  <div class="form-row three">
+    <div class="form-field"><label>Name *</label><input id="l_name" value="${c?.name||''}" placeholder="Full name"></div>
+    <div class="form-field"><label>Mobile Number</label><input id="l_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
+    ${rmFieldHtmlLead(c)}
+  </div>
+  <div class="form-section">Follow-up</div>
+  <div class="form-row three">
+    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}"></div>
+    <div class="form-field"><label>Follow-up Status</label><select id="l_followup">
+      <option value="">—</option>
+      <option ${c?.followup_status==='Pending'?'selected':''}>Pending</option>
+      <option ${c?.followup_status==='Done'?'selected':''}>Done</option>
+      <option ${c?.followup_status==='Not Required'?'selected':''}>Not Required</option>
+      <option ${c?.followup_status==='Not Interested'?'selected':''}>Not Interested</option>
+      <option ${c?.followup_status==='Call Not Received'?'selected':''}>Call Not Received</option>
+      <option ${c?.followup_status==='Call After Some Time'?'selected':''}>Call After Some Time</option>
+      <option ${c?.followup_status==='Interested In SIP'?'selected':''}>Interested In SIP</option>
+      <option ${c?.followup_status==='Interested In Lumpsum'?'selected':''}>Interested In Lumpsum</option>
+      <option ${c?.followup_status==='Interested In Other Product'?'selected':''}>Interested In Other Product</option>
+    </select></div>
+    <div class="form-field"><label>Remarks</label><input id="l_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
+  </div>`;
+}
+
+function rmFieldHtmlLead(c){
+  const rms=[...new Set([...getSegRMs('equity'),...getSegRMs('mf')])];
+  if(CU.role!=='admin'){
+    const myName=CU.name;
+    return `<div class="form-field"><label>RM</label>
+      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="l_rm" value="${myName}"></div>`;
+  }
+  const opts=rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
+  return `<div class="form-field"><label>RM</label><select id="l_rm"><option value="">Select RM</option>${opts}</select></div>`;
+}
+
+function openAddLead(){
+  currentEditLeadId=null;
+  document.getElementById('leadModalTitle').textContent='Add Lead';
+  document.getElementById('leadSaveBtn').textContent='Save Lead';
+  document.getElementById('leadModalBody').innerHTML=leadForm(null);
+  document.getElementById('leadModal').classList.add('open');
+}
+
+function editLead(id){
+  currentEditLeadId=id;
+  const leads=DB.get('leads')||[];
+  const c=leads.find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('leadModalTitle').textContent='Edit Lead';
+  document.getElementById('leadSaveBtn').textContent='Update';
+  document.getElementById('leadModalBody').innerHTML=leadForm(c);
+  document.getElementById('leadModal').classList.add('open');
+}
+
+async function saveLead(){
+  const name=(document.getElementById('l_name')||{value:''}).value.trim();
+  const rm=(document.getElementById('l_rm')||{value:''}).value.trim();
+  if(!name){ toast('Lead name is required','error'); return; }
+
+  const gv2=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const leads=DB.get('leads')||[];
+
+  let newId=currentEditLeadId;
+  if(!newId){
+    newId=uid();
+    while(leads.some(x=>x.id===newId)) newId=uid();
+  }
+  const rec={
+    id:newId, name, mobile:gv2('l_mobile'), rm,
+    next_call:gv2('l_next_call'), followup_status:gv2('l_followup'), remarks:gv2('l_remarks'),
+    created:currentEditLeadId?undefined:today(), updated:today()
+  };
+  if(currentEditLeadId){
+    const idx=leads.findIndex(x=>x.id===currentEditLeadId);
+    if(idx>=0){ const old=leads[idx]; rec.created=old.created||today(); }
+  } else {
+    rec.created=today();
+  }
+  await DB.setClient('leads',rec);
+  closeModal('leadModal');
+  toast(currentEditLeadId?'Lead updated!':'Lead added!','success');
+  renderLeadsTable();
+  updateBadges();
+}
+
+async function confirmDeleteLead(id,name){
+  if(CU.role!=='admin') return;
+  if(!confirm(`Delete lead "${name}"? This cannot be undone.`)) return;
+  await DB.deleteClient('leads',id);
+  toast('Lead deleted','success');
+  renderLeadsTable();
+  updateBadges();
+}
+
+async function convertLead(id,seg){
+  const leads=DB.get('leads')||[];
+  const lead=leads.find(x=>x.id===id);
+  if(!lead) return;
+  const label = seg==='equity'?'Equity Client':'MF Investor';
+  if(!confirm(`Convert "${lead.name}" to ${label}?`)) return;
+
+  const key=seg==='equity'?'eq_clients':'mf_clients';
+  const clients=DB.get(key)||[];
+
+  // Duplicate check by mobile
+  if(lead.mobile){
+    const dup=clients.find(c=>c.mobile && c.mobile.trim()===lead.mobile.trim());
+    if(dup){
+      toast(`⚠️ Already exists as ${label}: "${dup.name}" (${dup.mobile||''})`,'error');
+      return;
+    }
+  }
+
+  let newId=uid();
+  while(clients.some(x=>x.id===newId)) newId=uid();
+
+  let rec;
+  if(seg==='equity'){
+    rec={
+      id:newId, code:'', name:lead.name, mobile:lead.mobile, email:'',
+      rm:lead.rm, status:'Active',
+      asset_value:null, revenue:null,
+      last_trade_date:'', last_trade_month:'',
+      last_call_date:'', next_call:lead.next_call,
+      followup_status:lead.followup_status, remarks:lead.remarks,
+      created:today(), updated:today()
+    };
+  } else {
+    rec={
+      id:newId, name:lead.name, mobile:lead.mobile, pan:'', email:'',
+      rm:lead.rm, status:'Prospect',
+      aum:null, sip_amount:null, sip_count:null,
+      last_invest_date:'', last_call_date:'',
+      next_call:lead.next_call, followup_status:lead.followup_status, remarks:lead.remarks,
+      created:today(), updated:today()
+    };
+  }
+
+  await DB.setClient(key,rec);
+  await DB.deleteClient('leads',id);
+  toast(`Lead converted to ${label}!`,'success');
+  renderLeadsTable();
+  if(seg==='equity') renderEqTable(); else renderMfTable();
+  refreshDash();
+  updateBadges();
+}
+
+
 function openAddClient(seg){
   currentEditId=null;
   document.getElementById('clientModalTitle').textContent = seg==='equity'?'Add Equity Client':'Add MF Investor';
@@ -2421,11 +2734,12 @@ function renderPg(tab,tot,cur){
 }
 
 function gp(tab,p){
-  const tot=tab==='eq'?eqFiltered.length:mfFiltered.length;
+  const tot=tab==='eq'?eqFiltered.length:tab==='mf'?mfFiltered.length:leadsFiltered.length;
   const pages=Math.ceil(tot/PG_SIZE);
   if(p<1||p>pages) return;
   if(tab==='eq'){eqPage=p;renderEqTable();}
-  else{mfPage=p;renderMfTable();}
+  else if(tab==='mf'){mfPage=p;renderMfTable();}
+  else{leadsPage=p;renderLeadsTable();}
 }
 
 // ══════════════════════════════════════════
