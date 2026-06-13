@@ -1807,16 +1807,33 @@ async function convertLead(id,seg){
   const lead=leads.find(x=>x.id===id);
   if(!lead) return;
   const label = seg==='equity'?'Equity Client':'MF Investor';
+
+  let pan='';
+  if(seg==='mf'){
+    pan=prompt(`Enter PAN for "${lead.name}" (required for MF Investor):`,'');
+    if(pan===null) return; // cancelled
+    pan=pan.trim().toUpperCase();
+    if(!pan){ toast('PAN is required to convert to MF Investor','error'); return; }
+    if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+  }
+
   if(!confirm(`Convert "${lead.name}" to ${label}?`)) return;
 
   const key=seg==='equity'?'eq_clients':'mf_clients';
   const clients=DB.get(key)||[];
 
-  // Duplicate check by mobile
+  // Duplicate check by mobile / PAN
   if(lead.mobile){
     const dup=clients.find(c=>c.mobile && c.mobile.trim()===lead.mobile.trim());
     if(dup){
       toast(`⚠️ Already exists as ${label}: "${dup.name}" (${dup.mobile||''})`,'error');
+      return;
+    }
+  }
+  if(seg==='mf' && pan){
+    const dupPan=clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
+    if(dupPan){
+      toast(`⚠️ Already exists as ${label}: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error');
       return;
     }
   }
@@ -1837,7 +1854,7 @@ async function convertLead(id,seg){
     };
   } else {
     rec={
-      id:newId, name:lead.name, mobile:lead.mobile, pan:'', email:'',
+      id:newId, name:lead.name, mobile:lead.mobile, pan, email:'',
       rm:lead.rm, status:'Prospect',
       aum:null, sip_amount:null, sip_count:null,
       last_invest_date:'', last_call_date:'',
