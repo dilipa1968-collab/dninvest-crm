@@ -1763,7 +1763,7 @@ function renderEqTable(){
   if(rc) rc.textContent=data.length+' clients';
 
   // Sort full filtered dataset (not just current page) by selected field
-  const eqFieldMap = {0:'code',1:'name',2:'mobile',3:'rm',4:'status',5:'asset_value',6:'last_call_date',7:'last_trade_date',8:'next_call',9:'followup_status',10:'remarks'};
+  const eqFieldMap = {0:'code',1:'name',2:'mobile',3:'rm',4:'asset_value',5:'last_call_date',6:'last_trade_date',7:'next_call',8:'followup_status',9:'remarks'};
   if(eqSortField!==null){
     const field = eqFieldMap[eqSortField];
     data = data.slice().sort((a,b)=>{
@@ -1787,7 +1787,7 @@ function renderEqTable(){
   }
 
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
-  const cols=['Code','Name','Mobile','RM','Status','Assets','Last Call','Last Trade','Next Call','Follow-up','Remarks'];
+  const cols=['Code','Name','Mobile','RM','Assets','Last Call','Last Trade','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
@@ -1814,9 +1814,9 @@ function renderEqTable(){
       </th>`;
     }
     return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th></tr></thead><tbody>`;
+  }).join('')}<th>Actions</th><th>Status</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -1827,8 +1827,6 @@ function renderEqTable(){
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span>
-        <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
@@ -1840,7 +1838,10 @@ function renderEqTable(){
         <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
-      </td></tr>`;
+      </td>
+      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span>
+        <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
+      </tr>`;
   });
   h+='</tbody></table>';
   document.getElementById('eq-table').innerHTML=h;
@@ -1892,7 +1893,7 @@ function renderMfTable(){
   const rc=document.getElementById('mf-count');
   if(rc) rc.textContent=data.length+' investors';
 
-  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'status',5:'aum',6:'sip_amount',7:'sip_count',8:'last_call_date',9:'last_invest_date',10:'next_call',11:'followup_status',12:'remarks'};
+  const mfFieldMap = {0:'name',1:'mobile',2:'pan',3:'rm',4:'aum',5:'sip_amount',6:'sip_count',7:'last_call_date',8:'next_call',9:'followup_status',10:'remarks'};
   if(mfSortField!==null){
     const field = mfFieldMap[mfSortField];
     data = data.slice().sort((a,b)=>{
@@ -1914,7 +1915,7 @@ function renderMfTable(){
   }
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
-  const cols=['Name','Mobile','PAN','MF RM','Status','AUM','SIP Amt','SIP Cnt','Last Call','Last Inv','Next Call','Follow-up','Remarks'];
+  const cols=['Name','Mobile','PAN','MF RM','AUM','SIP Amt','SIP Cnt','Last Call','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
@@ -1940,9 +1941,9 @@ function renderMfTable(){
       </th>`;
     }
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th></tr></thead><tbody>`;
+  }).join('')}<th>Actions</th><th>Status</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
@@ -1951,13 +1952,10 @@ function renderMfTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
-      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span>
-        <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
       <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
       <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
       <td>${c.sip_count||'—'}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
-      <td>${fmtDate(c.last_invest_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
@@ -1967,7 +1965,10 @@ function renderMfTable(){
         <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
-      </td></tr>`;
+      </td>
+      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span>
+        <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
+      </tr>`;
   });
   h+='</tbody></table>';
   document.getElementById('mf-table').innerHTML=h;
