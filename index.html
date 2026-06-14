@@ -2261,7 +2261,7 @@ function renderSeminarsTable(){
     cont.innerHTML = `<div style="text-align:center;padding:48px;color:#bbb">No seminars yet. <a href="#" onclick="openAddSeminar()" style="color:var(--teal)">Add one?</a></div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Guests</th><th>Will Come</th><th>Expected People</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Guests</th><th>Will Come</th><th>Wait</th><th>Expected People</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
   seminars.forEach(s=>{
     const attendees = s.attendees||[];
     const eqCount = attendees.filter(a=>a.type==='equity').length;
@@ -2269,6 +2269,7 @@ function renderSeminarsTable(){
     const guestCount = attendees.filter(a=>a.type==='guest').length;
     const attendedCount = attendees.filter(a=>a.status==='Attended').length;
     const willComeCount = attendees.filter(a=>a.rsvp==='Yes').length;
+    const waitCount = attendees.filter(a=>a.rsvp==='Wait').length;
     const expectedTotal = attendees.reduce((sum,a)=>sum+(a.expected_count||0),0);
     h+=`<tr>
       <td>${fmtDate(s.date)||'—'}</td>
@@ -2279,6 +2280,7 @@ function renderSeminarsTable(){
       <td>${mfCount}</td>
       <td>${guestCount}</td>
       <td>${willComeCount}</td>
+      <td>${waitCount}</td>
       <td>${expectedTotal||'—'}</td>
       <td>${attendedCount}</td>
       <td>
@@ -2382,6 +2384,7 @@ function renderSeminarAttendees(){
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
         <option value="No" ${a.rsvp==='No'?'selected':''}>No</option>
+        <option value="Wait" ${a.rsvp==='Wait'?'selected':''}>Wait</option>
       </select></td>
       <td><input type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td><input type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
@@ -2450,13 +2453,14 @@ function exportSeminarAttendees(){
     a.status||'Pending', a.rsvp||'—', a.expected_count!=null?a.expected_count:'', a.remarks||''
   ]);
   const willCome = attendees.filter(x=>x.rsvp==='Yes').length;
+  const waitCount = attendees.filter(x=>x.rsvp==='Wait').length;
   const expectedTotal = attendees.reduce((sum,x)=>sum+(x.expected_count||0),0);
   const attended = attendees.filter(x=>x.status==='Attended').length;
 
   const wsData = [
     [s.name],
     [`Date: ${fmtDate(s.date)||'—'}${s.notes?'   |   Venue: '+s.notes:''}`],
-    [`Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}`],
+    [`Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Wait: ${waitCount}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}`],
     [],
     headers,
     ...rows
