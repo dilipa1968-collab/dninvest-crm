@@ -359,6 +359,32 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <button class="login-btn" onclick="doLogin()">Sign In →</button>
     <div class="login-err" id="lerr">Invalid username or password</div>
+    <div style="text-align:center;margin-top:12px">
+      <a href="#" onclick="event.preventDefault();openForgotPassword()" style="font-size:.8rem;color:var(--teal)">Forgot Password?</a>
+    </div>
+  </div>
+
+  <!-- Forgot Password Box -->
+  <div class="login-box" id="forgotBox" style="display:none">
+    <div class="login-logo">
+      <div class="brand">DN<span>Invest</span></div>
+      <div class="sub">Reset Password</div>
+    </div>
+    <div class="form-group"><label>Username</label>
+      <input type="text" id="fp_username" placeholder="Enter your username" autocomplete="off">
+    </div>
+    <div class="form-group"><label>Recovery Code</label>
+      <input type="text" id="fp_code" placeholder="Enter master recovery code">
+    </div>
+    <div class="form-group"><label>New Password</label>
+      <input type="password" id="fp_newpass" placeholder="Enter new password">
+    </div>
+    <button class="login-btn" onclick="doResetPassword()">Reset Password</button>
+    <div class="login-err" id="fp_err">Invalid username or recovery code</div>
+    <div class="login-ok" id="fp_ok" style="display:none;color:var(--green);text-align:center;font-size:.85rem;margin-top:8px;font-weight:600">Password reset successful! You can now login.</div>
+    <div style="text-align:center;margin-top:12px">
+      <a href="#" onclick="event.preventDefault();closeForgotPassword()" style="font-size:.8rem;color:var(--teal)">← Back to Login</a>
+    </div>
   </div>
 </div>
 
@@ -1217,6 +1243,68 @@ function doLogout(){
   document.getElementById('app').style.display='none';
   document.getElementById('lusr').value='';
   document.getElementById('lpwd').value='';
+}
+
+// ══════════════════════════════════════════
+// FORGOT PASSWORD
+// ══════════════════════════════════════════
+const MASTER_RECOVERY_CODE = 'DNINVEST2026';
+
+function openForgotPassword(){
+  document.querySelector('#loginScreen .login-box').style.display='none';
+  document.getElementById('forgotBox').style.display='block';
+  document.getElementById('fp_username').value='';
+  document.getElementById('fp_code').value='';
+  document.getElementById('fp_newpass').value='';
+  document.getElementById('fp_err').style.display='none';
+  document.getElementById('fp_ok').style.display='none';
+}
+
+function closeForgotPassword(){
+  document.getElementById('forgotBox').style.display='none';
+  document.querySelector('#loginScreen .login-box').style.display='block';
+}
+
+async function doResetPassword(){
+  const username=document.getElementById('fp_username').value.trim().toLowerCase();
+  const code=document.getElementById('fp_code').value.trim();
+  const newpass=document.getElementById('fp_newpass').value;
+  const errEl=document.getElementById('fp_err');
+  const okEl=document.getElementById('fp_ok');
+  errEl.style.display='none';
+  okEl.style.display='none';
+
+  if(!username || !code || !newpass){
+    errEl.textContent='Saare fields bharein';
+    errEl.style.display='block';
+    return;
+  }
+  if(newpass.length<4){
+    errEl.textContent='Password kam se kam 4 characters ka ho';
+    errEl.style.display='block';
+    return;
+  }
+  if(code!==MASTER_RECOVERY_CODE){
+    errEl.textContent='Invalid recovery code';
+    errEl.style.display='block';
+    return;
+  }
+
+  const users = DB.get('users') || DEFAULT_USERS;
+  const idx = users.findIndex(x=>x.username===username);
+  if(idx===-1){
+    errEl.textContent='Username nahi mila';
+    errEl.style.display='block';
+    return;
+  }
+
+  users[idx].password = newpass;
+  await DB.set('users', users);
+
+  okEl.style.display='block';
+  document.getElementById('fp_username').value='';
+  document.getElementById('fp_code').value='';
+  document.getElementById('fp_newpass').value='';
 }
 
 // Auto-login if session exists
