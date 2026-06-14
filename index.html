@@ -385,6 +385,10 @@ tbody td{padding:4px 5px;white-space:nowrap;}
         <span class="icon">🧲</span> Leads
         <span class="nav-badge" id="nb-leads">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('seminars')" id="nav-seminars">
+        <span class="icon">🎤</span> Seminars
+        <span class="nav-badge" id="nb-seminars">0</span>
+      </div>
 
       <div class="sidebar-section" id="eq-nav-section">Equity</div>
       <div class="nav-item" onclick="showPage('eq-clients')" id="nav-eq-clients">
@@ -479,6 +483,17 @@ tbody td{padding:4px 5px;white-space:nowrap;}
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="leads-table"></div></div>
         <div class="pagination" id="leads-pg"></div>
+      </div>
+
+      <!-- ── SEMINARS ── -->
+      <div class="page" id="page-seminars">
+        <div class="page-hdr">
+          <div class="page-title">Seminars</div>
+          <div class="hdr-actions">
+            <button class="btn btn-teal" onclick="openAddSeminar()">+ Add Seminar</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="seminars-table"></div></div>
       </div>
 
       <!-- ── EQUITY CLIENTS ── -->
@@ -719,6 +734,66 @@ tbody td{padding:4px 5px;white-space:nowrap;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('leadsImportModal')">Cancel</button>
       <button class="btn btn-teal" id="leadsImportBtn2" onclick="doLeadsImport()" disabled>Import Leads</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Seminar Modal -->
+<div class="modal-overlay" id="seminarModal" onclick="if(event.target===this)closeModal('seminarModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="seminarModalTitle">Add Seminar</h3>
+      <button class="modal-close" onclick="closeModal('seminarModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-field"><label>Seminar Name *</label><input id="sem_name" placeholder="e.g. Wealth Creation Seminar"></div>
+        <div class="form-field"><label>Date *</label><input id="sem_date" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field" style="grid-column:1/-1"><label>Venue / Notes</label><input id="sem_notes" placeholder="Venue / additional notes (optional)"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('seminarModal')">Cancel</button>
+      <button class="btn btn-primary" id="seminarSaveBtn" onclick="saveSeminar()">Save Seminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Seminar Detail Modal -->
+<div class="modal-overlay" id="seminarDetailModal" onclick="if(event.target===this)closeModal('seminarDetailModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="seminarDetailTitle">Seminar</h3>
+      <button class="modal-close" onclick="closeModal('seminarDetailModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+        <span id="seminarDetailSub" style="color:var(--gray);font-size:.85rem"></span>
+        <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
+      </div>
+      <div class="tbl-wrap"><div class="tbl-scroll" id="seminar-attendees-table"></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('seminarDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Attendee Modal -->
+<div class="modal-overlay" id="addAttendeeModal" onclick="if(event.target===this)closeModal('addAttendeeModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>Add Attendee</h3>
+      <button class="modal-close" onclick="closeModal('addAttendeeModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" placeholder="🔍 Search client / investor name or mobile..." oninput="searchAttendees()" id="attendee-search" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:.85rem;margin-bottom:10px">
+      <div class="tbl-wrap"><div class="tbl-scroll" id="attendee-search-results" style="max-height:340px"></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('addAttendeeModal')">Done</button>
     </div>
   </div>
 </div>
@@ -1041,7 +1116,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','users','call_logs','mf_business']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && doc.data().data && doc.data().data.length > 0){
           localStorage.setItem('dninvest_'+key,JSON.stringify(doc.data().data));
@@ -1178,7 +1253,7 @@ function initApp(){
       // write, AND skip while a setClient/deleteClient/setClientsBulk write is
       // in flight (DB._writing[key] > 0) to avoid a stale Firestore snapshot
       // overwriting localStorage between our read and our write.
-      ['eq_clients','mf_clients','leads'].forEach(key=>{
+      ['eq_clients','mf_clients','leads','seminars'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
           if(DB._writing[key]>0) return;
@@ -1191,6 +1266,7 @@ function initApp(){
               if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
               if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
               if(key==='leads' && getCurrentPageId()==='leads') renderLeadsTable();
+              if(key==='seminars' && getCurrentPageId()==='seminars') renderSeminarsTable();
               if(getCurrentPageId()==='dashboard') refreshDash();
               updateBadges();
             }
@@ -1316,6 +1392,7 @@ function showPage(id){
   if(id==='eq-clients') renderEqTable();
   else if(id==='mf-clients') renderMfTable();
   else if(id==='leads') renderLeadsTable();
+  else if(id==='seminars') renderSeminarsTable();
   else if(id==='eq-followup') renderFollowup('eqf');
   else if(id==='mf-followup') renderFollowup('mff');
   else if(id==='eq-notrade') renderNoTrade();
@@ -1486,6 +1563,7 @@ function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=1
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
   document.getElementById('nb-leads').textContent=getMyLeads().length;
+  document.getElementById('nb-seminars').textContent=getMySeminars().length;
   document.getElementById('nb-eq').textContent=eq.length;
   document.getElementById('nb-mf').textContent=mf.length;
   document.getElementById('nb-sip').textContent=mf.filter(c=>c.sip_amount>0).length;
@@ -2146,6 +2224,238 @@ async function doLeadsImport(){
   toast(`${added} leads imported${skipped?`, ${skipped} skipped (duplicate mobile)`:''}`,'success');
   renderLeadsTable();
   updateBadges();
+}
+
+// ══════════════════════════════════════════
+// SEMINARS
+// ══════════════════════════════════════════
+let currentEditSeminarId = null;
+let currentSeminarId = null;
+
+function getMySeminars(){
+  const all = DB.get('seminars')||[];
+  if(CU.role==='admin') return all;
+  // RM sees seminars they created OR that include their clients
+  return all.filter(s=>s.created_by===CU.name || (s.attendees||[]).some(a=>(a.rm||'').trim().toLowerCase()===CU.name.trim().toLowerCase()));
+}
+
+function renderSeminarsTable(){
+  const seminars = getMySeminars().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('nb-seminars').textContent = seminars.length;
+
+  const cont = document.getElementById('seminars-table');
+  if(!seminars.length){
+    cont.innerHTML = `<div style="text-align:center;padding:48px;color:#bbb">No seminars yet. <a href="#" onclick="openAddSeminar()" style="color:var(--teal)">Add one?</a></div>`;
+    return;
+  }
+  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
+  seminars.forEach(s=>{
+    const attendees = s.attendees||[];
+    const eqCount = attendees.filter(a=>a.type==='equity').length;
+    const mfCount = attendees.filter(a=>a.type==='mf').length;
+    const attendedCount = attendees.filter(a=>a.status==='Attended').length;
+    h+=`<tr>
+      <td>${fmtDate(s.date)||'—'}</td>
+      <td style="font-weight:600;cursor:pointer;color:var(--navy)" onclick="openSeminarDetail('${s.id}')">${s.name}</td>
+      <td>${s.notes||'—'}</td>
+      <td>${attendees.length}</td>
+      <td>${eqCount}</td>
+      <td>${mfCount}</td>
+      <td>${attendedCount}</td>
+      <td>
+        <button class="btn-icon" onclick="openSeminarDetail('${s.id}')" title="View / Manage Attendees">👁️</button>
+        <button class="btn-icon" onclick="editSeminar('${s.id}')" title="Edit">✏️</button>
+        ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteSeminar('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
+      </td></tr>`;
+  });
+  h+='</tbody></table>';
+  cont.innerHTML=h;
+}
+
+function openAddSeminar(){
+  currentEditSeminarId=null;
+  document.getElementById('seminarModalTitle').textContent='Add Seminar';
+  document.getElementById('seminarSaveBtn').textContent='Save Seminar';
+  document.getElementById('sem_name').value='';
+  document.getElementById('sem_date').value=today();
+  document.getElementById('sem_notes').value='';
+  document.getElementById('seminarModal').classList.add('open');
+}
+
+function editSeminar(id){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===id);
+  if(!s) return;
+  currentEditSeminarId=id;
+  document.getElementById('seminarModalTitle').textContent='Edit Seminar';
+  document.getElementById('seminarSaveBtn').textContent='Update';
+  document.getElementById('sem_name').value=s.name||'';
+  document.getElementById('sem_date').value=s.date||'';
+  document.getElementById('sem_notes').value=s.notes||'';
+  document.getElementById('seminarModal').classList.add('open');
+}
+
+async function saveSeminar(){
+  const name=document.getElementById('sem_name').value.trim();
+  const date=document.getElementById('sem_date').value;
+  const notes=document.getElementById('sem_notes').value.trim();
+  if(!name||!date){ toast('Seminar name aur date required hain','error'); return; }
+
+  const seminars=DB.get('seminars')||[];
+  let rec;
+  if(currentEditSeminarId){
+    rec = seminars.find(x=>x.id===currentEditSeminarId);
+    if(!rec) return;
+    rec.name=name; rec.date=date; rec.notes=notes; rec.updated=today();
+  } else {
+    let newId=uid();
+    while(seminars.some(x=>x.id===newId)) newId=uid();
+    rec={id:newId, name, date, notes, attendees:[], created_by:CU.name, created:today(), updated:today()};
+  }
+  await DB.setClient('seminars',rec);
+  closeModal('seminarModal');
+  toast(currentEditSeminarId?'Seminar updated!':'Seminar added!','success');
+  renderSeminarsTable();
+}
+
+async function confirmDeleteSeminar(id,name){
+  if(CU.role!=='admin') return;
+  if(!confirm(`Delete seminar "${name}"? This cannot be undone.`)) return;
+  await DB.deleteClient('seminars',id);
+  toast('Seminar deleted','success');
+  renderSeminarsTable();
+}
+
+function openSeminarDetail(id){
+  currentSeminarId=id;
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===id);
+  if(!s) return;
+  document.getElementById('seminarDetailTitle').textContent=s.name;
+  document.getElementById('seminarDetailSub').textContent=`Date: ${fmtDate(s.date)}${s.notes?' · '+s.notes:''}`;
+  renderSeminarAttendees();
+  document.getElementById('seminarDetailModal').classList.add('open');
+}
+
+function renderSeminarAttendees(){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  const cont=document.getElementById('seminar-attendees-table');
+  if(!s){ cont.innerHTML=''; return; }
+  const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!attendees.length){
+    cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
+    return;
+  }
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+  attendees.forEach(a=>{
+    h+=`<tr>
+      <td style="font-weight:600">${a.name}</td>
+      <td>${a.mobile||'—'}</td>
+      <td>${a.rm||'—'}</td>
+      <td><span class="badge ${a.type==='equity'?'b-active':'b-investor'}">${a.type==='equity'?'Equity':'MF'}</span></td>
+      <td><select onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+        <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
+        <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
+        <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
+      </select></td>
+      <td><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button></td>
+      </tr>`;
+  });
+  h+='</tbody></table>';
+  cont.innerHTML=h;
+}
+
+async function setAttendeeStatus(attendeeId,status){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
+  if(!a) return;
+  a.status=status;
+  s.updated=today();
+  await DB.setClient('seminars',s);
+  renderSeminarsTable();
+}
+
+async function removeAttendee(attendeeId){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  s.attendees=(s.attendees||[]).filter(x=>x.id!==attendeeId);
+  s.updated=today();
+  await DB.setClient('seminars',s);
+  renderSeminarAttendees();
+  renderSeminarsTable();
+}
+
+function openAddAttendee(){
+  document.getElementById('attendee-search').value='';
+  document.getElementById('attendee-search-results').innerHTML='<div style="text-align:center;padding:20px;color:#bbb">Type a name or mobile number to search...</div>';
+  document.getElementById('addAttendeeModal').classList.add('open');
+}
+
+function searchAttendees(){
+  const q=document.getElementById('attendee-search').value.trim().toLowerCase();
+  const cont=document.getElementById('attendee-search-results');
+  if(!q || q.length<2){
+    cont.innerHTML='<div style="text-align:center;padding:20px;color:#bbb">Type a name or mobile number to search...</div>';
+    return;
+  }
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  const existingIds=new Set((s?.attendees||[]).map(a=>a.source_id+'_'+a.type));
+
+  const eq=(DB.get('eq_clients')||[]).filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
+  const mf=(DB.get('mf_clients')||[]).filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
+
+  const results=[
+    ...eq.slice(0,20).map(c=>({...c,type:'equity'})),
+    ...mf.slice(0,20).map(c=>({...c,type:'mf'}))
+  ];
+
+  if(!results.length){
+    cont.innerHTML='<div style="text-align:center;padding:20px;color:#bbb">No matching clients/investors found</div>';
+    return;
+  }
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Action</th></tr></thead><tbody>`;
+  results.forEach(c=>{
+    const key=c.id+'_'+c.type;
+    const already=existingIds.has(key);
+    h+=`<tr>
+      <td style="font-weight:600">${c.name}</td>
+      <td>${c.mobile||'—'}</td>
+      <td>${c.rm||'—'}</td>
+      <td><span class="badge ${c.type==='equity'?'b-active':'b-investor'}">${c.type==='equity'?'Equity':'MF'}</span></td>
+      <td>${already
+        ? `<span style="color:var(--green);font-size:.78rem;font-weight:600">✓ Added</span>`
+        : `<button class="btn-icon" onclick="addAttendee('${c.id}','${c.type}')">+ Add</button>`}</td>
+      </tr>`;
+  });
+  h+='</tbody></table>';
+  cont.innerHTML=h;
+}
+
+async function addAttendee(sourceId,type){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const src=type==='equity'?(DB.get('eq_clients')||[]).find(c=>c.id===sourceId):(DB.get('mf_clients')||[]).find(c=>c.id===sourceId);
+  if(!src) return;
+
+  s.attendees = s.attendees||[];
+  if(s.attendees.some(a=>a.source_id===sourceId && a.type===type)) return; // already added
+
+  let newId=uid();
+  while(s.attendees.some(x=>x.id===newId)) newId=uid();
+  s.attendees.push({
+    id:newId, source_id:sourceId, type, name:src.name, mobile:src.mobile||'', rm:src.rm||'', status:'Pending'
+  });
+  s.updated=today();
+  await DB.setClient('seminars',s);
+  renderSeminarAttendees();
+  renderSeminarsTable();
+  searchAttendees(); // refresh "Added" state
 }
 
 
