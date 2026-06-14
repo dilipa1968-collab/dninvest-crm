@@ -2368,18 +2368,13 @@ function renderSeminarAttendees(){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Response</th><th>Headcount</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
     h+=`<tr>
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
       <td><span class="badge ${a.type==='equity'?'b-active':a.type==='mf'?'b-investor':'b-pending'}">${a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'}</span></td>
-      <td><select onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
-        <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
-        <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
-        <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
-      </select></td>
       <td><select onchange="setAttendeeRsvp('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
@@ -2387,6 +2382,11 @@ function renderSeminarAttendees(){
         <option value="Wait" ${a.rsvp==='Wait'?'selected':''}>Wait</option>
       </select></td>
       <td><input type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><select onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+        <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
+        <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
+        <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
+      </select></td>
       <td><input type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button></td>
       </tr>`;
@@ -2447,10 +2447,10 @@ function exportSeminarAttendees(){
   const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!attendees.length){ toast('No attendees to export','error'); return; }
 
-  const headers=['#','Name','Mobile','RM','Type','Status','Response','Headcount','Remarks'];
+  const headers=['#','Name','Mobile','RM','Type','Response','Headcount','Status','Remarks'];
   const rows=attendees.map((a,i)=>[
     i+1, a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
-    a.status||'Pending', a.rsvp||'—', a.expected_count!=null?a.expected_count:'', a.remarks||''
+    a.rsvp||'—', a.expected_count!=null?a.expected_count:'', a.status||'Pending', a.remarks||''
   ]);
   const willCome = attendees.filter(x=>x.rsvp==='Yes').length;
   const waitCount = attendees.filter(x=>x.rsvp==='Wait').length;
