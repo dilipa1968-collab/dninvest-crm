@@ -771,7 +771,10 @@ tbody td{padding:4px 5px;white-space:nowrap;}
     <div class="modal-body">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
         <span id="seminarDetailSub" style="color:var(--gray);font-size:.85rem"></span>
-        <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="exportSeminarAttendees()">⬇️ Export Excel</button>
+          <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
+        </div>
       </div>
       <div class="tbl-wrap"><div class="tbl-scroll" id="seminar-attendees-table"></div></div>
     </div>
@@ -2248,12 +2251,14 @@ function renderSeminarsTable(){
     cont.innerHTML = `<div style="text-align:center;padding:48px;color:#bbb">No seminars yet. <a href="#" onclick="openAddSeminar()" style="color:var(--teal)">Add one?</a></div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Will Come</th><th>Expected People</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
   seminars.forEach(s=>{
     const attendees = s.attendees||[];
     const eqCount = attendees.filter(a=>a.type==='equity').length;
     const mfCount = attendees.filter(a=>a.type==='mf').length;
     const attendedCount = attendees.filter(a=>a.status==='Attended').length;
+    const willComeCount = attendees.filter(a=>a.rsvp==='Yes').length;
+    const expectedTotal = attendees.reduce((sum,a)=>sum+(a.expected_count||0),0);
     h+=`<tr>
       <td>${fmtDate(s.date)||'—'}</td>
       <td style="font-weight:600;cursor:pointer;color:var(--navy)" onclick="openSeminarDetail('${s.id}')">${s.name}</td>
@@ -2261,6 +2266,8 @@ function renderSeminarsTable(){
       <td>${attendees.length}</td>
       <td>${eqCount}</td>
       <td>${mfCount}</td>
+      <td>${willComeCount}</td>
+      <td>${expectedTotal||'—'}</td>
       <td>${attendedCount}</td>
       <td>
         <button class="btn-icon" onclick="openSeminarDetail('${s.id}')" title="View / Manage Attendees">👁️</button>
@@ -2347,7 +2354,7 @@ function renderSeminarAttendees(){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Aayenge?</th><th>Kitne Log</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
     h+=`<tr>
       <td style="font-weight:600">${a.name}</td>
@@ -2359,6 +2366,12 @@ function renderSeminarAttendees(){
         <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
+      <td><select onchange="setAttendeeRsvp('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+        <option value="" ${!a.rsvp?'selected':''}>—</option>
+        <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
+        <option value="No" ${a.rsvp==='No'?'selected':''}>No</option>
+      </select></td>
+      <td><input type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button></td>
       </tr>`;
   });
@@ -2376,6 +2389,47 @@ async function setAttendeeStatus(attendeeId,status){
   s.updated=today();
   await DB.setClient('seminars',s);
   renderSeminarsTable();
+}
+
+async function setAttendeeRsvp(attendeeId,rsvp){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
+  if(!a) return;
+  a.rsvp=rsvp;
+  s.updated=today();
+  await DB.setClient('seminars',s);
+}
+
+async function setAttendeeCount(attendeeId,val){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
+  if(!a) return;
+  a.expected_count = val===''?null:parseInt(val);
+  s.updated=today();
+  await DB.setClient('seminars',s);
+}
+
+function exportSeminarAttendees(){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!attendees.length){ toast('No attendees to export','error'); return; }
+  const headers=['Name','Mobile','RM','Type','Status','Aayenge? (Yes/No)','Kitne Log'];
+  const rows=attendees.map(a=>[
+    a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':'MF',
+    a.status||'Pending', a.rsvp||'', a.expected_count!=null?a.expected_count:''
+  ]);
+  const csv=[headers,...rows].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download=(s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.csv';
+  a.click();
+  toast('Export done!','success');
 }
 
 async function removeAttendee(attendeeId){
