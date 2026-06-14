@@ -2366,7 +2366,7 @@ function renderSeminarAttendees(){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Aayenge?</th><th>Kitne Log</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Response</th><th>Headcount</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
     h+=`<tr>
       <td style="font-weight:600">${a.name}</td>
@@ -2443,16 +2443,63 @@ function exportSeminarAttendees(){
   if(!s) return;
   const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!attendees.length){ toast('No attendees to export','error'); return; }
-  const headers=['Name','Mobile','RM','Type','Status','Aayenge? (Yes/No)','Kitne Log','Remarks'];
-  const rows=attendees.map(a=>[
-    a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
-    a.status||'Pending', a.rsvp||'', a.expected_count!=null?a.expected_count:'', a.remarks||''
+
+  const headers=['#','Name','Mobile','RM','Type','Status','Response','Headcount','Remarks'];
+  const rows=attendees.map((a,i)=>[
+    i+1, a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
+    a.status||'Pending', a.rsvp||'—', a.expected_count!=null?a.expected_count:'', a.remarks||''
   ]);
-  const csv=[headers,...rows].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-  a.download=(s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.csv';
-  a.click();
+  const willCome = attendees.filter(x=>x.rsvp==='Yes').length;
+  const expectedTotal = attendees.reduce((sum,x)=>sum+(x.expected_count||0),0);
+  const attended = attendees.filter(x=>x.status==='Attended').length;
+
+  const wsData = [
+    [s.name],
+    [`Date: ${fmtDate(s.date)||'—'}${s.notes?'   |   Venue: '+s.notes:''}`],
+    [`Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}`],
+    [],
+    headers,
+    ...rows
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:4},{wch:24},{wch:14},{wch:14},{wch:8},{wch:14},{wch:11},{wch:11},{wch:30}
+  ];
+
+  // Merge title rows across all columns
+  ws['!merges'] = [
+    {s:{r:0,c:0},e:{r:0,c:headers.length-1}},
+    {s:{r:1,c:0},e:{r:1,c:headers.length-1}},
+    {s:{r:2,c:0},e:{r:2,c:headers.length-1}}
+  ];
+
+  // Style helper
+  const fmtCell = (addr, style) => { if(ws[addr]) ws[addr].s = style; };
+  const titleStyle = {font:{bold:true,sz:14,color:{rgb:'1A2744'}}, alignment:{horizontal:'center'}};
+  const subStyle = {font:{sz:10,color:{rgb:'555555'}}, alignment:{horizontal:'center'}};
+  const headerStyle = {font:{bold:true,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1A2744'}}, alignment:{horizontal:'center'}};
+
+  fmtCell('A1', titleStyle);
+  fmtCell('A2', subStyle);
+  fmtCell('A3', subStyle);
+  headers.forEach((h,ci)=>{ fmtCell(XLSX.utils.encode_cell({r:4,c:ci}), headerStyle); });
+
+  // Zebra striping + center alignment for data rows
+  rows.forEach((row,ri)=>{
+    const rowStyle = {alignment:{horizontal:'center', vertical:'center'}, fill: ri%2===1?{fgColor:{rgb:'F2F6FB'}}:undefined};
+    row.forEach((val,ci)=>{
+      const addr=XLSX.utils.encode_cell({r:5+ri,c:ci});
+      if(!ws[addr]) return;
+      ws[addr].s = ci===1 ? {...rowStyle, alignment:{horizontal:'left',vertical:'center'}} : rowStyle;
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendees');
+  XLSX.writeFile(wb, (s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.xlsx');
   toast('Export done!','success');
 }
 
