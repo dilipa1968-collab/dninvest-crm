@@ -2354,7 +2354,7 @@ function renderSeminarAttendees(){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Aayenge?</th><th>Kitne Log</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Status</th><th>Aayenge?</th><th>Kitne Log</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
     h+=`<tr>
       <td style="font-weight:600">${a.name}</td>
@@ -2372,6 +2372,7 @@ function renderSeminarAttendees(){
         <option value="No" ${a.rsvp==='No'?'selected':''}>No</option>
       </select></td>
       <td><input type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><input type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button></td>
       </tr>`;
   });
@@ -2413,16 +2414,27 @@ async function setAttendeeCount(attendeeId,val){
   await DB.setClient('seminars',s);
 }
 
+async function setAttendeeRemarks(attendeeId,val){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
+  if(!a) return;
+  a.remarks = val;
+  s.updated=today();
+  await DB.setClient('seminars',s);
+}
+
 function exportSeminarAttendees(){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
   if(!s) return;
   const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!attendees.length){ toast('No attendees to export','error'); return; }
-  const headers=['Name','Mobile','RM','Type','Status','Aayenge? (Yes/No)','Kitne Log'];
+  const headers=['Name','Mobile','RM','Type','Status','Aayenge? (Yes/No)','Kitne Log','Remarks'];
   const rows=attendees.map(a=>[
     a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':'MF',
-    a.status||'Pending', a.rsvp||'', a.expected_count!=null?a.expected_count:''
+    a.status||'Pending', a.rsvp||'', a.expected_count!=null?a.expected_count:'', a.remarks||''
   ]);
   const csv=[headers,...rows].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
