@@ -727,6 +727,19 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="ann-card">
           <h3>📢 Announcement for RMs</h3>
           <div class="form-field">
+            <label>Send To</label>
+            <select id="ann-target" onchange="onAnnTargetChange()">
+              <option value="all">All RMs</option>
+              <option value="seg-equity">Equity Team</option>
+              <option value="seg-mf">Mutual Fund Team</option>
+              <option value="users">Specific RM(s)</option>
+            </select>
+          </div>
+          <div class="form-field" id="ann-users-wrap" style="display:none;margin-top:10px">
+            <label>Select RM(s)</label>
+            <div id="ann-users-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px"></div>
+          </div>
+          <div class="form-field" style="margin-top:10px">
             <label>Message</label>
             <textarea id="ann-text" placeholder="Type announcement message here..." style="min-height:90px"></textarea>
           </div>
@@ -736,7 +749,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <div id="ann-img-preview"></div>
           </div>
           <div style="display:flex;gap:10px;margin-top:14px">
-            <button class="btn btn-gold" onclick="sendAnnouncement()">📤 Send to All RMs</button>
+            <button class="btn btn-gold" onclick="sendAnnouncement()">📤 Send Announcement</button>
             <button class="btn btn-danger" onclick="clearAnnouncement()">🗑️ Clear Announcement</button>
           </div>
           <div class="ann-meta" id="ann-meta"></div>
@@ -3723,17 +3736,43 @@ function renderAnnouncementAdmin(){
   const meta=document.getElementById('ann-meta');
   if(!txt) return;
   txt.value = ann?.text || '';
+
+  // Populate RM checkbox list
+  const users=(DB.get('users')||[]).filter(u=>u.active!==false);
+  const listEl=document.getElementById('ann-users-list');
+  const selectedUsers = (ann?.target?.type==='users') ? (ann.target.usernames||[]) : [];
+  listEl.innerHTML = users.map(u=>`
+    <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;font-weight:400;text-transform:none;letter-spacing:0">
+      <input type="checkbox" class="ann-user-chk" value="${u.username}" ${selectedUsers.includes(u.username)?'checked':''}> ${u.name}
+    </label>`).join('');
+
+  // Set target select
+  const targetSel=document.getElementById('ann-target');
+  let targetVal='all';
+  if(ann?.target?.type==='segment') targetVal='seg-'+ann.target.segment;
+  else if(ann?.target?.type==='users') targetVal='users';
+  targetSel.value=targetVal;
+  onAnnTargetChange();
+
   if(ann?.image){
     prev.innerHTML = `<div class="ann-imgwrap"><img src="${ann.image}"><button class="ann-rm" onclick="removeAnnouncementImage()" title="Remove image">×</button></div>`;
   } else {
     prev.innerHTML = '';
   }
   if(ann?.date){
-    meta.textContent = `Last sent: ${fmtDate(ann.date)} by ${ann.by||'Admin'}`;
+    let tgtLabel='All RMs';
+    if(ann.target?.type==='segment') tgtLabel = ann.target.segment==='equity'?'Equity Team':'Mutual Fund Team';
+    else if(ann.target?.type==='users') tgtLabel = (ann.target.usernames||[]).map(un=>{const u=users.find(x=>x.username===un); return u?u.name:un;}).join(', ') || '—';
+    meta.textContent = `Last sent: ${fmtDate(ann.date)} by ${ann.by||'Admin'} → ${tgtLabel}`;
   } else {
     meta.textContent = 'No announcement currently active.';
   }
   document.getElementById('ann-img-input').value='';
+}
+
+function onAnnTargetChange(){
+  const v=document.getElementById('ann-target').value;
+  document.getElementById('ann-users-wrap').style.display = (v==='users')?'':'none';
 }
 
 function handleAnnouncementImage(event){
@@ -3779,15 +3818,29 @@ function sendAnnouncement(){
 
   if(!text && !image){ toast('Type a message or add an image','error'); return; }
 
+  const targetVal = document.getElementById('ann-target').value;
+  let target = {type:'all'};
+  let tgtLabel = 'All RMs';
+  if(targetVal==='seg-equity'){ target = {type:'segment', segment:'equity'}; tgtLabel='Equity Team'; }
+  else if(targetVal==='seg-mf'){ target = {type:'segment', segment:'mf'}; tgtLabel='Mutual Fund Team'; }
+  else if(targetVal==='users'){
+    const usernames=[...document.querySelectorAll('.ann-user-chk:checked')].map(c=>c.value);
+    if(!usernames.length){ toast('Select at least one RM','error'); return; }
+    target = {type:'users', usernames};
+    const users=DB.get('users')||[];
+    tgtLabel = usernames.map(un=>{const u=users.find(x=>x.username===un); return u?u.name:un;}).join(', ');
+  }
+
   const ann = {
     id: uid(),
     text,
     image,
     date: new Date().toISOString(),
-    by: CU.name
+    by: CU.name,
+    target
   };
   DB.set('announcement', ann);
-  toast('Announcement sent to all RMs!','success');
+  toast('Announcement sent to: '+tgtLabel,'success');
   renderAnnouncementAdmin();
 }
 
@@ -3803,10 +3856,19 @@ function checkAnnouncement(){
   if(!CU) return;
   const ann = DB.get('announcement');
   if(!ann || (!ann.text && !ann.image)) return;
+  if(!announcementAppliesToMe(ann)) return;
   const seenKey = 'dninvest_ann_seen_' + CU.username;
   const seen = localStorage.getItem(seenKey);
   if(seen === ann.id) return;
   showAnnouncementPopup(ann);
+}
+
+function announcementAppliesToMe(ann){
+  const target = ann.target || {type:'all'};
+  if(target.type==='all') return true;
+  if(target.type==='segment') return (CU.segments||[]).includes(target.segment);
+  if(target.type==='users') return (target.usernames||[]).includes(CU.username);
+  return true;
 }
 
 function showAnnouncementPopup(ann){
