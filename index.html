@@ -2488,23 +2488,23 @@ function exportSeminarAttendees(){
 
   const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  let html = `<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:13px;border-color:#ccc">`;
+  let html = `<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt;border-color:#ccc">`;
   // Title row
-  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-weight:bold;font-size:16px;text-align:center;padding:8px">${esc(s.name)}</td></tr>`;
+  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-weight:bold;font-size:14pt;text-align:center;padding:10px">${esc(s.name)}</td></tr>`;
   // Subtitle row
-  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;text-align:center;padding:6px">Date: ${esc(fmtDate(s.date)||'—')}${s.notes?'   |   Venue: '+esc(s.notes):''}</td></tr>`;
+  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-size:11pt;text-align:center;padding:8px">Date: ${esc(fmtDate(s.date)||'—')}${s.notes?'   |   Venue: '+esc(s.notes):''}</td></tr>`;
   // Summary row
-  html += `<tr><td colspan="${colCount}" style="background:#00B050;color:#FFFFFF;font-weight:bold;text-align:center;padding:6px">Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Wait: ${waitCount}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}</td></tr>`;
+  html += `<tr><td colspan="${colCount}" style="background:#00B050;color:#FFFFFF;font-weight:bold;font-size:11pt;text-align:center;padding:8px">Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Wait: ${waitCount}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}</td></tr>`;
   // Blank spacer row
   html += `<tr>${headers.map(()=>`<td style="border:none"></td>`).join('')}</tr>`;
   // Header row
-  html += `<tr>${headers.map(h=>`<td style="background:#FFFF00;color:#FF0000;font-weight:bold;text-align:center;padding:6px">${esc(h)}</td>`).join('')}</tr>`;
+  html += `<tr>${headers.map(h=>`<td style="background:#FFFF00;color:#FF0000;font-weight:bold;font-size:11pt;text-align:center;padding:8px">${esc(h)}</td>`).join('')}</tr>`;
   // Data rows
   rows.forEach((row,ri)=>{
     const bg = ri%2===1 ? '#F2F6FB' : '#FFFFFF';
     html += '<tr>' + row.map((val,ci)=>{
       const align = ci===1 ? 'left' : 'center';
-      return `<td style="background:${bg};text-align:${align};padding:5px">${esc(val)}</td>`;
+      return `<td style="background:${bg};font-size:11pt;text-align:${align};padding:7px">${esc(val)}</td>`;
     }).join('') + '</tr>';
   });
   html += '</table>';
