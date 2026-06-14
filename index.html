@@ -150,8 +150,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 .btn-gold:hover{background:#b8963e;}
 .btn-teal{background:var(--teal);color:#fff;}
 .btn-teal:hover{background:#0771a0;}
-.btn-icon{padding:2px 5px;background:var(--bg);border:1.5px solid var(--border);
-  border-radius:6px;cursor:pointer;font-size:.7rem;transition:all .2s;}
+.btn-icon{padding:1px 3px;background:var(--bg);border:1px solid var(--border);
+  border-radius:5px;cursor:pointer;font-size:.66rem;transition:all .2s;line-height:1.2;}
 .btn-icon:hover{background:var(--border);}
 
 /* ── STATS ── */
@@ -181,8 +181,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 /* ── TABLE ── */
 .tbl-wrap{background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;}
 .tbl-scroll{overflow-x:auto;max-height:58vh;overflow-y:auto;}
-table{width:100%;border-collapse:collapse;font-size:.68rem;}
-thead th{background:var(--navy);color:#fff;padding:5px 5px;text-align:left;font-weight:700;
+table{width:100%;border-collapse:collapse;font-size:.63rem;}
+thead th{background:var(--navy);color:#fff;padding:4px 4px;text-align:left;font-weight:700;
   white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;}
 thead th:hover{background:var(--navy2);}
 thead th.sorted{background:#253f72;}
@@ -191,7 +191,7 @@ tbody tr:hover{background:var(--blue2)!important;}
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
-tbody td{padding:4px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;text-transform:uppercase;}
+tbody td{padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
@@ -1763,7 +1763,7 @@ function renderEqTable(){
   if(rc) rc.textContent=data.length+' clients';
 
   // Sort full filtered dataset (not just current page) by selected field
-  const eqFieldMap = {0:'code',1:'name',2:'mobile',3:'rm',4:'asset_value',5:'last_call_date',6:'last_trade_date',7:'next_call',8:'followup_status',9:'remarks'};
+  const eqFieldMap = {0:'code',1:'name',2:'mobile',3:'rm',4:'asset_value',5:'last_trade_date',6:'last_call_date',7:'next_call',8:'followup_status',9:'remarks'};
   if(eqSortField!==null){
     const field = eqFieldMap[eqSortField];
     data = data.slice().sort((a,b)=>{
@@ -1787,7 +1787,7 @@ function renderEqTable(){
   }
 
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
-  const cols=['Code','Name','Mobile','RM','Assets','Last Call','Last Trade','Next Call','Follow-up','Remarks'];
+  const cols=['Code','Name','Mobile','RM','Assets','Last Trade','Last Call','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
@@ -1828,19 +1828,19 @@ function renderEqTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
-      <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
+      <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
-      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
+        <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
         <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
-      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span>
-        <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
+      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -1958,16 +1958,16 @@ function renderMfTable(){
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
-      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
+        <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
         <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
         <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
-      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span>
-        <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit" style="margin-left:6px;padding:3px 6px">✏️</button></td>
+      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
       </tr>`;
   });
   h+='</tbody></table>';
