@@ -189,7 +189,8 @@ tbody tr:hover{background:var(--blue2)!important;}
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
-tbody td{padding:4px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+tbody td{padding:4px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;text-transform:uppercase;}
+tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -1178,6 +1179,7 @@ let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='
 const MN = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function today(){ return new Date().toISOString().split('T')[0]; }
+function upc(v){ return v==null?'':String(v).toUpperCase(); }
 function fmtDate(d){ if(!d) return ''; try{const dt=new Date(d); if(isNaN(dt)) return d; return dt.getDate()+'-'+MN[dt.getMonth()+1]+'-'+dt.getFullYear();}catch(e){return d||'';} }
 function daysDiff(d){ if(!d) return null; const diff=new Date()-new Date(d); return Math.floor(diff/(1000*60*60*24)); }
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
@@ -2477,8 +2479,8 @@ function exportSeminarAttendees(){
 
   const headers=['#','Name','Mobile','RM','Type','Response','Headcount','Status','Remarks'];
   const rows=attendees.map((a,i)=>[
-    i+1, a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
-    a.rsvp||'—', a.expected_count!=null?a.expected_count:'', a.status||'Pending', a.remarks||''
+    i+1, upc(a.name), upc(a.mobile), upc(a.rm), upc(a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'),
+    upc(a.rsvp||'—'), a.expected_count!=null?a.expected_count:'', upc(a.status||'Pending'), upc(a.remarks)
   ]);
   const willCome = attendees.filter(x=>x.rsvp==='Yes').length;
   const waitCount = attendees.filter(x=>x.rsvp==='Wait').length;
@@ -3256,7 +3258,7 @@ function showReport(title, headers, rows){
 
 function exportReportCSV(){
   const {headers,rows}=currentReportData;
-  const csv=[headers,...rows].map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+  const csv=[headers,...rows.map(r=>r.map(upc))].map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download='report_'+Date.now()+'.csv'; a.click();
@@ -3440,7 +3442,7 @@ function exportCSV(seg){
   const rows=seg==='equity'
     ?clients.map(c=>[c.code||'',c.name,c.mobile||'',c.email||'',c.rm,c.status,c.asset_value||'',c.revenue||'',c.last_trade_date||'',c.last_trade_month||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||''])
     :clients.map(c=>[c.name,c.mobile||'',c.email||'',c.rm,c.status,c.aum||'',c.sip_amount||'',c.sip_count||'',c.last_invest_date||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
-  const csv=[headers,...rows].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const csv=[headers,...rows.map(r=>r.map(upc))].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download=(seg==='equity'?'equity_clients_':'mf_investors_')+today()+'.csv'; a.click();
