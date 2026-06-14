@@ -794,6 +794,16 @@ tbody td{padding:4px 5px;white-space:nowrap;}
     <div class="modal-body">
       <input type="text" placeholder="🔍 Search client / investor name or mobile..." oninput="searchAttendees()" id="attendee-search" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:.85rem;margin-bottom:10px">
       <div class="tbl-wrap"><div class="tbl-scroll" id="attendee-search-results" style="max-height:340px"></div></div>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-weight:700;color:var(--navy);font-size:.85rem;margin-bottom:8px">➕ Naya Guest Add Karein (list mein nahi hai)</div>
+        <div class="form-row three">
+          <div class="form-field"><label>Name *</label><input id="guest_name" placeholder="Guest name"></div>
+          <div class="form-field"><label>Mobile</label><input id="guest_mobile" placeholder="Mobile number"></div>
+          <div class="form-field"><label>RM</label><select id="guest_rm"><option value="">Select RM</option></select></div>
+        </div>
+        <button class="btn btn-teal" onclick="addGuestAttendee()" style="margin-top:6px">+ Add Guest</button>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('addAttendeeModal')">Done</button>
@@ -2251,11 +2261,12 @@ function renderSeminarsTable(){
     cont.innerHTML = `<div style="text-align:center;padding:48px;color:#bbb">No seminars yet. <a href="#" onclick="openAddSeminar()" style="color:var(--teal)">Add one?</a></div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Will Come</th><th>Expected People</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Guests</th><th>Will Come</th><th>Expected People</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
   seminars.forEach(s=>{
     const attendees = s.attendees||[];
     const eqCount = attendees.filter(a=>a.type==='equity').length;
     const mfCount = attendees.filter(a=>a.type==='mf').length;
+    const guestCount = attendees.filter(a=>a.type==='guest').length;
     const attendedCount = attendees.filter(a=>a.status==='Attended').length;
     const willComeCount = attendees.filter(a=>a.rsvp==='Yes').length;
     const expectedTotal = attendees.reduce((sum,a)=>sum+(a.expected_count||0),0);
@@ -2266,6 +2277,7 @@ function renderSeminarsTable(){
       <td>${attendees.length}</td>
       <td>${eqCount}</td>
       <td>${mfCount}</td>
+      <td>${guestCount}</td>
       <td>${willComeCount}</td>
       <td>${expectedTotal||'—'}</td>
       <td>${attendedCount}</td>
@@ -2360,7 +2372,7 @@ function renderSeminarAttendees(){
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
-      <td><span class="badge ${a.type==='equity'?'b-active':'b-investor'}">${a.type==='equity'?'Equity':'MF'}</span></td>
+      <td><span class="badge ${a.type==='equity'?'b-active':a.type==='mf'?'b-investor':'b-pending'}">${a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'}</span></td>
       <td><select onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
         <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
@@ -2433,7 +2445,7 @@ function exportSeminarAttendees(){
   if(!attendees.length){ toast('No attendees to export','error'); return; }
   const headers=['Name','Mobile','RM','Type','Status','Aayenge? (Yes/No)','Kitne Log','Remarks'];
   const rows=attendees.map(a=>[
-    a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':'MF',
+    a.name, a.mobile||'', a.rm||'', a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
     a.status||'Pending', a.rsvp||'', a.expected_count!=null?a.expected_count:'', a.remarks||''
   ]);
   const csv=[headers,...rows].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
@@ -2458,6 +2470,11 @@ async function removeAttendee(attendeeId){
 function openAddAttendee(){
   document.getElementById('attendee-search').value='';
   document.getElementById('attendee-search-results').innerHTML='<div style="text-align:center;padding:20px;color:#bbb">Type a name or mobile number to search...</div>';
+  document.getElementById('guest_name').value='';
+  document.getElementById('guest_mobile').value='';
+  const allRMs=[...new Set([...getSegRMs('equity'),...getSegRMs('mf')])];
+  const guestRmSel=document.getElementById('guest_rm');
+  guestRmSel.innerHTML='<option value="">Select RM</option>'+allRMs.map(r=>`<option ${r===CU.name?'selected':''}>${r}</option>`).join('');
   document.getElementById('addAttendeeModal').classList.add('open');
 }
 
@@ -2522,6 +2539,33 @@ async function addAttendee(sourceId,type){
   renderSeminarAttendees();
   renderSeminarsTable();
   searchAttendees(); // refresh "Added" state
+}
+
+async function addGuestAttendee(){
+  const name=document.getElementById('guest_name').value.trim();
+  const mobile=document.getElementById('guest_mobile').value.trim();
+  const rm=document.getElementById('guest_rm').value;
+  if(!name){ toast('Guest ka naam likhein','error'); return; }
+
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+
+  s.attendees = s.attendees||[];
+  let newId=uid();
+  while(s.attendees.some(x=>x.id===newId)) newId=uid();
+  s.attendees.push({
+    id:newId, source_id:null, type:'guest', name, mobile, rm:rm||(CU.role!=='admin'?CU.name:''), status:'Pending'
+  });
+  s.updated=today();
+  await DB.setClient('seminars',s);
+
+  document.getElementById('guest_name').value='';
+  document.getElementById('guest_mobile').value='';
+
+  renderSeminarAttendees();
+  renderSeminarsTable();
+  toast('Guest added!','success');
 }
 
 
