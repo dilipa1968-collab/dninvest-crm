@@ -189,7 +189,10 @@ tbody tr:hover{background:var(--blue2)!important;}
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
-tbody td{padding:4px 5px;white-space:nowrap;}
+tbody td{padding:4px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+.col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
+  user-select:none;z-index:3;}
+.col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
 .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.66rem;font-weight:700;letter-spacing:.3px;}
 .b-active{background:#d1fae5;color:#065f46;}
 .b-inactive{background:#fef3c7;color:#92400e;}
@@ -780,6 +783,7 @@ tbody td{padding:4px 5px;white-space:nowrap;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('seminarDetailModal')">Close</button>
+      <button class="btn btn-primary" onclick="saveSeminarAttendeeChanges()">💾 Save Changes</button>
     </div>
   </div>
 </div>
@@ -2370,24 +2374,24 @@ function renderSeminarAttendees(){
   }
   let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
-    h+=`<tr>
+    h+=`<tr data-id="${a.id}">
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
       <td><span class="badge ${a.type==='equity'?'b-active':a.type==='mf'?'b-investor':'b-pending'}">${a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'}</span></td>
-      <td><select onchange="setAttendeeRsvp('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><select class="att-rsvp" onchange="setAttendeeRsvp('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
         <option value="No" ${a.rsvp==='No'?'selected':''}>No</option>
         <option value="Wait" ${a.rsvp==='Wait'?'selected':''}>Wait</option>
       </select></td>
-      <td><input type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td><select onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><input class="att-count" type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><select class="att-status" onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
         <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
-      <td><input type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button></td>
       </tr>`;
   });
@@ -2438,6 +2442,30 @@ async function setAttendeeRemarks(attendeeId,val){
   a.remarks = val;
   s.updated=today();
   await DB.setClient('seminars',s);
+}
+
+async function saveSeminarAttendeeChanges(){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  document.querySelectorAll('#seminar-attendees-table tbody tr').forEach(row=>{
+    const id=row.dataset.id;
+    if(!id) return;
+    const a=(s.attendees||[]).find(x=>x.id===id);
+    if(!a) return;
+    const rsvpEl=row.querySelector('.att-rsvp');
+    const countEl=row.querySelector('.att-count');
+    const statusEl=row.querySelector('.att-status');
+    const remarksEl=row.querySelector('.att-remarks');
+    if(rsvpEl) a.rsvp=rsvpEl.value;
+    if(countEl) a.expected_count = countEl.value===''?null:parseInt(countEl.value);
+    if(statusEl) a.status=statusEl.value;
+    if(remarksEl) a.remarks=remarksEl.value;
+  });
+  s.updated=today();
+  await DB.setClient('seminars',s);
+  renderSeminarsTable();
+  toast('Changes saved!','success');
 }
 
 function exportSeminarAttendees(){
@@ -4073,6 +4101,91 @@ document.addEventListener('click', function(e){
 
 // Initial sort setup after page load
 setTimeout(sortAllVisibleTables, 1000);
+
+// ══════════════════════════════════════════
+// COLUMN RESIZE (drag column borders to resize)
+// ══════════════════════════════════════════
+function enableColumnResize(table){
+  if(table.dataset.resizableInit) return;
+  table.dataset.resizableInit='1';
+  const ths = table.querySelectorAll('thead th');
+  ths.forEach(th=>{
+    if(th.querySelector('.col-resize-handle')) return;
+    th.style.position = th.style.position || 'sticky';
+    const handle=document.createElement('div');
+    handle.className='col-resize-handle';
+    th.appendChild(handle);
+
+    const startResize=(startX)=>{
+      const startWidth=th.offsetWidth;
+      if(table.style.tableLayout!=='fixed'){
+        ths.forEach(t=>{ t.style.width=t.offsetWidth+'px'; });
+        table.style.tableLayout='fixed';
+      }
+      handle.classList.add('active');
+      return startWidth;
+    };
+
+    handle.addEventListener('mousedown', function(e){
+      e.preventDefault(); e.stopPropagation();
+      const startX=e.pageX;
+      const startWidth=startResize(startX);
+      function onMove(ev){
+        const newWidth=Math.max(36, startWidth + (ev.pageX-startX));
+        th.style.width=newWidth+'px';
+      }
+      function onUp(){
+        handle.classList.remove('active');
+        document.removeEventListener('mousemove',onMove);
+        document.removeEventListener('mouseup',onUp);
+      }
+      document.addEventListener('mousemove',onMove);
+      document.addEventListener('mouseup',onUp);
+    });
+
+    handle.addEventListener('touchstart', function(e){
+      e.stopPropagation();
+      const touch=e.touches[0];
+      const startX=touch.pageX;
+      const startWidth=startResize(startX);
+      function onMove(ev){
+        const t=ev.touches[0];
+        const newWidth=Math.max(36, startWidth + (t.pageX-startX));
+        th.style.width=newWidth+'px';
+      }
+      function onEnd(){
+        handle.classList.remove('active');
+        document.removeEventListener('touchmove',onMove);
+        document.removeEventListener('touchend',onEnd);
+      }
+      document.addEventListener('touchmove',onMove,{passive:true});
+      document.addEventListener('touchend',onEnd);
+    },{passive:true});
+  });
+}
+
+function scanForResizableTables(root){
+  (root||document).querySelectorAll('.tbl-scroll table, #seminar-attendees-table table').forEach(t=>{
+    if(!t.dataset.resizableInit) enableColumnResize(t);
+  });
+}
+
+// Observe content area for new/re-rendered tables
+const colResizeObserver = new MutationObserver(muts=>{
+  for(const m of muts){
+    if(m.addedNodes && m.addedNodes.length){
+      m.addedNodes.forEach(node=>{
+        if(node.nodeType!==1) return;
+        if(node.tagName==='TABLE' && !node.dataset.resizableInit) enableColumnResize(node);
+        else if(node.querySelectorAll) scanForResizableTables(node);
+      });
+    }
+  }
+});
+colResizeObserver.observe(document.body, {childList:true, subtree:true});
+
+// Initial scan
+setTimeout(()=>scanForResizableTables(document), 500);
 
 // Auto-login on page load
 tryAutoLogin();
