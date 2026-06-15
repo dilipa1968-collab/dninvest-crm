@@ -592,7 +592,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="page-title">Equity Follow-ups</div>
         </div>
         <div class="tab-bar">
-          <div class="tab-item active" onclick="switchTab('eqf','today')">📅 Today</div>
+          <div class="tab-item active" onclick="switchTab('eqf','today')">📅 Today & Overdue</div>
           <div class="tab-item" onclick="switchTab('eqf','overdue')">🔴 Overdue</div>
           <div class="tab-item" onclick="switchTab('eqf','upcoming')">🔜 Upcoming (7d)</div>
           <div class="tab-item" onclick="switchTab('eqf','all')">📋 All Pending</div>
@@ -668,7 +668,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="page" id="page-mf-followup">
         <div class="page-hdr"><div class="page-title">MF Follow-ups</div></div>
         <div class="tab-bar">
-          <div class="tab-item active" onclick="switchTab('mff','today')">📅 Today</div>
+          <div class="tab-item active" onclick="switchTab('mff','today')">📅 Today & Overdue</div>
           <div class="tab-item" onclick="switchTab('mff','overdue')">🔴 Overdue</div>
           <div class="tab-item" onclick="switchTab('mff','upcoming')">🔜 Upcoming (7d)</div>
           <div class="tab-item" onclick="switchTab('mff','all')">📋 All Pending</div>
@@ -3406,7 +3406,7 @@ function renderFollowup(group){
   const t=today(), t7=addDays(t,7);
 
   let data;
-  if(tab==='today') data=clients.filter(c=>c.next_call===t);
+  if(tab==='today') data=clients.filter(c=>c.next_call&&c.next_call<=t);
   else if(tab==='overdue') data=clients.filter(c=>c.next_call&&c.next_call<t);
   else if(tab==='upcoming') data=clients.filter(c=>c.next_call&&c.next_call>t&&c.next_call<=t7);
   else data=clients.filter(c=>c.next_call||c.followup_status==='Pending');
