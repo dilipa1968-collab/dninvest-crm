@@ -561,7 +561,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
-            <option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Trade">Trade</option><option value="Interested in Other Product">Interested in Other Product</option><option value="Positive">Positive</option><option value="Wrong Number">Wrong Number</option></select>
+            <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterEq()" id="eq-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -1883,13 +1883,13 @@ function renderEqTable(){
             <div onclick="event.stopPropagation();setFuFilter('eq','today')">Due Today</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','overdue')">Overdue</div>
             <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Not Interested')">Not Interested</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Call Not Received')">Call Not Received</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Call After Some Time')">Call After Some Time</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Trade')">Trade</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Interested in Other Product')">Interested in Other Product</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Positive')">Positive</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Wrong Number')">Wrong Number</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','NOT INTERESTED')">NOT INTERESTED</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','CALL NOT RECEIVED')">CALL NOT RECEIVED</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','CALL LATER')">CALL LATER</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','TRADE')">TRADE</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','INTERESTED IN OTHER PRODUCT')">INTERESTED IN OTHER PRODUCT</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','POSITIVE')">POSITIVE</div>
+            <div onclick="event.stopPropagation();setFuFilter('eq','WRONG NUMBER')">WRONG NUMBER</div>
           </div>
         </span>
       </th>`;
@@ -2885,14 +2885,13 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}"></div>
       <div class="form-field"><label>Follow-up Status</label><select id="f_followup">
-        <option value="">—</option>
-        <option ${c?.followup_status==='Not Interested'?'selected':''}>Not Interested</option>
-        <option ${c?.followup_status==='Call Not Received'?'selected':''}>Call Not Received</option>
-        <option ${c?.followup_status==='Call After Some Time'?'selected':''}>Call After Some Time</option>
-        <option ${c?.followup_status==='Trade'?'selected':''}>Trade</option>
-        <option ${c?.followup_status==='Interested in Other Product'?'selected':''}>Interested in Other Product</option>
-        <option ${c?.followup_status==='Positive'?'selected':''}>Positive</option>
-        <option ${c?.followup_status==='Wrong Number'?'selected':''}>Wrong Number</option>
+        <option ${c?.followup_status==='NOT INTERESTED'?'selected':''}>NOT INTERESTED</option>
+        <option ${c?.followup_status==='CALL NOT RECEIVED'?'selected':''}>CALL NOT RECEIVED</option>
+        <option ${c?.followup_status==='CALL LATER'?'selected':''}>CALL LATER</option>
+        <option ${c?.followup_status==='TRADE'?'selected':''}>TRADE</option>
+        <option ${c?.followup_status==='INTERESTED IN OTHER PRODUCT'?'selected':''}>INTERESTED IN OTHER PRODUCT</option>
+        <option ${c?.followup_status==='POSITIVE'?'selected':''}>POSITIVE</option>
+        <option ${c?.followup_status==='WRONG NUMBER'?'selected':''}>WRONG NUMBER</option>
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>`;
@@ -3106,10 +3105,10 @@ function logCall(id,seg){
     </div>
     <div class="form-row">
       <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}" min="${today()}"></div>
-      <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">
-        <option>Pending</option><option>Done</option><option>Not Required</option>${seg==='equity'?`
-        <option>Not Interested</option><option>Call Not Received</option><option>Call After Some Time</option>
-        <option>Trade</option><option>Interested in Other Product</option><option>Positive</option><option>Wrong Number</option>`:`
+      <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">${seg==='equity'?`
+        <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
+        <option>TRADE</option><option>INTERESTED IN OTHER PRODUCT</option><option>POSITIVE</option><option>WRONG NUMBER</option>`:`
+        <option>Pending</option><option>Done</option><option>Not Required</option>
         <option>Not Interested</option><option>Call Not Received</option><option>Call After Some Time</option>
         <option>Interested In SIP</option><option>Interested In Lumpsum</option><option>Interested In Other Product</option>`}
       </select></div>
