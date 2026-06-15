@@ -1819,6 +1819,47 @@ function sortEqTable(colIndex){
   eqPage=1;
   renderEqTable();
 }
+
+// ══════════════════════════════════════════
+// GENERIC SORTABLE TABLE HELPER (for follow-up,
+// no-trade/no-call alerts, SIP tracker, seminars,
+// reports etc.)
+// ══════════════════════════════════════════
+let _sortState = {};
+function clickSort(tableKey, field, type, renderFn){
+  const cur = _sortState[tableKey] || {field:null, dir:1};
+  if(cur.field===field) cur.dir = -cur.dir;
+  else { cur.field=field; cur.dir=1; }
+  _sortState[tableKey]=cur;
+  _sortState[tableKey].type=type;
+  renderFn();
+}
+function applySort(data, tableKey, getters){
+  const st=_sortState[tableKey];
+  if(!st || !st.field || !getters[st.field]) return data;
+  const cfg = getters[st.field];
+  const get = cfg.get, type = cfg.type;
+  return data.slice().sort((a,b)=>{
+    let va=get(a), vb=get(b);
+    if(type==='num'){ va=parseFloat(va)||0; vb=parseFloat(vb)||0; return st.dir*(va-vb); }
+    if(type==='date'){
+      va=va||''; vb=vb||'';
+      if(!va && !vb) return 0;
+      if(!va) return 1; if(!vb) return -1;
+      return st.dir*(va<vb?-1:va>vb?1:0);
+    }
+    va=(va==null?'':va).toString().toLowerCase(); vb=(vb==null?'':vb).toString().toLowerCase();
+    return st.dir*va.localeCompare(vb, undefined, {numeric:true});
+  });
+}
+function sortArrow(tableKey, field){
+  const st=_sortState[tableKey];
+  return (st && st.field===field) ? (st.dir===1?' ▲':' ▼') : '';
+}
+function sortTh(label, tableKey, field, type, renderFnName){
+  return `<th onclick="clickSort('${tableKey}','${field}','${type}',${renderFnName})" style="cursor:pointer" title="Click to sort">${label}${sortArrow(tableKey,field)}</th>`;
+}
+
 function resetFilters(t){
   ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-date'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
@@ -2440,7 +2481,38 @@ function getMySeminars(){
 }
 
 function renderSeminarsTable(){
-  const seminars = getMySeminars().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  try{
+  let seminars = getMySeminars().slice().map(s=>{
+    const attendees = s.attendees||[];
+    return {
+      ...s,
+      _total: attendees.length,
+      _eq: attendees.filter(a=>a.type==='equity').length,
+      _mf: attendees.filter(a=>a.type==='mf').length,
+      _guest: attendees.filter(a=>a.type==='guest').length,
+      _attended: attendees.filter(a=>a.status==='Attended').length,
+      _willcome: attendees.filter(a=>a.rsvp==='Yes').length,
+      _wait: attendees.filter(a=>a.rsvp==='Wait').length,
+      _expected: attendees.reduce((sum,a)=>sum+(a.expected_count||0),0),
+    };
+  });
+  if(!_sortState.seminars || !_sortState.seminars.field){
+    seminars.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  } else {
+    seminars = applySort(seminars, 'seminars', {
+      date:{get:s=>s.date, type:'date'},
+      name:{get:s=>s.name, type:'str'},
+      notes:{get:s=>s.notes, type:'str'},
+      total:{get:s=>s._total, type:'num'},
+      eq:{get:s=>s._eq, type:'num'},
+      mf:{get:s=>s._mf, type:'num'},
+      guest:{get:s=>s._guest, type:'num'},
+      willcome:{get:s=>s._willcome, type:'num'},
+      wait:{get:s=>s._wait, type:'num'},
+      expected:{get:s=>s._expected, type:'num'},
+      attended:{get:s=>s._attended, type:'num'},
+    });
+  }
   document.getElementById('nb-seminars').textContent = seminars.length;
 
   const cont = document.getElementById('seminars-table');
@@ -2448,16 +2520,22 @@ function renderSeminarsTable(){
     cont.innerHTML = `<div style="text-align:center;padding:48px;color:#bbb">No seminars yet. <a href="#" onclick="openAddSeminar()" style="color:var(--teal)">Add one?</a></div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Date</th><th>Seminar Name</th><th>Venue / Notes</th><th>Total</th><th>Equity</th><th>MF</th><th>Guests</th><th>Will Come</th><th>Wait</th><th>Expected People</th><th>Attended</th><th>Actions</th></tr></thead><tbody>`;
+  let h=`<table><thead><tr>
+    ${sortTh('Date','seminars','date','date','renderSeminarsTable')}
+    ${sortTh('Seminar Name','seminars','name','str','renderSeminarsTable')}
+    ${sortTh('Venue / Notes','seminars','notes','str','renderSeminarsTable')}
+    ${sortTh('Total','seminars','total','num','renderSeminarsTable')}
+    ${sortTh('Equity','seminars','eq','num','renderSeminarsTable')}
+    ${sortTh('MF','seminars','mf','num','renderSeminarsTable')}
+    ${sortTh('Guests','seminars','guest','num','renderSeminarsTable')}
+    ${sortTh('Will Come','seminars','willcome','num','renderSeminarsTable')}
+    ${sortTh('Wait','seminars','wait','num','renderSeminarsTable')}
+    ${sortTh('Expected People','seminars','expected','num','renderSeminarsTable')}
+    ${sortTh('Attended','seminars','attended','num','renderSeminarsTable')}
+    <th>Actions</th></tr></thead><tbody>`;
   seminars.forEach(s=>{
+    const eqCount=s._eq, mfCount=s._mf, guestCount=s._guest, attendedCount=s._attended, willComeCount=s._willcome, waitCount=s._wait, expectedTotal=s._expected;
     const attendees = s.attendees||[];
-    const eqCount = attendees.filter(a=>a.type==='equity').length;
-    const mfCount = attendees.filter(a=>a.type==='mf').length;
-    const guestCount = attendees.filter(a=>a.type==='guest').length;
-    const attendedCount = attendees.filter(a=>a.status==='Attended').length;
-    const willComeCount = attendees.filter(a=>a.rsvp==='Yes').length;
-    const waitCount = attendees.filter(a=>a.rsvp==='Wait').length;
-    const expectedTotal = attendees.reduce((sum,a)=>sum+(a.expected_count||0),0);
     h+=`<tr>
       <td>${fmtDate(s.date)||'—'}</td>
       <td style="font-weight:600;cursor:pointer;color:var(--navy)" onclick="openSeminarDetail('${s.id}')">${s.name}</td>
@@ -2478,6 +2556,11 @@ function renderSeminarsTable(){
   });
   h+='</tbody></table>';
   cont.innerHTML=h;
+  }catch(e){
+    console.error('renderSeminarsTable error:', e);
+    const _errCont = document.getElementById('eqnc-content')||document.getElementById('mfnc-content')||document.getElementById('nt-content')||document.getElementById('sip-table')||document.getElementById('seminars-table')||document.getElementById((arguments[0]==='eqf'?'eqf':'mff')+'-content');
+    if(_errCont) _errCont.innerHTML = '<div style="text-align:center;padding:36px;color:var(--red)">⚠️ Error loading data: '+(e.message||e)+'</div>';
+  }
 }
 
 function openAddSeminar(){
@@ -2545,17 +2628,36 @@ function openSeminarDetail(id){
   document.getElementById('seminarDetailModal').classList.add('open');
 }
 
+let seminarAttSort = {col:'name', dir:1};
+
+function sortSeminarAttendees(col){
+  if(seminarAttSort.col===col) seminarAttSort.dir = -seminarAttSort.dir;
+  else { seminarAttSort.col=col; seminarAttSort.dir=1; }
+  renderSeminarAttendees();
+}
+
 function renderSeminarAttendees(){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
   const cont=document.getElementById('seminar-attendees-table');
   if(!s){ cont.innerHTML=''; return; }
-  const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const {col,dir}=seminarAttSort;
+  const attendees=(s.attendees||[]).slice().sort((a,b)=>{
+    let av,bv;
+    if(col==='rm'){ av=(a.rm||'').toLowerCase(); bv=(b.rm||'').toLowerCase(); }
+    else { av=(a.name||'').toLowerCase(); bv=(b.name||'').toLowerCase(); }
+    return av.localeCompare(bv)*dir;
+  });
   if(!attendees.length){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
+  const arrow=(c)=> col===c ? (dir===1?' ▲':' ▼') : '';
+  let h=`<table><thead><tr>
+    <th onclick="sortSeminarAttendees('name')" style="cursor:pointer" title="Click to sort">Name${arrow('name')}</th>
+    <th>Mobile</th>
+    <th onclick="sortSeminarAttendees('rm')" style="cursor:pointer" title="Click to sort">RM${arrow('rm')}</th>
+    <th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
     h+=`<tr data-id="${a.id}">
       <td style="font-weight:600">${a.name}</td>
@@ -3219,6 +3321,7 @@ function saveBusinessEntry(){
 // FOLLOW-UP PAGES
 // ══════════════════════════════════════════
 function renderFollowup(group){
+  try{
   const seg=group==='eqf'?'equity':'mf';
   const tab=group==='eqf'?activeEqfTab:activeMffTab;
   const clients=group==='eqf'?getMyEqClients():getMyMfClients();
@@ -3238,8 +3341,26 @@ function renderFollowup(group){
     return;
   }
 
+  const tableKey=group+'-fu';
+  data = applySort(data, tableKey, {
+    name:{get:c=>c.name, type:'str'},
+    mobile:{get:c=>c.mobile, type:'str'},
+    rm:{get:c=>c.rm, type:'str'},
+    next_call:{get:c=>c.next_call, type:'date'},
+    last_call_date:{get:c=>c.last_call_date, type:'date'},
+    followup_status:{get:c=>c.followup_status, type:'str'},
+    remarks:{get:c=>c.remarks, type:'str'},
+  });
+
   let h=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
-    <th>Name</th><th>Mobile</th><th>RM</th><th>Next Call</th><th>Last Call</th><th>Status</th><th>Remarks</th><th>Actions</th>
+    ${sortTh('Name',tableKey,'name','str',`()=>renderFollowup('${group}')`)}
+    ${sortTh('Mobile',tableKey,'mobile','str',`()=>renderFollowup('${group}')`)}
+    ${sortTh('RM',tableKey,'rm','str',`()=>renderFollowup('${group}')`)}
+    ${sortTh('Next Call',tableKey,'next_call','date',`()=>renderFollowup('${group}')`)}
+    ${sortTh('Last Call',tableKey,'last_call_date','date',`()=>renderFollowup('${group}')`)}
+    ${sortTh('Status',tableKey,'followup_status','str',`()=>renderFollowup('${group}')`)}
+    ${sortTh('Remarks',tableKey,'remarks','str',`()=>renderFollowup('${group}')`)}
+    <th>Actions</th>
     </tr></thead><tbody>`;
 
   data.forEach(c=>{
@@ -3259,15 +3380,21 @@ function renderFollowup(group){
   });
   h+='</tbody></table></div></div>';
   cont.innerHTML=h;
+  }catch(e){
+    console.error('renderFollowup error:', e);
+    const _errCont = document.getElementById('eqnc-content')||document.getElementById('mfnc-content')||document.getElementById('nt-content')||document.getElementById('sip-table')||document.getElementById('seminars-table')||document.getElementById((arguments[0]==='eqf'?'eqf':'mff')+'-content');
+    if(_errCont) _errCont.innerHTML = '<div style="text-align:center;padding:36px;color:var(--red)">⚠️ Error loading data: '+(e.message||e)+'</div>';
+  }
 }
 
 // ══════════════════════════════════════════
 // NO-TRADE ALERTS
 // ══════════════════════════════════════════
 function renderNoTrade(){
+  try{
   const days=parseInt(activeNtTab);
   const eq=getMyEqClients();
-  const data=eq.filter(c=>daysDiff(c.last_trade_date)>=days)
+  let data=eq.filter(c=>daysDiff(c.last_trade_date)>=days)
     .map(c=>({...c,daysAgo:daysDiff(c.last_trade_date)}))
     .sort((a,b)=>b.daysAgo-a.daysAgo);
 
@@ -3277,9 +3404,25 @@ function renderNoTrade(){
     cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No clients with ${days}+ days no-trade</div>`;
     return;
   }
+  data = applySort(data, 'nt', {
+    code:{get:c=>c.code, type:'str'},
+    name:{get:c=>c.name, type:'str'},
+    mobile:{get:c=>c.mobile, type:'str'},
+    rm:{get:c=>c.rm, type:'str'},
+    last_trade_date:{get:c=>c.last_trade_date, type:'date'},
+    daysAgo:{get:c=>c.daysAgo, type:'num'},
+    asset_value:{get:c=>c.asset_value, type:'num'},
+  });
   let h=`<p style="margin-bottom:12px;color:var(--gray);font-size:.82rem">${data.length} clients with no trade in ${days}+ days</p>
     <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
-    <th>Code</th><th>Name</th><th>Mobile</th><th>RM</th><th>Last Trade</th><th>Days Since</th><th>Asset Value</th><th>Actions</th>
+    ${sortTh('Code','nt','code','str','renderNoTrade')}
+    ${sortTh('Name','nt','name','str','renderNoTrade')}
+    ${sortTh('Mobile','nt','mobile','str','renderNoTrade')}
+    ${sortTh('RM','nt','rm','str','renderNoTrade')}
+    ${sortTh('Last Trade','nt','last_trade_date','date','renderNoTrade')}
+    ${sortTh('Days Since','nt','daysAgo','num','renderNoTrade')}
+    ${sortTh('Asset Value','nt','asset_value','num','renderNoTrade')}
+    <th>Actions</th>
     </tr></thead><tbody>`;
   data.forEach(c=>{
     const cls=c.daysAgo>=180?'row-alert':c.daysAgo>=90?'row-inactive':'';
@@ -3298,15 +3441,21 @@ function renderNoTrade(){
   });
   h+='</tbody></table></div></div>';
   cont.innerHTML=h;
+  }catch(e){
+    console.error('renderNoTrade error:', e);
+    const _errCont = document.getElementById('eqnc-content')||document.getElementById('mfnc-content')||document.getElementById('nt-content')||document.getElementById('sip-table')||document.getElementById('seminars-table')||document.getElementById((arguments[0]==='eqf'?'eqf':'mff')+'-content');
+    if(_errCont) _errCont.innerHTML = '<div style="text-align:center;padding:36px;color:var(--red)">⚠️ Error loading data: '+(e.message||e)+'</div>';
+  }
 }
 
 // ══════════════════════════════════════════
 // NO-CALL ALERTS (last_call_date not updated)
 // ══════════════════════════════════════════
 function renderNoCall(seg){
+  try{
   const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
   const clients = seg==='equity'?getMyEqClients():getMyMfClients();
-  const data = clients.filter(c=>{
+  let data = clients.filter(c=>{
     const d = daysDiff(c.last_call_date);
     return d===null || d>=days; // never called, or not called in N+ days
   }).map(c=>({...c,daysAgo:daysDiff(c.last_call_date)}))
@@ -3324,9 +3473,26 @@ function renderNoCall(seg){
   }
   const label = seg==='equity'?'clients':'investors';
   const idLabel = seg==='equity'?'Code':'PAN';
+  const ncKey = seg==='equity'?'eqnc':'mfnc';
+  data = applySort(data, ncKey, {
+    idval:{get:c=>seg==='equity'?c.code:c.pan, type:'str'},
+    name:{get:c=>c.name, type:'str'},
+    mobile:{get:c=>c.mobile, type:'str'},
+    rm:{get:c=>c.rm, type:'str'},
+    last_call_date:{get:c=>c.last_call_date, type:'date'},
+    daysAgo:{get:c=>c.daysAgo, type:'num'},
+    next_call:{get:c=>c.next_call, type:'date'},
+  });
   let h=`<p style="margin-bottom:12px;color:var(--gray);font-size:.82rem">${data.length} ${label} with no call in ${days}+ days (or never called)</p>
     <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
-    <th>${idLabel}</th><th>Name</th><th>Mobile</th><th>RM</th><th>Last Call</th><th>Days Since</th><th>Next Call</th><th>Actions</th>
+    ${sortTh(idLabel,ncKey,'idval','str',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Name',ncKey,'name','str',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Mobile',ncKey,'mobile','str',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('RM',ncKey,'rm','str',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Last Call',ncKey,'last_call_date','date',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Days Since',ncKey,'daysAgo','num',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Next Call',ncKey,'next_call','date',`()=>renderNoCall('${seg}')`)}
+    <th>Actions</th>
     </tr></thead><tbody>`;
   data.forEach(c=>{
     const d=c.daysAgo;
@@ -3348,10 +3514,16 @@ function renderNoCall(seg){
   });
   h+='</tbody></table></div></div>';
   cont.innerHTML=h;
+  }catch(e){
+    console.error('renderNoCall error:', e);
+    const _errCont = document.getElementById('eqnc-content')||document.getElementById('mfnc-content')||document.getElementById('nt-content')||document.getElementById('sip-table')||document.getElementById('seminars-table')||document.getElementById((arguments[0]==='eqf'?'eqf':'mff')+'-content');
+    if(_errCont) _errCont.innerHTML = '<div style="text-align:center;padding:36px;color:var(--red)">⚠️ Error loading data: '+(e.message||e)+'</div>';
+  }
 }
 
 
 function renderSip(){
+  try{
   const mf=getMyMfClients();
   const sipClients=mf.filter(c=>c.sip_amount>0);
   const totalAUM=mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
@@ -3364,8 +3536,26 @@ function renderSip(){
     `<div class="stat-card"><div class="stat-n">${totalCount}</div><div class="stat-l">Total SIP Count</div></div>`+
     `<div class="stat-card purple"><div class="stat-n">₹${fmtNum(totalAUM)}</div><div class="stat-l">Total AUM</div></div>`;
 
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>MF RM</th><th>Status</th><th>AUM</th><th>SIP/mo</th><th>SIP Count</th><th>Actions</th></tr></thead><tbody>`;
-  sipClients.sort((a,b)=>(b.sip_amount||0)-(a.sip_amount||0)).forEach(c=>{
+  let sipData = applySort(sipClients, 'sip', {
+    name:{get:c=>c.name, type:'str'},
+    mobile:{get:c=>c.mobile, type:'str'},
+    rm:{get:c=>c.rm, type:'str'},
+    status:{get:c=>c.status, type:'str'},
+    aum:{get:c=>c.aum, type:'num'},
+    sip_amount:{get:c=>c.sip_amount, type:'num'},
+    sip_count:{get:c=>c.sip_count, type:'num'},
+  });
+  if(!_sortState.sip || !_sortState.sip.field) sipData = sipData.slice().sort((a,b)=>(b.sip_amount||0)-(a.sip_amount||0));
+  let h=`<table><thead><tr>
+    ${sortTh('Name','sip','name','str','renderSip')}
+    ${sortTh('Mobile','sip','mobile','str','renderSip')}
+    ${sortTh('MF RM','sip','rm','str','renderSip')}
+    ${sortTh('Status','sip','status','str','renderSip')}
+    ${sortTh('AUM','sip','aum','num','renderSip')}
+    ${sortTh('SIP/mo','sip','sip_amount','num','renderSip')}
+    ${sortTh('SIP Count','sip','sip_count','num','renderSip')}
+    <th>Actions</th></tr></thead><tbody>`;
+  sipData.forEach(c=>{
     h+=`<tr class="row-mf">
       <td style="font-weight:600">${c.name}</td>
       <td>${c.mobile||'—'}</td>
@@ -3379,6 +3569,11 @@ function renderSip(){
   });
   h+='</tbody></table>';
   document.getElementById('sip-table').innerHTML=`<div class="tbl-wrap"><div class="tbl-scroll">${h}</div></div>`;
+  }catch(e){
+    console.error('renderSip error:', e);
+    const _errCont = document.getElementById('eqnc-content')||document.getElementById('mfnc-content')||document.getElementById('nt-content')||document.getElementById('sip-table')||document.getElementById('seminars-table')||document.getElementById((arguments[0]==='eqf'?'eqf':'mff')+'-content');
+    if(_errCont) _errCont.innerHTML = '<div style="text-align:center;padding:36px;color:var(--red)">⚠️ Error loading data: '+(e.message||e)+'</div>';
+  }
 }
 
 // ══════════════════════════════════════════
@@ -3417,15 +3612,46 @@ function reportCard(r){
     <h4>${r.title}</h4><p>${r.desc}</p></div>`;
 }
 
+let _reportSort = {col:null, dir:1};
+
 function showReport(title, headers, rows){
   currentReportData={headers,rows};
+  _reportSort = {col:null, dir:1};
   document.getElementById('reportModalTitle').textContent=title;
+  renderReportTable();
+  document.getElementById('reportModal').classList.add('open');
+}
+
+function sortReportCol(colIndex){
+  if(_reportSort.col===colIndex) _reportSort.dir = -_reportSort.dir;
+  else { _reportSort.col=colIndex; _reportSort.dir=1; }
+  renderReportTable();
+}
+
+function renderReportTable(){
+  let {headers,rows}=currentReportData;
+  rows = rows.slice();
+  if(_reportSort.col!=null){
+    const col=_reportSort.col, dir=_reportSort.dir;
+    rows.sort((a,b)=>{
+      let va=a[col], vb=b[col];
+      const na=parseFloat((va==null?'':va).toString().replace(/[^0-9.\-]/g,''));
+      const nb=parseFloat((vb==null?'':vb).toString().replace(/[^0-9.\-]/g,''));
+      if(!isNaN(na) && !isNaN(nb) && (va==null||va==='' || /[0-9]/.test(va)) && (vb==null||vb===''||/[0-9]/.test(vb))){
+        return dir*(na-nb);
+      }
+      va=(va==null?'':va).toString().toLowerCase(); vb=(vb==null?'':vb).toString().toLowerCase();
+      return dir*va.localeCompare(vb, undefined, {numeric:true});
+    });
+  }
   let h=`<p style="color:var(--gray);font-size:.8rem;margin-bottom:12px">${rows.length} records</p>`;
-  h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${headers.map((hd,i)=>{
+    const arrow = _reportSort.col===i ? (_reportSort.dir===1?' ▲':' ▼') : '';
+    return `<th onclick="sortReportCol(${i})" style="cursor:pointer" title="Click to sort">${hd}${arrow}</th>`;
+  }).join('')}</tr></thead><tbody>`;
   rows.forEach(r=>{ h+=`<tr>${r.map(c=>`<td>${c!=null?c:'—'}</td>`).join('')}</tr>`; });
   h+='</tbody></table></div></div>';
   document.getElementById('reportModalBody').innerHTML=h;
-  document.getElementById('reportModal').classList.add('open');
 }
 
 function exportReportCSV(){
