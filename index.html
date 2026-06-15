@@ -1814,9 +1814,9 @@ function renderEqTable(){
       </th>`;
     }
     return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th><th>Status</th><th>Contact</th></tr></thead><tbody>`;
+  }).join('')}<th>Actions</th><th>Status</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+3}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -1837,12 +1837,10 @@ function renderEqTable(){
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
-      </td>
-      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
-      <td>
         <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
       </td>
+      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -1943,9 +1941,9 @@ function renderMfTable(){
       </th>`;
     }
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th><th>Status</th><th>Contact</th></tr></thead><tbody>`;
+  }).join('')}<th>Actions</th><th>Status</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+3}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
@@ -1966,12 +1964,10 @@ function renderMfTable(){
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
         <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
-      </td>
-      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
-      <td>
         <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
       </td>
+      <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
       </tr>`;
   });
   h+='</tbody></table>';
