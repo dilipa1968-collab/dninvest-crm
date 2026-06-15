@@ -2545,17 +2545,36 @@ function openSeminarDetail(id){
   document.getElementById('seminarDetailModal').classList.add('open');
 }
 
+let seminarAttSort = {col:'name', dir:1};
+
+function sortSeminarAttendees(col){
+  if(seminarAttSort.col===col) seminarAttSort.dir = -seminarAttSort.dir;
+  else { seminarAttSort.col=col; seminarAttSort.dir=1; }
+  renderSeminarAttendees();
+}
+
 function renderSeminarAttendees(){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
   const cont=document.getElementById('seminar-attendees-table');
   if(!s){ cont.innerHTML=''; return; }
-  const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const {col,dir}=seminarAttSort;
+  const attendees=(s.attendees||[]).slice().sort((a,b)=>{
+    let av,bv;
+    if(col==='rm'){ av=(a.rm||'').toLowerCase(); bv=(b.rm||'').toLowerCase(); }
+    else { av=(a.name||'').toLowerCase(); bv=(b.name||'').toLowerCase(); }
+    return av.localeCompare(bv)*dir;
+  });
   if(!attendees.length){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
     return;
   }
-  let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
+  const arrow=(c)=> col===c ? (dir===1?' ▲':' ▼') : '';
+  let h=`<table><thead><tr>
+    <th onclick="sortSeminarAttendees('name')" style="cursor:pointer" title="Click to sort">Name${arrow('name')}</th>
+    <th>Mobile</th>
+    <th onclick="sortSeminarAttendees('rm')" style="cursor:pointer" title="Click to sort">RM${arrow('rm')}</th>
+    <th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
     h+=`<tr data-id="${a.id}">
       <td style="font-weight:600">${a.name}</td>
