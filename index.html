@@ -1291,9 +1291,12 @@ function v(x){ return (x!=null&&x!=='')?x:'—'; }
 document.getElementById('lpwd').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('lusr').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('lpwd').focus(); });
 
-function doLogin(){
+async function doLogin(){
   const u = document.getElementById('lusr').value.trim().toLowerCase();
   const p = document.getElementById('lpwd').value;
+  if(typeof fdb!=='undefined'){
+    try{ await DB.syncFromFirebase(); }catch(e){}
+  }
   const users = DB.get('users') || DEFAULT_USERS;
   const user = users.find(x=>x.username===u && x.password===p && x.active!==false);
   if(user){
@@ -1362,6 +1365,12 @@ async function doResetPassword(){
     return;
   }
 
+  // Make sure we have the real, latest users list from Firebase before
+  // writing back - otherwise (e.g. on a fresh browser that hasn't synced
+  // yet) we'd overwrite everyone's passwords with DEFAULT_USERS.
+  if(typeof fdb!=='undefined'){
+    try{ await DB.syncFromFirebase(); }catch(e){}
+  }
   const users = DB.get('users') || DEFAULT_USERS;
   const idx = users.findIndex(x=>x.username===username);
   if(idx===-1){
@@ -1407,6 +1416,7 @@ function initApp(){
   // Sync from Firebase first, then setup real-time listeners
   if(typeof fdb!=='undefined'){
     DB.syncFromFirebase().then(()=>{
+      DB.load(); // only seed defaults AFTER real Firestore data has been loaded
       refreshDash(); updateBadges(); populateRmDropdowns();
       if(getCurrentPageId()==='eq-clients') renderEqTable();
       if(getCurrentPageId()==='mf-clients') renderMfTable();
@@ -1467,11 +1477,10 @@ function initApp(){
           }
         });
       });
-    }).catch(()=>{ refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); });
+    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); });
   } else {
     DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement();
   }
-  DB.load();
 
   const segs = CU.segments||[];
   const hasEq = segs.includes('equity');
@@ -1832,10 +1841,10 @@ function renderEqTable(){
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
-  if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
+  if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
-  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>c.followup_status===fu);
+  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(lastTradeDate) data=data.filter(c=>c.last_trade_date===lastTradeDate);
@@ -1963,10 +1972,10 @@ function renderMfTable(){
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
   if(st) data=data.filter(c=>c.status===st);
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
-  if(fu==='pending') data=data.filter(c=>c.followup_status==='Pending'||c.next_call);
+  if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
-  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>c.followup_status===fu);
+  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
 
@@ -2079,7 +2088,7 @@ function renderLeadsTable(){
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
-  if(fu&&!['today','overdue'].includes(fu)) data=data.filter(c=>c.followup_status===fu);
+  if(fu&&!['today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
 
   leadsFiltered=data;
