@@ -590,6 +590,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="page" id="page-eq-followup">
         <div class="page-hdr">
           <div class="page-title">Equity Follow-ups</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="DB.syncFromFirebase().then(()=>{renderFollowup('eqf');updateBadges();toast('Data refreshed ✓')})">🔄 Refresh</button>
+          </div>
         </div>
         <div class="tab-bar">
           <div class="tab-item active" onclick="switchTab('eqf','today')">📅 Today & Overdue</div>
@@ -666,7 +669,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 
       <!-- ── MF FOLLOW-UPS ── -->
       <div class="page" id="page-mf-followup">
-        <div class="page-hdr"><div class="page-title">MF Follow-ups</div></div>
+        <div class="page-hdr">
+          <div class="page-title">MF Follow-ups</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="DB.syncFromFirebase().then(()=>{renderFollowup('mff');updateBadges();toast('Data refreshed ✓')})">🔄 Refresh</button>
+          </div>
+        </div>
         <div class="tab-bar">
           <div class="tab-item active" onclick="switchTab('mff','today')">📅 Today & Overdue</div>
           <div class="tab-item" onclick="switchTab('mff','overdue')">🔴 Overdue</div>
@@ -1535,7 +1543,13 @@ function initApp(){
               localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
               console.log('Real-time update:', key);
               if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
+              if(key==='eq_clients' && getCurrentPageId()==='eq-followup') renderFollowup('eqf');
+              if(key==='eq_clients' && getCurrentPageId()==='eq-notrade') renderNoTrade();
+              if(key==='eq_clients' && getCurrentPageId()==='eq-nocall') renderNoCall('equity');
               if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
+              if(key==='mf_clients' && getCurrentPageId()==='mf-followup') renderFollowup('mff');
+              if(key==='mf_clients' && getCurrentPageId()==='mf-nocall') renderNoCall('mf');
+              if(key==='mf_clients' && getCurrentPageId()==='mf-sip') renderSip();
               if(key==='leads' && getCurrentPageId()==='leads') renderLeadsTable();
               if(key==='seminars' && getCurrentPageId()==='seminars') renderSeminarsTable();
               if(getCurrentPageId()==='dashboard') refreshDash();
@@ -1663,8 +1677,8 @@ function showPage(id){
   else if(id==='mf-clients') renderMfTable();
   else if(id==='leads') renderLeadsTable();
   else if(id==='seminars') renderSeminarsTable();
-  else if(id==='eq-followup') renderFollowup('eqf');
-  else if(id==='mf-followup') renderFollowup('mff');
+  else if(id==='eq-followup'){ renderFollowup('eqf'); }
+  else if(id==='mf-followup'){ renderFollowup('mff'); }
   else if(id==='eq-notrade') renderNoTrade();
   else if(id==='eq-nocall') renderNoCall('equity');
   else if(id==='mf-nocall') renderNoCall('mf');
@@ -3329,6 +3343,8 @@ async function saveCallLog(){
   closeModal('callModal');
   toast('Call logged!','success');
   if(seg==='equity') renderEqTable(); else renderMfTable();
+  if(getCurrentPageId()==='eq-followup') renderFollowup('eqf');
+  if(getCurrentPageId()==='mf-followup') renderFollowup('mff');
   refreshDash(); updateBadges();
 }
 
@@ -4837,8 +4853,18 @@ colResizeObserver.observe(document.body, {childList:true, subtree:true});
 // Initial scan
 setTimeout(()=>scanForResizableTables(document), 500);
 
-// Auto-login on page load
-tryAutoLogin();
+// Debug helper - type checkFollowups() in browser console
+window.checkFollowups = function(){
+  const eq = DB.get('eq_clients')||[];
+  const t = today();
+  const withNextCall = eq.filter(c=>c.next_call);
+  const due = eq.filter(c=>c.next_call && c.next_call<=t);
+  console.log('Total eq_clients:', eq.length);
+  console.log('With next_call set:', withNextCall.length);
+  console.log('Due today or overdue (<='+t+'):', due.length);
+  if(withNextCall.length>0) console.log('Sample next_call values:', withNextCall.slice(0,5).map(c=>c.name+': '+c.next_call));
+  return {total:eq.length, withNextCall:withNextCall.length, due:due.length};
+};
 
 </script>
 
