@@ -478,6 +478,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
         <span class="icon">📋</span> Reports
       </div>
+      <div class="nav-item" onclick="showPage('brokerage')" id="nav-brokerage">
+        <span class="icon">💰</span> Brokerage
+      </div>
 
       <div class="sidebar-section" id="admin-nav-section">Admin</div>
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
@@ -696,6 +699,70 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       </div>
 
       <!-- ── REPORTS ── -->
+      <!-- ── BROKERAGE ── -->
+      <div class="page" id="page-brokerage">
+        <div class="page-hdr">
+          <div class="page-title">Brokerage Calculator</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="brkExport()">⬇️ Excel Export</button>
+          </div>
+        </div>
+
+        <div class="form-row full">
+          <div class="form-field">
+            <label>MF "New Business" Keywords (comma separated, transaction type match)</label>
+            <input id="brk-keywords" value="purchase, sip, switch in, stp in, additional, fresh, systematic" oninput="brkRender()">
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('brk','mf')">🏦 Mutual Fund Brokerage</div>
+          <div class="tab-item" onclick="switchTab('brk','equity')">📈 Equity Brokerage</div>
+          <div class="tab-item" onclick="switchTab('brk','results')">📊 Results</div>
+        </div>
+
+        <div class="tab-panel active" id="brk-mf">
+          <div class="form-row">
+            <div class="form-field">
+              <label>CAMS Brokerage File (WBR6)</label>
+              <input type="file" id="brk-cams-file" accept=".xlsx,.xls,.csv" onchange="brkHandleFile(this,'cams','mf')">
+              <div id="brk-cams-status" style="margin-top:6px;font-size:.78rem;color:var(--gray)"></div>
+            </div>
+            <div class="form-field">
+              <label>KFintech Brokerage File (MFSD205)</label>
+              <input type="file" id="brk-kfin-file" accept=".xlsx,.xls,.csv" onchange="brkHandleFile(this,'kfin','mf')">
+              <div id="brk-kfin-status" style="margin-top:6px;font-size:.78rem;color:var(--gray)"></div>
+            </div>
+          </div>
+          <div id="brk-cams-map"></div>
+          <div id="brk-kfin-map"></div>
+        </div>
+
+        <div class="tab-panel" id="brk-equity">
+          <div class="form-row">
+            <div class="form-field">
+              <label>Equity Broker Brokerage / Ledger File (any broker)</label>
+              <input type="file" id="brk-eq-file" accept=".xlsx,.xls,.csv" onchange="brkHandleFile(this,'eq','equity')">
+              <div id="brk-eq-status" style="margin-top:6px;font-size:.78rem;color:var(--gray)"></div>
+            </div>
+          </div>
+          <p style="font-size:.78rem;color:var(--gray);margin:4px 0 10px">Columns ko map karein - Client Code/UCC ya PAN se aapke existing Equity clients (Clients page) ke saath match karke RM mil jayega.</p>
+          <div id="brk-eq-map"></div>
+        </div>
+
+        <div class="tab-panel" id="brk-results">
+          <div class="stats-row" id="brk-stats"></div>
+          <div class="tbl-wrap" style="margin-bottom:18px">
+            <div style="padding:12px 16px;font-weight:800;color:var(--navy)">RM-wise Summary</div>
+            <div class="tbl-scroll"><table id="brk-rm-table"></table></div>
+          </div>
+          <div class="tbl-wrap">
+            <div style="padding:12px 16px;font-weight:800;color:var(--navy)">Client-wise Detail</div>
+            <div class="tbl-scroll"><table id="brk-client-table"></table></div>
+          </div>
+        </div>
+      </div>
+
       <div class="page" id="page-reports">
         <div class="page-hdr"><div class="page-title">Reports</div></div>
         <div class="tab-bar">
@@ -1603,6 +1670,7 @@ function showPage(id){
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
   else if(id==='reports') renderReports();
+  else if(id==='brokerage') renderBrokeragePage();
   else if(id==='admin') renderAdmin();
   else if(id==='dashboard') refreshDash();
 
@@ -1639,6 +1707,16 @@ function switchTab(group, tab){
     document.querySelectorAll('#page-reports .tab-panel').forEach(p=>p.classList.remove('active'));
     const tp=document.getElementById('rpt-'+tab);
     if(tp) tp.classList.add('active');
+    return;
+  }
+  else if(group==='brk'){
+    document.querySelectorAll('#page-brokerage .tab-item').forEach((el,i)=>{
+      el.classList.toggle('active',['mf','equity','results'][i]===tab);
+    });
+    document.querySelectorAll('#page-brokerage .tab-panel').forEach(p=>p.classList.remove('active'));
+    const tp=document.getElementById('brk-'+tab);
+    if(tp) tp.classList.add('active');
+    if(tab==='results') brkRender();
     return;
   }
 
@@ -4762,6 +4840,282 @@ setTimeout(()=>scanForResizableTables(document), 500);
 // Auto-login on page load
 tryAutoLogin();
 
+</script>
+
+<script>
+// ══════════════════════════════════════════
+// BROKERAGE CALCULATOR MODULE
+// ══════════════════════════════════════════
+const BRK_MF_FIELDS = [
+  {value:'ignore', label:'-- Ignore --'},
+  {value:'clientName', label:'Client Name'},
+  {value:'folio', label:'Folio No'},
+  {value:'pan', label:'PAN'},
+  {value:'txnType', label:'Transaction Type'},
+  {value:'amount', label:'Amount'},
+  {value:'brokerage', label:'Brokerage Amount'},
+];
+const BRK_EQ_FIELDS = [
+  {value:'ignore', label:'-- Ignore --'},
+  {value:'clientName', label:'Client Name'},
+  {value:'clientCode', label:'Client Code / UCC'},
+  {value:'pan', label:'PAN'},
+  {value:'turnover', label:'Turnover Amount'},
+  {value:'brokerage', label:'Brokerage Amount'},
+];
+
+let brkData = { cams:null, kfin:null, eq:null };
+
+function brkNorm(s){ return (s??'').toString().trim().toLowerCase(); }
+function brkNormFolio(s){ return brkNorm(s).replace(/[\s\/\-]/g,''); }
+function brkNormCode(s){ return brkNorm(s).replace(/[\s\-]/g,''); }
+function brkToNumber(v){
+  if(v===''||v===null||v===undefined) return 0;
+  const n=parseFloat(String(v).replace(/[, ]/g,''));
+  return isNaN(n)?0:n;
+}
+
+function brkGuessMapping(headers, kind){
+  const used={}; const result={};
+  headers.forEach((h,i)=>{
+    const hh=brkNorm(h);
+    let field='ignore';
+    if(kind==='mf'){
+      if(!used.clientName && /(client|investor).*name|^name$/.test(hh)) field='clientName';
+      else if(!used.folio && /folio/.test(hh)) field='folio';
+      else if(!used.pan && /pan/.test(hh)) field='pan';
+      else if(!used.txnType && /(trxn|transaction|txn).*type|^type$/.test(hh)) field='txnType';
+      else if(!used.brokerage && /(brokerage|commission)/.test(hh)) field='brokerage';
+      else if(!used.amount && /(amount|amt)/.test(hh)) field='amount';
+    } else {
+      if(!used.clientName && /(client|customer).*name|^name$/.test(hh)) field='clientName';
+      else if(!used.clientCode && /(client.*code|ucc|trading.*code|client.*id)/.test(hh)) field='clientCode';
+      else if(!used.pan && /pan/.test(hh)) field='pan';
+      else if(!used.brokerage && /(brokerage|commission)/.test(hh)) field='brokerage';
+      else if(!used.turnover && /(turnover|amount|amt|value|traded)/.test(hh)) field='turnover';
+    }
+    if(field!=='ignore') used[field]=true;
+    result[i]=field;
+  });
+  return result;
+}
+
+function brkParseFile(file, cb){
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+      cb(null,rows);
+    }catch(err){ cb(err); }
+  };
+  reader.onerror=()=>cb(new Error('File read failed'));
+  reader.readAsArrayBuffer(file);
+}
+
+function brkHandleFile(input, key, kind){
+  const file=input.files[0];
+  if(!file) return;
+  brkParseFile(file,(err,rows)=>{
+    const statusEl=document.getElementById('brk-'+key+'-status');
+    if(err){ if(statusEl) statusEl.textContent='Error: '+err.message; return; }
+    if(!rows.length){ if(statusEl) statusEl.textContent='File khali hai.'; return; }
+    const headers=rows[0].map(h=>String(h));
+    const dataRows=rows.slice(1).filter(r=>r.some(c=>String(c).trim()!==''));
+    const mapping=brkGuessMapping(headers, kind);
+    brkData[key]={fileName:file.name, headers, rows:dataRows, mapping, kind};
+    if(statusEl) statusEl.textContent=`✓ ${file.name} — ${dataRows.length} rows`;
+    brkRenderMapping(key);
+    brkRender();
+  });
+}
+
+function brkRenderMapping(key){
+  const d=brkData[key];
+  const container=document.getElementById('brk-'+key+'-map');
+  if(!d || !container){ if(container) container.innerHTML=''; return; }
+  const opts = d.kind==='equity'?BRK_EQ_FIELDS:BRK_MF_FIELDS;
+  let rows = d.headers.map((h,i)=>{
+    const o = opts.map(op=>`<option value="${op.value}" ${d.mapping[i]===op.value?'selected':''}>${op.label}</option>`).join('');
+    return `<div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:6px">
+      <div style="padding:8px 12px;background:var(--bg);border-radius:8px;font-size:.8rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h||('Column '+(i+1))}</div>
+      <select onchange="brkSetMapping('${key}',${i},this.value)" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.8rem">${o}</select>
+    </div>`;
+  }).join('');
+  const req = d.kind==='equity' ? 'Client Code/UCC ya PAN, Turnover, Brokerage' : 'Folio/PAN, Amount, Brokerage, Transaction Type';
+  container.innerHTML = `<div style="font-size:.78rem;color:var(--gray);margin:10px 0 6px">Columns map karein (zaroori: <b>${req}</b>):</div>${rows}`;
+}
+
+function brkSetMapping(key, colIndex, field){
+  brkData[key].mapping[colIndex]=field;
+  brkRender();
+}
+
+function brkExtractMF(d, source){
+  if(!d || !d.rows) return [];
+  const m=d.mapping;
+  const colFor=f=>Object.keys(m).find(k=>m[k]===f);
+  const cName=colFor('clientName'), cFolio=colFor('folio'), cPan=colFor('pan'),
+        cType=colFor('txnType'), cAmount=colFor('amount'), cBrokerage=colFor('brokerage');
+  return d.rows.map(row=>({
+    source,
+    clientName: cName!==undefined?String(row[cName]??'').trim():'',
+    folio: cFolio!==undefined?String(row[cFolio]??'').trim():'',
+    pan: cPan!==undefined?String(row[cPan]??'').trim().toUpperCase():'',
+    txnType: cType!==undefined?String(row[cType]??'').trim():'',
+    amount: cAmount!==undefined?brkToNumber(row[cAmount]):0,
+    brokerage: cBrokerage!==undefined?brkToNumber(row[cBrokerage]):0,
+  }));
+}
+
+function brkExtractEQ(d){
+  if(!d || !d.rows) return [];
+  const m=d.mapping;
+  const colFor=f=>Object.keys(m).find(k=>m[k]===f);
+  const cName=colFor('clientName'), cCode=colFor('clientCode'), cPan=colFor('pan'),
+        cTurnover=colFor('turnover'), cBrokerage=colFor('brokerage');
+  return d.rows.map(row=>({
+    clientName: cName!==undefined?String(row[cName]??'').trim():'',
+    clientCode: cCode!==undefined?String(row[cCode]??'').trim().toUpperCase():'',
+    pan: cPan!==undefined?String(row[cPan]??'').trim().toUpperCase():'',
+    turnover: cTurnover!==undefined?brkToNumber(row[cTurnover]):0,
+    brokerage: cBrokerage!==undefined?brkToNumber(row[cBrokerage]):0,
+  }));
+}
+
+function brkCompute(){
+  const camsTxns=brkExtractMF(brkData.cams,'CAMS');
+  const kfinTxns=brkExtractMF(brkData.kfin,'KFintech');
+  const mfTxns=[...camsTxns,...kfinTxns];
+  const eqTxns=brkExtractEQ(brkData.eq);
+  if(mfTxns.length===0 && eqTxns.length===0) return null;
+
+  const kwEl=document.getElementById('brk-keywords');
+  const kwList=(kwEl?kwEl.value:'').split(',').map(k=>brkNorm(k.trim())).filter(Boolean);
+  const isNewBiz = t=>{ const tt=brkNorm(t); return tt && kwList.some(k=>tt.includes(k)); };
+
+  const mfClients = DB.get('mf_clients')||[];
+  const eqClients = DB.get('eq_clients')||[];
+  const byPan=new Map(), byNameMF=new Map();
+  mfClients.forEach(c=>{ if(c.pan) byPan.set(brkNorm(c.pan),c); if(c.name && !byNameMF.has(brkNorm(c.name))) byNameMF.set(brkNorm(c.name),c); });
+  const byCode=new Map(), byNameEQ=new Map();
+  eqClients.forEach(c=>{ if(c.code) byCode.set(brkNormCode(c.code),c); if(c.name && !byNameEQ.has(brkNorm(c.name))) byNameEQ.set(brkNorm(c.name),c); });
+
+  const matchMF=txn=>{
+    if(txn.pan && byPan.has(brkNorm(txn.pan))) return {c:byPan.get(brkNorm(txn.pan)), seg:'mf'};
+    if(txn.clientName && byNameMF.has(brkNorm(txn.clientName))) return {c:byNameMF.get(brkNorm(txn.clientName)), seg:'mf'};
+    return null;
+  };
+  const matchEQ=txn=>{
+    if(txn.clientCode && byCode.has(brkNormCode(txn.clientCode))) return {c:byCode.get(brkNormCode(txn.clientCode)), seg:'equity'};
+    if(txn.pan && byPan.has(brkNorm(txn.pan))) return {c:byPan.get(brkNorm(txn.pan)), seg:'mf'};
+    if(txn.clientName && byNameEQ.has(brkNorm(txn.clientName))) return {c:byNameEQ.get(brkNorm(txn.clientName)), seg:'equity'};
+    return null;
+  };
+
+  const agg=new Map();
+  let unmatchedMF=0, unmatchedEQ=0;
+  function getRow(key,base){
+    if(!agg.has(key)) agg.set(key, Object.assign({clientName:'',folio:'',pan:'',code:'',rm:'',mfBrokerage:0,newBusiness:0,eqBrokerage:0,eqTurnover:0,matched:false}, base));
+    return agg.get(key);
+  }
+  mfTxns.forEach(txn=>{
+    const m=matchMF(txn);
+    let key,base;
+    if(m){ key='C'+m.seg+m.c.id; base={clientName:m.c.name,folio:m.c.pan?'':'',pan:m.c.pan||'',code:m.c.code||'',rm:m.c.rm,matched:true}; }
+    else { unmatchedMF++; key='U::'+(txn.pan||brkNorm(txn.clientName)||'unk'); base={clientName:txn.clientName||'(Unknown)',pan:txn.pan,rm:'Unmatched',matched:false}; }
+    const row=getRow(key,base);
+    row.mfBrokerage+=txn.brokerage;
+    if(isNewBiz(txn.txnType)) row.newBusiness+=txn.amount;
+  });
+  eqTxns.forEach(txn=>{
+    const m=matchEQ(txn);
+    let key,base;
+    if(m){ key='C'+m.seg+m.c.id; base={clientName:m.c.name,pan:m.c.pan||'',code:m.c.code||'',rm:m.c.rm,matched:true}; }
+    else { unmatchedEQ++; key='U::'+(txn.clientCode||txn.pan||brkNorm(txn.clientName)||'unk'); base={clientName:txn.clientName||'(Unknown)',code:txn.clientCode,rm:'Unmatched',matched:false}; }
+    const row=getRow(key,base);
+    row.eqBrokerage+=txn.brokerage;
+    row.eqTurnover+=txn.turnover;
+  });
+
+  const clientRows=Array.from(agg.values()).map(r=>({...r, totalBrokerage:r.mfBrokerage+r.eqBrokerage}))
+    .sort((a,b)=>b.totalBrokerage-a.totalBrokerage);
+
+  const rmAgg=new Map();
+  clientRows.forEach(r=>{
+    if(!rmAgg.has(r.rm)) rmAgg.set(r.rm,{rm:r.rm,mfBrokerage:0,eqBrokerage:0,totalBrokerage:0,newBusiness:0,eqTurnover:0,clientCount:0});
+    const a=rmAgg.get(r.rm);
+    a.mfBrokerage+=r.mfBrokerage; a.eqBrokerage+=r.eqBrokerage; a.totalBrokerage+=r.totalBrokerage;
+    a.newBusiness+=r.newBusiness; a.eqTurnover+=r.eqTurnover; a.clientCount+=1;
+  });
+  const rmRows=Array.from(rmAgg.values()).sort((a,b)=>b.totalBrokerage-a.totalBrokerage);
+
+  const totals=clientRows.reduce((acc,r)=>({
+    mfBrokerage:acc.mfBrokerage+r.mfBrokerage, eqBrokerage:acc.eqBrokerage+r.eqBrokerage,
+    totalBrokerage:acc.totalBrokerage+r.totalBrokerage, newBusiness:acc.newBusiness+r.newBusiness, eqTurnover:acc.eqTurnover+r.eqTurnover
+  }),{mfBrokerage:0,eqBrokerage:0,totalBrokerage:0,newBusiness:0,eqTurnover:0});
+
+  return {clientRows, rmRows, totals, unmatchedMF, unmatchedEQ, mfTxnCount:mfTxns.length, eqTxnCount:eqTxns.length};
+}
+
+function brkFmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function brkRender(){
+  const statsEl=document.getElementById('brk-stats');
+  const rmTbl=document.getElementById('brk-rm-table');
+  const clTbl=document.getElementById('brk-client-table');
+  if(!statsEl||!rmTbl||!clTbl) return;
+  const r=brkCompute();
+  if(!r){
+    statsEl.innerHTML='';
+    rmTbl.innerHTML='<tr><td style="padding:16px;color:var(--gray)">CAMS/KFintech/Equity file upload karein.</td></tr>';
+    clTbl.innerHTML='';
+    return;
+  }
+  statsEl.innerHTML=`
+    <div class="stat-card teal"><div class="stat-n">₹${brkFmt(r.totals.mfBrokerage)}</div><div class="stat-l">MF Brokerage</div></div>
+    <div class="stat-card gold"><div class="stat-n">₹${brkFmt(r.totals.eqBrokerage)}</div><div class="stat-l">Equity Brokerage</div></div>
+    <div class="stat-card"><div class="stat-n">₹${brkFmt(r.totals.totalBrokerage)}</div><div class="stat-l">Total Brokerage</div></div>
+    <div class="stat-card green"><div class="stat-n">₹${brkFmt(r.totals.newBusiness)}</div><div class="stat-l">MF New Business</div></div>
+    <div class="stat-card purple"><div class="stat-n">₹${brkFmt(r.totals.eqTurnover)}</div><div class="stat-l">Equity Turnover</div></div>
+    <div class="stat-card red"><div class="stat-n">${r.unmatchedMF} / ${r.unmatchedEQ}</div><div class="stat-l">Unmatched (MF/Eq)</div></div>
+  `;
+  const totRm=r.rmRows.reduce((a,x)=>({clientCount:a.clientCount+x.clientCount,mfBrokerage:a.mfBrokerage+x.mfBrokerage,eqBrokerage:a.eqBrokerage+x.eqBrokerage,totalBrokerage:a.totalBrokerage+x.totalBrokerage,newBusiness:a.newBusiness+x.newBusiness,eqTurnover:a.eqTurnover+x.eqTurnover}),{clientCount:0,mfBrokerage:0,eqBrokerage:0,totalBrokerage:0,newBusiness:0,eqTurnover:0});
+  rmTbl.innerHTML=`<thead><tr><th>RM</th><th style="text-align:right">Clients</th><th style="text-align:right">MF Brok.</th><th style="text-align:right">Equity Brok.</th><th style="text-align:right">Total Brok.</th><th style="text-align:right">New Business</th><th style="text-align:right">Eq Turnover</th></tr></thead>
+    <tbody>${r.rmRows.map(x=>`<tr><td>${x.rm}${x.rm==='Unmatched'?' <span style="color:var(--red);font-size:.7rem">(check master)</span>':''}</td><td style="text-align:right">${x.clientCount}</td><td style="text-align:right">${brkFmt(x.mfBrokerage)}</td><td style="text-align:right">${brkFmt(x.eqBrokerage)}</td><td style="text-align:right">${brkFmt(x.totalBrokerage)}</td><td style="text-align:right">${brkFmt(x.newBusiness)}</td><td style="text-align:right">${brkFmt(x.eqTurnover)}</td></tr>`).join('')}
+    <tr style="font-weight:800;background:var(--bg)"><td>TOTAL</td><td style="text-align:right">${totRm.clientCount}</td><td style="text-align:right">${brkFmt(totRm.mfBrokerage)}</td><td style="text-align:right">${brkFmt(totRm.eqBrokerage)}</td><td style="text-align:right">${brkFmt(totRm.totalBrokerage)}</td><td style="text-align:right">${brkFmt(totRm.newBusiness)}</td><td style="text-align:right">${brkFmt(totRm.eqTurnover)}</td></tr>
+    </tbody>`;
+  clTbl.innerHTML=`<thead><tr><th>Client Name</th><th>RM</th><th style="text-align:right">MF Brok.</th><th style="text-align:right">Equity Brok.</th><th style="text-align:right">Total Brok.</th><th style="text-align:right">New Business</th><th style="text-align:right">Eq Turnover</th></tr></thead>
+    <tbody>${r.clientRows.map(x=>`<tr><td>${x.clientName}${!x.matched?' <span style="color:var(--red);font-size:.7rem">(unmatched)</span>':''}</td><td>${x.rm}</td><td style="text-align:right">${brkFmt(x.mfBrokerage)}</td><td style="text-align:right">${brkFmt(x.eqBrokerage)}</td><td style="text-align:right">${brkFmt(x.totalBrokerage)}</td><td style="text-align:right">${brkFmt(x.newBusiness)}</td><td style="text-align:right">${brkFmt(x.eqTurnover)}</td></tr>`).join('')}</tbody>`;
+}
+
+function renderBrokeragePage(){
+  brkRenderMapping('cams');
+  brkRenderMapping('kfin');
+  brkRenderMapping('eq');
+  brkRender();
+}
+
+function brkExport(){
+  const r=brkCompute();
+  if(!r){ toast('Pehle file upload karein','error'); return; }
+  const wb=XLSX.utils.book_new();
+  const clientData=[
+    ['Client Name','PAN','Client Code','RM','MF Brokerage','Equity Brokerage','Total Brokerage','New Business (MF)','Equity Turnover','Matched'],
+    ...r.clientRows.map(x=>[x.clientName,x.pan,x.code,x.rm,Math.round(x.mfBrokerage*100)/100,Math.round(x.eqBrokerage*100)/100,Math.round(x.totalBrokerage*100)/100,Math.round(x.newBusiness*100)/100,Math.round(x.eqTurnover*100)/100,x.matched?'Yes':'No']),
+    [],
+    ['TOTAL','','','',Math.round(r.totals.mfBrokerage*100)/100,Math.round(r.totals.eqBrokerage*100)/100,Math.round(r.totals.totalBrokerage*100)/100,Math.round(r.totals.newBusiness*100)/100,Math.round(r.totals.eqTurnover*100)/100,'']
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clientData), 'Client-wise');
+  const rmData=[
+    ['RM','No. of Clients','MF Brokerage','Equity Brokerage','Total Brokerage','New Business (MF)','Equity Turnover'],
+    ...r.rmRows.map(x=>[x.rm,x.clientCount,Math.round(x.mfBrokerage*100)/100,Math.round(x.eqBrokerage*100)/100,Math.round(x.totalBrokerage*100)/100,Math.round(x.newBusiness*100)/100,Math.round(x.eqTurnover*100)/100])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rmData), 'RM-wise');
+  XLSX.writeFile(wb, `Brokerage_Summary_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
 </script>
 </body>
 </html>
