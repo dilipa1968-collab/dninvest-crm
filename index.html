@@ -641,7 +641,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
-            <option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Interested In SIP">Interested In SIP</option><option value="Interested In Lumpsum">Interested In Lumpsum</option><option value="Interested In Other Product">Interested In Other Product</option></select>
+            <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterMf()" id="mf-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -2010,12 +2010,12 @@ function renderMfTable(){
             <div onclick="event.stopPropagation();setFuFilter('mf','today')">Due Today</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','overdue')">Overdue</div>
             <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Not Interested')">Not Interested</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Call Not Received')">Call Not Received</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Call After Some Time')">Call After Some Time</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Interested In SIP')">Interested In SIP</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Interested In Lumpsum')">Interested In Lumpsum</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Interested In Other Product')">Interested In Other Product</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','NOT INTERESTED')">NOT INTERESTED</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','CALL NOT RECEIVED')">CALL NOT RECEIVED</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','CALL LATER')">CALL LATER</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','INTERESTED IN SIP')">INTERESTED IN SIP</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','INTERESTED IN LUMPSUM')">INTERESTED IN LUMPSUM</div>
+            <div onclick="event.stopPropagation();setFuFilter('mf','INTERESTED IN OTHER PRODUCT')">INTERESTED IN OTHER PRODUCT</div>
           </div>
         </span>
       </th>`;
@@ -2924,16 +2924,12 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}"></div>
       <div class="form-field"><label>Follow-up Status</label><select id="f_followup">
-        <option value="">—</option>
-        <option ${c?.followup_status==='Pending'?'selected':''}>Pending</option>
-        <option ${c?.followup_status==='Done'?'selected':''}>Done</option>
-        <option ${c?.followup_status==='Not Required'?'selected':''}>Not Required</option>
-        <option ${c?.followup_status==='Not Interested'?'selected':''}>Not Interested</option>
-        <option ${c?.followup_status==='Call Not Received'?'selected':''}>Call Not Received</option>
-        <option ${c?.followup_status==='Call After Some Time'?'selected':''}>Call After Some Time</option>
-        <option ${c?.followup_status==='Interested In SIP'?'selected':''}>Interested In SIP</option>
-        <option ${c?.followup_status==='Interested In Lumpsum'?'selected':''}>Interested In Lumpsum</option>
-        <option ${c?.followup_status==='Interested In Other Product'?'selected':''}>Interested In Other Product</option>
+        <option ${c?.followup_status==='NOT INTERESTED'?'selected':''}>NOT INTERESTED</option>
+        <option ${c?.followup_status==='CALL NOT RECEIVED'?'selected':''}>CALL NOT RECEIVED</option>
+        <option ${c?.followup_status==='CALL LATER'?'selected':''}>CALL LATER</option>
+        <option ${c?.followup_status==='INTERESTED IN SIP'?'selected':''}>INTERESTED IN SIP</option>
+        <option ${c?.followup_status==='INTERESTED IN LUMPSUM'?'selected':''}>INTERESTED IN LUMPSUM</option>
+        <option ${c?.followup_status==='INTERESTED IN OTHER PRODUCT'?'selected':''}>INTERESTED IN OTHER PRODUCT</option>
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>`;
@@ -3108,9 +3104,8 @@ function logCall(id,seg){
       <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">${seg==='equity'?`
         <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
         <option>TRADE</option><option>INTERESTED IN OTHER PRODUCT</option><option>POSITIVE</option><option>WRONG NUMBER</option>`:`
-        <option>Pending</option><option>Done</option><option>Not Required</option>
-        <option>Not Interested</option><option>Call Not Received</option><option>Call After Some Time</option>
-        <option>Interested In SIP</option><option>Interested In Lumpsum</option><option>Interested In Other Product</option>`}
+        <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
+        <option>INTERESTED IN SIP</option><option>INTERESTED IN LUMPSUM</option><option>INTERESTED IN OTHER PRODUCT</option>`}
       </select></div>
     </div>`;
   document.getElementById('callModal').classList.add('open');
