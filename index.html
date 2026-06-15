@@ -2432,10 +2432,8 @@ let currentEditSeminarId = null;
 let currentSeminarId = null;
 
 function getMySeminars(){
-  const all = DB.get('seminars')||[];
-  if(CU.role==='admin') return all;
-  // RM sees seminars they created OR that include their clients
-  return all.filter(s=>s.created_by===CU.name || (s.attendees||[]).some(a=>(a.rm||'').trim().toLowerCase()===CU.name.trim().toLowerCase()));
+  // All users (Admin & RMs) see all seminars - seminars are company-wide events
+  return DB.get('seminars')||[];
 }
 
 function renderSeminarsTable(){
