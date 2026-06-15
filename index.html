@@ -238,21 +238,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;
   justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px;}
 
-/* ── ANNOUNCEMENT ── */
-.ann-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px;margin-bottom:18px;}
-.ann-card h3{font-size:.95rem;font-weight:800;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.ann-imgwrap{margin-top:10px;position:relative;display:inline-block;}
-.ann-imgwrap img{max-width:240px;max-height:160px;border-radius:9px;border:1.5px solid var(--border);display:block;}
-.ann-imgwrap .ann-rm{position:absolute;top:-8px;right:-8px;background:var(--red);color:#fff;border:none;
-  border-radius:50%;width:24px;height:24px;font-size:.9rem;cursor:pointer;line-height:1;}
-.ann-meta{font-size:.78rem;color:var(--gray);margin-top:10px;}
-#announcementPopup .modal{width:480px;}
-#announcementPopup .modal-body{padding:22px;text-align:center;}
-#announcementPopup .ann-pop-img{max-width:100%;max-height:320px;border-radius:10px;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto;}
-#announcementPopup .ann-pop-text{font-size:.95rem;color:var(--navy);white-space:pre-wrap;text-align:left;line-height:1.5;}
-#announcementPopup .ann-pop-meta{font-size:.75rem;color:var(--gray);margin-top:12px;text-align:right;}
-#announcementPopup .modal-hdr{background:var(--gold);}
-
 /* ── DASHBOARD ── */
 .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:4px;}
 .dash-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
@@ -493,10 +478,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="page-hdr">
           <div class="page-title">Dashboard <span id="dash-date"></span></div>
           <div class="hdr-actions">
+            <button class="btn btn-teal" onclick="openAddAnnouncement()" id="addAnnouncementBtn">📢 New Announcement</button>
             <button class="btn btn-outline" onclick="refreshDash()">🔄 Refresh</button>
           </div>
         </div>
         <div class="stats-row" id="dashStats"></div>
+        <div class="dash-card" id="announcementsCard" style="margin-bottom:18px"><h3>📢 Announcements</h3><div id="announcementsList"></div></div>
         <div class="dash-grid">
           <div class="dash-card" id="rmEqCard"><h3>Equity RM — Client Count</h3><div id="rmEqChart"></div></div>
           <div class="dash-card" id="rmMfCard"><h3>MF RM — AUM Summary</h3><div id="rmMfChart"></div></div>
@@ -722,39 +709,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <button class="btn btn-primary" onclick="openAddUser()">+ Add User</button>
           </div>
         </div>
-
-        <!-- Announcement -->
-        <div class="ann-card">
-          <h3>📢 Announcement for RMs</h3>
-          <div class="form-field">
-            <label>Send To</label>
-            <select id="ann-target" onchange="onAnnTargetChange()">
-              <option value="all">All RMs</option>
-              <option value="seg-equity">Equity Team</option>
-              <option value="seg-mf">Mutual Fund Team</option>
-              <option value="users">Specific RM(s)</option>
-            </select>
-          </div>
-          <div class="form-field" id="ann-users-wrap" style="display:none;margin-top:10px">
-            <label>Select RM(s)</label>
-            <div id="ann-users-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px"></div>
-          </div>
-          <div class="form-field" style="margin-top:10px">
-            <label>Message</label>
-            <textarea id="ann-text" placeholder="Type announcement message here..." style="min-height:90px"></textarea>
-          </div>
-          <div class="form-field" style="margin-top:10px">
-            <label>Image (optional)</label>
-            <input type="file" id="ann-img-input" accept="image/*" onchange="handleAnnouncementImage(event)">
-            <div id="ann-img-preview"></div>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:14px">
-            <button class="btn btn-gold" onclick="sendAnnouncement()">📤 Send Announcement</button>
-            <button class="btn btn-danger" onclick="clearAnnouncement()">🗑️ Clear Announcement</button>
-          </div>
-          <div class="ann-meta" id="ann-meta"></div>
-        </div>
-
         <div id="user-list"></div>
       </div>
 
@@ -790,6 +744,30 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('leadModal')">Cancel</button>
       <button class="btn btn-primary" id="leadSaveBtn" onclick="saveLead()">Save Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- Announcement Modal -->
+<div class="modal-overlay" id="announcementModal" onclick="if(event.target===this)closeModal('announcementModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>📢 New Announcement</h3>
+      <button class="modal-close" onclick="closeModal('announcementModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-field" style="grid-column:1/-1"><label>Title</label><input id="ann_title" placeholder="e.g. Office Closed Tomorrow"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field" style="grid-column:1/-1"><label>Message *</label>
+          <textarea id="ann_message" rows="4" placeholder="Type your message for all RM/Staff..." style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:.85rem;resize:vertical"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('announcementModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAnnouncement()">📢 Send to All</button>
     </div>
   </div>
 </div>
@@ -962,19 +940,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('userModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveUser()">Save User</button>
-    </div>
-  </div>
-</div>
-
-<!-- Announcement Popup -->
-<div class="modal-overlay" id="announcementPopup">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h3>📢 Announcement</h3>
-    </div>
-    <div class="modal-body" id="announcementPopupBody"></div>
-    <div class="modal-footer">
-      <button class="btn btn-primary" onclick="closeAnnouncementPopup()">OK, Got it</button>
     </div>
   </div>
 </div>
@@ -1224,19 +1189,11 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','announcements','users','call_logs','mf_business']){
         const doc=await fdb.collection('crm_data').doc(key).get();
-        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
-          const d = doc.data().data;
-          if(Array.isArray(d)){
-            if(d.length>0){
-              localStorage.setItem('dninvest_'+key,JSON.stringify(d));
-              console.log('Loaded from Firebase:',key, d.length,'records');
-            }
-          } else {
-            localStorage.setItem('dninvest_'+key,JSON.stringify(d));
-            console.log('Loaded from Firebase:',key, 'object');
-          }
+        if(doc.exists && doc.data() && doc.data().data && doc.data().data.length > 0){
+          localStorage.setItem('dninvest_'+key,JSON.stringify(doc.data().data));
+          console.log('Loaded from Firebase:',key, doc.data().data.length,'records');
         }
       }
     }catch(e){ console.log('Firebase sync error:',e); }
@@ -1410,21 +1367,6 @@ function initApp(){
       refreshDash(); updateBadges(); populateRmDropdowns();
       if(getCurrentPageId()==='eq-clients') renderEqTable();
       if(getCurrentPageId()==='mf-clients') renderMfTable();
-      checkAnnouncement();
-
-      // Real-time listener for announcements (single object, not array)
-      fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
-        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
-          const newData = doc.data().data;
-          const existing = DB.get('announcement');
-          if(JSON.stringify(newData) !== JSON.stringify(existing)){
-            localStorage.setItem('dninvest_announcement', JSON.stringify(newData));
-            console.log('Real-time update: announcement');
-            if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
-            checkAnnouncement();
-          }
-        }
-      });
 
       // Real-time listeners for small array collections (users, call_logs, mf_business)
       ['call_logs','users','mf_business'].forEach(key=>{
@@ -1447,7 +1389,7 @@ function initApp(){
       // write, AND skip while a setClient/deleteClient/setClientsBulk write is
       // in flight (DB._writing[key] > 0) to avoid a stale Firestore snapshot
       // overwriting localStorage between our read and our write.
-      ['eq_clients','mf_clients','leads','seminars'].forEach(key=>{
+      ['eq_clients','mf_clients','leads','seminars','announcements'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
           if(DB._writing[key]>0) return;
@@ -1461,15 +1403,16 @@ function initApp(){
               if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
               if(key==='leads' && getCurrentPageId()==='leads') renderLeadsTable();
               if(key==='seminars' && getCurrentPageId()==='seminars') renderSeminarsTable();
+              if(key==='announcements' && getCurrentPageId()==='dashboard') renderAnnouncements();
               if(getCurrentPageId()==='dashboard') refreshDash();
               updateBadges();
             }
           }
         });
       });
-    }).catch(()=>{ refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); });
+    }).catch(()=>{ refreshDash(); updateBadges(); populateRmDropdowns(); });
   } else {
-    DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement();
+    DB.load(); refreshDash(); updateBadges(); populateRmDropdowns();
   }
   DB.load();
 
@@ -1641,7 +1584,68 @@ function switchTab(group, tab){
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// ANNOUNCEMENTS (Admin -> All RM/Staff broadcast)
+// ══════════════════════════════════════════
+function openAddAnnouncement(){
+  document.getElementById('ann_title').value='';
+  document.getElementById('ann_message').value='';
+  document.getElementById('announcementModal').classList.add('open');
+}
+
+async function saveAnnouncement(){
+  const title=document.getElementById('ann_title').value.trim();
+  const message=document.getElementById('ann_message').value.trim();
+  if(!message){ toast('Message likhna zaroori hai','error'); return; }
+
+  const list=DB.get('announcements')||[];
+  let newId=uid();
+  while(list.some(x=>x.id===newId)) newId=uid();
+  list.unshift({id:newId, title, message, created_by:CU.name, created:new Date().toISOString()});
+  // keep only latest 30
+  if(list.length>30) list.length=30;
+  await DB.set('announcements', list);
+  closeModal('announcementModal');
+  toast('Announcement sent to all!','success');
+  renderAnnouncements();
+}
+
+async function deleteAnnouncement(id){
+  if(CU.role!=='admin') return;
+  if(!confirm('Delete this announcement?')) return;
+  const list=(DB.get('announcements')||[]).filter(x=>x.id!==id);
+  await DB.set('announcements', list);
+  renderAnnouncements();
+}
+
+function renderAnnouncements(){
+  const list=DB.get('announcements')||[];
+  const cont=document.getElementById('announcementsList');
+  if(!cont) return;
+  const btn=document.getElementById('addAnnouncementBtn');
+  if(btn) btn.style.display=CU.role==='admin'?'inline-flex':'none';
+
+  if(!list.length){
+    cont.innerHTML='<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No announcements yet.</p>';
+    return;
+  }
+  cont.innerHTML=list.slice(0,10).map(a=>{
+    const d=new Date(a.created);
+    const dateStr=isNaN(d)?'':d.getDate()+'-'+MN[d.getMonth()+1]+'-'+d.getFullYear()+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+    return `<div class="alert-row" style="background:#fff8e1;align-items:flex-start;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+        <span style="font-weight:700;color:var(--navy)">${a.title?a.title+' — ':''}${dateStr}</span>
+        ${CU.role==='admin'?`<button class="btn-icon" onclick="deleteAnnouncement('${a.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
+      </div>
+      <div style="font-size:.85rem;color:var(--navy);white-space:pre-wrap">${a.message}</div>
+      <div style="font-size:.72rem;color:var(--gray)">— ${a.created_by}</div>
+    </div>`;
+  }).join('');
+}
+
+
 function refreshDash(){
+  renderAnnouncements();
   const eq = getMyEqClients();
   const mf = getMyMfClients();
   const segs=CU.segments||[];
@@ -1898,9 +1902,9 @@ function renderEqTable(){
       </th>`;
     }
     return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th><th>Status</th></tr></thead><tbody>`;
+  }).join('')}<th>Actions</th><th>Status</th><th>Contact</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+3}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -1920,11 +1924,13 @@ function renderEqTable(){
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
-        <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
-        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
+      <td>
+        <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+      </td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -2025,9 +2031,9 @@ function renderMfTable(){
       </th>`;
     }
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th><th>Status</th></tr></thead><tbody>`;
+  }).join('')}<th>Actions</th><th>Status</th><th>Contact</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+2}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+3}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
@@ -2046,12 +2052,14 @@ function renderMfTable(){
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
-        <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
         <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
-        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
+      <td>
+        <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
+        ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+      </td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -3630,7 +3638,6 @@ function exportCSV(seg){
 // ══════════════════════════════════════════
 function renderAdmin(){
   const users=DB.get('users')||[];
-  renderAnnouncementAdmin();
   let h=users.map(u=>`
     <div class="user-card">
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
@@ -3721,177 +3728,6 @@ function toggleUser(id){
   const users=DB.get('users')||[];
   const idx=users.findIndex(u=>u.id===id);
   if(idx>=0){ users[idx].active=!users[idx].active; DB.set('users',users); renderAdmin(); toast('User status updated!','success'); }
-}
-
-// ══════════════════════════════════════════
-// ANNOUNCEMENT
-// ══════════════════════════════════════════
-let _annImageData; // undefined = unchanged, '' = removed, dataURL = new image
-
-function renderAnnouncementAdmin(){
-  const ann = DB.get('announcement');
-  _annImageData = undefined;
-  const txt=document.getElementById('ann-text');
-  const prev=document.getElementById('ann-img-preview');
-  const meta=document.getElementById('ann-meta');
-  if(!txt) return;
-  txt.value = ann?.text || '';
-
-  // Populate RM checkbox list
-  const users=(DB.get('users')||[]).filter(u=>u.active!==false);
-  const listEl=document.getElementById('ann-users-list');
-  const selectedUsers = (ann?.target?.type==='users') ? (ann.target.usernames||[]) : [];
-  listEl.innerHTML = users.map(u=>`
-    <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;font-weight:400;text-transform:none;letter-spacing:0">
-      <input type="checkbox" class="ann-user-chk" value="${u.username}" ${selectedUsers.includes(u.username)?'checked':''}> ${u.name}
-    </label>`).join('');
-
-  // Set target select
-  const targetSel=document.getElementById('ann-target');
-  let targetVal='all';
-  if(ann?.target?.type==='segment') targetVal='seg-'+ann.target.segment;
-  else if(ann?.target?.type==='users') targetVal='users';
-  targetSel.value=targetVal;
-  onAnnTargetChange();
-
-  if(ann?.image){
-    prev.innerHTML = `<div class="ann-imgwrap"><img src="${ann.image}"><button class="ann-rm" onclick="removeAnnouncementImage()" title="Remove image">×</button></div>`;
-  } else {
-    prev.innerHTML = '';
-  }
-  if(ann?.date){
-    let tgtLabel='All RMs';
-    if(ann.target?.type==='segment') tgtLabel = ann.target.segment==='equity'?'Equity Team':'Mutual Fund Team';
-    else if(ann.target?.type==='users') tgtLabel = (ann.target.usernames||[]).map(un=>{const u=users.find(x=>x.username===un); return u?u.name:un;}).join(', ') || '—';
-    meta.textContent = `Last sent: ${fmtDate(ann.date)} by ${ann.by||'Admin'} → ${tgtLabel}`;
-  } else {
-    meta.textContent = 'No announcement currently active.';
-  }
-  document.getElementById('ann-img-input').value='';
-}
-
-function onAnnTargetChange(){
-  const v=document.getElementById('ann-target').value;
-  document.getElementById('ann-users-wrap').style.display = (v==='users')?'':'none';
-}
-
-function handleAnnouncementImage(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  if(!file.type.startsWith('image/')){ toast('Please select an image file','error'); return; }
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const img = new Image();
-    img.onload = function(){
-      const MAX = 700;
-      let w = img.width, h = img.height;
-      if(w > MAX || h > MAX){
-        if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
-        else { w = Math.round(w * MAX / h); h = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      _annImageData = canvas.toDataURL('image/jpeg', 0.7);
-      document.getElementById('ann-img-preview').innerHTML =
-        `<div class="ann-imgwrap"><img src="${_annImageData}"><button class="ann-rm" onclick="removeAnnouncementImage()" title="Remove image">×</button></div>`;
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeAnnouncementImage(){
-  _annImageData = '';
-  document.getElementById('ann-img-preview').innerHTML='';
-  document.getElementById('ann-img-input').value='';
-}
-
-function sendAnnouncement(){
-  const text = document.getElementById('ann-text').value.trim();
-  const existing = DB.get('announcement');
-  let image;
-  if(_annImageData === '') image = '';
-  else if(typeof _annImageData === 'string') image = _annImageData;
-  else image = existing?.image || '';
-
-  if(!text && !image){ toast('Type a message or add an image','error'); return; }
-
-  const targetVal = document.getElementById('ann-target').value;
-  let target = {type:'all'};
-  let tgtLabel = 'All RMs';
-  if(targetVal==='seg-equity'){ target = {type:'segment', segment:'equity'}; tgtLabel='Equity Team'; }
-  else if(targetVal==='seg-mf'){ target = {type:'segment', segment:'mf'}; tgtLabel='Mutual Fund Team'; }
-  else if(targetVal==='users'){
-    const usernames=[...document.querySelectorAll('.ann-user-chk:checked')].map(c=>c.value);
-    if(!usernames.length){ toast('Select at least one RM','error'); return; }
-    target = {type:'users', usernames};
-    const users=DB.get('users')||[];
-    tgtLabel = usernames.map(un=>{const u=users.find(x=>x.username===un); return u?u.name:un;}).join(', ');
-  }
-
-  const ann = {
-    id: uid(),
-    text,
-    image,
-    date: new Date().toISOString(),
-    by: CU.name,
-    target
-  };
-  DB.set('announcement', ann);
-  toast('Announcement sent to: '+tgtLabel,'success');
-  renderAnnouncementAdmin();
-}
-
-function clearAnnouncement(){
-  if(!confirm('Clear the current announcement for all RMs?')) return;
-  DB.set('announcement', null);
-  toast('Announcement cleared','success');
-  renderAnnouncementAdmin();
-}
-
-// Show popup if there's an unseen announcement for the current user
-function checkAnnouncement(){
-  if(!CU) return;
-  const ann = DB.get('announcement');
-  if(!ann || (!ann.text && !ann.image)) return;
-  if(!announcementAppliesToMe(ann)) return;
-  const seenKey = 'dninvest_ann_seen_' + CU.username;
-  const seen = localStorage.getItem(seenKey);
-  if(seen === ann.id) return;
-  showAnnouncementPopup(ann);
-}
-
-function announcementAppliesToMe(ann){
-  const target = ann.target || {type:'all'};
-  if(target.type==='all') return true;
-  if(target.type==='segment') return (CU.segments||[]).includes(target.segment);
-  if(target.type==='users') return (target.usernames||[]).includes(CU.username);
-  return true;
-}
-
-function showAnnouncementPopup(ann){
-  let h='';
-  if(ann.image) h += `<img class="ann-pop-img" src="${ann.image}">`;
-  if(ann.text) h += `<div class="ann-pop-text">${escapeHtml(ann.text).replace(/\n/g,'<br>')}</div>`;
-  if(ann.date) h += `<div class="ann-pop-meta">— ${ann.by||'Admin'}, ${fmtDate(ann.date)}</div>`;
-  document.getElementById('announcementPopupBody').innerHTML = h;
-  document.getElementById('announcementPopup').dataset.annId = ann.id;
-  document.getElementById('announcementPopup').classList.add('open');
-}
-
-function closeAnnouncementPopup(){
-  const el = document.getElementById('announcementPopup');
-  const id = el.dataset.annId;
-  if(id && CU){ localStorage.setItem('dninvest_ann_seen_' + CU.username, id); }
-  el.classList.remove('open');
-}
-
-function escapeHtml(str){
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
 }
 
 // ══════════════════════════════════════════
