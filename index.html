@@ -560,8 +560,8 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option>Active</option><option>Inactive</option></select>
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
-            <option value="pending">Pending (with Next Call)</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
-            <option value="Pending">Status: Pending</option><option value="Done">Done</option><option value="Not Required">Not Required</option><option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Trade">Trade</option><option value="Interested in Other Product">Interested in Other Product</option><option value="Positive">Positive</option><option value="Wrong Number">Wrong Number</option></select>
+            <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
+            <option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Trade">Trade</option><option value="Interested in Other Product">Interested in Other Product</option><option value="Positive">Positive</option><option value="Wrong Number">Wrong Number</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterEq()" id="eq-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -640,8 +640,8 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option>Investor</option><option>Prospect</option></select>
           <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
-            <option value="pending">Pending (with Next Call)</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
-            <option value="Pending">Status: Pending</option><option value="Done">Done</option><option value="Not Required">Not Required</option><option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Interested In SIP">Interested In SIP</option><option value="Interested In Lumpsum">Interested In Lumpsum</option><option value="Interested In Other Product">Interested In Other Product</option></select>
+            <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
+            <option value="Not Interested">Not Interested</option><option value="Call Not Received">Call Not Received</option><option value="Call After Some Time">Call After Some Time</option><option value="Interested In SIP">Interested In SIP</option><option value="Interested In Lumpsum">Interested In Lumpsum</option><option value="Interested In Other Product">Interested In Other Product</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterMf()" id="mf-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -1883,9 +1883,6 @@ function renderEqTable(){
             <div onclick="event.stopPropagation();setFuFilter('eq','today')">Due Today</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','overdue')">Overdue</div>
             <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Pending')">Pending</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Done')">Done</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','Not Required')">Not Required</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','Not Interested')">Not Interested</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','Call Not Received')">Call Not Received</div>
             <div onclick="event.stopPropagation();setFuFilter('eq','Call After Some Time')">Call After Some Time</div>
@@ -2013,9 +2010,6 @@ function renderMfTable(){
             <div onclick="event.stopPropagation();setFuFilter('mf','today')">Due Today</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','overdue')">Overdue</div>
             <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Pending')">Pending</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Done')">Done</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','Not Required')">Not Required</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','Not Interested')">Not Interested</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','Call Not Received')">Call Not Received</div>
             <div onclick="event.stopPropagation();setFuFilter('mf','Call After Some Time')">Call After Some Time</div>
