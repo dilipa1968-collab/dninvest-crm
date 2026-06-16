@@ -568,7 +568,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
-            <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option></select>
+            <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
             <input type="date" onchange="filterEq()" id="eq-last-call-date" style="padding:6px;font-size:.78rem"></label>
@@ -2404,6 +2404,7 @@ function leadForm(c){
       <option ${c?.followup_status==='Interested In SIP'?'selected':''}>Interested In SIP</option>
       <option ${c?.followup_status==='Interested In Lumpsum'?'selected':''}>Interested In Lumpsum</option>
       <option ${c?.followup_status==='Interested In Other Product'?'selected':''}>Interested In Other Product</option>
+      <option ${c?.followup_status==='Open Demat Account'?'selected':''}>Open Demat Account</option>
     </select></div>
     <div class="form-field"><label>Remarks</label><input id="l_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
   </div>`;
@@ -3204,6 +3205,7 @@ function clientForm(seg, c){
         <option ${c?.followup_status==='INTERESTED IN OTHER PRODUCT'?'selected':''}>INTERESTED IN OTHER PRODUCT</option>
         <option ${c?.followup_status==='POSITIVE'?'selected':''}>POSITIVE</option>
         <option ${c?.followup_status==='WRONG NUMBER'?'selected':''}>WRONG NUMBER</option>
+        <option ${c?.followup_status==='OPEN DEMAT ACCOUNT'?'selected':''}>OPEN DEMAT ACCOUNT</option>
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>`;
@@ -3485,7 +3487,7 @@ function logCall(id,seg){
       <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}" min="${today()}"></div>
       <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">${seg==='equity'?`
         <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
-        <option>TRADE</option><option>INTERESTED IN OTHER PRODUCT</option><option>POSITIVE</option><option>WRONG NUMBER</option>`:`
+        <option>TRADE</option><option>INTERESTED IN OTHER PRODUCT</option><option>POSITIVE</option><option>WRONG NUMBER</option><option>OPEN DEMAT ACCOUNT</option>`:`
         <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
         <option>INTERESTED IN SIP</option><option>INTERESTED IN LUMPSUM</option><option>INTERESTED IN OTHER PRODUCT</option>`}
       </select></div>
