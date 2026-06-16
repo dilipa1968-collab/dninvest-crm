@@ -2493,7 +2493,7 @@ async function convertLead(id,seg){
         created: today()
       });
       const newBiz = { entries: mfEntries, eq_entries: eqEntries };
-      await DB.save('mf_business', newBiz);
+      await DB.set('mf_business', newBiz);
     }catch(e){ console.error('eq new business entry error',e); }
   }
 
