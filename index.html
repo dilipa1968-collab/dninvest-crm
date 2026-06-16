@@ -2650,7 +2650,7 @@ function renderSeminarsTable(){
       <td>${attendedCount}</td>
       <td>
         <button class="btn-icon" onclick="openSeminarDetail('${s.id}')" title="View / Manage Attendees">👁️</button>
-        <button class="btn-icon" onclick="editSeminar('${s.id}')" title="Edit">✏️</button>
+        ${(CU.role==='admin'||s.created_by===CU.name)?`<button class="btn-icon" onclick="editSeminar('${s.id}')" title="Edit">✏️</button>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteSeminar('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td></tr>`;
   });
@@ -2759,25 +2759,27 @@ function renderSeminarAttendees(){
     <th onclick="sortSeminarAttendees('rm')" style="cursor:pointer" title="Click to sort">RM${arrow('rm')}</th>
     <th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
   attendees.forEach(a=>{
+    const isMyAttendee = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+    const dis = isMyAttendee ? '' : 'disabled style="opacity:0.45;pointer-events:none"';
     h+=`<tr data-id="${a.id}">
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
       <td><span class="badge ${a.type==='equity'?'b-active':a.type==='mf'?'b-investor':'b-pending'}">${a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'}</span></td>
-      <td><select class="att-rsvp" onchange="setAttendeeRsvp('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><select class="att-rsvp" onchange="setAttendeeRsvp('${a.id}',this.value)" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
         <option value="No" ${a.rsvp==='No'?'selected':''}>No</option>
         <option value="Wait" ${a.rsvp==='Wait'?'selected':''}>Wait</option>
       </select></td>
-      <td><input class="att-count" type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td><select class="att-status" onchange="setAttendeeStatus('${a.id}',this.value)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><input class="att-count" type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" ${dis} style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><select class="att-status" onchange="setAttendeeStatus('${a.id}',this.value)" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
         <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
-      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button></td>
+      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" ${dis} style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td>${isMyAttendee?`<button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
   h+='</tbody></table>';
