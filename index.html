@@ -479,6 +479,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
         <span class="icon">📋</span> Reports
       </div>
+      <div class="nav-item" onclick="showPage('activity-log')" id="nav-activity-log">
+        <span class="icon">🕐</span> Activity Log
+      </div>
       <div class="nav-item" onclick="showPage('brokerage')" id="nav-brokerage">
         <span class="icon">💰</span> Brokerage
       </div>
@@ -708,6 +711,68 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       </div>
 
       <!-- ── REPORTS ── -->
+      <!-- ── ACTIVITY LOG ── -->
+      <div class="page" id="page-activity-log">
+        <div class="page-hdr">
+          <div class="page-title">🕐 Activity Log</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="exportActivityLog()">⬇️ Excel Export</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div class="form-field" style="min-width:160px">
+            <label>Segment</label>
+            <select id="al-seg" onchange="renderActivityLog()">
+              <option value="">All</option>
+              <option value="equity">Equity</option>
+              <option value="mf">Mutual Fund</option>
+            </select>
+          </div>
+          <div class="form-field" style="min-width:160px">
+            <label>RM</label>
+            <select id="al-rm" onchange="renderActivityLog()">
+              <option value="">All RMs</option>
+            </select>
+          </div>
+          <div class="form-field" style="min-width:140px">
+            <label>Type</label>
+            <select id="al-type" onchange="renderActivityLog()">
+              <option value="">All Types</option>
+              <option value="add">New Client Added</option>
+              <option value="edit">Client Edited</option>
+              <option value="call">Call Logged</option>
+            </select>
+          </div>
+          <div class="form-field" style="min-width:140px">
+            <label>By (User)</label>
+            <select id="al-by" onchange="renderActivityLog()">
+              <option value="">All Users</option>
+            </select>
+          </div>
+          <div class="form-field" style="min-width:130px">
+            <label>From Date</label>
+            <input type="date" id="al-from" onchange="renderActivityLog()">
+          </div>
+          <div class="form-field" style="min-width:130px">
+            <label>To Date</label>
+            <input type="date" id="al-to" onchange="renderActivityLog()">
+          </div>
+          <div class="form-field" style="min-width:200px">
+            <label>Search Client</label>
+            <input type="text" id="al-search" placeholder="Client name..." oninput="renderActivityLog()">
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn btn-outline" onclick="document.getElementById('al-seg').value='';document.getElementById('al-rm').value='';document.getElementById('al-type').value='';document.getElementById('al-by').value='';document.getElementById('al-from').value='';document.getElementById('al-to').value='';document.getElementById('al-search').value='';renderActivityLog()">✕ Reset</button>
+          </div>
+        </div>
+        <div id="al-count" style="font-size:.8rem;color:var(--gray);margin-bottom:8px"></div>
+        <div class="tbl-wrap">
+          <div class="tbl-scroll">
+            <table id="al-table"></table>
+          </div>
+        </div>
+      </div>
+
       <!-- ── BROKERAGE ── -->
       <div class="page" id="page-brokerage">
         <div class="page-hdr">
@@ -1308,7 +1373,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -1697,6 +1762,7 @@ function showPage(id){
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
   else if(id==='reports') renderReports();
+  else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
   else if(id==='admin') renderAdmin();
   else if(id==='dashboard') refreshDash();
@@ -3250,9 +3316,52 @@ async function saveClient(){
 
   if(currentEditId){
     const idx=clients.findIndex(x=>x.id===currentEditId);
-    if(idx>=0){ const old=clients[idx]; rec.created=old.created||today(); }
+    if(idx>=0){
+      const old=clients[idx];
+      rec.created=old.created||today();
+      // Audit log - track changed fields
+      const auditFields = seg==='equity'
+        ? ['name','mobile','email','rm','status','code','asset_value','revenue','last_trade_date','last_call_date','next_call','followup_status','remarks']
+        : ['name','mobile','email','rm','status','pan','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
+      const changes = [];
+      auditFields.forEach(f=>{
+        const ov = old[f]===null||old[f]===undefined?'':String(old[f]);
+        const nv = rec[f]===null||rec[f]===undefined?'':String(rec[f]);
+        if(ov!==nv) changes.push({field:f, old:ov||'—', new:nv||'—'});
+      });
+      if(changes.length>0){
+        const logs = DB.get('activity_logs')||[];
+        logs.unshift({
+          id: uid(),
+          type: 'edit',
+          seg,
+          client_id: currentEditId,
+          client_name: old.name,
+          rm: old.rm,
+          by: CU.name,
+          date: new Date().toISOString(),
+          changes
+        });
+        // Keep last 2000 logs only
+        DB.set('activity_logs', logs.slice(0,2000));
+      }
+    }
   } else {
     rec.created=today();
+    // Audit log - new client added
+    const logs = DB.get('activity_logs')||[];
+    logs.unshift({
+      id: uid(),
+      type: 'add',
+      seg,
+      client_id: rec.id,
+      client_name: rec.name,
+      rm: rec.rm,
+      by: CU.name,
+      date: new Date().toISOString(),
+      changes: []
+    });
+    DB.set('activity_logs', logs.slice(0,2000));
   }
   await DB.setClient(key,rec);
   closeModal('clientModal');
@@ -3369,8 +3478,17 @@ async function saveCallLog(){
   const nextCall=document.getElementById('cl_next').value;
   const fuStatus=document.getElementById('cl_followup').value;
 
+  const clients2=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
+  const clientObj=clients2.find(x=>x.id===id);
   const logs=DB.get('call_logs')||[];
-  logs.push({id:uid(),client_id:id,seg,date,status,note,next_call:nextCall,created:today()});
+  logs.push({
+    id:uid(), client_id:id, seg, date, status, note,
+    next_call:nextCall, created:today(),
+    client_name: clientObj?clientObj.name:'',
+    rm: clientObj?clientObj.rm:'',
+    remarks: note,
+    by: CU.name
+  });
   DB.set('call_logs',logs);
 
   // Update client record
@@ -4965,6 +5083,139 @@ window.checkFollowups = function(){
 </script>
 
 <script>
+// ══════════════════════════════════════════
+// ACTIVITY LOG
+// ══════════════════════════════════════════
+function renderActivityLog(){
+  const isAdmin = CU && CU.role==='admin';
+  const seg = (document.getElementById('al-seg')||{value:''}).value;
+  const rmF = (document.getElementById('al-rm')||{value:''}).value;
+  const typeF = (document.getElementById('al-type')||{value:''}).value;
+  const byF = (document.getElementById('al-by')||{value:''}).value;
+  const fromF = (document.getElementById('al-from')||{value:''}).value;
+  const toF = (document.getElementById('al-to')||{value:''}).value;
+  const search = ((document.getElementById('al-search')||{value:''}).value||'').toLowerCase().trim();
+
+  // Merge call_logs + activity_logs
+  const callLogs = (DB.get('call_logs')||[]).map(l=>({
+    id: l.id||uid(),
+    type: 'call',
+    seg: l.seg||'equity',
+    client_id: l.client_id,
+    client_name: l.client_name||l.name||'—',
+    rm: l.rm||'—',
+    by: l.by||l.rm||'—',
+    date: l.date||'',
+    changes: [],
+    call_status: l.status||'',
+    next_call: l.next_call||'',
+    remarks: l.remarks||''
+  }));
+  const editLogs = DB.get('activity_logs')||[];
+  let all = [...editLogs, ...callLogs].sort((a,b)=>b.date.localeCompare(a.date));
+
+  // Staff only sees their own RM logs
+  if(!isAdmin){
+    const myRMs = [...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])])].map(d=>d.trim().toUpperCase());
+    all = all.filter(l=>myRMs.includes((l.rm||'').trim().toUpperCase()));
+  }
+
+  // Populate RM + By dropdowns
+  const rmEl=document.getElementById('al-rm'), byEl=document.getElementById('al-by');
+  if(rmEl && rmEl.options.length<=1){
+    const rms=[...new Set(all.map(l=>l.rm).filter(Boolean))].sort();
+    rms.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; rmEl.appendChild(o); });
+  }
+  if(byEl && byEl.options.length<=1){
+    const bys=[...new Set(all.map(l=>l.by).filter(Boolean))].sort();
+    bys.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; byEl.appendChild(o); });
+  }
+
+  // Apply filters
+  if(seg) all=all.filter(l=>l.seg===seg);
+  if(rmF) all=all.filter(l=>l.rm===rmF);
+  if(typeF) all=all.filter(l=>l.type===typeF);
+  if(byF) all=all.filter(l=>l.by===byF);
+  if(fromF) all=all.filter(l=>l.date&&l.date>=fromF);
+  if(toF) all=all.filter(l=>l.date&&l.date<=toF+'T23:59:59');
+  if(search) all=all.filter(l=>(l.client_name||'').toLowerCase().includes(search));
+
+  const countEl=document.getElementById('al-count');
+  if(countEl) countEl.textContent=`${all.length} records`;
+
+  const tbl=document.getElementById('al-table');
+  if(!tbl) return;
+
+  const typeLabel={add:'✅ New Client',edit:'✏️ Edited',call:'📞 Call Log'};
+  const typeBg={add:'#d1fae5',edit:'#fef3c7',call:'#e0f2fe'};
+  const typeColor={add:'#065f46',edit:'#92400e',call:'#0369a1'};
+
+  if(!all.length){
+    tbl.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray)">Koi log nahi mila. Filters reset karein.</td></tr>`;
+    return;
+  }
+
+  let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>Segment</th><th>RM</th><th>By</th><th>Changes / Details</th></tr></thead><tbody>';
+  all.forEach(l=>{
+    const dt = l.date ? new Date(l.date).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    let detail='';
+    if(l.type==='call'){
+      detail=`<span style="color:var(--gray);font-size:.8rem">Status: <b>${l.call_status||'—'}</b>${l.next_call?` | Next Call: <b>${fmtDate(l.next_call)}</b>`:''} ${l.remarks?`| <i>${l.remarks}</i>`:''}</span>`;
+    } else if(l.type==='add'){
+      detail=`<span style="color:var(--gray);font-size:.8rem">Naya client add kiya</span>`;
+    } else if(l.changes && l.changes.length){
+      detail=l.changes.map(ch=>{
+        const fLabel={name:'Name',mobile:'Mobile',email:'Email',rm:'RM',status:'Status',code:'Client Code',asset_value:'Asset Value',revenue:'Revenue',last_trade_date:'Last Trade',last_call_date:'Last Call',next_call:'Next Call',followup_status:'Follow-up Status',remarks:'Remarks',pan:'PAN',aum:'AUM',sip_amount:'SIP Amount',sip_count:'SIP Count',last_invest_date:'Last Invest'}[ch.field]||ch.field;
+        return `<div style="font-size:.78rem;margin-bottom:2px"><b>${fLabel}:</b> <span style="color:#ef4444;text-decoration:line-through">${ch.old}</span> → <span style="color:#16a34a">${ch.new}</span></div>`;
+      }).join('');
+    } else {
+      detail='<span style="color:var(--gray);font-size:.8rem">—</span>';
+    }
+    rows+=`<tr>
+      <td style="font-size:.8rem;white-space:nowrap">${dt}</td>
+      <td><span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:700">${typeLabel[l.type]||l.type}</span></td>
+      <td style="font-weight:600">${l.client_name||'—'}</td>
+      <td style="font-size:.8rem">${l.seg==='equity'?'📈 Equity':'🏦 MF'}</td>
+      <td style="font-size:.8rem">${l.rm||'—'}</td>
+      <td style="font-size:.8rem">${l.by||'—'}</td>
+      <td>${detail}</td>
+    </tr>`;
+  });
+  rows+='</tbody>';
+  tbl.innerHTML=rows;
+}
+
+function exportActivityLog(){
+  const tbl=document.getElementById('al-table');
+  if(!tbl||!tbl.rows.length){ toast('Koi data nahi hai export ke liye','error'); return; }
+  const wb=XLSX.utils.book_new();
+  const rows=[['Date & Time','Type','Client Name','Segment','RM','By','Field','Old Value','New Value','Remarks']];
+  const isAdmin = CU && CU.role==='admin';
+  const callLogs=(DB.get('call_logs')||[]).map(l=>({type:'call',seg:l.seg||'equity',client_name:l.client_name||l.name||'',rm:l.rm||'',by:l.by||l.rm||'',date:l.date||'',call_status:l.status||'',next_call:l.next_call||'',remarks:l.remarks||'',changes:[]}));
+  const editLogs=DB.get('activity_logs')||[];
+  let all=[...editLogs,...callLogs].sort((a,b)=>b.date.localeCompare(a.date));
+  if(!isAdmin){
+    const myRMs=[...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])].map(d=>d.trim().toUpperCase());
+    all=all.filter(l=>myRMs.includes((l.rm||'').trim().toUpperCase()));
+  }
+  all.forEach(l=>{
+    const dt=l.date?new Date(l.date).toLocaleString('en-IN'):'';
+    if(l.type==='call'){
+      rows.push([dt,'Call Log',l.client_name,l.seg,l.rm,l.by,'—','—','—',`Status: ${l.call_status}${l.next_call?' | Next: '+l.next_call:''} ${l.remarks}`]);
+    } else if(!l.changes||!l.changes.length){
+      rows.push([dt,l.type==='add'?'New Client':'Edited',l.client_name,l.seg,l.rm,l.by,'—','—','—','']);
+    } else {
+      l.changes.forEach((ch,i)=>{
+        rows.push([i===0?dt:'',i===0?'Edited':'',i===0?l.client_name:'',i===0?l.seg:'',i===0?l.rm:'',i===0?l.by:'',ch.field,ch.old,ch.new,'']);
+      });
+    }
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:20},{wch:14},{wch:24},{wch:10},{wch:12},{wch:12},{wch:18},{wch:20},{wch:20},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws,'Activity Log');
+  XLSX.writeFile(wb,`Activity_Log_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 // ══════════════════════════════════════════
 // BROKERAGE CALCULATOR MODULE
 // ══════════════════════════════════════════
