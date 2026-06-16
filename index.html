@@ -2412,13 +2412,19 @@ async function convertLead(id,seg){
   if(!lead) return;
   const label = seg==='equity'?'Equity Client':'MF Investor';
 
-  let pan='';
+  let pan='', clientCode='';
   if(seg==='mf'){
     pan=prompt(`Enter PAN for "${lead.name}" (required for MF Investor):`,'');
-    if(pan===null) return; // cancelled
+    if(pan===null) return;
     pan=pan.trim().toUpperCase();
     if(!pan){ toast('PAN is required to convert to MF Investor','error'); return; }
     if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+  }
+
+  if(seg==='equity'){
+    clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Leave blank if not yet assigned)`,'');
+    if(clientCode===null) return;
+    clientCode=clientCode.trim().toUpperCase();
   }
 
   if(!confirm(`Convert "${lead.name}" to ${label}?`)) return;
@@ -2426,20 +2432,18 @@ async function convertLead(id,seg){
   const key=seg==='equity'?'eq_clients':'mf_clients';
   const clients=DB.get(key)||[];
 
-  // Duplicate check by mobile / PAN
+  // Duplicate check by mobile / PAN / code
   if(lead.mobile){
     const dup=clients.find(c=>c.mobile && c.mobile.trim()===lead.mobile.trim());
-    if(dup){
-      toast(`⚠️ Already exists as ${label}: "${dup.name}" (${dup.mobile||''})`,'error');
-      return;
-    }
+    if(dup){ toast(`⚠️ Already exists as ${label}: "${dup.name}" (${dup.mobile||''})`,'error'); return; }
   }
   if(seg==='mf' && pan){
     const dupPan=clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
-    if(dupPan){
-      toast(`⚠️ Already exists as ${label}: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error');
-      return;
-    }
+    if(dupPan){ toast(`⚠️ Already exists as ${label}: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+  }
+  if(seg==='equity' && clientCode){
+    const dupCode=clients.find(c=>c.code && c.code.trim().toUpperCase()===clientCode);
+    if(dupCode){ toast(`⚠️ Already exists as ${label}: "${dupCode.name}" (Code: ${dupCode.code})`,'error'); return; }
   }
 
   let newId=uid();
@@ -2448,7 +2452,7 @@ async function convertLead(id,seg){
   let rec;
   if(seg==='equity'){
     rec={
-      id:newId, code:'', name:lead.name, mobile:lead.mobile, email:'',
+      id:newId, code:clientCode, name:lead.name, mobile:lead.mobile, email:'',
       rm:lead.rm, status:'Active',
       asset_value:null, revenue:null,
       last_trade_date:'', last_trade_month:'',
@@ -2468,8 +2472,33 @@ async function convertLead(id,seg){
   }
 
   await DB.setClient(key,rec);
+
+  // Equity: Add "Open Demat Account" entry in New Business
+  if(seg==='equity'){
+    try{
+      let biz = DB.get('mf_business');
+      // Support both old array format and new object format
+      let mfEntries = Array.isArray(biz) ? biz : (biz?.entries || []);
+      let eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries || []);
+      eqEntries.push({
+        id: uid(),
+        client_id: newId,
+        client_name: lead.name,
+        client_code: clientCode||'',
+        rm: lead.rm,
+        type: 'Open Demat Account',
+        date: today(),
+        mobile: lead.mobile||'',
+        remarks: 'Converted from Lead',
+        created: today()
+      });
+      const newBiz = { entries: mfEntries, eq_entries: eqEntries };
+      await DB.save('mf_business', newBiz);
+    }catch(e){ console.error('eq new business entry error',e); }
+  }
+
   await DB.deleteClient('leads',id);
-  toast(`Lead converted to ${label}!`,'success');
+  toast(`Lead converted to ${label}${seg==='equity'?' — Demat entry added in New Business!':''}!`,'success');
   renderLeadsTable();
   if(seg==='equity') renderEqTable(); else renderMfTable();
   refreshDash();
@@ -3385,7 +3414,8 @@ function saveBusinessEntry(){
   if(!amount || amount<=0){ toast('Amount daalein','error'); return; }
   if(!date){ toast('Date daalein','error'); return; }
 
-  const entries = DB.get('mf_business')||[];
+  const biz = DB.get('mf_business');
+  const entries = Array.isArray(biz) ? biz : (biz?.entries || []);
 
   if(editingBusinessId){
     const idx = entries.findIndex(e=>e.id===editingBusinessId);
@@ -3395,7 +3425,8 @@ function saveBusinessEntry(){
       entries[idx].date = date;
       entries[idx].remarks = remarks;
     }
-    DB.set('mf_business', entries);
+    const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
+    DB.set('mf_business', {entries, eq_entries: eqEntries});
     closeModal('businessModal');
     toast('Business entry updated!','success');
     editingBusinessId = null;
@@ -3416,7 +3447,8 @@ function saveBusinessEntry(){
     created_by: CU.name,
     created: today()
   });
-  DB.set('mf_business', entries);
+  const eqEntries2 = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
+  DB.set('mf_business', {entries, eq_entries: eqEntries2});
   closeModal('businessModal');
   toast('Business entry saved!','success');
 }
@@ -3693,6 +3725,7 @@ function renderReports(){
     {icon:'⚫',title:'No Trade — 90/180 Days',desc:'Clients inactive 90/180+ days',fn:'noTrade90'},
     {icon:'📞',title:'Follow-up Pending',desc:'Clients with pending follow-ups',fn:'fuPendingEq'},
     {icon:'💰',title:'Revenue Report',desc:'RM-wise brokerage/revenue',fn:'revenueReport'},
+    {icon:'🆕',title:'New Business — Demat Accounts',desc:'Lead se convert hue Demat accounts (month-wise)',fn:'eqNewBusinessReport'},
   ];
   const mfCards=[
     {icon:'🏦',title:'RM-wise Investor List',desc:'Investors grouped by MF RM',fn:'rmMfReport'},
@@ -3847,7 +3880,8 @@ function fuPendingMf(){
 }
 
 function newBusinessMonthlyReport(){
-  let entries = DB.get('mf_business')||[];
+  const biz = DB.get('mf_business');
+  let entries = Array.isArray(biz) ? biz : (biz?.entries || []);
   // Staff sees only their own entries
   if(CU.role!=='admin'){
     const myNames = (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
@@ -3917,10 +3951,55 @@ function editBusinessEntry(id){
 
 function deleteBusinessEntry(id){
   if(!confirm('Delete this business entry? This cannot be undone.')) return;
-  const entries = (DB.get('mf_business')||[]).filter(e=>e.id!==id);
-  DB.set('mf_business', entries);
+  const biz = DB.get('mf_business');
+  const entries = (Array.isArray(biz) ? biz : (biz?.entries||[])).filter(e=>e.id!==id);
+  const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
+  DB.set('mf_business', {entries, eq_entries: eqEntries});
   toast('Entry deleted','success');
   newBusinessMonthlyReport();
+}
+
+function eqNewBusinessReport(){
+  const biz = DB.get('mf_business');
+  const entries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
+  const isAdmin = CU && CU.role==='admin';
+
+  const filtered = isAdmin ? entries : entries.filter(e=>(e.rm||'').toLowerCase()===(CU.name||'').toLowerCase());
+
+  if(!filtered.length){
+    toast('Koi Demat account entry nahi mili. Leads convert karein.','error');
+    return;
+  }
+
+  // Month-wise grouping
+  const monthAgg = {};
+  filtered.forEach(e=>{
+    const month = (e.date||'').slice(0,7); // YYYY-MM
+    if(!monthAgg[month]) monthAgg[month]={month, count:0, rms:{}};
+    monthAgg[month].count++;
+    const rm = e.rm||'—';
+    if(!monthAgg[month].rms[rm]) monthAgg[month].rms[rm]=0;
+    monthAgg[month].rms[rm]++;
+  });
+
+  // Flat rows: Date | Client Name | Client Code | RM | Type | Remarks
+  const rows = filtered
+    .slice()
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+    .map(e=>[
+      fmtDate(e.date)||e.date||'—',
+      e.client_name||'—',
+      e.client_code||'—',
+      e.rm||'—',
+      e.type||'Open Demat Account',
+      e.remarks||'—'
+    ]);
+
+  showReport(
+    `New Business — Demat Accounts (${filtered.length} entries)`,
+    ['Date','Client Name','Client Code','RM','Type','Remarks'],
+    rows
+  );
 }
 
 function rmPerf(){
