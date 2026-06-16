@@ -1011,6 +1011,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('seminarDetailModal')">Close</button>
+      <span style="font-size:.78rem;color:var(--amber);font-weight:600;margin-right:8px">⚠️ Changes sirf "Save Changes" se save honge</span>
       <button class="btn btn-primary" onclick="saveSeminarAttendeeChanges()">💾 Save Changes</button>
     </div>
   </div>
@@ -2866,19 +2867,19 @@ function renderSeminarAttendees(){
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
       <td><span class="badge ${a.type==='equity'?'b-active':a.type==='mf'?'b-investor':'b-pending'}">${a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'}</span></td>
-      <td><select class="att-rsvp" onchange="setAttendeeRsvp('${a.id}',this.value)" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><select class="att-rsvp" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
         <option value="No" ${a.rsvp==='No'?'selected':''}>No</option>
         <option value="Wait" ${a.rsvp==='Wait'?'selected':''}>Wait</option>
       </select></td>
-      <td><input class="att-count" type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" onchange="setAttendeeCount('${a.id}',this.value)" ${dis} style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td><select class="att-status" onchange="setAttendeeStatus('${a.id}',this.value)" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><input class="att-count" type="number" min="0" value="${a.expected_count!=null?a.expected_count:''}" placeholder="—" ${dis} style="width:60px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><select class="att-status" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="Pending" ${a.status==='Pending'||!a.status?'selected':''}>Pending</option>
         <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
-      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" onchange="setAttendeeRemarks('${a.id}',this.value)" ${dis} style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td>${isMyAttendee?`<button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
