@@ -5623,383 +5623,331 @@ function brkExport(){
 }
 
 // ============================================================
-// COMMISSION MODULE
+// COMMISSION MODULE v3
 // ============================================================
 
 function commSaveSalaries() {
-  var allU = DB.get('users'); if (!allU||!allU.length) allU = DEFAULT_USERS;
-  var staff = allU.filter(function(u){ return u.active!==false && u.role==='staff'; });
+  var allU = DB.get('users');
+  if (!allU || !allU.length) allU = DEFAULT_USERS;
+  var staff = allU.filter(function(u){ return u.active !== false && u.role === 'staff'; });
   var sal = {};
   staff.forEach(function(u){
-    var inp = document.getElementById('sal_' + u.name);
-    sal[u.name] = inp ? (parseFloat(inp.value)||0) : 0;
+    var el = document.getElementById('comsal_' + u.id);
+    sal[u.name] = el ? (parseFloat(el.value) || 0) : 0;
   });
-  saveCommissionSalaries(sal).then(function(){ renderCommissionPage(); });
+  DB.set('commission_salaries', sal).then(function(){
+    toast('Salaries save ho gayi!');
+    renderCommissionPage();
+  });
 }
 
-async function saveCommissionSalaries(salaries) {
-  await DB.set('commission_salaries', salaries);
-  toast('✅ Salaries saved!');
-}
-
-function getCommissionSalaries() {
+function getCommSalaries() {
   return DB.get('commission_salaries') || {};
 }
 
-async function saveCommissionData(monthKey, data) {
-  // data = {entries: [...], verified: {rmName: true/false}}
-  await DB.set('commission_data_' + monthKey, data);
+function getCommData(mk) {
+  return DB.get('comm_data_' + mk) || { entries: [], verified: {} };
 }
 
-function getCommissionData(monthKey) {
-  return DB.get('commission_data_' + monthKey) || {entries: [], verified: {}};
+function saveCommData(mk, data) {
+  return DB.set('comm_data_' + mk, data);
 }
 
-function commFmt(n) {
-  return '₹' + Math.round(n).toLocaleString('en-IN');
+function cfmt(n) {
+  return '\u20b9' + Math.round(n || 0).toLocaleString('en-IN');
 }
 
-function calcRMCommission(rmName, eqBrok, activeCount, qualDemat, mfNew, salary) {
-  // Equity commission
-  const min3x = salary * 3;
-  const min10x = salary * 10;
-  let eqComm = 0, eqRate = 0, eqNote = '';
-  if (eqBrok < min3x) {
-    eqComm = 0; eqNote = `Brok(${commFmt(eqBrok)}) < 3×Sal(${commFmt(min3x)}) = ₹0`;
-  } else if (eqBrok >= min10x) {
-    eqRate = 7; eqComm = (eqBrok - min3x) * 0.07;
-    eqNote = `7% of (${commFmt(eqBrok)}−${commFmt(min3x)}) [10× achieved!]`;
-  } else {
-    eqRate = 5; eqComm = (eqBrok - min3x) * 0.05;
-    eqNote = `5% of (${commFmt(eqBrok)}−${commFmt(min3x)})`;
-  }
-  // Good activation
-  const goodAct = activeCount >= 50 ? 700 : 0;
-  // Demat bonus
-  const dematBonus = qualDemat * 600;
-  // MF new business (5% of new business amount)
-  const mfComm = mfNew * 0.05;
-  const total = eqComm + goodAct + dematBonus + mfComm;
-  return {eqComm, eqRate, eqNote, goodAct, dematBonus, mfComm, total, activeCount, qualDemat, mfNew};
+function calcComm(eqBrok, active100, qualDemat, mfNew, salary) {
+  var min3 = salary * 3, min10 = salary * 10;
+  var eqC = 0, eqNote = '';
+  if (!salary) { eqNote = 'Salary set nahi hai'; }
+  else if (eqBrok < min3) { eqC = 0; eqNote = 'Brok ' + cfmt(eqBrok) + ' < 3x Sal ' + cfmt(min3) + ' = Zero'; }
+  else if (eqBrok >= min10) { eqC = (eqBrok - min3) * 0.07; eqNote = '7% of (' + cfmt(eqBrok) + ' - ' + cfmt(min3) + ') [10x achieved!]'; }
+  else { eqC = (eqBrok - min3) * 0.05; eqNote = '5% of (' + cfmt(eqBrok) + ' - ' + cfmt(min3) + ')'; }
+  var goodAct = active100 >= 50 ? 700 : 0;
+  var dematB = qualDemat * 600;
+  var mfC = (mfNew || 0) * 0.05;
+  var total = eqC + goodAct + dematB + mfC;
+  return { eqC: eqC, eqNote: eqNote, goodAct: goodAct, dematB: dematB, mfC: mfC, total: total };
 }
 
 function renderCommissionPage() {
-  const isAdmin = CU.role === 'admin';
-  const salaries = getCommissionSalaries();
-  // DB se users lo — agar empty to DEFAULT_USERS fallback
-  let allUsers = DB.get('users');
-  if (!allUsers || !allUsers.length) allUsers = DEFAULT_USERS;
-  const users = allUsers.filter(u => u.active !== false && u.role === 'staff');
-  
-  const now = new Date();
-  const months = [];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const label = d.toLocaleString('en-IN', {month: 'long', year: 'numeric'});
-    months.push({key, label});
+  var el = document.getElementById('comm-page-content');
+  if (!el) return;
+
+  var isAdmin = CU.role === 'admin';
+  var sal = getCommSalaries();
+  var allU = DB.get('users');
+  if (!allU || !allU.length) allU = DEFAULT_USERS;
+  var staff = allU.filter(function(u){ return u.active !== false && u.role === 'staff'; });
+
+  // Month list
+  var now = new Date();
+  var months = [];
+  for (var i = 0; i < 12; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    var mk = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    var lbl = d.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    months.push({ key: mk, label: lbl });
   }
+  var selMk = window._commMk || months[0].key;
 
-  const selMonth = window._commSelMonth || months[0].key;
+  var h = '<div style="padding:16px 0">';
 
-  let html = `<div style="padding:16px 0">`;
-
-  // ── Admin: Salary Setup ──
+  // ── Salary Setup (Admin only) ──
   if (isAdmin) {
-    var salFields = '';
-    users.forEach(function(u) {
-      var cur = salaries[u.name] !== undefined ? salaries[u.name] : 0;
-      salFields += '<div style="background:#f8f9fa;border-radius:8px;padding:12px;border:1px solid #e8e8e8">'
-        + '<div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">' + u.name + '</div>'
-        + '<div style="display:flex;align-items:center;gap:6px">'
-        + '<span style="font-size:13px;color:#888;font-weight:600">&#8377;</span>'
-        + '<input type="number" id="sal_' + u.name + '" value="' + cur + '" min="0"'
-        + ' style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-weight:700;color:#0F2B5B"'
-        + ' placeholder="0">'
-        + '</div></div>';
-    });
-    html += '<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;padding:18px;margin-bottom:16px">'
-      + '<div style="font-weight:700;font-size:15px;color:#0F2B5B;margin-bottom:14px;border-bottom:1px solid #f0f0f0;padding-bottom:10px">'
-      + '&#9881;&#65039; RM Monthly Salary Setup</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:14px">'
-      + salFields + '</div>'
-      + '<button class="btn btn-success" onclick="commSaveSalaries()">&#128190; Save Salaries</button>'
-      + '</div>';
+    h += '<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;padding:18px;margin-bottom:16px">';
+    h += '<div style="font-weight:700;font-size:15px;color:#0F2B5B;margin-bottom:14px;border-bottom:1px solid #f0f0f0;padding-bottom:10px">&#9881; RM Monthly Salary Setup</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:14px">';
+    for (var si = 0; si < staff.length; si++) {
+      var u = staff[si];
+      var cur = sal[u.name] !== undefined ? sal[u.name] : 0;
+      h += '<div style="background:#f8f9fa;border-radius:8px;padding:12px;border:1px solid #e8e8e8">';
+      h += '<div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">' + u.name + '</div>';
+      h += '<div style="display:flex;align-items:center;gap:4px">';
+      h += '<span style="color:#888;font-size:12px">&#8377;</span>';
+      h += '<input type="number" id="comsal_' + u.id + '" value="' + cur + '" min="0" placeholder="0"';
+      h += ' style="width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-weight:700;color:#0F2B5B">';
+      h += '</div></div>';
+    }
+    h += '</div>';
+    h += '<button class="btn btn-success" onclick="commSaveSalaries()">&#128190; Save Salaries</button>';
+    h += '</div>';
 
-        // Admin: Brokerage CSV Upload
-    html += `<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;padding:18px;margin-bottom:16px">
-      <div style="font-weight:700;font-size:15px;color:#0F2B5B;margin-bottom:4px;border-bottom:1px solid #f0f0f0;padding-bottom:10px">
-        📂 Brokerage CSV Upload + Commission Calculate
-      </div>
-      <div style="background:#E1F5EE;border-left:3px solid #1D9E75;border-radius:6px;padding:10px 14px;font-size:12px;color:#0F6E56;margin:12px 0">
-        CSV Format: <b>Client Name, RM Name, Monthly Brokerage, New Demat (Y/N)</b><br>
-        MF New Business data automatically CRM ke New Business records se liya jaayega.
-      </div>
-      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
-        <div>
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px">Month</label>
-          <select id="comm-month-sel" style="padding:8px 12px;border:1px solid #ccc;border-radius:7px;font-size:13px">
-            ${months.map(m => `<option value="${m.key}" ${m.key === selMonth ? 'selected' : ''}>${m.label}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px">Brokerage CSV</label>
-          <input type="file" id="comm-csv-in" accept=".csv,.txt" style="padding:6px;border:1px solid #ccc;border-radius:7px;font-size:12px">
-        </div>
-        <button class="btn btn-primary" onclick="processCommissionCSV()">⚡ Calculate Commission</button>
-      </div>
-    </div>`;
+    // ── CSV Upload ──
+    h += '<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;padding:18px;margin-bottom:16px">';
+    h += '<div style="font-weight:700;font-size:15px;color:#0F2B5B;margin-bottom:10px;border-bottom:1px solid #f0f0f0;padding-bottom:10px">&#128194; Brokerage CSV Upload</div>';
+    h += '<div style="background:#E1F5EE;border-left:3px solid #1D9E75;border-radius:6px;padding:10px 14px;font-size:12px;color:#0F6E56;margin-bottom:12px">';
+    h += '<b>CSV Format:</b> Client Name, RM Name, Monthly Brokerage, New Demat (Y/N)<br>';
+    h += 'MF New Business CRM ke records se automatic aayega.';
+    h += '</div>';
+    h += '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">';
+    h += '<div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Month</label>';
+    h += '<select id="comm-mo" style="padding:8px 12px;border:1px solid #ccc;border-radius:7px;font-size:13px">';
+    for (var mi = 0; mi < months.length; mi++) {
+      h += '<option value="' + months[mi].key + '"' + (months[mi].key === selMk ? ' selected' : '') + '>' + months[mi].label + '</option>';
+    }
+    h += '</select></div>';
+    h += '<div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Brokerage CSV</label>';
+    h += '<input type="file" id="comm-csv" accept=".csv,.txt" style="padding:6px;border:1px solid #ccc;border-radius:7px;font-size:12px"></div>';
+    h += '<button class="btn btn-primary" onclick="commCalc()">&#9889; Calculate Commission</button>';
+    h += '</div></div>';
+  } else {
+    // RM: month selector
+    h += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">';
+    h += '<label style="font-size:13px;font-weight:600;color:#555">Month:</label>';
+    h += '<select id="comm-mo" style="padding:8px 12px;border:1px solid #ccc;border-radius:7px;font-size:13px" onchange="window._commMk=this.value;commShowResult()">';
+    for (var mi2 = 0; mi2 < months.length; mi2++) {
+      h += '<option value="' + months[mi2].key + '"' + (months[mi2].key === selMk ? ' selected' : '') + '>' + months[mi2].label + '</option>';
+    }
+    h += '</select></div>';
   }
 
-  // Month selector for non-admin
-  if (!isAdmin) {
-    html += `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-      <label style="font-size:13px;font-weight:600;color:#555">Month:</label>
-      <select id="comm-month-sel" style="padding:8px 12px;border:1px solid #ccc;border-radius:7px;font-size:13px" onchange="window._commSelMonth=this.value;loadCommissionView()">
-        ${months.map(m => `<option value="${m.key}" ${m.key === selMonth ? 'selected' : ''}>${m.label}</option>`).join('')}
-      </select>
-      <button class="btn btn-outline" onclick="window._commSelMonth=document.getElementById('comm-month-sel').value;loadCommissionView()">🔄 Load</button>
-    </div>`;
-  }
+  h += '<div id="comm-result">' + commBuildResult(selMk, isAdmin) + '</div>';
+  h += '</div>';
 
-  // Commission result area
-  html += `<div id="comm-result-area">${renderCommissionResult(selMonth, isAdmin)}</div>`;
-  html += `</div>`;
-
-  document.getElementById('comm-page-content').innerHTML = html;
+  el.innerHTML = h;
 }
 
-function processCommissionCSV() {
-  const fileInput = document.getElementById('comm-csv-in');
-  const monthKey = document.getElementById('comm-month-sel').value;
-  const file = fileInput.files[0];
-  if (!file) { toast('Pehle CSV file choose karo', 'error'); return; }
+function commShowResult() {
+  var mk = document.getElementById('comm-mo') ? document.getElementById('comm-mo').value : (window._commMk || '');
+  window._commMk = mk;
+  var el = document.getElementById('comm-result');
+  if (el) el.innerHTML = commBuildResult(mk, CU.role === 'admin');
+}
 
-  const salaries = getCommissionSalaries();
-  let allUsersC = DB.get('users');
-  if (!allUsersC || !allUsersC.length) allUsersC = DEFAULT_USERS;
-  const users = allUsersC.filter(u => u.active !== false && u.role === 'staff');
+function commCalc() {
+  var fileEl = document.getElementById('comm-csv');
+  var moEl = document.getElementById('comm-mo');
+  if (!fileEl || !fileEl.files[0]) { toast('Pehle CSV file choose karo', 'error'); return; }
+  var mk = moEl ? moEl.value : (window._commMk || '');
+  window._commMk = mk;
 
-  // Get MF new business from CRM
-  const mfBusiness = DB.get('mf_business') || [];
-  const [yr, mo] = monthKey.split('-').map(Number);
-  const mfNewByRM = {};
-  users.forEach(u => { mfNewByRM[u.name.toUpperCase()] = 0; });
-  mfBusiness.forEach(b => {
-    const d = new Date(b.date || b.entryDate || '');
-    if (d.getFullYear() === yr && d.getMonth() + 1 === mo) {
-      const txnType = (b.txnType || b.type || '').toUpperCase();
-      const isNew = ['LUMPSUM','SIP','SIP STOP','SWITCH','NEW SIP','NEW LUMPSUM'].some(t => txnType.includes(t));
+  var sal = getCommSalaries();
+  var allU = DB.get('users'); if (!allU||!allU.length) allU = DEFAULT_USERS;
+  var staff = allU.filter(function(u){ return u.active!==false && u.role==='staff'; });
+
+  // MF new business from CRM
+  var mfBiz = DB.get('mf_business') || [];
+  var parts = mk.split('-');
+  var yr = parseInt(parts[0]), mo = parseInt(parts[1]);
+  var mfNewByRM = {};
+  staff.forEach(function(u){ mfNewByRM[u.name.toUpperCase()] = 0; });
+  mfBiz.forEach(function(b){
+    var d = new Date(b.date || b.entryDate || '');
+    if (d.getFullYear()===yr && d.getMonth()+1===mo) {
+      var ttype = (b.txnType||b.type||'').toUpperCase();
+      var isNew = ['LUMPSUM','SIP','NEW SIP','NEW LUMPSUM','SWITCH'].some(function(t){ return ttype.indexOf(t)>=0; });
       if (isNew) {
-        const rmKey = (b.rm || '').toUpperCase();
-        if (mfNewByRM[rmKey] !== undefined) mfNewByRM[rmKey] += (parseFloat(b.amount) || 0);
-        else {
-          // try matching user names
-          users.forEach(u => {
-            const dealers = (u.mf_dealers || [u.name]).map(d => d.toUpperCase());
-            if (dealers.includes(rmKey)) mfNewByRM[u.name.toUpperCase()] = (mfNewByRM[u.name.toUpperCase()] || 0) + (parseFloat(b.amount) || 0);
-          });
-        }
+        var rmk = (b.rm||'').toUpperCase();
+        staff.forEach(function(u){
+          var dealers = (u.mf_dealers||[u.name]).map(function(d){ return d.toUpperCase(); });
+          if (dealers.indexOf(rmk)>=0) mfNewByRM[u.name.toUpperCase()] = (mfNewByRM[u.name.toUpperCase()]||0) + (parseFloat(b.amount)||0);
+        });
       }
     }
   });
 
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l);
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var lines = e.target.result.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l; });
     if (lines.length < 2) { toast('File mein data nahi', 'error'); return; }
 
-    // Parse CSV
-    const rmMap = {};
-    lines.slice(1).forEach(line => {
-      const cols = line.split(',').map(c => c.trim().replace(/"/g, ''));
+    // Parse CSV into RM map
+    var rmMap = {};
+    lines.slice(1).forEach(function(line){
+      var cols = line.split(',').map(function(c){ return c.trim().replace(/"/g,''); });
       if (cols.length < 4) return;
-      const [clientName, rmName, brokStr, dematStr] = cols;
-      const brok = parseFloat(brokStr) || 0;
-      const isDemat = dematStr.toUpperCase() === 'Y';
-      const rmKey = rmName.trim().toUpperCase();
-      if (!rmMap[rmKey]) rmMap[rmKey] = { brok: 0, active100: 0, qualDemat: 0, clients: [] };
-      rmMap[rmKey].brok += brok;
-      if (brok >= 100) rmMap[rmKey].active100++;
-      if (isDemat && brok >= 100) rmMap[rmKey].qualDemat++;
-      if (isDemat && brok < 100) rmMap[rmKey].nonQualDemat = (rmMap[rmKey].nonQualDemat || 0) + 1;
-      rmMap[rmKey].clients.push({ clientName, brok, isDemat });
+      var clientName=cols[0], rmName=cols[1], brok=parseFloat(cols[2])||0, isDemat=cols[3].toUpperCase()==='Y';
+      var rk = rmName.toUpperCase();
+      if (!rmMap[rk]) rmMap[rk] = { brok:0, active:0, qualDemat:0, nonQual:0 };
+      rmMap[rk].brok += brok;
+      if (brok >= 100) rmMap[rk].active++;
+      if (isDemat && brok >= 100) rmMap[rk].qualDemat++;
+      if (isDemat && brok < 100) rmMap[rk].nonQual++;
     });
 
-    // Build per-RM entries
-    const entries = [];
-    users.forEach(u => {
-      const dealers = (u.eq_dealers || [u.name]).map(d => d.toUpperCase());
-      let brok = 0, active100 = 0, qualDemat = 0, nonQualDemat = 0;
-      dealers.forEach(d => {
+    // Build entries per RM
+    var entries = [];
+    var existData = getCommData(mk);
+    staff.forEach(function(u){
+      var dealers = (u.eq_dealers||[u.name]).map(function(d){ return d.toUpperCase(); });
+      var brok=0, active=0, qualDemat=0, nonQual=0;
+      dealers.forEach(function(d){
         if (rmMap[d]) {
-          brok += rmMap[d].brok;
-          active100 += rmMap[d].active100;
-          qualDemat += rmMap[d].qualDemat;
-          nonQualDemat += (rmMap[d].nonQualDemat || 0);
+          brok += rmMap[d].brok; active += rmMap[d].active;
+          qualDemat += rmMap[d].qualDemat; nonQual += (rmMap[d].nonQual||0);
         }
       });
-      const salary = salaries[u.name] || 0;
-      const mfNew = mfNewByRM[u.name.toUpperCase()] || 0;
-      const calc = calcRMCommission(u.name, brok, active100, qualDemat, mfNew, salary);
+      var salary = sal[u.name] || 0;
+      var mfNew = mfNewByRM[u.name.toUpperCase()] || 0;
+      var c = calcComm(brok, active, qualDemat, mfNew, salary);
       entries.push({
-        rmName: u.name, salary, eqBrok: brok, active100, qualDemat, nonQualDemat, mfNew,
-        ...calc, verified: false
+        rmName: u.name, salary: salary, eqBrok: brok, active100: active,
+        qualDemat: qualDemat, nonQual: nonQual, mfNew: mfNew,
+        eqC: c.eqC, eqNote: c.eqNote, goodAct: c.goodAct,
+        dematB: c.dematB, mfC: c.mfC, total: c.total
       });
     });
 
-    const existing = getCommissionData(monthKey);
-    const newData = {
-      entries,
-      verified: existing.verified || {},
-      monthKey,
-      calcDate: new Date().toISOString()
-    };
-
-    await saveCommissionData(monthKey, newData);
-    window._commSelMonth = monthKey;
-    document.getElementById('comm-result-area').innerHTML = renderCommissionResult(monthKey, true);
-    toast('✅ Commission calculated!');
+    var newData = { entries: entries, verified: existData.verified || {}, calcDate: new Date().toISOString() };
+    saveCommData(mk, newData).then(function(){
+      var el = document.getElementById('comm-result');
+      if (el) el.innerHTML = commBuildResult(mk, true);
+      toast('Commission calculate ho gaya!');
+    });
   };
-  reader.readAsText(file);
+  reader.readAsText(fileEl.files[0]);
 }
 
-async function toggleVerify(monthKey, rmName, currentVal) {
+function commToggleVerify(mk, rmName, cur) {
   if (CU.role !== 'admin') return;
-  const data = getCommissionData(monthKey);
+  var data = getCommData(mk);
   if (!data.verified) data.verified = {};
-  data.verified[rmName] = !currentVal;
-  await saveCommissionData(monthKey, data);
-  document.getElementById('comm-result-area').innerHTML = renderCommissionResult(monthKey, true);
-  toast(data.verified[rmName] ? '✅ Verified — Commission approved' : '❌ Unverified');
+  data.verified[rmName] = !cur;
+  saveCommData(mk, data).then(function(){
+    var el = document.getElementById('comm-result');
+    if (el) el.innerHTML = commBuildResult(mk, true);
+    toast(data.verified[rmName] ? 'Approved!' : 'Unapproved');
+  });
 }
 
-function loadCommissionView() {
-  const monthKey = (document.getElementById('comm-month-sel') || {}).value || window._commSelMonth;
-  window._commSelMonth = monthKey;
-  document.getElementById('comm-result-area').innerHTML = renderCommissionResult(monthKey, CU.role === 'admin');
-}
-
-function renderCommissionResult(monthKey, isAdmin) {
-  const data = getCommissionData(monthKey);
+function commBuildResult(mk, isAdmin) {
+  var data = getCommData(mk);
   if (!data.entries || !data.entries.length) {
-    return `<div style="text-align:center;padding:50px;color:#aaa">
-      <div style="font-size:40px;margin-bottom:12px">💰</div>
-      <div>${isAdmin ? 'Brokerage CSV upload karke Calculate karo' : 'Admin ne abhi commission calculate nahi kiya'}</div>
-    </div>`;
+    return '<div style="text-align:center;padding:50px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">&#128184;</div>'
+      + '<div>' + (isAdmin ? 'CSV upload karke Calculate karo' : 'Admin ne abhi commission calculate nahi kiya') + '</div></div>';
   }
 
-  const isMyData = !isAdmin;
-  const myName = CU.name;
-  const entries = isAdmin ? data.entries : (data.entries || []).filter(e => e.rmName === myName);
+  var entries = isAdmin ? data.entries : data.entries.filter(function(e){ return e.rmName === CU.name; });
+  if (!entries.length) return '<div style="text-align:center;padding:40px;color:#aaa">Is month ka data nahi mila.</div>';
 
-  if (!entries.length) {
-    return `<div style="text-align:center;padding:40px;color:#aaa">Is month ka aapka commission data nahi mila.</div>`;
-  }
+  var h = '';
 
-  const grandTotal = entries.filter(e => data.verified[e.rmName]).reduce((a, e) => a + e.total, 0);
-  const allTotal = entries.reduce((a, e) => a + e.total, 0);
-
-  let html = '';
-
-  // Summary cards (admin only)
+  // Summary (admin)
   if (isAdmin) {
-    const verifiedCount = entries.filter(e => data.verified[e.rmName]).length;
-    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">
-      <div style="background:#E1F5EE;border-radius:8px;padding:14px;text-align:center;border:1px solid #9FE1CB">
-        <div style="font-size:20px;font-weight:700;color:#0F6E56">${commFmt(grandTotal)}</div>
-        <div style="font-size:11px;color:#666;margin-top:4px">Verified Total</div>
-      </div>
-      <div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:center;border:1px solid #eee">
-        <div style="font-size:20px;font-weight:700;color:#333">${commFmt(allTotal)}</div>
-        <div style="font-size:11px;color:#666;margin-top:4px">Calculated Total</div>
-      </div>
-      <div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:center;border:1px solid #eee">
-        <div style="font-size:20px;font-weight:700;color:#333">${verifiedCount} / ${entries.length}</div>
-        <div style="font-size:11px;color:#666;margin-top:4px">RMs Verified</div>
-      </div>
-    </div>`;
+    var verifiedTotal=0, allTotal=0, vCount=0;
+    entries.forEach(function(e){
+      allTotal += (e.total||0);
+      if (data.verified[e.rmName]) { verifiedTotal += (e.total||0); vCount++; }
+    });
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">';
+    h += '<div style="background:#E1F5EE;border-radius:8px;padding:14px;text-align:center;border:1px solid #9FE1CB"><div style="font-size:19px;font-weight:700;color:#0F6E56">' + cfmt(verifiedTotal) + '</div><div style="font-size:11px;color:#666;margin-top:4px">Verified Total</div></div>';
+    h += '<div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:center;border:1px solid #eee"><div style="font-size:19px;font-weight:700;color:#333">' + cfmt(allTotal) + '</div><div style="font-size:11px;color:#666;margin-top:4px">Calculated Total</div></div>';
+    h += '<div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:center;border:1px solid #eee"><div style="font-size:19px;font-weight:700;color:#333">' + vCount + ' / ' + entries.length + '</div><div style="font-size:11px;color:#666;margin-top:4px">RMs Verified</div></div>';
+    h += '</div>';
   }
 
   // Per-RM cards
-  entries.forEach(e => {
-    const isVerified = data.verified[e.rmName];
-    const bgColor = isVerified ? '#f0faf5' : '#fff';
-    const borderColor = isVerified ? '#1D9E75' : '#e0e0e0';
+  for (var i=0; i<entries.length; i++) {
+    var e = entries[i];
+    var isV = !!(data.verified && data.verified[e.rmName]);
+    var bgC = isV ? '#f0faf5' : '#fff';
+    var bdC = isV ? '#1D9E75' : '#e0e0e0';
 
-    // For non-admin show only their own
-    if (!isAdmin && e.rmName !== myName) return;
+    h += '<div style="background:' + bgC + ';border-radius:12px;border:2px solid ' + bdC + ';padding:18px;margin-bottom:14px">';
 
-    html += `<div style="background:${bgColor};border-radius:12px;border:2px solid ${borderColor};padding:18px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-        <div>
-          <span style="font-weight:700;font-size:16px;color:#0F2B5B">${e.rmName}</span>
-          <span style="font-size:12px;color:#888;margin-left:10px">Salary: ${commFmt(e.salary || 0)}/mo</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="font-size:18px;font-weight:700;color:${e.total > 0 ? '#0F6E56' : '#dc2626'}">${commFmt(e.total)}</div>
-          ${isAdmin ? `
-            <button onclick="toggleVerify('${monthKey}','${e.rmName}',${isVerified})"
-              style="padding:7px 16px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:700;
-              background:${isVerified ? '#FEE2E2' : '#0F6E56'};color:${isVerified ? '#dc2626' : '#fff'}">
-              ${isVerified ? '❌ Unverify' : '✅ Verify & Approve'}
-            </button>` : `
-            <span style="padding:5px 12px;border-radius:12px;font-size:11px;font-weight:700;
-              background:${isVerified ? '#D1FAE5' : '#FEF3C7'};color:${isVerified ? '#065F46' : '#92400E'}">
-              ${isVerified ? '✅ Approved' : '⏳ Pending Approval'}
-            </span>`}
-        </div>
-      </div>
+    // Header row
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">';
+    h += '<div><span style="font-weight:700;font-size:16px;color:#0F2B5B">' + e.rmName + '</span>';
+    h += '<span style="font-size:12px;color:#888;margin-left:10px">Salary: ' + cfmt(e.salary||0) + '/mo</span></div>';
+    h += '<div style="display:flex;align-items:center;gap:10px">';
+    h += '<div style="font-size:18px;font-weight:700;color:' + (e.total>0?'#0F6E56':'#dc2626') + '">' + cfmt(e.total) + '</div>';
+    if (isAdmin) {
+      h += '<button onclick="commToggleVerify(\'' + mk + '\',\'' + e.rmName + '\',' + isV + ')"';
+      h += ' style="padding:7px 16px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:700;';
+      h += 'background:' + (isV?'#FEE2E2':'#0F6E56') + ';color:' + (isV?'#dc2626':'#fff') + '">';
+      h += isV ? '&#10060; Unapprove' : '&#9989; Verify & Approve';
+      h += '</button>';
+    } else {
+      h += '<span style="padding:5px 12px;border-radius:12px;font-size:11px;font-weight:700;';
+      h += 'background:' + (isV?'#D1FAE5':'#FEF3C7') + ';color:' + (isV?'#065F46':'#92400E') + '">';
+      h += isV ? '&#9989; Approved' : '&#8987; Pending Approval';
+      h += '</span>';
+    }
+    h += '</div></div>';
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px">
-        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
-          <div style="font-size:16px;font-weight:700;color:${e.eqComm > 0 ? '#0F6E56' : '#dc2626'}">${commFmt(e.eqComm)}</div>
-          <div style="font-size:11px;color:#888;margin-top:3px">Equity Commission</div>
-        </div>
-        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
-          <div style="font-size:16px;font-weight:700;color:#0F6E56">${commFmt(e.mfComm || 0)}</div>
-          <div style="font-size:11px;color:#888;margin-top:3px">MF Commission</div>
-        </div>
-        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
-          <div style="font-size:16px;font-weight:700;color:${e.goodAct > 0 ? '#0F6E56' : '#aaa'}">${commFmt(e.goodAct)}</div>
-          <div style="font-size:11px;color:#888;margin-top:3px">Good Activation (${e.active100} clients)</div>
-        </div>
-        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
-          <div style="font-size:16px;font-weight:700;color:${e.dematBonus > 0 ? '#0F6E56' : '#aaa'}">${commFmt(e.dematBonus)}</div>
-          <div style="font-size:11px;color:#888;margin-top:3px">Demat Bonus (${e.qualDemat} acc)</div>
-        </div>
-      </div>
+    // Metric boxes
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px">';
+    var metrics = [
+      { v: e.eqC, l: 'Equity Commission' },
+      { v: e.mfC, l: 'MF Commission' },
+      { v: e.goodAct, l: 'Good Activation (' + e.active100 + ' clients)' },
+      { v: e.dematB, l: 'Demat Bonus (' + e.qualDemat + ' acc)' }
+    ];
+    metrics.forEach(function(m){
+      h += '<div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">';
+      h += '<div style="font-size:15px;font-weight:700;color:' + (m.v>0?'#0F6E56':'#aaa') + '">' + cfmt(m.v) + '</div>';
+      h += '<div style="font-size:11px;color:#888;margin-top:3px">' + m.l + '</div></div>';
+    });
+    h += '</div>';
 
-      <div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:12px;color:#555;line-height:1.8">
-        <b>Equity:</b> ${e.eqNote || (e.salary ? 'No brokerage data' : 'Salary not set')}<br>
-        <b>MF New Business:</b> ${commFmt(e.mfNew || 0)} → 5% = ${commFmt(e.mfComm || 0)}<br>
-        <b>Good Activation:</b> ${e.active100} active clients ${e.active100 >= 50 ? '✅ (≥50 → ₹700)' : `❌ (Need ${50 - e.active100} more for ₹700)`}<br>
-        <b>Demat:</b> ${e.qualDemat} qualifying × ₹600${e.nonQualDemat ? ` | ${e.nonQualDemat} disqualified (brok <₹100)` : ''}
-      </div>
-    </div>`;
-  });
-
-  // Export button (admin only)
-  if (isAdmin && entries.length) {
-    html += `<div style="margin-top:8px">
-      <button class="btn btn-outline" onclick="exportCommissionXLSX('${monthKey}')">⬇️ Excel Export</button>
-    </div>`;
+    // Detail note
+    h += '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:12px;color:#555;line-height:1.9">';
+    h += '<b>Equity:</b> ' + e.eqNote + '<br>';
+    h += '<b>MF New Biz:</b> ' + cfmt(e.mfNew||0) + ' &rarr; 5% = ' + cfmt(e.mfC) + '<br>';
+    h += '<b>Good Activation:</b> ' + e.active100 + ' active ' + (e.active100>=50?'&#10003; (50+ = &#8377;700)':'&#10006; (' + (50-e.active100) + ' aur chahiye)') + '<br>';
+    h += '<b>Demat:</b> ' + e.qualDemat + ' qualifying x &#8377;600' + (e.nonQual?' | ' + e.nonQual + ' disqualified (brok <&#8377;100)':'');
+    h += '</div></div>';
   }
 
-  return html;
+  // Export button
+  if (isAdmin) {
+    h += '<div style="margin-top:8px"><button class="btn btn-outline" onclick="commExport(\'' + mk + '\')">&#8595; Excel Export</button></div>';
+  }
+  return h;
 }
 
-function exportCommissionXLSX(monthKey) {
-  const data = getCommissionData(monthKey);
-  if (!data.entries || !data.entries.length) { toast('Koi data nahi', 'error'); return; }
-  const wb = XLSX.utils.book_new();
-  const rows = [
-    ['RM', 'Salary', 'EQ Brokerage', 'Active 100+', 'Qual Demats', 'MF New Biz', 'EQ Commission', 'MF Commission', 'Good Activation', 'Demat Bonus', 'Total', 'Verified'],
-    ...data.entries.map(e => [e.rmName, e.salary||0, Math.round(e.eqBrok), e.active100, e.qualDemat, Math.round(e.mfNew||0), Math.round(e.eqComm), Math.round(e.mfComm||0), e.goodAct, e.dematBonus, Math.round(e.total), data.verified[e.rmName] ? 'Yes' : 'No'])
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb, ws, 'Commission');
-  XLSX.writeFile(wb, `DN_Commission_${monthKey}.xlsx`);
+function commExport(mk) {
+  var data = getCommData(mk);
+  if (!data.entries||!data.entries.length) { toast('Koi data nahi','error'); return; }
+  var rows = [['RM','Salary','EQ Brok','Active 100+','Qual Demat','MF New Biz','EQ Comm','MF Comm','Good Act','Demat Bonus','Total','Verified']];
+  data.entries.forEach(function(e){
+    rows.push([e.rmName,e.salary||0,Math.round(e.eqBrok),e.active100,e.qualDemat,Math.round(e.mfNew||0),Math.round(e.eqC),Math.round(e.mfC||0),e.goodAct,e.dematB,Math.round(e.total),data.verified[e.rmName]?'Yes':'No']);
+  });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Commission');
+  XLSX.writeFile(wb, 'DN_Commission_' + mk + '.xlsx');
 }
 
 </script>
