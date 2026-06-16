@@ -5675,7 +5675,10 @@ function calcRMCommission(rmName, eqBrok, activeCount, qualDemat, mfNew, salary)
 function renderCommissionPage() {
   const isAdmin = CU.role === 'admin';
   const salaries = getCommissionSalaries();
-  const users = (DB.get('users') || []).filter(u => u.active !== false && u.role === 'staff');
+  // DB se users lo — agar empty to DEFAULT_USERS fallback
+  let allUsers = DB.get('users');
+  if (!allUsers || !allUsers.length) allUsers = DEFAULT_USERS;
+  const users = allUsers.filter(u => u.active !== false && u.role === 'staff');
   
   const now = new Date();
   const months = [];
@@ -5712,7 +5715,7 @@ function renderCommissionPage() {
         const users=(DB.get('users')||[]).filter(u=>u.active!==false&&u.role==='staff');
         const sal={};
         users.forEach(u=>{sal[u.name]=parseFloat(document.getElementById('sal_'+u.name).value)||0;});
-        saveCommissionSalaries(sal).then(()=>renderCommissionPage());
+        saveCommissionSalaries(sal).then(()=>{renderCommissionPage();});
       ">💾 Save Salaries</button>
     </div>`;
 
@@ -5766,7 +5769,9 @@ function processCommissionCSV() {
   if (!file) { toast('Pehle CSV file choose karo', 'error'); return; }
 
   const salaries = getCommissionSalaries();
-  const users = (DB.get('users') || []).filter(u => u.active !== false && u.role === 'staff');
+  let allUsersC = DB.get('users');
+  if (!allUsersC || !allUsersC.length) allUsersC = DEFAULT_USERS;
+  const users = allUsersC.filter(u => u.active !== false && u.role === 'staff');
 
   // Get MF new business from CRM
   const mfBusiness = DB.get('mf_business') || [];
@@ -5879,7 +5884,7 @@ function renderCommissionResult(monthKey, isAdmin) {
 
   const isMyData = !isAdmin;
   const myName = CU.name;
-  const entries = isAdmin ? data.entries : data.entries.filter(e => e.rmName === myName);
+  const entries = isAdmin ? data.entries : (data.entries || []).filter(e => e.rmName === myName);
 
   if (!entries.length) {
     return `<div style="text-align:center;padding:40px;color:#aaa">Is month ka aapka commission data nahi mila.</div>`;
