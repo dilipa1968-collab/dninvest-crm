@@ -199,6 +199,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.66rem;font-weight:700;letter-spacing:.3px;}
 .b-active{background:#d1fae5;color:#065f46;}
 .b-inactive{background:#fef3c7;color:#92400e;}
+.b-closed{background:#f1f5f9;color:#64748b;}
 .b-prospect{background:var(--purple2);color:var(--purple);}
 .b-investor{background:var(--teal2);color:var(--teal);}
 .b-pending{background:var(--red2);color:var(--red);}
@@ -560,7 +561,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="filters" id="eq-filters">
           <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search">
           <select onchange="filterEq()" id="eq-status"><option value="">All Status</option>
-            <option>Active</option><option>Inactive</option></select>
+            <option>Active</option><option>Inactive</option><option>Closed</option></select>
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
@@ -1620,6 +1621,10 @@ function getMyEqClients(){
   const dealers=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
   return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
 }
+// Helper - active eq clients (Closed exclude)
+function getActiveEqClients(){
+  return getMyEqClients().filter(c=>c.status!=='Closed');
+}
 function getMyMfClients(){
   const all = DB.get('mf_clients')||[];
   if(CU.role==='admin') return all;
@@ -1752,15 +1757,16 @@ function switchTab(group, tab){
 // ══════════════════════════════════════════
 function refreshDash(){
   const eq = getMyEqClients();
+  const activeEq = getActiveEqClients();
   const mf = getMyMfClients();
   const segs=CU.segments||[];
   const hasEq=segs.includes('equity'), hasMf=segs.includes('mf');
 
-  const eqActive=eq.filter(c=>c.status==='Active').length;
+  const eqActive=activeEq.filter(c=>c.status==='Active').length;
   const mfInv=mf.filter(c=>c.status==='Investor').length;
   const totalAUM=mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
   const totalSIP=mf.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0);
-  const pendEq=eq.filter(c=>c.next_call&&c.next_call<=today()).length;
+  const pendEq=activeEq.filter(c=>c.next_call&&c.next_call<=today()).length;
   const pendMf=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
 
   let statsHtml='';
@@ -1803,7 +1809,7 @@ function refreshDash(){
   }
 
   // No-trade alerts
-  const alerts = eq.map(c=>({...c,days:daysDiff(c.last_trade_date)}))
+  const alerts = activeEq.map(c=>({...c,days:daysDiff(c.last_trade_date)}))
     .filter(c=>c.days!==null&&c.days>30)
     .sort((a,b)=>b.days-a.days).slice(0,8);
   document.getElementById('noTradeAlert').innerHTML = alerts.length
@@ -1814,7 +1820,7 @@ function refreshDash(){
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
 
   // No-call alerts (Equity)
-  const noCallEq = eq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
+  const noCallEq = activeEq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
     .filter(c=>c.days===null||c.days>=60)
     .sort((a,b)=>{const av=a.days===null?Infinity:a.days, bv=b.days===null?Infinity:b.days; return bv-av;})
     .slice(0,8);
@@ -1865,17 +1871,18 @@ function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=1
 
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
+  const activeEq=getActiveEqClients();
   document.getElementById('nb-leads').textContent=getMyLeads().length;
   document.getElementById('nb-seminars').textContent=getMySeminars().length;
   document.getElementById('nb-eq').textContent=eq.length;
   document.getElementById('nb-mf').textContent=mf.length;
   document.getElementById('nb-sip').textContent=mf.filter(c=>c.sip_amount>0).length;
-  const eqf=eq.filter(c=>c.next_call&&c.next_call<=today()).length;
+  const eqf=activeEq.filter(c=>c.next_call&&c.next_call<=today()).length;
   const mff=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
   document.getElementById('nb-eqf').textContent=eqf;
   document.getElementById('nb-mff').textContent=mff;
-  document.getElementById('nb-eqnt').textContent=eq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
-  document.getElementById('nb-eqnc').textContent=eq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
+  document.getElementById('nb-eqnt').textContent=activeEq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
+  document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
   document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
 }
 
@@ -2069,7 +2076,7 @@ function renderEqTable(){
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
-      <td><span class="badge ${c.status==='Active'?'b-active':'b-inactive'}">${c.status||'—'}</span></td>
+      <td><span class="badge ${c.status==='Active'?'b-active':c.status==='Closed'?'b-closed':'b-inactive'}">${c.status||'—'}</span></td>
       <td>
         <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
@@ -3114,7 +3121,7 @@ function clientForm(seg, c){
     </div>
     <div class="form-section">Trading Info</div>
     <div class="form-row three">
-      <div class="form-field"><label>Trading Status</label><select id="f_status"><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option></select></div>
+      <div class="form-field"><label>Trading Status</label><select id="f_status"><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option><option ${c?.status==='Closed'?'selected':''}>Closed</option></select></div>
       <div class="form-field"><label>Asset Value (₹)</label><input id="f_asset" type="number" value="${c?.asset_value||''}" placeholder="e.g. 500000"></div>
       <div class="form-field"><label>Revenue/Brokerage (₹)</label><input id="f_revenue" type="number" value="${c?.revenue||''}" placeholder="e.g. 5000"></div>
     </div>
@@ -3460,7 +3467,7 @@ function renderFollowup(group){
   try{
   const seg=group==='eqf'?'equity':'mf';
   const tab=group==='eqf'?activeEqfTab:activeMffTab;
-  const clients=group==='eqf'?getMyEqClients():getMyMfClients();
+  const clients=group==='eqf'?getActiveEqClients():getMyMfClients();
   const t=today(), t7=addDays(t,7);
 
   let data;
@@ -3529,7 +3536,7 @@ function renderFollowup(group){
 function renderNoTrade(){
   try{
   const days=parseInt(activeNtTab);
-  const eq=getMyEqClients();
+  const eq=getActiveEqClients();
   let data=eq.filter(c=>daysDiff(c.last_trade_date)>=days)
     .map(c=>({...c,daysAgo:daysDiff(c.last_trade_date)}))
     .sort((a,b)=>b.daysAgo-a.daysAgo);
@@ -3590,7 +3597,7 @@ function renderNoTrade(){
 function renderNoCall(seg){
   try{
   const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
-  const clients = seg==='equity'?getMyEqClients():getMyMfClients();
+  const clients = seg==='equity'?getActiveEqClients():getMyMfClients();
   let data = clients.filter(c=>{
     const d = daysDiff(c.last_call_date);
     return d===null || d>=days; // never called, or not called in N+ days
@@ -3800,7 +3807,7 @@ function exportReportCSV(){
 }
 
 function rmEqReport(){
-  const eq=getMyEqClients();
+  const eq=getActiveEqClients();
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]=[]; rms[c.rm].push(c); });
   const rows=[];
@@ -3811,13 +3818,13 @@ function rmEqReport(){
 }
 
 function statusEqReport(){
-  const eq=getMyEqClients();
+  const eq=getActiveEqClients();
   const rows=eq.sort((a,b)=>a.status?.localeCompare(b.status)).map(c=>[c.rm,c.code||'',c.name,c.mobile||'',c.status,fmtDate(c.last_trade_date)||'',daysDiff(c.last_trade_date)||'']);
   showReport('Active/Inactive Report',['RM','Code','Name','Mobile','Status','Last Trade','Days'],rows);
 }
 
 function lastTradeReport(){
-  const eq=getMyEqClients().filter(c=>c.last_trade_date).sort((a,b)=>a.last_trade_date.localeCompare(b.last_trade_date));
+  const eq=getActiveEqClients().filter(c=>c.last_trade_date).sort((a,b)=>a.last_trade_date.localeCompare(b.last_trade_date));
   const rows=eq.map(c=>[c.rm,c.name,c.mobile||'',fmtDate(c.last_trade_date),daysDiff(c.last_trade_date),c.status,c.asset_value?'₹'+fmtNum(c.asset_value):'']);
   showReport('Last Trade Date Report',['RM','Name','Mobile','Last Trade','Days Ago','Status','Asset'],rows);
 }
@@ -3826,20 +3833,20 @@ function noTrade30(){ ntReport(30); }
 function noTrade60(){ ntReport(60); }
 function noTrade90(){ ntReport(90); }
 function ntReport(d){
-  const rows=getMyEqClients().filter(c=>daysDiff(c.last_trade_date)>=d)
+  const rows=getActiveEqClients().filter(c=>daysDiff(c.last_trade_date)>=d)
     .sort((a,b)=>daysDiff(b.last_trade_date)-daysDiff(a.last_trade_date))
     .map(c=>[c.rm,c.code||'',c.name,c.mobile||'',fmtDate(c.last_trade_date)||'Never',daysDiff(c.last_trade_date)||'',c.asset_value?'₹'+fmtNum(c.asset_value):'']);
   showReport(`No-Trade ${d}+ Days Report`,['RM','Code','Name','Mobile','Last Trade','Days','Asset Value'],rows);
 }
 
 function fuPendingEq(){
-  const rows=getMyEqClients().filter(c=>c.followup_status==='Pending'||c.next_call).sort((a,b)=>(a.next_call||'').localeCompare(b.next_call||''))
+  const rows=getActiveEqClients().filter(c=>c.followup_status==='Pending'||c.next_call).sort((a,b)=>(a.next_call||'').localeCompare(b.next_call||''))
     .map(c=>[c.rm,c.name,c.mobile||'',fmtDate(c.last_call_date)||'',fmtDate(c.next_call)||'',c.followup_status||'',c.remarks||'']);
   showReport('Follow-up Pending — Equity',['RM','Name','Mobile','Last Call','Next Call','Status','Remarks'],rows);
 }
 
 function revenueReport(){
-  const eq=getMyEqClients();
+  const eq=getActiveEqClients();
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,rev:0,aum:0}; rms[c.rm].count++; rms[c.rm].rev+=(c.revenue||0); rms[c.rm].aum+=(c.asset_value||0); });
   const rows=Object.entries(rms).sort().map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.rev)]);
@@ -4003,7 +4010,7 @@ function eqNewBusinessReport(){
 }
 
 function rmPerf(){
-  const eq=getMyEqClients(), mf=getMyMfClients();
+  const eq=getActiveEqClients(), mf=getMyMfClients();
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].eqC++; rms[c.rm].rev+=(c.revenue||0); });
   mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].mfC++; rms[c.rm].aum+=(c.aum||0); rms[c.rm].sip+=(c.sip_amount||0); });
@@ -4015,7 +4022,7 @@ function rmPerf(){
 // EXPORT
 // ══════════════════════════════════════════
 function exportCSV(seg){
-  const clients=seg==='equity'?getMyEqClients():getMyMfClients();
+  const clients=seg==='equity'?getActiveEqClients():getMyMfClients();
   if(!clients.length){ toast('No data to export','error'); return; }
   const headers=seg==='equity'
     ?['Code','Name','Mobile','Email','RM','Status','Asset Value','Revenue','Last Trade Date','Last Trade Month','Last Call Date','Next Call Date','Follow-up Status','Remarks']
