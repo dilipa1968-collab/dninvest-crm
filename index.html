@@ -849,6 +849,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="tab-item active" onclick="switchTab('rpt','equity')">📈 Equity</div>
           <div class="tab-item" onclick="switchTab('rpt','mf')">🏦 Mutual Fund</div>
           <div class="tab-item" onclick="switchTab('rpt','combined')">📊 Combined</div>
+          <div class="tab-item" onclick="switchTab('rpt','commission');renderCommissionPage()">💰 Commission</div>
         </div>
         <div class="tab-panel active" id="rpt-equity">
           <div class="report-grid" id="eq-reports"></div>
@@ -858,6 +859,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
         <div class="tab-panel" id="rpt-combined">
           <div class="report-grid" id="co-reports"></div>
+        </div>
+        <div class="tab-panel" id="rpt-commission">
+          <div id="comm-page-content"></div>
         </div>
       </div>
 
@@ -5617,6 +5621,375 @@ function brkExport(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rmData), 'RM-wise');
   XLSX.writeFile(wb, `Brokerage_Summary_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
+
+// ============================================================
+// COMMISSION MODULE
+// ============================================================
+
+async function saveCommissionSalaries(salaries) {
+  await DB.set('commission_salaries', salaries);
+  toast('✅ Salaries saved!');
+}
+
+function getCommissionSalaries() {
+  return DB.get('commission_salaries') || {};
+}
+
+async function saveCommissionData(monthKey, data) {
+  // data = {entries: [...], verified: {rmName: true/false}}
+  await DB.set('commission_data_' + monthKey, data);
+}
+
+function getCommissionData(monthKey) {
+  return DB.get('commission_data_' + monthKey) || {entries: [], verified: {}};
+}
+
+function commFmt(n) {
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+function calcRMCommission(rmName, eqBrok, activeCount, qualDemat, mfNew, salary) {
+  // Equity commission
+  const min3x = salary * 3;
+  const min10x = salary * 10;
+  let eqComm = 0, eqRate = 0, eqNote = '';
+  if (eqBrok < min3x) {
+    eqComm = 0; eqNote = `Brok(${commFmt(eqBrok)}) < 3×Sal(${commFmt(min3x)}) = ₹0`;
+  } else if (eqBrok >= min10x) {
+    eqRate = 7; eqComm = (eqBrok - min3x) * 0.07;
+    eqNote = `7% of (${commFmt(eqBrok)}−${commFmt(min3x)}) [10× achieved!]`;
+  } else {
+    eqRate = 5; eqComm = (eqBrok - min3x) * 0.05;
+    eqNote = `5% of (${commFmt(eqBrok)}−${commFmt(min3x)})`;
+  }
+  // Good activation
+  const goodAct = activeCount >= 50 ? 700 : 0;
+  // Demat bonus
+  const dematBonus = qualDemat * 600;
+  // MF new business (5% of new business amount)
+  const mfComm = mfNew * 0.05;
+  const total = eqComm + goodAct + dematBonus + mfComm;
+  return {eqComm, eqRate, eqNote, goodAct, dematBonus, mfComm, total, activeCount, qualDemat, mfNew};
+}
+
+function renderCommissionPage() {
+  const isAdmin = CU.role === 'admin';
+  const salaries = getCommissionSalaries();
+  const users = (DB.get('users') || []).filter(u => u.active !== false && u.role === 'staff');
+  
+  const now = new Date();
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const label = d.toLocaleString('en-IN', {month: 'long', year: 'numeric'});
+    months.push({key, label});
+  }
+
+  const selMonth = window._commSelMonth || months[0].key;
+
+  let html = `<div style="padding:16px 0">`;
+
+  // ── Admin: Salary Setup ──
+  if (isAdmin) {
+    html += `<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;padding:18px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:15px;color:#0F2B5B;margin-bottom:14px;border-bottom:1px solid #f0f0f0;padding-bottom:10px">
+        ⚙️ RM Monthly Salary Setup
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px">
+        ${users.map(u => `
+          <div style="background:#f8f9fa;border-radius:8px;padding:12px;border:1px solid #e8e8e8">
+            <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">${u.name}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:#888">₹</span>
+              <input type="number" id="sal_${u.name}" value="${salaries[u.name] || 0}" min="0"
+                style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-weight:700;color:#0F2B5B"
+                placeholder="0">
+            </div>
+          </div>`).join('')}
+      </div>
+      <button class="btn btn-success" onclick="
+        const users=(DB.get('users')||[]).filter(u=>u.active!==false&&u.role==='staff');
+        const sal={};
+        users.forEach(u=>{sal[u.name]=parseFloat(document.getElementById('sal_'+u.name).value)||0;});
+        saveCommissionSalaries(sal).then(()=>renderCommissionPage());
+      ">💾 Save Salaries</button>
+    </div>`;
+
+    // Admin: Brokerage CSV Upload
+    html += `<div style="background:#fff;border-radius:12px;border:1px solid #e0e0e0;padding:18px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:15px;color:#0F2B5B;margin-bottom:4px;border-bottom:1px solid #f0f0f0;padding-bottom:10px">
+        📂 Brokerage CSV Upload + Commission Calculate
+      </div>
+      <div style="background:#E1F5EE;border-left:3px solid #1D9E75;border-radius:6px;padding:10px 14px;font-size:12px;color:#0F6E56;margin:12px 0">
+        CSV Format: <b>Client Name, RM Name, Monthly Brokerage, New Demat (Y/N)</b><br>
+        MF New Business data automatically CRM ke New Business records se liya jaayega.
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px">Month</label>
+          <select id="comm-month-sel" style="padding:8px 12px;border:1px solid #ccc;border-radius:7px;font-size:13px">
+            ${months.map(m => `<option value="${m.key}" ${m.key === selMonth ? 'selected' : ''}>${m.label}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px">Brokerage CSV</label>
+          <input type="file" id="comm-csv-in" accept=".csv,.txt" style="padding:6px;border:1px solid #ccc;border-radius:7px;font-size:12px">
+        </div>
+        <button class="btn btn-primary" onclick="processCommissionCSV()">⚡ Calculate Commission</button>
+      </div>
+    </div>`;
+  }
+
+  // Month selector for non-admin
+  if (!isAdmin) {
+    html += `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <label style="font-size:13px;font-weight:600;color:#555">Month:</label>
+      <select id="comm-month-sel" style="padding:8px 12px;border:1px solid #ccc;border-radius:7px;font-size:13px" onchange="window._commSelMonth=this.value;loadCommissionView()">
+        ${months.map(m => `<option value="${m.key}" ${m.key === selMonth ? 'selected' : ''}>${m.label}</option>`).join('')}
+      </select>
+      <button class="btn btn-outline" onclick="window._commSelMonth=document.getElementById('comm-month-sel').value;loadCommissionView()">🔄 Load</button>
+    </div>`;
+  }
+
+  // Commission result area
+  html += `<div id="comm-result-area">${renderCommissionResult(selMonth, isAdmin)}</div>`;
+  html += `</div>`;
+
+  document.getElementById('comm-page-content').innerHTML = html;
+}
+
+function processCommissionCSV() {
+  const fileInput = document.getElementById('comm-csv-in');
+  const monthKey = document.getElementById('comm-month-sel').value;
+  const file = fileInput.files[0];
+  if (!file) { toast('Pehle CSV file choose karo', 'error'); return; }
+
+  const salaries = getCommissionSalaries();
+  const users = (DB.get('users') || []).filter(u => u.active !== false && u.role === 'staff');
+
+  // Get MF new business from CRM
+  const mfBusiness = DB.get('mf_business') || [];
+  const [yr, mo] = monthKey.split('-').map(Number);
+  const mfNewByRM = {};
+  users.forEach(u => { mfNewByRM[u.name.toUpperCase()] = 0; });
+  mfBusiness.forEach(b => {
+    const d = new Date(b.date || b.entryDate || '');
+    if (d.getFullYear() === yr && d.getMonth() + 1 === mo) {
+      const txnType = (b.txnType || b.type || '').toUpperCase();
+      const isNew = ['LUMPSUM','SIP','SIP STOP','SWITCH','NEW SIP','NEW LUMPSUM'].some(t => txnType.includes(t));
+      if (isNew) {
+        const rmKey = (b.rm || '').toUpperCase();
+        if (mfNewByRM[rmKey] !== undefined) mfNewByRM[rmKey] += (parseFloat(b.amount) || 0);
+        else {
+          // try matching user names
+          users.forEach(u => {
+            const dealers = (u.mf_dealers || [u.name]).map(d => d.toUpperCase());
+            if (dealers.includes(rmKey)) mfNewByRM[u.name.toUpperCase()] = (mfNewByRM[u.name.toUpperCase()] || 0) + (parseFloat(b.amount) || 0);
+          });
+        }
+      }
+    }
+  });
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 2) { toast('File mein data nahi', 'error'); return; }
+
+    // Parse CSV
+    const rmMap = {};
+    lines.slice(1).forEach(line => {
+      const cols = line.split(',').map(c => c.trim().replace(/"/g, ''));
+      if (cols.length < 4) return;
+      const [clientName, rmName, brokStr, dematStr] = cols;
+      const brok = parseFloat(brokStr) || 0;
+      const isDemat = dematStr.toUpperCase() === 'Y';
+      const rmKey = rmName.trim().toUpperCase();
+      if (!rmMap[rmKey]) rmMap[rmKey] = { brok: 0, active100: 0, qualDemat: 0, clients: [] };
+      rmMap[rmKey].brok += brok;
+      if (brok >= 100) rmMap[rmKey].active100++;
+      if (isDemat && brok >= 100) rmMap[rmKey].qualDemat++;
+      if (isDemat && brok < 100) rmMap[rmKey].nonQualDemat = (rmMap[rmKey].nonQualDemat || 0) + 1;
+      rmMap[rmKey].clients.push({ clientName, brok, isDemat });
+    });
+
+    // Build per-RM entries
+    const entries = [];
+    users.forEach(u => {
+      const dealers = (u.eq_dealers || [u.name]).map(d => d.toUpperCase());
+      let brok = 0, active100 = 0, qualDemat = 0, nonQualDemat = 0;
+      dealers.forEach(d => {
+        if (rmMap[d]) {
+          brok += rmMap[d].brok;
+          active100 += rmMap[d].active100;
+          qualDemat += rmMap[d].qualDemat;
+          nonQualDemat += (rmMap[d].nonQualDemat || 0);
+        }
+      });
+      const salary = salaries[u.name] || 0;
+      const mfNew = mfNewByRM[u.name.toUpperCase()] || 0;
+      const calc = calcRMCommission(u.name, brok, active100, qualDemat, mfNew, salary);
+      entries.push({
+        rmName: u.name, salary, eqBrok: brok, active100, qualDemat, nonQualDemat, mfNew,
+        ...calc, verified: false
+      });
+    });
+
+    const existing = getCommissionData(monthKey);
+    const newData = {
+      entries,
+      verified: existing.verified || {},
+      monthKey,
+      calcDate: new Date().toISOString()
+    };
+
+    await saveCommissionData(monthKey, newData);
+    window._commSelMonth = monthKey;
+    document.getElementById('comm-result-area').innerHTML = renderCommissionResult(monthKey, true);
+    toast('✅ Commission calculated!');
+  };
+  reader.readAsText(file);
+}
+
+async function toggleVerify(monthKey, rmName, currentVal) {
+  if (CU.role !== 'admin') return;
+  const data = getCommissionData(monthKey);
+  if (!data.verified) data.verified = {};
+  data.verified[rmName] = !currentVal;
+  await saveCommissionData(monthKey, data);
+  document.getElementById('comm-result-area').innerHTML = renderCommissionResult(monthKey, true);
+  toast(data.verified[rmName] ? '✅ Verified — Commission approved' : '❌ Unverified');
+}
+
+function loadCommissionView() {
+  const monthKey = (document.getElementById('comm-month-sel') || {}).value || window._commSelMonth;
+  window._commSelMonth = monthKey;
+  document.getElementById('comm-result-area').innerHTML = renderCommissionResult(monthKey, CU.role === 'admin');
+}
+
+function renderCommissionResult(monthKey, isAdmin) {
+  const data = getCommissionData(monthKey);
+  if (!data.entries || !data.entries.length) {
+    return `<div style="text-align:center;padding:50px;color:#aaa">
+      <div style="font-size:40px;margin-bottom:12px">💰</div>
+      <div>${isAdmin ? 'Brokerage CSV upload karke Calculate karo' : 'Admin ne abhi commission calculate nahi kiya'}</div>
+    </div>`;
+  }
+
+  const isMyData = !isAdmin;
+  const myName = CU.name;
+  const entries = isAdmin ? data.entries : data.entries.filter(e => e.rmName === myName);
+
+  if (!entries.length) {
+    return `<div style="text-align:center;padding:40px;color:#aaa">Is month ka aapka commission data nahi mila.</div>`;
+  }
+
+  const grandTotal = entries.filter(e => data.verified[e.rmName]).reduce((a, e) => a + e.total, 0);
+  const allTotal = entries.reduce((a, e) => a + e.total, 0);
+
+  let html = '';
+
+  // Summary cards (admin only)
+  if (isAdmin) {
+    const verifiedCount = entries.filter(e => data.verified[e.rmName]).length;
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+      <div style="background:#E1F5EE;border-radius:8px;padding:14px;text-align:center;border:1px solid #9FE1CB">
+        <div style="font-size:20px;font-weight:700;color:#0F6E56">${commFmt(grandTotal)}</div>
+        <div style="font-size:11px;color:#666;margin-top:4px">Verified Total</div>
+      </div>
+      <div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:center;border:1px solid #eee">
+        <div style="font-size:20px;font-weight:700;color:#333">${commFmt(allTotal)}</div>
+        <div style="font-size:11px;color:#666;margin-top:4px">Calculated Total</div>
+      </div>
+      <div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:center;border:1px solid #eee">
+        <div style="font-size:20px;font-weight:700;color:#333">${verifiedCount} / ${entries.length}</div>
+        <div style="font-size:11px;color:#666;margin-top:4px">RMs Verified</div>
+      </div>
+    </div>`;
+  }
+
+  // Per-RM cards
+  entries.forEach(e => {
+    const isVerified = data.verified[e.rmName];
+    const bgColor = isVerified ? '#f0faf5' : '#fff';
+    const borderColor = isVerified ? '#1D9E75' : '#e0e0e0';
+
+    // For non-admin show only their own
+    if (!isAdmin && e.rmName !== myName) return;
+
+    html += `<div style="background:${bgColor};border-radius:12px;border:2px solid ${borderColor};padding:18px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div>
+          <span style="font-weight:700;font-size:16px;color:#0F2B5B">${e.rmName}</span>
+          <span style="font-size:12px;color:#888;margin-left:10px">Salary: ${commFmt(e.salary || 0)}/mo</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:18px;font-weight:700;color:${e.total > 0 ? '#0F6E56' : '#dc2626'}">${commFmt(e.total)}</div>
+          ${isAdmin ? `
+            <button onclick="toggleVerify('${monthKey}','${e.rmName}',${isVerified})"
+              style="padding:7px 16px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:700;
+              background:${isVerified ? '#FEE2E2' : '#0F6E56'};color:${isVerified ? '#dc2626' : '#fff'}">
+              ${isVerified ? '❌ Unverify' : '✅ Verify & Approve'}
+            </button>` : `
+            <span style="padding:5px 12px;border-radius:12px;font-size:11px;font-weight:700;
+              background:${isVerified ? '#D1FAE5' : '#FEF3C7'};color:${isVerified ? '#065F46' : '#92400E'}">
+              ${isVerified ? '✅ Approved' : '⏳ Pending Approval'}
+            </span>`}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px">
+        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
+          <div style="font-size:16px;font-weight:700;color:${e.eqComm > 0 ? '#0F6E56' : '#dc2626'}">${commFmt(e.eqComm)}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">Equity Commission</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
+          <div style="font-size:16px;font-weight:700;color:#0F6E56">${commFmt(e.mfComm || 0)}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">MF Commission</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
+          <div style="font-size:16px;font-weight:700;color:${e.goodAct > 0 ? '#0F6E56' : '#aaa'}">${commFmt(e.goodAct)}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">Good Activation (${e.active100} clients)</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #eee;text-align:center">
+          <div style="font-size:16px;font-weight:700;color:${e.dematBonus > 0 ? '#0F6E56' : '#aaa'}">${commFmt(e.dematBonus)}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">Demat Bonus (${e.qualDemat} acc)</div>
+        </div>
+      </div>
+
+      <div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:12px;color:#555;line-height:1.8">
+        <b>Equity:</b> ${e.eqNote || (e.salary ? 'No brokerage data' : 'Salary not set')}<br>
+        <b>MF New Business:</b> ${commFmt(e.mfNew || 0)} → 5% = ${commFmt(e.mfComm || 0)}<br>
+        <b>Good Activation:</b> ${e.active100} active clients ${e.active100 >= 50 ? '✅ (≥50 → ₹700)' : `❌ (Need ${50 - e.active100} more for ₹700)`}<br>
+        <b>Demat:</b> ${e.qualDemat} qualifying × ₹600${e.nonQualDemat ? ` | ${e.nonQualDemat} disqualified (brok <₹100)` : ''}
+      </div>
+    </div>`;
+  });
+
+  // Export button (admin only)
+  if (isAdmin && entries.length) {
+    html += `<div style="margin-top:8px">
+      <button class="btn btn-outline" onclick="exportCommissionXLSX('${monthKey}')">⬇️ Excel Export</button>
+    </div>`;
+  }
+
+  return html;
+}
+
+function exportCommissionXLSX(monthKey) {
+  const data = getCommissionData(monthKey);
+  if (!data.entries || !data.entries.length) { toast('Koi data nahi', 'error'); return; }
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ['RM', 'Salary', 'EQ Brokerage', 'Active 100+', 'Qual Demats', 'MF New Biz', 'EQ Commission', 'MF Commission', 'Good Activation', 'Demat Bonus', 'Total', 'Verified'],
+    ...data.entries.map(e => [e.rmName, e.salary||0, Math.round(e.eqBrok), e.active100, e.qualDemat, Math.round(e.mfNew||0), Math.round(e.eqComm), Math.round(e.mfComm||0), e.goodAct, e.dematBonus, Math.round(e.total), data.verified[e.rmName] ? 'Yes' : 'No'])
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Commission');
+  XLSX.writeFile(wb, `DN_Commission_${monthKey}.xlsx`);
+}
+
 </script>
 </body>
 </html>
