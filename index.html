@@ -741,6 +741,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <option value="add">New Client Added</option>
               <option value="edit">Client Edited</option>
               <option value="call">Call Logged</option>
+              <option value="call_update">Follow-up Updated (via Call)</option>
             </select>
           </div>
           <div class="form-field" style="min-width:140px">
@@ -3496,13 +3497,30 @@ async function saveCallLog(){
   const clients=DB.get(key)||[];
   const idx=clients.findIndex(x=>x.id===id);
   if(idx>=0){
-    const rm = clients[idx].rm; // preserve RM explicitly - never let it change here
+    const oldClient = clients[idx];
+    const rm = oldClient.rm;
+    // Track changes via call log
+    const callChanges = [];
+    if(nextCall && nextCall!==oldClient.next_call) callChanges.push({field:'next_call', old:oldClient.next_call||'—', new:nextCall});
+    if(fuStatus && fuStatus!==oldClient.followup_status) callChanges.push({field:'followup_status', old:oldClient.followup_status||'—', new:fuStatus});
+    if(note && note!==oldClient.remarks) callChanges.push({field:'remarks', old:oldClient.remarks||'—', new:note});
     clients[idx].last_call_date=date;
     clients[idx].next_call=nextCall;
     clients[idx].followup_status=fuStatus;
     if(note) clients[idx].remarks=note;
     clients[idx].rm = rm;
     await DB.setClient(key, clients[idx]);
+    // Save field changes to activity_logs too (so changes are visible in Activity Log)
+    if(callChanges.length>0){
+      const actLogs = DB.get('activity_logs')||[];
+      actLogs.unshift({
+        id: uid(), type: 'call_update', seg,
+        client_id: id, client_name: oldClient.name, rm,
+        by: CU.name, date: new Date().toISOString(),
+        changes: callChanges
+      });
+      DB.set('activity_logs', actLogs.slice(0,2000));
+    }
   }
   closeModal('callModal');
   toast('Call logged!','success');
@@ -5097,20 +5115,29 @@ function renderActivityLog(){
   const search = ((document.getElementById('al-search')||{value:''}).value||'').toLowerCase().trim();
 
   // Merge call_logs + activity_logs
-  const callLogs = (DB.get('call_logs')||[]).map(l=>({
-    id: l.id||uid(),
-    type: 'call',
-    seg: l.seg||'equity',
-    client_id: l.client_id,
-    client_name: l.client_name||l.name||'—',
-    rm: l.rm||'—',
-    by: l.by||l.rm||'—',
-    date: l.date||'',
-    changes: [],
-    call_status: l.status||'',
-    next_call: l.next_call||'',
-    remarks: l.remarks||''
-  }));
+  // Build client lookup map for enriching old call logs (which may lack rm/client_name)
+  const allEqClients = DB.get('eq_clients')||[];
+  const allMfClients = DB.get('mf_clients')||[];
+  const clientMap = new Map();
+  [...allEqClients,...allMfClients].forEach(c=>clientMap.set(c.id, c));
+
+  const callLogs = (DB.get('call_logs')||[]).map(l=>{
+    const c = clientMap.get(l.client_id)||{};
+    return {
+      id: l.id||uid(),
+      type: 'call',
+      seg: l.seg || (c.pan?'mf':'equity'),
+      client_id: l.client_id,
+      client_name: l.client_name||l.name||c.name||'—',
+      rm: l.rm||c.rm||'—',
+      by: l.by||l.rm||c.rm||'—',
+      date: l.date||'',
+      changes: [],
+      call_status: l.status||'',
+      next_call: l.next_call||'',
+      remarks: l.note||l.remarks||''
+    };
+  });
   const editLogs = DB.get('activity_logs')||[];
   let all = [...editLogs, ...callLogs].sort((a,b)=>b.date.localeCompare(a.date));
 
@@ -5120,15 +5147,19 @@ function renderActivityLog(){
     all = all.filter(l=>myRMs.includes((l.rm||'').trim().toUpperCase()));
   }
 
-  // Populate RM + By dropdowns
+  // Populate RM + By dropdowns (rebuild every time)
   const rmEl=document.getElementById('al-rm'), byEl=document.getElementById('al-by');
-  if(rmEl && rmEl.options.length<=1){
-    const rms=[...new Set(all.map(l=>l.rm).filter(Boolean))].sort();
-    rms.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; rmEl.appendChild(o); });
+  if(rmEl){
+    const prevRm=rmEl.value;
+    rmEl.innerHTML='<option value="">All RMs</option>';
+    const rms=[...new Set(all.map(l=>l.rm).filter(r=>r&&r!=='—'))].sort();
+    rms.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; if(r===prevRm) o.selected=true; rmEl.appendChild(o); });
   }
-  if(byEl && byEl.options.length<=1){
-    const bys=[...new Set(all.map(l=>l.by).filter(Boolean))].sort();
-    bys.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; byEl.appendChild(o); });
+  if(byEl){
+    const prevBy=byEl.value;
+    byEl.innerHTML='<option value="">All Users</option>';
+    const bys=[...new Set(all.map(l=>l.by).filter(b=>b&&b!=='—'))].sort();
+    bys.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; if(b===prevBy) o.selected=true; byEl.appendChild(o); });
   }
 
   // Apply filters
@@ -5146,9 +5177,9 @@ function renderActivityLog(){
   const tbl=document.getElementById('al-table');
   if(!tbl) return;
 
-  const typeLabel={add:'✅ New Client',edit:'✏️ Edited',call:'📞 Call Log'};
-  const typeBg={add:'#d1fae5',edit:'#fef3c7',call:'#e0f2fe'};
-  const typeColor={add:'#065f46',edit:'#92400e',call:'#0369a1'};
+  const typeLabel={add:'✅ New Client',edit:'✏️ Edited',call:'📞 Call Log',call_update:'📞 Follow-up Updated'};
+  const typeBg={add:'#d1fae5',edit:'#fef3c7',call:'#e0f2fe',call_update:'#f0e6ff'};
+  const typeColor={add:'#065f46',edit:'#92400e',call:'#0369a1',call_update:'#6d28d9'};
 
   if(!all.length){
     tbl.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray)">Koi log nahi mila. Filters reset karein.</td></tr>`;
