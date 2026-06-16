@@ -2506,18 +2506,14 @@ async function convertLead(id,seg){
   const key=seg==='equity'?'eq_clients':'mf_clients';
   const clients=DB.get(key)||[];
 
-  // Duplicate check by mobile / PAN / code
-  if(lead.mobile){
-    const dup=clients.find(c=>c.mobile && c.mobile.trim()===lead.mobile.trim());
-    if(dup){ toast(`⚠️ Already exists as ${label}: "${dup.name}" (${dup.mobile||''})`,'error'); return; }
-  }
+  // Duplicate check - MF: PAN se, Equity: Client Code se
   if(seg==='mf' && pan){
     const dupPan=clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
-    if(dupPan){ toast(`⚠️ Already exists as ${label}: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+    if(dupPan){ toast(`⚠️ Already exists as MF Investor: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
   }
   if(seg==='equity' && clientCode){
     const dupCode=clients.find(c=>c.code && c.code.trim().toUpperCase()===clientCode);
-    if(dupCode){ toast(`⚠️ Already exists as ${label}: "${dupCode.name}" (Code: ${dupCode.code})`,'error'); return; }
+    if(dupCode){ toast(`⚠️ Already exists as Equity Client: "${dupCode.name}" (Code: ${dupCode.code})`,'error'); return; }
   }
 
   let newId=uid();
@@ -3264,21 +3260,48 @@ async function saveClient(){
 
   const gv2 = id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
 
-  // Duplicate check (mobile / PAN) - only when adding a NEW record (not editing)
+  // Duplicate check - MF: PAN se, Equity: Client Code se (mobile same ho sakta hai family accounts me)
   if(!currentEditId){
-    const mobile = gv2('f_mobile');
-    const pan = seg==='mf' ? (gv2('f_pan')||'') : '';
-    let dup=null;
-    if(mobile){
-      dup = clients.find(c=>c.mobile && c.mobile.trim()===mobile);
+    if(seg==='mf'){
+      const pan = gv2('f_pan').toUpperCase();
+      if(pan){
+        const dup = clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
+        if(dup){
+          toast(`⚠️ MF Investor already exists: "${dup.name}" (PAN: ${dup.pan}) - RM: ${dup.rm||'—'}`,'error');
+          return;
+        }
+      }
+    } else {
+      // Equity - Client Code se check (agar code diya ho)
+      const code = gv2('f_code').toUpperCase();
+      if(code){
+        const dup = clients.find(c=>c.code && c.code.trim().toUpperCase()===code);
+        if(dup){
+          toast(`⚠️ Equity Client already exists: "${dup.name}" (Code: ${dup.code}) - RM: ${dup.rm||'—'}`,'error');
+          return;
+        }
+      }
     }
-    if(!dup && pan){
-      dup = clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan.toUpperCase());
-    }
-    if(dup){
-      const label = seg==='equity'?'Client':'Investor';
-      toast(`⚠️ ${label} already exists: "${dup.name}" (${dup.mobile||dup.pan||''}) - RM: ${dup.rm||'—'}`,'error');
-      return;
+  } else {
+    // Edit mode - same check but exclude current client
+    if(seg==='mf'){
+      const pan = gv2('f_pan').toUpperCase();
+      if(pan){
+        const dup = clients.find(c=>c.id!==currentEditId && c.pan && c.pan.trim().toUpperCase()===pan);
+        if(dup){
+          toast(`⚠️ Yeh PAN already exists: "${dup.name}" (PAN: ${dup.pan}) - RM: ${dup.rm||'—'}`,'error');
+          return;
+        }
+      }
+    } else {
+      const code = gv2('f_code').toUpperCase();
+      if(code){
+        const dup = clients.find(c=>c.id!==currentEditId && c.code && c.code.trim().toUpperCase()===code);
+        if(dup){
+          toast(`⚠️ Yeh Client Code already exists: "${dup.name}" (Code: ${dup.code}) - RM: ${dup.rm||'—'}`,'error');
+          return;
+        }
+      }
     }
   }
 
@@ -4785,12 +4808,12 @@ function openEqImportModal(){
   document.getElementById('eq-file').value='';
   if(CU.role!=='admin'){
     document.getElementById('eqImportDesc1').innerHTML =
-      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to naya client <b>aapke naam (${CU.name}) ke RM</b> ke saath add ho jayega.`;
+      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> se hoga (mobile se nahi — family accounts me same mobile ho sakta hai) — match mila to existing client update hoga, match nahi mila to naya client <b>aapke naam (${CU.name}) ke RM</b> ke saath add ho jayega.`;
     document.getElementById('eqImportDesc2').innerHTML =
       `Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)`;
   } else {
     document.getElementById('eqImportDesc1').innerHTML =
-      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega.`;
+      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> se hoga (mobile se nahi — family accounts me same mobile ho sakta hai) — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega.`;
     document.getElementById('eqImportDesc2').innerHTML =
       `Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (naye clients ke liye zaroori), <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)`;
   }
@@ -4871,10 +4894,10 @@ function handleEqFile(input){
 async function doEqImport(){
   if(!eqImportData || !eqImportData.length) return;
   const existing = DB.get('eq_clients')||[];
-  const byCode = {}, byMobile = {};
+  const byCode = {}, byName = {};
   existing.forEach(c=>{
-    if(c.code) byCode[String(c.code).trim()] = c;
-    if(c.mobile) byMobile[String(c.mobile).trim()] = c;
+    if(c.code) byCode[String(c.code).trim().toUpperCase()] = c;
+    if(c.name) byName[String(c.name).trim().toUpperCase()] = c;
   });
   // ids already used (to avoid collision with new uids)
   const usedIds = new Set(existing.map(c=>c.id));
@@ -4882,7 +4905,8 @@ async function doEqImport(){
   let updated=0, added=0, skipped=0;
   const touched = [];
   eqImportData.forEach(row=>{
-    let ex = (row.code && byCode[row.code]) || (row.mobile && byMobile[row.mobile]);
+    // Match by Client Code first, then by Name (mobile match removed - family accounts me same mobile hota hai)
+    let ex = (row.code && byCode[String(row.code).trim().toUpperCase()]) || (row.name && byName[String(row.name).trim().toUpperCase()]);
     if(ex){
       if(row.asset_value!==null) ex.asset_value = row.asset_value;
       if(row.last_trade_date) ex.last_trade_date = row.last_trade_date;
