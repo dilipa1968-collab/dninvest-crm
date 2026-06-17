@@ -387,8 +387,8 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="form-group"><label>Username</label>
       <input type="text" id="lusr" placeholder="Enter username" autocomplete="off">
     </div>
-    <div class="form-group"><label>Password</label>
-      <input type="password" id="lpwd" placeholder="Enter password">
+    <div class="form-group"><label>Password / PIN</label>
+      <input type="password" id="lpwd" placeholder="Enter password or 4-digit PIN" inputmode="numeric">
     </div>
     <button class="login-btn" onclick="doLogin()">Sign In →</button>
     <div class="login-err" id="lerr">Invalid username or password</div>
@@ -1502,7 +1502,13 @@ async function doLogin(){
     try{ await DB.syncFromFirebase(); }catch(e){}
   }
   const users = DB.get('users') || DEFAULT_USERS;
-  const user = users.find(x=>x.username===u && x.password===p && x.active!==false);
+  // RM can login with PIN (4-digit) OR password; Admin uses password only
+  const user = users.find(x=>{
+    if(x.username!==u || x.active===false) return false;
+    if(x.password===p) return true;
+    if(x.role==='rm' && x.pin && x.pin===p) return true;
+    return false;
+  });
   if(user){
     CU = user;
     sessionStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p}));
@@ -4368,6 +4374,7 @@ function renderAdmin(){
         <div class="user-role">@${u.username} · ${u.role}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
+        ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
         <div class="user-segs">${(u.segments||[]).map(s=>`<span class="badge ${s==='equity'?'b-eq':'b-mf'}">${s==='equity'?'Equity':'MF'}</span>`).join('')}</div>
       </div>
       <div style="display:flex;gap:6px">
@@ -4406,10 +4413,14 @@ function userForm(u){
       <div class="form-field"><label>Password *</label><input id="uf_pwd" type="password" placeholder="${u?'Leave blank to keep current':'Enter password'}"></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Role</label><select id="uf_role">
+      <div class="form-field"><label>Role</label><select id="uf_role" onchange="togglePinField(this)">
         <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
         <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
       </select></div>
+      <div class="form-field" id="uf_pin_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
+        <label>4-Digit PIN (RM only)</label>
+        <input id="uf_pin" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" value="" placeholder="${u?'Leave blank to keep current':'Enter 4-digit PIN'}">
+      </div>
     </div>
     <div class="form-field"><label>Segments Access</label>
       <div style="display:flex;gap:12px;margin-top:6px">
@@ -4428,6 +4439,10 @@ function saveUser(){
   const uname=document.getElementById('uf_uname').value.trim().toLowerCase();
   const pwd=document.getElementById('uf_pwd').value;
   const role=document.getElementById('uf_role').value;
+  const pinVal=document.getElementById('uf_pin')?.value||'';
+  if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
+    toast('PIN 4 digit ka hona chahiye (0-9)','error'); return;
+  }
   const segs=[];
   if(document.getElementById('uf_eq').checked) segs.push('equity');
   if(document.getElementById('uf_mf').checked) segs.push('mf');
@@ -4443,13 +4458,16 @@ function saveUser(){
       const eml=document.getElementById('uf_email').value.trim();
       users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml};
       if(pwd) users[idx].password=pwd;
+      if(role==='rm' && pinVal) users[idx].pin=pinVal;
     }
   } else {
     if(!pwd){ toast('Password required for new user','error'); return; }
     if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
     const mob2=document.getElementById('uf_mobile').value.trim();
     const eml2=document.getElementById('uf_email').value.trim();
-    users.push({id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true});
+    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true};
+    if(role==='rm' && pinVal) newUser.pin=pinVal;
+    users.push(newUser);
   }
   DB.set('users',users);
   closeModal('userModal');
@@ -4873,6 +4891,13 @@ function showRmReplyNotif(msg){
     };
   }
   popup.classList.add('open');
+}
+
+
+function togglePinField(sel){
+  const wrap = document.getElementById('uf_pin_wrap');
+  if(!wrap) return;
+  wrap.style.display = sel.value==='rm' ? '' : 'none';
 }
 
 
