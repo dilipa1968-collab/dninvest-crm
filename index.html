@@ -2291,8 +2291,9 @@ function renderEqTable(){
   const lastTradeDate=(document.getElementById('eq-last-trade-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
-  if(st==='DNC') data=data.filter(c=>c.do_not_call);
-  else if(st) data=data.filter(c=>c.status===st);
+  if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
+  else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
+  else data=data.filter(c=>!c.do_not_call); // default: DNC hide
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
@@ -2423,8 +2424,9 @@ function renderMfTable(){
   const lastCallDate=(document.getElementById('mf-last-call-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
-  if(st==='DNC') data=data.filter(c=>c.do_not_call);
-  else if(st) data=data.filter(c=>c.status===st);
+  if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
+  else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
+  else data=data.filter(c=>!c.do_not_call); // default: DNC hide
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
