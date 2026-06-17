@@ -3769,9 +3769,9 @@ function renderFollowup(group){
       <td><span class="badge ${c.followup_status==='Done'?'b-done':'b-pending'}">${c.followup_status||'—'}</span></td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${c.remarks||'—'}</td>
       <td>
+        <button class="btn-icon" onclick="editClient('${c.id}','${seg==='equity'?'equity':'mf'}')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="logCall('${c.id}','${seg}')" title="Log Call">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
-        <button class="btn-icon" onclick="editClient('${c.id}','${seg==='equity'?'equity':'mf'}')" title="Edit">✏️</button>
       </td></tr>`;
   });
   h+='</tbody></table></div></div>';
