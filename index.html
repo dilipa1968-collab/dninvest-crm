@@ -584,7 +584,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="filters" id="eq-filters">
           <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search">
           <select onchange="filterEq()" id="eq-status"><option value="">All Status</option>
-            <option>Active</option><option>Inactive</option><option>Closed</option></select>
+            <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
@@ -672,7 +672,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="filters">
           <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search">
           <select onchange="filterMf()" id="mf-status"><option value="">All Status</option>
-            <option>Investor</option><option>Prospect</option></select>
+            <option>Investor</option><option>Prospect</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
@@ -2166,7 +2166,8 @@ function renderEqTable(){
   const lastTradeDate=(document.getElementById('eq-last-trade-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
-  if(st) data=data.filter(c=>c.status===st);
+  if(st==='DNC') data=data.filter(c=>c.do_not_call);
+  else if(st) data=data.filter(c=>c.status===st);
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
@@ -2297,7 +2298,8 @@ function renderMfTable(){
   const lastCallDate=(document.getElementById('mf-last-call-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
-  if(st) data=data.filter(c=>c.status===st);
+  if(st==='DNC') data=data.filter(c=>c.do_not_call);
+  else if(st) data=data.filter(c=>c.status===st);
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
@@ -4045,6 +4047,7 @@ function renderReports(){
     {icon:'📞',title:'Follow-up Pending',desc:'Clients with pending follow-ups',fn:'fuPendingEq'},
     {icon:'💰',title:'Revenue Report',desc:'RM-wise brokerage/revenue',fn:'revenueReport'},
     {icon:'🆕',title:'New Business — Demat Accounts',desc:'Lead se convert hue Demat accounts (month-wise)',fn:'eqNewBusinessReport'},
+    {icon:'🚫',title:'DNC List — Equity',desc:'Do Not Call clients (Equity)',fn:'()=>showDncReport("equity")'},
   ];
   const mfCards=[
     {icon:'🏦',title:'RM-wise Investor List',desc:'Investors grouped by MF RM',fn:'rmMfReport'},
@@ -4053,6 +4056,7 @@ function renderReports(){
     {icon:'🧲',title:'Investor vs Prospect',desc:'Status breakdown',fn:'statusMfReport'},
     {icon:'📞',title:'MF Follow-up Pending',desc:'MF clients with pending calls',fn:'fuPendingMf'},
     {icon:'💼',title:'New Business (Month-wise)',desc:'Lumpsum/SIP/Switch/Resumption entries by month',fn:'newBusinessMonthlyReport'},
+    {icon:'🚫',title:'DNC List — MF',desc:'Do Not Call investors (MF)',fn:'()=>showDncReport("mf")'},
   ];
   const coCards=[
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
@@ -4869,6 +4873,22 @@ function toggleDNC(cb){
   } else {
     dateInput.disabled = false;
   }
+}
+
+
+function showDncReport(seg){
+  const data = seg==='equity'
+    ? (DB.get('eq_clients')||[]).filter(c=>c.do_not_call)
+    : (DB.get('mf_clients')||[]).filter(c=>c.do_not_call);
+  if(!data.length){ toast('Koi DNC client nahi mila','info'); return; }
+  const cols = seg==='equity'
+    ? ['Code','Name','Mobile','RM','Follow-up','Remarks']
+    : ['Name','Mobile','PAN','RM','AUM','Follow-up','Remarks'];
+  const rows = data.map(c=> seg==='equity'
+    ? [c.code||'—', c.name, c.mobile||'—', c.rm||'—', c.followup_status||'—', c.remarks||'—']
+    : [c.name, c.mobile||'—', c.pan||'—', c.rm||'—', c.aum?'₹'+fmtNum(c.aum):'—', c.followup_status||'—', c.remarks||'—']
+  );
+  showReport('🚫 DNC Clients — '+(seg==='equity'?'Equity':'MF')+' ('+data.length+')', cols, rows);
 }
 
 
