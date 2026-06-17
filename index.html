@@ -2111,10 +2111,23 @@ function applySort(data, tableKey, getters){
       va=va||''; vb=vb||'';
       if(!va && !vb) return 0;
       if(!va) return 1; if(!vb) return -1;
-      // Parse properly — handles YYYY-MM-DD, DD-MMM-YY, DD-MMM-YYYY etc.
-      const da = new Date(va), db = new Date(vb);
-      const ta = isNaN(da)?0:da.getTime(), tb = isNaN(db)?0:db.getTime();
-      return st.dir*(ta-tb);
+      // Robust date parse — YYYY-MM-DD preferred, also handles DD-MMM-YY/YYYY
+      function parseD(s){
+        if(!s) return 0;
+        // YYYY-MM-DD (standard storage format)
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if(iso) return new Date(+iso[1], +iso[2]-1, +iso[3]).getTime();
+        // DD-MMM-YY or DD-MMM-YYYY (e.g. 3-Jun-26 or 3-Jun-2026)
+        const mn2={'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11};
+        const dmy = s.match(/^(\d{1,2})[-\/]([a-zA-Z]{3})[-\/](\d{2,4})$/);
+        if(dmy){
+          let yr = +dmy[3];
+          if(yr < 100) yr += yr < 50 ? 2000 : 1900;
+          return new Date(yr, mn2[dmy[2].toLowerCase()]||0, +dmy[1]).getTime();
+        }
+        return new Date(s).getTime()||0;
+      }
+      return st.dir*(parseD(va)-parseD(vb));
     }
     va=(va==null?'':va).toString().toLowerCase(); vb=(vb==null?'':vb).toString().toLowerCase();
     return st.dir*va.localeCompare(vb, undefined, {numeric:true});
