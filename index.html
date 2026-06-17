@@ -248,6 +248,21 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
   border-radius:50%;width:24px;height:24px;font-size:.9rem;cursor:pointer;line-height:1;}
 .ann-meta{font-size:.78rem;color:var(--gray);margin-top:10px;}
 #announcementPopup .modal{width:480px;}
+/* Two-way messaging */
+.msg-bubble{padding:10px 14px;border-radius:14px;max-width:85%;font-size:.88rem;line-height:1.45;word-break:break-word;}
+.msg-bubble.sent{background:var(--gold);color:var(--navy);align-self:flex-end;border-bottom-right-radius:4px;}
+.msg-bubble.recv{background:var(--navy);color:#fff;align-self:flex-start;border-bottom-left-radius:4px;}
+.msg-meta{font-size:.72rem;margin-top:4px;opacity:.7;}
+.msg-wrap{display:flex;flex-direction:column;}
+.msg-wrap.sent{align-items:flex-end;}
+.msg-wrap.recv{align-items:flex-start;}
+.inbox-thread{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff;}
+.inbox-thread .thread-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.inbox-thread .rm-name{font-weight:600;color:var(--navy);font-size:.88rem;}
+.inbox-thread .thread-msgs{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;padding-right:2px;}
+.inbox-thread .reply-row{display:flex;gap:8px;margin-top:10px;}
+.inbox-thread .reply-row input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:.85rem;}
+.unread-dot{width:9px;height:9px;border-radius:50%;background:var(--red);display:inline-block;margin-left:6px;}
 #announcementPopup .modal-body{padding:22px;text-align:center;}
 #announcementPopup .ann-pop-img{max-width:100%;max-height:320px;border-radius:10px;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto;}
 #announcementPopup .ann-pop-text{font-size:.95rem;color:var(--navy);white-space:pre-wrap;text-align:left;line-height:1.5;}
@@ -1371,7 +1386,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -1568,6 +1583,8 @@ function initApp(){
       if(getCurrentPageId()==='eq-clients') renderEqTable();
       if(getCurrentPageId()==='mf-clients') renderMfTable();
       checkAnnouncement();
+      updateMsgBadge();
+      checkRmReply();
 
       // Real-time listener for announcements (single object, not array)
       fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
@@ -1579,6 +1596,21 @@ function initApp(){
             console.log('Real-time update: announcement');
             if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
             checkAnnouncement();
+          }
+        }
+      });
+
+      // Real-time listener for rm_messages (two-way messaging)
+      fdb.collection('crm_data').doc('rm_messages').onSnapshot(doc=>{
+        if(doc.exists && doc.data() && doc.data().data){
+          const newData = doc.data().data;
+          const existing = JSON.parse(localStorage.getItem('dninvest_rm_messages')||'[]');
+          if(JSON.stringify(newData) !== JSON.stringify(existing)){
+            localStorage.setItem('dninvest_rm_messages', JSON.stringify(newData));
+            console.log('Real-time update: rm_messages');
+            updateMsgBadge();
+            if(getCurrentPageId()==='admin') renderInbox();
+            checkRmReply();
           }
         }
       });
@@ -1630,7 +1662,7 @@ function initApp(){
           }
         });
       });
-    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); });
+    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); updateMsgBadge(); });
   } else {
     DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement();
   }
@@ -1662,6 +1694,11 @@ function initApp(){
   if(adminSec) adminSec.style.display=CU.role==='admin'?'':'none';
   const adminNav=document.getElementById('nav-admin');
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
+
+  // Messages nav — only for RMs (not admin)
+  const msgNav = document.getElementById('nav-rm-messages');
+  if(msgNav) msgNav.style.display = CU.role!=='admin' ? 'flex' : 'none';
+  updateMsgBadge();
 
   // Bulk Excel import is admin-only
   const eqImportBtn=document.getElementById('eqImportBtn');
@@ -1763,6 +1800,7 @@ function showPage(id){
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
   else if(id==='admin') renderAdmin();
+  else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
 
   closeSidebar();
@@ -4213,6 +4251,7 @@ function exportCSV(seg){
 function renderAdmin(){
   const users=DB.get('users')||[];
   renderAnnouncementAdmin();
+  renderInbox();
   let h=users.map(u=>`
     <div class="user-card">
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
@@ -4469,6 +4508,135 @@ function closeAnnouncementPopup(){
   if(id && CU){ localStorage.setItem('dninvest_ann_seen_' + CU.username, id); }
   el.classList.remove('open');
 }
+
+// ══════════════════════════════════════════
+// TWO-WAY RM <-> ADMIN MESSAGING
+// ══════════════════════════════════════════
+
+// Structure: rm_messages = array of threads
+// thread = { id, rmUsername, rmName, messages: [{id, from, fromName, text, date, isAdmin}] }
+
+function getRmMessages(){ return DB.get('rm_messages') || []; }
+
+function getMyThread(){
+  if(!CU) return null;
+  const threads = getRmMessages();
+  return threads.find(t => t.rmUsername === CU.username) || null;
+}
+
+function updateMsgBadge(){
+  if(!CU || CU.role === 'admin') return;
+  const thread = getMyThread();
+  const seenKey = 'dninvest_msg_seen_' + CU.username;
+  const lastSeen = localStorage.getItem(seenKey) || '';
+  let unread = 0;
+  if(thread){
+    thread.messages.forEach(m => {
+      if(m.isAdmin && m.id > lastSeen) unread++;
+    });
+  }
+  const badge = document.getElementById('nb-msg');
+  if(badge){
+    badge.textContent = unread;
+    badge.style.display = unread > 0 ? '' : 'none';
+  }
+}
+
+function sendRmMessage(){
+  if(!CU || CU.role === 'admin') return;
+  const text = (document.getElementById('rm-msg-text').value || '').trim();
+  if(!text){ toast('Message likhein', 'error'); return; }
+  const threads = getRmMessages();
+  let thread = threads.find(t => t.rmUsername === CU.username);
+  const msgId = uid();
+  const newMsg = { id: msgId, from: CU.username, fromName: CU.name, text, date: new Date().toISOString(), isAdmin: false };
+  if(thread){
+    thread.messages.push(newMsg);
+  } else {
+    thread = { id: uid(), rmUsername: CU.username, rmName: CU.name, messages: [newMsg] };
+    threads.push(thread);
+  }
+  DB.set('rm_messages', threads);
+  document.getElementById('rm-msg-text').value = '';
+  toast('Message sent to Admin ✓', 'success');
+  renderRmMessages();
+}
+
+function adminReplyToRm(rmUsername){
+  const inp = document.getElementById('admin-reply-' + rmUsername);
+  const text = (inp ? inp.value : '').trim();
+  if(!text){ toast('Reply likhein', 'error'); return; }
+  const threads = getRmMessages();
+  const thread = threads.find(t => t.rmUsername === rmUsername);
+  if(!thread){ toast('Thread not found', 'error'); return; }
+  const newMsg = { id: uid(), from: CU.username, fromName: CU.name, text, date: new Date().toISOString(), isAdmin: true };
+  thread.messages.push(newMsg);
+  DB.set('rm_messages', threads);
+  if(inp) inp.value = '';
+  toast('Reply sent ✓', 'success');
+  renderInbox();
+}
+
+function renderRmMessages(){
+  const thread = getMyThread();
+  const seenKey = 'dninvest_msg_seen_' + CU.username;
+  // Mark all admin messages as seen
+  if(thread){
+    const lastMsg = thread.messages.filter(m=>m.isAdmin).slice(-1)[0];
+    if(lastMsg) localStorage.setItem(seenKey, lastMsg.id);
+  }
+  updateMsgBadge();
+  const el = document.getElementById('rm-conversation');
+  if(!el) return;
+  if(!thread || !thread.messages.length){
+    el.innerHTML = '<em style="color:var(--gray);font-size:.85rem">Abhi koi message nahi hai. Admin ko message karein.</em>';
+    return;
+  }
+  el.innerHTML = thread.messages.map(m => {
+    const side = m.isAdmin ? 'recv' : 'sent';
+    const label = m.isAdmin ? '🔴 Admin' : '🟢 You';
+    return `<div class="msg-wrap ${side}">
+      <div class="msg-bubble ${side}">${escapeHtml(m.text).replace(/\n/g,'<br>')}</div>
+      <div class="msg-meta">${label} · ${fmtDate(m.date)}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderInbox(){
+  const el = document.getElementById('admin-inbox-list');
+  const card = document.getElementById('admin-inbox-card');
+  if(!el || !card) return;
+  card.style.display = '';
+  const threads = getRmMessages();
+  if(!threads.length){
+    el.innerHTML = '<em style="color:var(--gray)">No messages from RMs yet.</em>';
+    return;
+  }
+  el.innerHTML = threads.map(t => {
+    const msgs = t.messages || [];
+    const hasUnread = msgs.some(m => !m.isAdmin);
+    const msgsHtml = msgs.map(m => {
+      const side = m.isAdmin ? 'sent' : 'recv';
+      const label = m.isAdmin ? '🔴 Admin' : `🟢 ${m.fromName}`;
+      return `<div class="msg-wrap ${side}">
+        <div class="msg-bubble ${side}">${escapeHtml(m.text).replace(/\n/g,'<br>')}</div>
+        <div class="msg-meta">${label} · ${fmtDate(m.date)}</div>
+      </div>`;
+    }).join('');
+    return `<div class="inbox-thread">
+      <div class="thread-hdr">
+        <span class="rm-name">👤 ${t.rmName} <span style="font-size:.75rem;color:var(--gray)">(@${t.rmUsername})</span>${hasUnread?'<span class="unread-dot"></span>':''}</span>
+      </div>
+      <div class="thread-msgs">${msgsHtml}</div>
+      <div class="reply-row">
+        <input type="text" id="admin-reply-${t.rmUsername}" placeholder="Reply to ${t.rmName}..." onkeydown="if(event.key==='Enter')adminReplyToRm('${t.rmUsername}')">
+        <button class="btn btn-primary" style="padding:7px 14px;font-size:.82rem" onclick="adminReplyToRm('${t.rmUsername}')">Reply</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 
 function escapeHtml(str){
   const d = document.createElement('div');
