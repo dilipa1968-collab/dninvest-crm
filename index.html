@@ -2483,7 +2483,7 @@ function leadForm(c){
   </div>
   <div class="form-section">Follow-up</div>
   <div class="form-row three">
-    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}"></div>
+    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}"></div>
     <div class="form-field"><label>Follow-up Status</label><select id="l_followup">
       <option value="">—</option>
       <option ${c?.followup_status==='Pending'?'selected':''}>Pending</option>
@@ -3289,7 +3289,7 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field">
         <label>Next Calling Date</label>
-        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" ${c?.do_not_call?'disabled':''}>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}" ${c?.do_not_call?'disabled':''}>
         <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
           <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
           🚫 Do Not Call
@@ -3336,7 +3336,7 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field">
         <label>Next Calling Date</label>
-        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" ${c?.do_not_call?'disabled':''}>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}" ${c?.do_not_call?'disabled':''}>
         <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
           <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
           🚫 Do Not Call
