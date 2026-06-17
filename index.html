@@ -1134,7 +1134,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <button class="modal-close" onclick="closeModal('reportModal')">×</button>
     </div>
     <div class="modal-body" id="reportModalBody"></div>
-    <div id="brok-upload-bar" style="display:none;padding:10px 24px;border-top:1px solid var(--border);background:#f8faff;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+    <div id="brok-upload-bar" style="display:none;padding:10px 24px;border-top:1px solid var(--border);background:#f8faff;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:700;color:#0F2B5B;white-space:nowrap">📂 Brokerage File:</span>
       <input type="file" id="brok-csv-input" accept=".csv,.txt"
         style="font-size:12px;padding:5px 8px;border:1.5px solid #BFDBFE;border-radius:6px;background:#fff;flex:1;min-width:160px"
@@ -3928,6 +3928,9 @@ function showReport(title, headers, rows){
   _reportSort = {col:null, dir:1};
   document.getElementById('reportModalTitle').textContent=title;
   renderReportTable();
+  // Hide brokerage bar by default — rmEqReport will show it
+  const bbar = document.getElementById('brok-upload-bar');
+  if(bbar) bbar.style.display='none';
   document.getElementById('reportModal').classList.add('open');
 }
 
@@ -4011,7 +4014,7 @@ function rmEqReport(){
 
   // Show/hide upload bar
   const bar = document.getElementById('brok-upload-bar');
-  if(bar) bar.style.display='flex';
+  if(bar){ bar.style.display='flex'; }
 
   if(_brokLoaded){
     // Headers with brokerage columns
@@ -4072,7 +4075,7 @@ function rmEqReport(){
     // Show upload bar after modal opens
     setTimeout(()=>{
       const bar=document.getElementById('brok-upload-bar');
-      if(bar) bar.style.display='flex';
+      if(bar){ bar.style.display='flex'; }
     },50);
   }
 }
