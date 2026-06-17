@@ -1749,7 +1749,21 @@ function initApp(){
             if(JSON.stringify(newData) !== JSON.stringify(existing)){
               localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
               console.log('Real-time update:', key);
-              if(key==='users'){ populateRmDropdowns(); if(getCurrentPageId()==='admin') renderAdmin(); }
+              if(key==='users'){
+                populateRmDropdowns();
+                if(getCurrentPageId()==='admin') renderAdmin();
+                // Refresh current page if RM got temp access granted
+                else if(CU.role!=='admin'){
+                  const pg = getCurrentPageId();
+                  if(pg==='eq-clients') renderEqTable();
+                  else if(pg==='mf-clients') renderMfTable();
+                  else if(pg==='eq-followup') renderFollowup('eqf');
+                  else if(pg==='mf-followup') renderFollowup('mff');
+                  else if(pg==='eq-nocall') renderNoCall('equity');
+                  else if(pg==='mf-nocall') renderNoCall('mf');
+                  else if(pg==='dashboard') refreshDash();
+                }
+              }
               refreshDash(); updateBadges();
             }
           }
@@ -1848,12 +1862,13 @@ function initApp(){
 }
 
 function getTempAccessDealers(seg){
-  // Check if current user has temp access granted for today
+  // Always fetch fresh from DB (not CU, which may be stale)
   const users = DB.get('users')||[];
   const me = users.find(u=>u.id===CU.id);
-  if(!me || !me.tempAccess) return [];
+  if(!me || !me.tempAccess || !me.tempAccess.length) return [];
   const today = new Date().toISOString().split('T')[0];
-  const valid = (me.tempAccess||[]).filter(t=>t.expiry===today);
+  const valid = me.tempAccess.filter(t=>t.expiry===today);
+  if(!valid.length) return [];
   const extraDealers = [];
   valid.forEach(t=>{
     const absentUser = users.find(u=>u.id===t.absentUserId);
@@ -4397,12 +4412,7 @@ function eqNewBusinessReport(){
   const entries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
   const isAdmin = CU && CU.role==='admin';
 
-  const myNames = isAdmin ? null : [CU.name, ...(()=>{
-    const users=DB.get('users')||[], today=new Date().toISOString().split('T')[0];
-    const ta=(CU.tempAccess||[]).filter(t=>t.expiry===today);
-    return ta.map(t=>(users.find(u=>u.id===t.absentUserId)||{}).name||'').filter(Boolean);
-  })()].map(n=>n.toLowerCase());
-  const filtered = isAdmin ? entries : entries.filter(e=>myNames.includes((e.rm||'').toLowerCase()));
+  const filtered = isAdmin ? entries : entries.filter(e=>(e.rm||'').toLowerCase()===(CU.name||'').toLowerCase());
 
   if(!filtered.length){
     toast('Koi Demat account entry nahi mili. Leads convert karein.','error');
