@@ -501,6 +501,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="sidebar-section" id="admin-nav-section">Admin</div>
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Users & Settings
+        <span class="badge" id="admin-inbox-badge-nav" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
       </div>
 
       <!-- RM: Message Admin button (hidden for admin) -->
@@ -4558,7 +4559,25 @@ function getMyThread(){
 }
 
 function updateMsgBadge(){
-  if(!CU || CU.role === 'admin') return;
+  if(!CU) return;
+  if(CU.role === 'admin'){
+    // Admin: count unread RM messages (not yet seen)
+    const threads = getRmMessages();
+    const seenKey = 'dninvest_admin_msg_seen';
+    const lastSeen = localStorage.getItem(seenKey) || '';
+    let unread = 0;
+    threads.forEach(t => {
+      (t.messages||[]).forEach(m => {
+        if(!m.isAdmin && m.id > lastSeen) unread++;
+      });
+    });
+    const badge = document.getElementById('admin-inbox-badge-nav');
+    if(badge){ badge.textContent = unread; badge.style.display = unread > 0 ? '' : 'none'; }
+    const inboxBadge = document.getElementById('inbox-unread-badge');
+    if(inboxBadge){ inboxBadge.style.display = unread > 0 ? '' : 'none'; }
+    return;
+  }
+  // RM: count unread admin replies
   const thread = getMyThread();
   const seenKey = 'dninvest_msg_seen_' + CU.username;
   const lastSeen = localStorage.getItem(seenKey) || '';
@@ -4689,16 +4708,59 @@ function closeMsgPopup(){
 
 // Check if admin has replied to this RM — show popup notification
 function checkRmReply(){
-  if(!CU || CU.role==='admin') return;
+  if(!CU) return;
+  if(CU.role==='admin'){
+    // Admin: check for new RM messages
+    const threads = getRmMessages();
+    const seenKey = 'dninvest_admin_msg_seen';
+    const lastSeen = localStorage.getItem(seenKey) || '';
+    let newMsgs = [];
+    threads.forEach(t => {
+      (t.messages||[]).forEach(m => {
+        if(!m.isAdmin && m.id > lastSeen) newMsgs.push({...m, rmName: t.rmName});
+      });
+    });
+    if(!newMsgs.length) return;
+    const last = newMsgs[newMsgs.length-1];
+    showAdminMsgNotif(last);
+    return;
+  }
+  // RM: check for new admin replies
   const thread = getMyThread();
   if(!thread) return;
   const seenKey = 'dninvest_msg_seen_' + CU.username;
   const lastSeen = localStorage.getItem(seenKey) || '';
   const newReplies = thread.messages.filter(m => m.isAdmin && m.id > lastSeen);
   if(!newReplies.length) return;
-  // Show notification popup for new admin reply
   const last = newReplies[newReplies.length-1];
   showRmReplyNotif(last);
+}
+
+function showAdminMsgNotif(msg){
+  const body = document.getElementById('announcementPopupBody');
+  const popup = document.getElementById('announcementPopup');
+  body.innerHTML = `<div style="text-align:left">
+    <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">✉️ <b>${escapeHtml(msg.rmName)}</b> ne message bheja:</div>
+    <div class="msg-bubble recv" style="max-width:100%;background:var(--navy);color:#fff">${escapeHtml(msg.text).replace(/\n/g,'<br>')}</div>
+    <div style="font-size:.72rem;color:var(--gray);margin-top:8px;text-align:right">${fmtDate(msg.date)}</div>
+  </div>`;
+  popup.dataset.annId = 'adminnotif_' + msg.id;
+  const closeBtn = popup.querySelector('.modal-footer .btn');
+  if(closeBtn){
+    closeBtn.onclick = function(){
+      // Mark all current RM messages as seen for admin
+      const allThreads = getRmMessages();
+      let lastId = '';
+      allThreads.forEach(t => {
+        (t.messages||[]).forEach(m => { if(!m.isAdmin && m.id > lastId) lastId = m.id; });
+      });
+      if(lastId) localStorage.setItem('dninvest_admin_msg_seen', lastId);
+      popup.classList.remove('open');
+      updateMsgBadge();
+      if(getCurrentPageId()==='admin') renderInbox();
+    };
+  }
+  popup.classList.add('open');
 }
 
 function showRmReplyNotif(msg){
