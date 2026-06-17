@@ -2226,7 +2226,7 @@ function renderEqTable(){
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
-      <td>${fmtDate(c.next_call)||'—'}</td>
+      <td>${c.do_not_call?'<span style="color:var(--red);font-weight:700;font-size:.75rem">🚫 DNC</span>':(fmtDate(c.next_call)||'—')}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
@@ -2351,7 +2351,7 @@ function renderMfTable(){
       <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
       <td>${c.sip_count||'—'}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
-      <td>${fmtDate(c.next_call)||'—'}</td>
+      <td>${c.do_not_call?'<span style="color:var(--red);font-weight:700;font-size:.75rem">🚫 DNC</span>':(fmtDate(c.next_call)||'—')}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
@@ -3287,7 +3287,14 @@ function clientForm(seg, c){
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
-      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}"></div>
+      <div class="form-field">
+        <label>Next Calling Date</label>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" ${c?.do_not_call?'disabled':''}>
+        <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
+          <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
+          🚫 Do Not Call
+        </label>
+      </div>
       <div class="form-field"><label>Follow-up Status</label><select id="f_followup">
         <option ${c?.followup_status==='NOT INTERESTED'?'selected':''}>NOT INTERESTED</option>
         <option ${c?.followup_status==='CALL NOT RECEIVED'?'selected':''}>CALL NOT RECEIVED</option>
@@ -3327,7 +3334,14 @@ function clientForm(seg, c){
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
-      <div class="form-field"><label>Next Calling Date</label><input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}"></div>
+      <div class="form-field">
+        <label>Next Calling Date</label>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" ${c?.do_not_call?'disabled':''}>
+        <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
+          <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
+          🚫 Do Not Call
+        </label>
+      </div>
       <div class="form-field"><label>Follow-up Status</label><select id="f_followup">
         <option ${c?.followup_status==='NOT INTERESTED'?'selected':''}>NOT INTERESTED</option>
         <option ${c?.followup_status==='CALL NOT RECEIVED'?'selected':''}>CALL NOT RECEIVED</option>
@@ -3413,7 +3427,9 @@ async function saveClient(){
       asset_value:parseFloat(gv2('f_asset'))||null,
       revenue:parseFloat(gv2('f_revenue'))||null,
       last_trade_date:gv2('f_last_trade'), last_trade_month:gv2('f_last_month'),
-      last_call_date:gv2('f_last_call'), next_call:gv2('f_next_call'),
+      last_call_date:gv2('f_last_call'),
+      next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
+      do_not_call: document.getElementById('f_do_not_call')?.checked || false,
       followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
       created:currentEditId?undefined:today(), updated:today()
     };
@@ -3426,7 +3442,9 @@ async function saveClient(){
       sip_amount:parseFloat(gv2('f_sip'))||null,
       sip_count:parseInt(gv2('f_sip_count'))||null,
       last_invest_date:gv2('f_last_invest'), last_call_date:gv2('f_last_call'),
-      next_call:gv2('f_next_call'), followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
+      next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
+      do_not_call: document.getElementById('f_do_not_call')?.checked || false,
+      followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
       created:currentEditId?undefined:today(), updated:today()
     };
   }
@@ -3852,6 +3870,7 @@ function renderNoCall(seg){
   const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
   const clients = seg==='equity'?getActiveEqClients():getMyMfClients();
   let data = clients.filter(c=>{
+    if(c.do_not_call) return false; // DNC clients exclude karo
     const d = daysDiff(c.last_call_date);
     return d===null || d>=days; // never called, or not called in N+ days
   }).map(c=>({...c,daysAgo:daysDiff(c.last_call_date)}))
@@ -4817,6 +4836,18 @@ function showRmReplyNotif(msg){
     };
   }
   popup.classList.add('open');
+}
+
+
+function toggleDNC(cb){
+  const dateInput = document.getElementById('f_next_call');
+  if(!dateInput) return;
+  if(cb.checked){
+    dateInput.value = '';
+    dateInput.disabled = true;
+  } else {
+    dateInput.disabled = false;
+  }
 }
 
 
