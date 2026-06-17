@@ -432,6 +432,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="topbar-right">
       <span class="seg-indicator" id="segBadge"></span>
       <div class="user-pill">Hello, <b id="uLabel"></b></div>
+      <button class="btn-sm" id="changeCredBtn" onclick="openChangeCredModal()" style="background:var(--teal);display:none">🔑 Change PIN/Password</button>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
   </div>
@@ -1170,6 +1171,35 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
   </div>
 </div>
 
+<!-- Change PIN/Password Modal -->
+<div class="modal-overlay" id="changeCredModal" onclick="if(event.target===this)closeModal('changeCredModal')">
+  <div class="modal" style="width:400px">
+    <div class="modal-hdr" style="background:var(--navy)">
+      <h3 style="color:#fff" id="changeCredTitle">🔑 Change Password/PIN</h3>
+      <button class="modal-close" onclick="closeModal('changeCredModal')" style="color:#fff">×</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div class="form-field" style="margin-bottom:14px">
+        <label>Current Password</label>
+        <input type="password" id="cc_current" placeholder="Enter current password">
+      </div>
+      <div class="form-field" style="margin-bottom:14px" id="cc_pass_wrap">
+        <label>New Password</label>
+        <input type="password" id="cc_newpass" placeholder="Leave blank to keep current">
+      </div>
+      <div class="form-field" style="margin-bottom:14px" id="cc_pin_wrap">
+        <label>New 4-Digit PIN <span style="font-size:.75rem;color:var(--gray)">(RM only)</span></label>
+        <input type="password" id="cc_newpin" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" placeholder="Leave blank to keep current">
+      </div>
+      <div style="color:var(--red);font-size:.82rem;display:none;margin-bottom:10px" id="cc_err"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="closeModal('changeCredModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveChangeCred()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Announcement Popup -->
 <div class="modal-overlay" id="announcementPopup">
   <div class="modal">
@@ -1749,6 +1779,9 @@ function initApp(){
   if(msgNav) msgNav.style.display = CU.role!=='admin' ? 'flex' : 'none';
   if(msgSec) msgSec.style.display = CU.role!=='admin' ? '' : 'none';
   updateMsgBadge();
+  // Show Change PIN/Password button for all users
+  const credBtn = document.getElementById('changeCredBtn');
+  if(credBtn) credBtn.style.display = '';
 
   // Bulk Excel import is admin-only
   const eqImportBtn=document.getElementById('eqImportBtn');
@@ -4891,6 +4924,59 @@ function showRmReplyNotif(msg){
     };
   }
   popup.classList.add('open');
+}
+
+
+function openChangeCredModal(){
+  if(!CU) return;
+  document.getElementById('cc_current').value='';
+  document.getElementById('cc_newpass').value='';
+  document.getElementById('cc_newpin').value='';
+  document.getElementById('cc_err').style.display='none';
+  // Show PIN field only for RMs
+  document.getElementById('cc_pin_wrap').style.display = CU.role==='rm' ? '' : 'none';
+  document.getElementById('changeCredModal').classList.add('open');
+}
+
+function saveChangeCred(){
+  if(!CU) return;
+  const current = document.getElementById('cc_current').value;
+  const newPass = document.getElementById('cc_newpass').value;
+  const newPin  = document.getElementById('cc_newpin').value;
+  const errEl   = document.getElementById('cc_err');
+
+  // Verify current password
+  if(current !== CU.password){
+    errEl.textContent = '❌ Current password galat hai';
+    errEl.style.display = '';
+    return;
+  }
+  // Validate new PIN if entered
+  if(newPin && !/^[0-9]{4}$/.test(newPin)){
+    errEl.textContent = '❌ PIN 4 digit ka hona chahiye (0-9)';
+    errEl.style.display = '';
+    return;
+  }
+  if(!newPass && !newPin){
+    errEl.textContent = '❌ Kuch toh change karo — password ya PIN';
+    errEl.style.display = '';
+    return;
+  }
+
+  const users = DB.get('users') || [];
+  const idx = users.findIndex(u => u.id === CU.id);
+  if(idx < 0){ toast('User not found','error'); return; }
+
+  if(newPass) users[idx].password = newPass;
+  if(newPin && CU.role==='rm') users[idx].pin = newPin;
+
+  // Update session
+  if(newPass){ CU.password = newPass; sessionStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass})); }
+  if(newPin && CU.role==='rm') CU.pin = newPin;
+
+  DB.set('users', users);
+  closeModal('changeCredModal');
+  toast('✅ Password/PIN update ho gaya!', 'success');
 }
 
 
