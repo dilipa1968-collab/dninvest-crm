@@ -479,10 +479,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-eqnc">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('eq-closed-dnc')" id="nav-eq-closed-dnc">
-        <span class="icon">🗂️</span> Closed & DNC
-        <span class="nav-badge" id="nb-eq-closed-dnc">0</span>
-      </div>
 
       <div class="sidebar-section" id="mf-nav-section">Mutual Fund</div>
       <div class="nav-item" onclick="showPage('mf-clients')" id="nav-mf-clients">
@@ -500,10 +496,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('mf-nocall')" id="nav-mf-nocall">
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-mfnc">0</span>
-      </div>
-      <div class="nav-item" onclick="showPage('mf-closed-dnc')" id="nav-mf-closed-dnc">
-        <span class="icon">🗂️</span> Closed & DNC
-        <span class="nav-badge" id="nb-mf-closed-dnc">0</span>
       </div>
 
       <div class="sidebar-section">Reports</div>
@@ -676,40 +668,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <span class="res-count" id="eqnc-count"></span>
         </div>
         <div id="eqnc-content"></div>
-      </div>
-
-      <!-- ── EQ CLOSED & DNC ── -->
-      <div class="page" id="page-eq-closed-dnc">
-        <div class="page-hdr">
-          <div class="page-title">🗂️ Closed & DNC — Equity</div>
-        </div>
-        <div class="tab-bar">
-          <div class="tab-item active" onclick="switchClosedDncTab('eq','closed')">🔒 Closed</div>
-          <div class="tab-item" onclick="switchClosedDncTab('eq','dnc')">🚫 DNC</div>
-        </div>
-        <div class="filters" style="padding:10px 16px 6px">
-          <input type="text" id="eq-cd-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderClosedDnc('eq')" style="min-width:260px">
-          <button class="btn btn-outline" onclick="document.getElementById('eq-cd-search').value='';renderClosedDnc('eq')">✕ Clear</button>
-          <span class="res-count" id="eq-cd-count"></span>
-        </div>
-        <div id="eq-cd-content"></div>
-      </div>
-
-      <!-- ── MF CLOSED & DNC ── -->
-      <div class="page" id="page-mf-closed-dnc">
-        <div class="page-hdr">
-          <div class="page-title">🗂️ Closed & DNC — MF</div>
-        </div>
-        <div class="tab-bar">
-          <div class="tab-item active" onclick="switchClosedDncTab('mf','closed')">🔒 Closed</div>
-          <div class="tab-item" onclick="switchClosedDncTab('mf','dnc')">🚫 DNC</div>
-        </div>
-        <div class="filters" style="padding:10px 16px 6px">
-          <input type="text" id="mf-cd-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderClosedDnc('mf')" style="min-width:260px">
-          <button class="btn btn-outline" onclick="document.getElementById('mf-cd-search').value='';renderClosedDnc('mf')">✕ Clear</button>
-          <span class="res-count" id="mf-cd-count"></span>
-        </div>
-        <div id="mf-cd-content"></div>
       </div>
 
       <!-- ── MF CLIENTS ── -->
@@ -2004,8 +1962,6 @@ function showPage(id){
   else if(id==='mf-followup'){ renderFollowup('mff'); }
   else if(id==='eq-notrade') renderNoTrade();
   else if(id==='eq-nocall') renderNoCall('equity');
-  else if(id==='eq-closed-dnc') renderClosedDnc('eq');
-  else if(id==='mf-closed-dnc') renderClosedDnc('mf');
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
   else if(id==='reports') renderReports();
@@ -2209,13 +2165,8 @@ function updateBadges(){
   document.getElementById('nb-eqf').textContent=eqf;
   document.getElementById('nb-mff').textContent=mff;
   document.getElementById('nb-eqnt').textContent=activeEq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
-  document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return !c.do_not_call&&(d===null||d>=60);}).length;
-  document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return !c.do_not_call&&(d===null||d>=60);}).length;
-  // Closed & DNC badges
-  const nbEqCd=document.getElementById('nb-eq-closed-dnc');
-  if(nbEqCd) nbEqCd.textContent=eq.filter(c=>c.status==='Closed'||c.do_not_call).length;
-  const nbMfCd=document.getElementById('nb-mf-closed-dnc');
-  if(nbMfCd) nbMfCd.textContent=mf.filter(c=>c.status==='Closed'||c.do_not_call).length;
+  document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
+  document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
 }
 
 // ══════════════════════════════════════════
@@ -2342,8 +2293,6 @@ function renderEqTable(){
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
   if(st==='DNC') data=data.filter(c=>c.do_not_call);
   else if(st) data=data.filter(c=>c.status===st);
-  else data=data.filter(c=>!c.do_not_call); // DNC default se hide
-  else data=data.filter(c=>!c.do_not_call); // DNC default se hide
   if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
@@ -4064,95 +4013,6 @@ function renderNoTrade(){
 // ══════════════════════════════════════════
 // NO-CALL ALERTS (last_call_date not updated)
 // ══════════════════════════════════════════
-let _activeEqCdTab = 'closed', _activeMfCdTab = 'closed';
-
-function switchClosedDncTab(seg, tab){
-  if(seg==='eq') _activeEqCdTab=tab;
-  else _activeMfCdTab=tab;
-  // Update tab UI
-  const pageId = 'page-'+(seg==='eq'?'eq':'mf')+'-closed-dnc';
-  document.querySelectorAll('#'+pageId+' .tab-item').forEach((el,i)=>{
-    el.classList.toggle('active', (i===0&&tab==='closed')||(i===1&&tab==='dnc'));
-  });
-  renderClosedDnc(seg);
-}
-
-function renderClosedDnc(seg){
-  const tab = seg==='eq' ? _activeEqCdTab : _activeMfCdTab;
-  const searchId = seg==='eq' ? 'eq-cd-search' : 'mf-cd-search';
-  const countId  = seg==='eq' ? 'eq-cd-count'  : 'mf-cd-count';
-  const contId   = seg==='eq' ? 'eq-cd-content' : 'mf-cd-content';
-  const cont = document.getElementById(contId);
-  if(!cont) return;
-
-  const allClients = seg==='eq'
-    ? (getMyEqClients())
-    : (getMyMfClients());
-
-  let data = tab==='closed'
-    ? allClients.filter(c=>c.status==='Closed')
-    : allClients.filter(c=>c.do_not_call);
-
-  // Search
-  const q = (document.getElementById(searchId)?.value||'').toLowerCase().trim();
-  if(q) data = data.filter(c=>
-    (c.name||'').toLowerCase().includes(q)||
-    (c.mobile||'').includes(q)||
-    (c.rm||'').toLowerCase().includes(q)||
-    (c.code||c.pan||'').toLowerCase().includes(q)
-  );
-
-  const countEl = document.getElementById(countId);
-  if(countEl) countEl.textContent = data.length ? data.length+' found' : '';
-
-  if(!data.length){
-    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ Koi ${tab==='closed'?'Closed':'DNC'} ${seg==='eq'?'client':'investor'} nahi mila${q?' matching "'+q+'"':''}</div>`;
-    return;
-  }
-
-  const rows = data.map(c=>{
-    const badge = tab==='dnc' ? '<span style="color:var(--red);font-weight:700;font-size:.75rem">🚫 DNC</span>' : '<span style="color:var(--gray);font-size:.75rem">🔒 Closed</span>';
-    if(seg==='eq'){
-      return `<tr>
-        <td>${c.code||'—'}</td>
-        <td style="font-weight:600">${c.name}</td>
-        <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
-        <td>${c.rm||'—'}</td>
-        <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
-        <td>${fmtDate(c.last_call_date)||'—'}</td>
-        <td>${badge}</td>
-        <td>${c.followup_status||'—'}</td>
-        <td>${c.remarks||'—'}</td>
-        <td>
-          <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
-          <button class="btn-icon" onclick="logCall('${c.id}','equity')" title="Log Call">📞</button>
-        </td>
-      </tr>`;
-    } else {
-      return `<tr>
-        <td style="font-weight:600">${c.name}</td>
-        <td>${c.mobile||'—'}</td>
-        <td>${c.pan||'—'}</td>
-        <td>${c.rm||'—'}</td>
-        <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
-        <td>${fmtDate(c.last_call_date)||'—'}</td>
-        <td>${badge}</td>
-        <td>${c.followup_status||'—'}</td>
-        <td>${c.remarks||'—'}</td>
-        <td>
-          <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
-          <button class="btn-icon" onclick="logCall('${c.id}','mf')" title="Log Call">📞</button>
-        </td>
-      </tr>`;
-    }
-  }).join('');
-
-  const eqHdr = '<th>Code</th><th>Name</th><th>Mobile</th><th>RM</th><th>Assets</th><th>Last Call</th><th>Status</th><th>Follow-up</th><th>Remarks</th><th>Actions</th>';
-  const mfHdr = '<th>Name</th><th>Mobile</th><th>PAN</th><th>RM</th><th>AUM</th><th>Last Call</th><th>Status</th><th>Follow-up</th><th>Remarks</th><th>Actions</th>';
-  cont.innerHTML=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${seg==='eq'?eqHdr:mfHdr}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
-}
-
-
 function renderNoCall(seg){
   try{
   const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
