@@ -497,7 +497,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="page-hdr">
           <div class="page-title">Dashboard <span id="dash-date"></span></div>
           <div class="hdr-actions">
-            <button class="btn btn-outline" onclick="refreshDash()">🔄 Refresh</button>
+            <button class="btn btn-outline" onclick="hardRefresh()" title="Hard Refresh — Cache clear karke reload">🔄 Refresh</button>
           </div>
         </div>
         <div class="stats-row" id="dashStats"></div>
@@ -1819,6 +1819,18 @@ function switchTab(group, tab){
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
+function hardRefresh(){
+  if('caches' in window){
+    caches.keys().then(function(names){
+      names.forEach(function(name){ caches.delete(name); });
+    }).then(function(){
+      window.location.reload(true);
+    });
+  } else {
+    window.location.reload(true);
+  }
+}
+
 function refreshDash(){
   const eq = getMyEqClients();
   const activeEq = getActiveEqClients();
