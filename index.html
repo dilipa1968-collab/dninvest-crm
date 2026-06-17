@@ -2111,7 +2111,10 @@ function applySort(data, tableKey, getters){
       va=va||''; vb=vb||'';
       if(!va && !vb) return 0;
       if(!va) return 1; if(!vb) return -1;
-      return st.dir*(va<vb?-1:va>vb?1:0);
+      // Parse properly — handles YYYY-MM-DD, DD-MMM-YY, DD-MMM-YYYY etc.
+      const da = new Date(va), db = new Date(vb);
+      const ta = isNaN(da)?0:da.getTime(), tb = isNaN(db)?0:db.getTime();
+      return st.dir*(ta-tb);
     }
     va=(va==null?'':va).toString().toLowerCase(); vb=(vb==null?'':vb).toString().toLowerCase();
     return st.dir*va.localeCompare(vb, undefined, {numeric:true});
@@ -3769,8 +3772,8 @@ function renderFollowup(group){
     ${sortTh('Name',tableKey,'name','str',`()=>renderFollowup('${group}')`)}
     ${sortTh('Mobile',tableKey,'mobile','str',`()=>renderFollowup('${group}')`)}
     ${sortTh('RM',tableKey,'rm','str',`()=>renderFollowup('${group}')`)}
-    ${sortTh('Last Call',tableKey,'last_call_date','date',`()=>renderFollowup('${group}')`)}
     ${sortTh('Next Call',tableKey,'next_call','date',`()=>renderFollowup('${group}')`)}
+    ${sortTh('Last Call',tableKey,'last_call_date','date',`()=>renderFollowup('${group}')`)}
     ${sortTh('Status',tableKey,'followup_status','str',`()=>renderFollowup('${group}')`)}
     ${sortTh('Remarks',tableKey,'remarks','str',`()=>renderFollowup('${group}')`)}
     <th>Actions</th>
@@ -3782,8 +3785,8 @@ function renderFollowup(group){
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td style="color:${isOver?'var(--red)':'inherit'};font-weight:${isOver?700:400}">${fmtDate(c.next_call)||'—'}</td>
+      <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td><span class="badge ${c.followup_status==='Done'?'b-done':'b-pending'}">${c.followup_status||'—'}</span></td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${c.remarks||'—'}</td>
       <td>
