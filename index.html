@@ -651,6 +651,11 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="tab-item" onclick="switchTab('eqnc','90')">🟠 90+ Days</div>
           <div class="tab-item" onclick="switchTab('eqnc','180')">⚫ 180+ Days</div>
         </div>
+        <div class="filters" style="padding:10px 16px 6px">
+          <input type="text" id="eqnc-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderNoCall('equity')" style="min-width:260px">
+          <button class="btn btn-outline" onclick="document.getElementById('eqnc-search').value='';renderNoCall('equity')">✕ Clear</button>
+          <span class="res-count" id="eqnc-count"></span>
+        </div>
         <div id="eqnc-content"></div>
       </div>
 
@@ -726,6 +731,11 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="tab-item active" onclick="switchTab('mfnc','60')">🔴 60+ Days</div>
           <div class="tab-item" onclick="switchTab('mfnc','90')">🟠 90+ Days</div>
           <div class="tab-item" onclick="switchTab('mfnc','180')">⚫ 180+ Days</div>
+        </div>
+        <div class="filters" style="padding:10px 16px 6px">
+          <input type="text" id="mfnc-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderNoCall('mf')" style="min-width:260px">
+          <button class="btn btn-outline" onclick="document.getElementById('mfnc-search').value='';renderNoCall('mf')">✕ Clear</button>
+          <span class="res-count" id="mfnc-count"></span>
         </div>
         <div id="mfnc-content"></div>
       </div>
@@ -3849,11 +3859,29 @@ function renderNoCall(seg){
       return bv-av;
     });
 
+  // Search filter
+  const searchEl = document.getElementById(seg==='equity'?'eqnc-search':'mfnc-search');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  if(q){
+    data = data.filter(c=>{
+      const name = (c.name||'').toLowerCase();
+      const mobile = (c.mobile||'').toLowerCase();
+      const rm = (c.rm||'').toLowerCase();
+      const code = (seg==='equity'?(c.code||''):(c.pan||'')).toLowerCase();
+      return name.includes(q)||mobile.includes(q)||rm.includes(q)||code.includes(q);
+    });
+  }
+
   const contId = seg==='equity'?'eqnc-content':'mfnc-content';
   const cont=document.getElementById(contId);
   if(!cont) return;
+
+  // Update count badge
+  const countEl = document.getElementById(seg==='equity'?'eqnc-count':'mfnc-count');
+  if(countEl) countEl.textContent = data.length ? data.length+' found' : '';
+
   if(!data.length){
-    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No ${seg==='equity'?'clients':'investors'} with ${days}+ days since last call</div>`;
+    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No ${seg==='equity'?'clients':'investors'} with ${days}+ days since last call${q?' matching "'+q+'"':''}</div>`;
     return;
   }
   const label = seg==='equity'?'clients':'investors';
