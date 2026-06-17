@@ -502,6 +502,13 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Users & Settings
       </div>
+
+      <!-- RM: Message Admin button (hidden for admin) -->
+      <div class="sidebar-section" id="msg-admin-nav-section" style="display:none">Messages</div>
+      <div class="nav-item" id="nav-msg-admin" style="display:none" onclick="openMsgPopup()">
+        <span class="icon">✉️</span> Message Admin
+        <span class="badge" id="nb-msg" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
+      </div>
     </div>
 
     <!-- CONTENT -->
@@ -917,6 +924,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="ann-meta" id="ann-meta"></div>
         </div>
 
+        <!-- Admin Inbox: RM messages -->
+        <div class="ann-card" id="admin-inbox-card" style="display:none">
+          <h3>📬 RM Messages <span id="inbox-unread-badge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;margin-left:6px">New</span></h3>
+          <div id="admin-inbox-list"></div>
+        </div>
+
         <div id="user-list"></div>
       </div>
 
@@ -1124,6 +1137,24 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('userModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- RM Message Admin Popup -->
+<div class="modal-overlay" id="msgAdminPopup" onclick="if(event.target===this)closeMsgPopup()">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr" style="background:var(--navy)">
+      <h3 style="color:#fff">✉️ Message Admin</h3>
+      <button class="modal-close" onclick="closeMsgPopup()" style="color:#fff">×</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <div id="rm-conversation" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:14px;padding-right:4px"></div>
+      <div style="display:flex;gap:8px">
+        <textarea id="rm-msg-text" placeholder="Admin ko message likhein..." style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.88rem;resize:vertical;min-height:60px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendRmMessage();}"></textarea>
+        <button class="btn btn-primary" style="align-self:flex-end;padding:8px 16px" onclick="sendRmMessage()">Send</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--gray);margin-top:6px">Enter to send, Shift+Enter for new line</div>
     </div>
   </div>
 </div>
@@ -1662,7 +1693,7 @@ function initApp(){
           }
         });
       });
-    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); updateMsgBadge(); });
+    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); updateMsgBadge(); checkRmReply(); });
   } else {
     DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement();
   }
@@ -1696,8 +1727,10 @@ function initApp(){
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
 
   // Messages nav — only for RMs (not admin)
-  const msgNav = document.getElementById('nav-rm-messages');
+  const msgNav = document.getElementById('nav-msg-admin');
+  const msgSec = document.getElementById('msg-admin-nav-section');
   if(msgNav) msgNav.style.display = CU.role!=='admin' ? 'flex' : 'none';
+  if(msgSec) msgSec.style.display = CU.role!=='admin' ? '' : 'none';
   updateMsgBadge();
 
   // Bulk Excel import is admin-only
@@ -4609,6 +4642,12 @@ function renderInbox(){
   if(!el || !card) return;
   card.style.display = '';
   const threads = getRmMessages();
+  // Update unread badge
+  const unreadBadge = document.getElementById('inbox-unread-badge');
+  const totalUnread = threads.reduce((acc,t)=>{
+    return acc + (t.messages||[]).filter(m=>!m.isAdmin && !m.adminRead).length;
+  }, 0);
+  if(unreadBadge) unreadBadge.style.display = totalUnread > 0 ? '' : 'none';
   if(!threads.length){
     el.innerHTML = '<em style="color:var(--gray)">No messages from RMs yet.</em>';
     return;
@@ -4635,6 +4674,57 @@ function renderInbox(){
       </div>
     </div>`;
   }).join('');
+}
+
+
+function openMsgPopup(){
+  if(!CU || CU.role==='admin') return;
+  document.getElementById('msgAdminPopup').classList.add('open');
+  renderRmMessages();
+}
+
+function closeMsgPopup(){
+  document.getElementById('msgAdminPopup').classList.remove('open');
+}
+
+// Check if admin has replied to this RM — show popup notification
+function checkRmReply(){
+  if(!CU || CU.role==='admin') return;
+  const thread = getMyThread();
+  if(!thread) return;
+  const seenKey = 'dninvest_msg_seen_' + CU.username;
+  const lastSeen = localStorage.getItem(seenKey) || '';
+  const newReplies = thread.messages.filter(m => m.isAdmin && m.id > lastSeen);
+  if(!newReplies.length) return;
+  // Show notification popup for new admin reply
+  const last = newReplies[newReplies.length-1];
+  showRmReplyNotif(last);
+}
+
+function showRmReplyNotif(msg){
+  // Re-use announcement popup with different styling
+  const body = document.getElementById('announcementPopupBody');
+  const popup = document.getElementById('announcementPopup');
+  body.innerHTML = `<div style="text-align:left">
+    <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">📨 Admin ka jawab aaya:</div>
+    <div class="msg-bubble recv" style="max-width:100%">${escapeHtml(msg.text).replace(/\n/g,'<br>')}</div>
+    <div style="font-size:.72rem;color:var(--gray);margin-top:8px;text-align:right">${fmtDate(msg.date)}</div>
+  </div>`;
+  popup.dataset.annId = 'rmreply_' + msg.id;
+  // Override close button to mark rm reply as seen
+  const closeBtn = popup.querySelector('.modal-footer .btn');
+  if(closeBtn){
+    closeBtn.onclick = function(){
+      const thread2 = getMyThread();
+      if(thread2){
+        const lastAdminMsg = thread2.messages.filter(m=>m.isAdmin).slice(-1)[0];
+        if(lastAdminMsg) localStorage.setItem('dninvest_msg_seen_' + CU.username, lastAdminMsg.id);
+      }
+      popup.classList.remove('open');
+      updateMsgBadge();
+    };
+  }
+  popup.classList.add('open');
 }
 
 
