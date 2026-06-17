@@ -1134,6 +1134,13 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <button class="modal-close" onclick="closeModal('reportModal')">×</button>
     </div>
     <div class="modal-body" id="reportModalBody"></div>
+    <div id="brok-upload-bar" style="display:none;padding:10px 24px;border-top:1px solid var(--border);background:#f8faff;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:#0F2B5B;white-space:nowrap">📂 Brokerage File:</span>
+      <input type="file" id="brok-csv-input" accept=".csv,.txt"
+        style="font-size:12px;padding:5px 8px;border:1.5px solid #BFDBFE;border-radius:6px;background:#fff;flex:1;min-width:160px"
+        onchange="loadBrokCSV(this)">
+      <button class="btn btn-outline" onclick="clearBrokData()" style="font-size:12px;padding:5px 12px">✕ Clear</button>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('reportModal')">Close</button>
       <button class="btn btn-success" onclick="exportReportCSV()">⬇️ Export CSV</button>
@@ -3964,15 +3971,110 @@ function exportReportCSV(){
   a.download='report_'+Date.now()+'.csv'; a.click();
 }
 
+// Brokerage data store
+let _brokMap = {}; // {clientCode: grossBrok}
+let _brokLoaded = false;
+
+function loadBrokCSV(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const lines = e.target.result.split('\n').map(l=>l.trim()).filter(l=>l);
+    _brokMap = {};
+    let matched = 0;
+    lines.slice(1).forEach(line=>{
+      const cols = line.split(',');
+      if(cols.length < 9) return;
+      // Col 5 = Client Code, Col 8 = Gross Brk
+      const code = (cols[5]||'').trim().replace(/\s+/g,'');
+      const brok = parseFloat(cols[8])||0;
+      if(code){ _brokMap[code] = (_brokMap[code]||0) + brok; matched++; }
+    });
+    _brokLoaded = true;
+    rmEqReport();
+    toast('✅ Brokerage loaded: '+matched+' clients');
+  };
+  reader.readAsText(f);
+}
+
+function clearBrokData(){
+  _brokMap={}; _brokLoaded=false;
+  document.getElementById('brok-csv-input').value='';
+  rmEqReport();
+  toast('Brokerage data clear ho gaya');
+}
+
 function rmEqReport(){
   const eq=getActiveEqClients();
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]=[]; rms[c.rm].push(c); });
-  const rows=[];
-  Object.entries(rms).sort().forEach(([rm,cls])=>{
-    cls.forEach(c=>rows.push([rm,c.code||'',c.name,c.mobile||'',c.status,c.asset_value?'₹'+fmtNum(c.asset_value):'',fmtDate(c.last_trade_date)||'']));
-  });
-  showReport('RM-wise Equity Client List',['RM','Code','Name','Mobile','Status','Asset Value','Last Trade'],rows);
+
+  // Show/hide upload bar
+  const bar = document.getElementById('brok-upload-bar');
+  if(bar) bar.style.display='flex';
+
+  if(_brokLoaded){
+    // Headers with brokerage columns
+    const headers=['RM','Code','Name','Mobile','Status','Asset Value','Last Trade','Gross Brokerage'];
+    const rows=[];
+    const rmTotals={};
+    Object.entries(rms).sort().forEach(([rm,cls])=>{
+      let rmBrok=0;
+      cls.forEach(c=>{
+        const code=(c.code||'').trim().replace(/\s+/g,'');
+        const brok=_brokMap[code]||0;
+        rmBrok+=brok;
+        rows.push([rm,c.code||'',c.name,c.mobile||'',c.status,
+          c.asset_value?'₹'+fmtNum(c.asset_value):'',
+          fmtDate(c.last_trade_date)||'',
+          brok>0?'₹'+fmtNum(brok):'—']);
+      });
+      rmTotals[rm]=rmBrok;
+      // RM subtotal row
+      rows.push(['── '+rm+' Total ──','','','','','','','₹'+fmtNum(rmBrok)]);
+    });
+    showReport('RM-wise Client List + Brokerage',headers,rows);
+
+    // After render — color brokerage cells & subtotal rows
+    setTimeout(()=>{
+      const tbody = document.querySelector('#reportModalBody tbody');
+      if(!tbody) return;
+      tbody.querySelectorAll('tr').forEach(tr=>{
+        const tds=tr.querySelectorAll('td');
+        if(!tds.length) return;
+        const first=tds[0].textContent;
+        if(first.startsWith('──')){
+          // Subtotal row styling
+          tr.style.background='#f0faf5';
+          tds.forEach(td=>{td.style.fontWeight='700';td.style.color='#0F6E56';});
+          tds[0].style.color='#555';
+          tds[0].colSpan=1;
+        } else {
+          // Brokerage cell color
+          const brokCell=tds[7];
+          if(brokCell && brokCell.textContent!=='—'){
+            const val=parseFloat(brokCell.textContent.replace(/[^0-9.]/g,''))||0;
+            if(val>=100) brokCell.style.color='#0F6E56';
+            else brokCell.style.color='#dc2626';
+            brokCell.style.fontWeight='700';
+          }
+        }
+      });
+    },50);
+  } else {
+    // Normal view without brokerage
+    const rows=[];
+    Object.entries(rms).sort().forEach(([rm,cls])=>{
+      cls.forEach(c=>rows.push([rm,c.code||'',c.name,c.mobile||'',c.status,
+        c.asset_value?'₹'+fmtNum(c.asset_value):'',fmtDate(c.last_trade_date)||'']));
+    });
+    showReport('RM-wise Equity Client List',['RM','Code','Name','Mobile','Status','Asset Value','Last Trade'],rows);
+    // Show upload bar after modal opens
+    setTimeout(()=>{
+      const bar=document.getElementById('brok-upload-bar');
+      if(bar) bar.style.display='flex';
+    },50);
+  }
 }
 
 function statusEqReport(){
