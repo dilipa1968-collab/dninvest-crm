@@ -4047,7 +4047,7 @@ function renderReports(){
     {icon:'📞',title:'Follow-up Pending',desc:'Clients with pending follow-ups',fn:'fuPendingEq'},
     {icon:'💰',title:'Revenue Report',desc:'RM-wise brokerage/revenue',fn:'revenueReport'},
     {icon:'🆕',title:'New Business — Demat Accounts',desc:'Lead se convert hue Demat accounts (month-wise)',fn:'eqNewBusinessReport'},
-    {icon:'🚫',title:'DNC List — Equity',desc:'Do Not Call clients (Equity)',fn:'()=>showDncReport("equity")'},
+    {icon:'🚫',title:'DNC List — Equity',desc:'Do Not Call clients (Equity)',fn:'showDncReportEq'},
   ];
   const mfCards=[
     {icon:'🏦',title:'RM-wise Investor List',desc:'Investors grouped by MF RM',fn:'rmMfReport'},
@@ -4056,7 +4056,7 @@ function renderReports(){
     {icon:'🧲',title:'Investor vs Prospect',desc:'Status breakdown',fn:'statusMfReport'},
     {icon:'📞',title:'MF Follow-up Pending',desc:'MF clients with pending calls',fn:'fuPendingMf'},
     {icon:'💼',title:'New Business (Month-wise)',desc:'Lumpsum/SIP/Switch/Resumption entries by month',fn:'newBusinessMonthlyReport'},
-    {icon:'🚫',title:'DNC List — MF',desc:'Do Not Call investors (MF)',fn:'()=>showDncReport("mf")'},
+    {icon:'🚫',title:'DNC List — MF',desc:'Do Not Call investors (MF)',fn:'showDncReportMf'},
   ];
   const coCards=[
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
@@ -4875,6 +4875,9 @@ function toggleDNC(cb){
   }
 }
 
+
+function showDncReportEq(){ showDncReport('equity'); }
+function showDncReportMf(){ showDncReport('mf'); }
 
 function showDncReport(seg){
   const data = seg==='equity'
