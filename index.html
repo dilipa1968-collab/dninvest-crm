@@ -500,6 +500,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       </div>
 
       <div class="sidebar-section" id="admin-nav-section">Admin</div>
+      <div class="nav-item" onclick="showPage('announcements')" id="nav-announcements">
+        <span class="icon">📢</span> Announcements
+      </div>
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Users & Settings
         <span class="badge" id="admin-inbox-badge-nav" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
@@ -904,38 +907,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           </div>
         </div>
 
-        <!-- Announcement -->
-        <div class="ann-card">
-          <h3>📢 Announcement for RMs</h3>
-          <div class="form-field">
-            <label>Send To</label>
-            <select id="ann-target" onchange="onAnnTargetChange()">
-              <option value="all">All RMs</option>
-              <option value="seg-equity">Equity Team</option>
-              <option value="seg-mf">Mutual Fund Team</option>
-              <option value="users">Specific RM(s)</option>
-            </select>
-          </div>
-          <div class="form-field" id="ann-users-wrap" style="display:none;margin-top:10px">
-            <label>Select RM(s)</label>
-            <div id="ann-users-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px"></div>
-          </div>
-          <div class="form-field" style="margin-top:10px">
-            <label>Message</label>
-            <textarea id="ann-text" placeholder="Type announcement message here..." style="min-height:90px"></textarea>
-          </div>
-          <div class="form-field" style="margin-top:10px">
-            <label>Image (optional)</label>
-            <input type="file" id="ann-img-input" accept="image/*" onchange="handleAnnouncementImage(event)">
-            <div id="ann-img-preview"></div>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:14px">
-            <button class="btn btn-gold" onclick="sendAnnouncement()">📤 Send Announcement</button>
-            <button class="btn btn-danger" onclick="clearAnnouncement()">🗑️ Clear Announcement</button>
-          </div>
-          <div class="ann-meta" id="ann-meta"></div>
-        </div>
-
         <!-- Admin Inbox: RM messages -->
         <div class="ann-card" id="admin-inbox-card" style="display:none">
           <h3>📬 RM Messages <span id="inbox-unread-badge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;margin-left:6px">New</span></h3>
@@ -943,6 +914,45 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
 
         <div id="user-list"></div>
+      </div>
+
+      <!-- ── ANNOUNCEMENTS PAGE ── -->
+      <div class="page" id="page-announcements">
+        <div class="page-hdr">
+          <div class="page-title">📢 Announcements</div>
+        </div>
+        <div style="max-width:700px;margin:0 auto">
+          <div class="ann-card">
+            <h3>📢 Send Announcement to RMs</h3>
+            <div class="form-field">
+              <label>Send To</label>
+              <select id="ann-target" onchange="onAnnTargetChange()">
+                <option value="all">All RMs</option>
+                <option value="seg-equity">Equity Team</option>
+                <option value="seg-mf">Mutual Fund Team</option>
+                <option value="users">Specific RM(s)</option>
+              </select>
+            </div>
+            <div class="form-field" id="ann-users-wrap" style="display:none;margin-top:10px">
+              <label>Select RM(s)</label>
+              <div id="ann-users-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px"></div>
+            </div>
+            <div class="form-field" style="margin-top:10px">
+              <label>Message</label>
+              <textarea id="ann-text" placeholder="Type announcement message here..." style="min-height:90px"></textarea>
+            </div>
+            <div class="form-field" style="margin-top:10px">
+              <label>Image (optional)</label>
+              <input type="file" id="ann-img-input" accept="image/*" onchange="handleAnnouncementImage(event)">
+              <div id="ann-img-preview"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <button class="btn btn-gold" onclick="sendAnnouncement()">📤 Send Announcement</button>
+              <button class="btn btn-danger" onclick="clearAnnouncement()">🗑️ Clear Announcement</button>
+            </div>
+            <div class="ann-meta" id="ann-meta"></div>
+          </div>
+        </div>
       </div>
 
     </div><!-- /content -->
@@ -1672,7 +1682,7 @@ function initApp(){
           if(JSON.stringify(newData) !== JSON.stringify(existing)){
             localStorage.setItem('dninvest_announcement', JSON.stringify(newData));
             console.log('Real-time update: announcement');
-            if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
+            if(getCurrentPageId()==='admin'||getCurrentPageId()==='announcements') renderAnnouncementAdmin();
             checkAnnouncement();
           }
         }
@@ -1772,6 +1782,8 @@ function initApp(){
   if(adminSec) adminSec.style.display=CU.role==='admin'?'':'none';
   const adminNav=document.getElementById('nav-admin');
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
+  const annNav=document.getElementById('nav-announcements');
+  if(annNav) annNav.style.display=CU.role==='admin'?'flex':'none';
 
   // Messages nav — only for RMs (not admin)
   const msgNav = document.getElementById('nav-msg-admin');
@@ -1883,6 +1895,7 @@ function showPage(id){
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
   else if(id==='admin') renderAdmin();
+  else if(id==='announcements') renderAnnouncementAdmin();
   else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
 
