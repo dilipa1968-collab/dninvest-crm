@@ -89,7 +89,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 /* ── LAYOUT ── */
 #app{display:none;}
 .topbar{background:var(--navy);color:#fff;padding:0 24px;display:flex;align-items:center;
-  justify-content:space-between;height:56px;position:sticky;top:0;z-index:200;box-shadow:var(--shadow2);}
+  justify-content:space-between;height:56px;position:sticky;top:0;z-index:200;box-shadow:var(--shadow2);min-width:0;overflow:hidden;}
 .topbar-brand{font-size:1.2rem;font-weight:900;letter-spacing:1px;}
 .topbar-brand span{color:var(--gold);}
 .topbar-logo-img{width:32px;height:32px;object-fit:contain;}
@@ -352,6 +352,11 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
   .hamburger-btn{display:inline-block;}
   .topbar-brand{font-size:1rem;}
   .user-pill{display:none;}
+  #changeCredBtn{font-size:.7rem;padding:4px 7px;}
+  #changeCredBtn .cred-btn-text{display:none;}
+  .topbar-right{gap:5px;}
+  .btn-sm{font-size:.72rem;padding:5px 8px;}
+  .seg-indicator{display:none;}
   .sidebar{position:fixed;left:0;top:56px;height:calc(100vh - 56px);z-index:160;
     transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow2);}
   .sidebar.open{transform:translateX(0);}
@@ -432,7 +437,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="topbar-right">
       <span class="seg-indicator" id="segBadge"></span>
       <div class="user-pill">Hello, <b id="uLabel"></b></div>
-      <button class="btn-sm" id="changeCredBtn" onclick="openChangeCredModal()" style="background:var(--teal);display:none">🔑 Change PIN/Password</button>
+      <button class="btn-sm" id="changeCredBtn" onclick="openChangeCredModal()" style="background:var(--teal);display:none" title="Change PIN/Password">
+        🔑 <span class="cred-btn-text">Change PIN/Password</span>
+      </button>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
   </div>
