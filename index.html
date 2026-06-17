@@ -4397,7 +4397,12 @@ function eqNewBusinessReport(){
   const entries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
   const isAdmin = CU && CU.role==='admin';
 
-  const filtered = isAdmin ? entries : entries.filter(e=>(e.rm||'').toLowerCase()===(CU.name||'').toLowerCase());
+  const myNames = isAdmin ? null : [CU.name, ...(()=>{
+    const users=DB.get('users')||[], today=new Date().toISOString().split('T')[0];
+    const ta=(CU.tempAccess||[]).filter(t=>t.expiry===today);
+    return ta.map(t=>(users.find(u=>u.id===t.absentUserId)||{}).name||'').filter(Boolean);
+  })()].map(n=>n.toLowerCase());
+  const filtered = isAdmin ? entries : entries.filter(e=>myNames.includes((e.rm||'').toLowerCase()));
 
   if(!filtered.length){
     toast('Koi Demat account entry nahi mili. Leads convert karein.','error');
