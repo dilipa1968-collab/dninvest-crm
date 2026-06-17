@@ -4183,8 +4183,13 @@ function rmEqReport(){
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]=[]; rms[c.rm].push(c); });
   const rows=[];
-  Object.entries(rms).sort().forEach(([rm,cls])=>{
-    cls.forEach(c=>rows.push([rm,c.code||'',c.name,c.mobile||'',c.status,c.asset_value?'₹'+fmtNum(c.asset_value):'',fmtDate(c.last_trade_date)||'']));
+  // RM: sirf apna group; Admin: sab
+  const keys = CU.role==='admin' ? Object.keys(rms).sort() : Object.keys(rms).filter(rm=>{
+    const dealers=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    return dealers.includes((rm||'').trim().toUpperCase());
+  });
+  keys.forEach(rm=>{
+    (rms[rm]||[]).forEach(c=>rows.push([rm,c.code||'',c.name,c.mobile||'',c.status,c.asset_value?'₹'+fmtNum(c.asset_value):'',fmtDate(c.last_trade_date)||'']));
   });
   showReport('RM-wise Equity Client List',['RM','Code','Name','Mobile','Status','Asset Value','Last Trade'],rows);
 }
@@ -4221,13 +4226,18 @@ function revenueReport(){
   const eq=getActiveEqClients();
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,rev:0,aum:0}; rms[c.rm].count++; rms[c.rm].rev+=(c.revenue||0); rms[c.rm].aum+=(c.asset_value||0); });
-  const rows=Object.entries(rms).sort().map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.rev)]);
+  let entries = Object.entries(rms).sort();
+  if(CU.role!=='admin'){
+    const dealers=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    entries = entries.filter(([rm])=>dealers.includes((rm||'').trim().toUpperCase()));
+  }
+  const rows=entries.map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.rev)]);
   showReport('Revenue Report',['RM','Client Count','Total AUM','Total Revenue'],rows);
 }
 
 function rmMfReport(){
   const mf=getMyMfClients();
-  const rows=mf.sort((a,b)=>a.rm?.localeCompare(b.rm)).map(c=>[c.rm,c.name,c.mobile||'',c.status,c.aum?'₹'+fmtNum(c.aum):'',c.sip_amount?'₹'+fmtNum(c.sip_amount):'',c.sip_count||'']);
+  const rows=mf.sort((a,b)=>(a.rm||'').localeCompare(b.rm||'')).map(c=>[c.rm,c.name,c.mobile||'',c.status,c.aum?'₹'+fmtNum(c.aum):'',c.sip_amount?'₹'+fmtNum(c.sip_amount):'',c.sip_count||'']);
   showReport('RM-wise MF Investor List',['RM','Name','Mobile','Status','AUM','SIP/mo','SIP Count'],rows);
 }
 
@@ -4235,7 +4245,12 @@ function aumReport(){
   const mf=getMyMfClients();
   const rms={};
   mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,aum:0,inv:0}; rms[c.rm].count++; rms[c.rm].aum+=(c.aum||0); rms[c.rm].inv+=(c.status==='Investor'?1:0); });
-  const rows=Object.entries(rms).sort((a,b)=>b[1].aum-a[1].aum).map(([rm,d])=>[rm,d.count,d.inv,'₹'+fmtNum(d.aum)]);
+  let entries = Object.entries(rms).sort((a,b)=>b[1].aum-a[1].aum);
+  if(CU.role!=='admin'){
+    const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    entries = entries.filter(([rm])=>dealers.includes((rm||'').trim().toUpperCase()));
+  }
+  const rows=entries.map(([rm,d])=>[rm,d.count,d.inv,'₹'+fmtNum(d.aum)]);
   showReport('AUM Report',['RM','Total Clients','Investors','Total AUM'],rows);
 }
 
@@ -4243,7 +4258,12 @@ function sipReport(){
   const mf=getMyMfClients();
   const rms={};
   mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={count:0,sip:0,sipC:0}; rms[c.rm].count++; rms[c.rm].sip+=(c.sip_amount||0); rms[c.rm].sipC+=(c.sip_count||0); });
-  const rows=Object.entries(rms).sort((a,b)=>b[1].sip-a[1].sip).map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.sip),d.sipC]);
+  let entries = Object.entries(rms).sort((a,b)=>b[1].sip-a[1].sip);
+  if(CU.role!=='admin'){
+    const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    entries = entries.filter(([rm])=>dealers.includes((rm||'').trim().toUpperCase()));
+  }
+  const rows=entries.map(([rm,d])=>[rm,d.count,'₹'+fmtNum(d.sip),d.sipC]);
   showReport('SIP Report',['RM','Total Investors','Monthly SIP','Total SIP Count'],rows);
 }
 
@@ -4386,7 +4406,14 @@ function rmPerf(){
   const rms={};
   eq.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].eqC++; rms[c.rm].rev+=(c.revenue||0); });
   mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].mfC++; rms[c.rm].aum+=(c.aum||0); rms[c.rm].sip+=(c.sip_amount||0); });
-  const rows=Object.entries(rms).sort().map(([rm,d])=>[rm,d.eqC,d.mfC,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.sip),'₹'+fmtNum(d.rev)]);
+  let entries = Object.entries(rms).sort();
+  if(CU.role!=='admin'){
+    const eqD=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    const mfD=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    const all=[...new Set([...eqD,...mfD])];
+    entries = entries.filter(([rm])=>all.includes((rm||'').trim().toUpperCase()));
+  }
+  const rows=entries.map(([rm,d])=>[rm,d.eqC,d.mfC,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.sip),'₹'+fmtNum(d.rev)]);
   showReport('RM Performance Report',['RM','EQ Clients','MF Investors','Total AUM','Monthly SIP','Revenue'],rows);
 }
 
