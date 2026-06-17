@@ -2093,8 +2093,13 @@ function sortEqTable(colIndex){
 let _sortState = {};
 function clickSort(tableKey, field, type, renderFn){
   const cur = _sortState[tableKey] || {field:null, dir:1};
-  if(cur.field===field) cur.dir = -cur.dir;
-  else { cur.field=field; cur.dir=1; }
+  if(cur.field===field){
+    cur.dir = -cur.dir;
+  } else {
+    cur.field=field;
+    // Date columns: pehli click descending (latest first)
+    cur.dir = (type==='date') ? -1 : 1;
+  }
   _sortState[tableKey]=cur;
   _sortState[tableKey].type=type;
   renderFn();
