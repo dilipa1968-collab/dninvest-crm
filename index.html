@@ -907,12 +907,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           </div>
         </div>
 
-        <!-- Admin Inbox: RM messages -->
-        <div class="ann-card" id="admin-inbox-card" style="display:none">
-          <h3>📬 RM Messages <span id="inbox-unread-badge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;margin-left:6px">New</span></h3>
-          <div id="admin-inbox-list"></div>
-        </div>
-
         <div id="user-list"></div>
       </div>
 
@@ -951,6 +945,14 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <button class="btn btn-danger" onclick="clearAnnouncement()">🗑️ Clear Announcement</button>
             </div>
             <div class="ann-meta" id="ann-meta"></div>
+          </div>
+        </div>
+
+        <!-- RM Messages Inbox -->
+        <div style="max-width:700px;margin:0 auto">
+          <div class="ann-card" id="admin-inbox-card" style="display:none">
+            <h3>📬 RM Messages <span id="inbox-unread-badge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;margin-left:6px">New</span></h3>
+            <div id="admin-inbox-list"></div>
           </div>
         </div>
       </div>
@@ -1682,7 +1684,8 @@ function initApp(){
           if(JSON.stringify(newData) !== JSON.stringify(existing)){
             localStorage.setItem('dninvest_announcement', JSON.stringify(newData));
             console.log('Real-time update: announcement');
-            if(getCurrentPageId()==='admin'||getCurrentPageId()==='announcements') renderAnnouncementAdmin();
+            if(getCurrentPageId()==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
+            else if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
             checkAnnouncement();
           }
         }
@@ -1697,7 +1700,7 @@ function initApp(){
             localStorage.setItem('dninvest_rm_messages', JSON.stringify(newData));
             console.log('Real-time update: rm_messages');
             updateMsgBadge();
-            if(getCurrentPageId()==='admin') renderInbox();
+            if(getCurrentPageId()==='admin'||getCurrentPageId()==='announcements') renderInbox();
             checkRmReply();
           }
         }
@@ -1895,7 +1898,7 @@ function showPage(id){
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
   else if(id==='admin') renderAdmin();
-  else if(id==='announcements') renderAnnouncementAdmin();
+  else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
   else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
 
@@ -4410,8 +4413,6 @@ function exportCSV(seg){
 // ══════════════════════════════════════════
 function renderAdmin(){
   const users=DB.get('users')||[];
-  renderAnnouncementAdmin();
-  renderInbox();
   let h=users.map(u=>`
     <div class="user-card">
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
