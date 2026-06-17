@@ -4366,6 +4366,8 @@ function renderAdmin(){
       <div class="user-info">
         <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}</div>
         <div class="user-role">@${u.username} · ${u.role}</div>
+        <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
+        <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         <div class="user-segs">${(u.segments||[]).map(s=>`<span class="badge ${s==='equity'?'b-eq':'b-mf'}">${s==='equity'?'Equity':'MF'}</span>`).join('')}</div>
       </div>
       <div style="display:flex;gap:6px">
@@ -4397,7 +4399,13 @@ function userForm(u){
       <div class="form-field"><label>Username *</label><input id="uf_uname" value="${u?.username||''}" ${u?'readonly':''}></div>
     </div>
     <div class="form-row">
+      <div class="form-field"><label>Mobile Number</label><input id="uf_mobile" type="tel" value="${u?.mobile||''}" placeholder="10 digit mobile" maxlength="10"></div>
+      <div class="form-field"><label>Email</label><input id="uf_email" type="email" value="${u?.email||''}" placeholder="email@example.com"></div>
+    </div>
+    <div class="form-row">
       <div class="form-field"><label>Password *</label><input id="uf_pwd" type="password" placeholder="${u?'Leave blank to keep current':'Enter password'}"></div>
+    </div>
+    <div class="form-row">
       <div class="form-field"><label>Role</label><select id="uf_role">
         <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
         <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
@@ -4431,13 +4439,17 @@ function saveUser(){
   if(id){
     const idx=users.findIndex(u=>u.id===id);
     if(idx>=0){
-      users[idx]={...users[idx],name,role,segments:segs};
+      const mob=document.getElementById('uf_mobile').value.trim();
+      const eml=document.getElementById('uf_email').value.trim();
+      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml};
       if(pwd) users[idx].password=pwd;
     }
   } else {
     if(!pwd){ toast('Password required for new user','error'); return; }
     if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
-    users.push({id:uid(),username:uname,password:pwd,name,role,segments:segs,active:true});
+    const mob2=document.getElementById('uf_mobile').value.trim();
+    const eml2=document.getElementById('uf_email').value.trim();
+    users.push({id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true});
   }
   DB.set('users',users);
   closeModal('userModal');
