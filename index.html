@@ -1190,6 +1190,31 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
   </div>
 </div>
 
+<!-- Temp Access Modal -->
+<div class="modal-overlay" id="tempAccessModal" onclick="if(event.target===this)closeModal('tempAccessModal')">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr" style="background:var(--teal)">
+      <h3 style="color:#fff">🔄 Temporary Access</h3>
+      <button class="modal-close" onclick="closeModal('tempAccessModal')" style="color:#fff">×</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div style="font-size:.85rem;color:var(--gray);margin-bottom:14px">
+        <b id="ta-rm-name"></b> ko aaj ke liye kisi absent RM ke clients access karne do.<br>
+        <span style="color:var(--red);font-size:.78rem">⏰ Aaj midnight (IST) pe auto-expire ho jayega.</span>
+      </div>
+      <div class="form-field" style="margin-bottom:14px">
+        <label>Absent RM select karo (jiske clients access karne hain):</label>
+        <div id="ta-rm-list" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+      </div>
+      <div id="ta-current" style="font-size:.8rem;color:var(--gray);margin-bottom:12px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="closeModal('tempAccessModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTempAccess()">✅ Grant Access</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Change PIN/Password Modal -->
 <div class="modal-overlay" id="changeCredModal" onclick="if(event.target===this)closeModal('changeCredModal')">
   <div class="modal" style="width:400px">
@@ -1683,6 +1708,7 @@ function initApp(){
       updateMsgBadge();
       checkRmReply();
       runAutoSchedule(); // Run auto-schedule on load
+      cleanExpiredTempAccess(); // Clean expired temp access
 
       // Real-time listener for announcements (single object, not array)
       fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
@@ -1821,11 +1847,30 @@ function initApp(){
   updateBadges();
 }
 
+function getTempAccessDealers(seg){
+  // Check if current user has temp access granted for today
+  const users = DB.get('users')||[];
+  const me = users.find(u=>u.id===CU.id);
+  if(!me || !me.tempAccess) return [];
+  const today = new Date().toISOString().split('T')[0];
+  const valid = (me.tempAccess||[]).filter(t=>t.expiry===today);
+  const extraDealers = [];
+  valid.forEach(t=>{
+    const absentUser = users.find(u=>u.id===t.absentUserId);
+    if(!absentUser) return;
+    const dealers = seg==='eq' ? (absentUser.eq_dealers||[absentUser.name]) : (absentUser.mf_dealers||[absentUser.name]);
+    dealers.forEach(d=>extraDealers.push(d.trim().toUpperCase()));
+  });
+  return extraDealers;
+}
+
 function getMyEqClients(){
   const all = DB.get('eq_clients')||[];
   if(CU.role==='admin') return all;
   const dealers=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
-  return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
+  const tempDealers = getTempAccessDealers('eq');
+  const allDealers = [...new Set([...dealers,...tempDealers])];
+  return all.filter(c=>allDealers.includes((c.rm||'').trim().toUpperCase()));
 }
 // Helper - active eq clients (Closed exclude)
 function getActiveEqClients(){
@@ -1835,7 +1880,9 @@ function getMyMfClients(){
   const all = DB.get('mf_clients')||[];
   if(CU.role==='admin') return all;
   const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
-  return all.filter(c=>dealers.includes((c.rm||'').trim().toUpperCase()));
+  const tempDealers = getTempAccessDealers('mf');
+  const allDealers = [...new Set([...dealers,...tempDealers])];
+  return all.filter(c=>allDealers.includes((c.rm||'').trim().toUpperCase()));
 }
 function getMyLeads(){
   const all = DB.get('leads')||[];
@@ -4430,10 +4477,12 @@ function renderAdmin(){
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
+        ${(()=>{ const today=new Date().toISOString().split('T')[0]; const ta=(u.tempAccess||[]).filter(t=>t.expiry===today); if(!ta.length) return ''; const users2=DB.get('users')||[]; const names=ta.map(t=>(users2.find(x=>x.id===t.absentUserId)||{}).name||'').join(', '); return `<div class="user-role" style="margin-top:2px;color:var(--teal)">🔄 Temp: ${names}</div>`; })()}
         <div class="user-segs">${(u.segments||[]).map(s=>`<span class="badge ${s==='equity'?'b-eq':'b-mf'}">${s==='equity'?'Equity':'MF'}</span>`).join('')}</div>
       </div>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="editUser('${u.id}')">Edit</button>
+        ${u.role!=='admin'?`<button class="btn" onclick="openTempAccessModal('${u.id}')" style="background:var(--teal);color:#fff;border:none" title="Temp Access">🔄 Temp</button>`:''}
         <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
       </div>
     </div>`).join('');
@@ -5011,6 +5060,87 @@ function showRmReplyNotif(msg){
     };
   }
   popup.classList.add('open');
+}
+
+
+let _taTargetUserId = null;
+
+function openTempAccessModal(userId){
+  if(!CU || CU.role!=='admin'){ toast('Sirf admin kar sakta hai','error'); return; }
+  _taTargetUserId = userId;
+  const users = DB.get('users')||[];
+  const targetUser = users.find(u=>u.id===userId);
+  if(!targetUser){ toast('User not found','error'); return; }
+
+  document.getElementById('ta-rm-name').textContent = targetUser.name;
+
+  // Show all other RMs as options (not admin, not self)
+  const otherRMs = users.filter(u=>u.role!=='admin' && u.id!==userId);
+  const today = new Date().toISOString().split('T')[0];
+  const existing = (targetUser.tempAccess||[]).filter(t=>t.expiry===today).map(t=>t.absentUserId);
+
+  let listHtml = '';
+  otherRMs.forEach(u=>{
+    const checked = existing.includes(u.id) ? 'checked' : '';
+    listHtml += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:${checked?'rgba(0,150,136,.08)':'#fff'}">
+      <input type="checkbox" value="${u.id}" ${checked} onchange="this.closest('label').style.background=this.checked?'rgba(0,150,136,.08)':'#fff'">
+      <span><b>${u.name}</b> <span style="color:var(--gray);font-size:.78rem">(${(u.eq_dealers||[]).concat(u.mf_dealers||[]).filter((v,i,a)=>a.indexOf(v)===i).join(', ')})</span></span>
+    </label>`;
+  });
+  document.getElementById('ta-rm-list').innerHTML = listHtml || '<em style="color:var(--gray)">Koi doosra RM nahi mila</em>';
+
+  // Show current access
+  if(existing.length){
+    const names = existing.map(id=>(users.find(u=>u.id===id)||{}).name||id).join(', ');
+    document.getElementById('ta-current').innerHTML = `✅ Current temp access: <b>${names}</b> (aaj expire)`;
+  } else {
+    document.getElementById('ta-current').textContent = '';
+  }
+
+  document.getElementById('tempAccessModal').classList.add('open');
+}
+
+function saveTempAccess(){
+  const users = DB.get('users')||[];
+  const idx = users.findIndex(u=>u.id===_taTargetUserId);
+  if(idx<0){ toast('User not found','error'); return; }
+
+  const today = new Date().toISOString().split('T')[0];
+  const checkboxes = document.querySelectorAll('#ta-rm-list input[type=checkbox]');
+  const selected = [];
+  checkboxes.forEach(cb=>{
+    if(cb.checked) selected.push({absentUserId: cb.value, expiry: today});
+  });
+
+  // Keep future access entries (if any), replace today's
+  const existing = (users[idx].tempAccess||[]).filter(t=>t.expiry!==today);
+  users[idx].tempAccess = [...existing, ...selected];
+
+  DB.set('users', users);
+  // Update CU if granting to logged-in user
+  if(CU.id === users[idx].id) CU.tempAccess = users[idx].tempAccess;
+
+  closeModal('tempAccessModal');
+  renderAdmin();
+  if(selected.length){
+    const names = selected.map(s=>(users.find(u=>u.id===s.absentUserId)||{}).name||'').join(', ');
+    toast(`✅ ${users[idx].name} ko aaj ke liye ${names} ka access diya gaya!`, 'success');
+  } else {
+    toast(`🔄 ${users[idx].name} ka temp access hata diya`, 'info');
+  }
+}
+
+// Check & auto-expire temp access on load
+function cleanExpiredTempAccess(){
+  const users = DB.get('users')||[];
+  const today = new Date().toISOString().split('T')[0];
+  let changed = false;
+  users.forEach((u,i)=>{
+    if(!u.tempAccess?.length) return;
+    const valid = u.tempAccess.filter(t=>t.expiry>=today);
+    if(valid.length !== u.tempAccess.length){ users[i].tempAccess=valid; changed=true; }
+  });
+  if(changed) DB.set('users', users);
 }
 
 
