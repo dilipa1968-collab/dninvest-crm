@@ -2298,7 +2298,7 @@ function renderEqTable(){
   const nextCallDate=(document.getElementById('eq-next-call-date')||{value:''}).value;
   const lastTradeDate=(document.getElementById('eq-last-trade-date')||{value:''}).value;
 
-  if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||(c.code||'').includes(q));
+  if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.code||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
   else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
@@ -2431,7 +2431,7 @@ function renderMfTable(){
   const nextCallDate=(document.getElementById('mf-next-call-date')||{value:''}).value;
   const lastCallDate=(document.getElementById('mf-last-call-date')||{value:''}).value;
 
-  if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
+  if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.pan||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
   else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
