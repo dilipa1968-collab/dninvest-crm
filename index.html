@@ -1575,10 +1575,12 @@ let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='
 const MN = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function today(){
-  // IST = UTC+5:30 — use local IST date, not UTC
+  // Use device local date directly — avoids double IST offset bug
   const now = new Date();
-  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000) - (now.getTimezoneOffset() * 60 * 1000));
-  return ist.toISOString().split('T')[0];
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
 }
 function upc(v){ return v==null?'':String(v).toUpperCase(); }
 function fmtDate(d){ if(!d) return ''; try{const dt=new Date(d); if(isNaN(dt)) return d; return dt.getDate()+'-'+MN[dt.getMonth()+1]+'-'+dt.getFullYear();}catch(e){return d||'';} }
