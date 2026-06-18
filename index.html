@@ -823,8 +823,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <label>Search Client</label>
             <input type="text" id="al-search" placeholder="Client name..." oninput="renderActivityLog()">
           </div>
-          <div style="display:flex;align-items:flex-end">
+          <div style="display:flex;align-items:flex-end;gap:8px">
             <button class="btn btn-outline" onclick="document.getElementById('al-seg').value='';document.getElementById('al-rm').value='';document.getElementById('al-type').value='';document.getElementById('al-by').value='';document.getElementById('al-from').value='';document.getElementById('al-to').value='';document.getElementById('al-search').value='';renderActivityLog()">✕ Reset</button>
+            <button class="btn btn-outline" id="al-view-toggle" onclick="toggleAlView()" title="View Toggle">☰ Compact</button>
           </div>
         </div>
         <div id="al-count" style="font-size:.8rem;color:var(--gray);margin-bottom:8px"></div>
@@ -6065,6 +6066,14 @@ window.checkFollowups = function(){
 // ══════════════════════════════════════════
 // ACTIVITY LOG
 // ══════════════════════════════════════════
+let alViewMode = 'detail'; // 'detail' or 'compact'
+function toggleAlView(){
+  alViewMode = alViewMode==='detail' ? 'compact' : 'detail';
+  const btn = document.getElementById('al-view-toggle');
+  if(btn) btn.textContent = alViewMode==='compact' ? '☰ Detailed' : '☰ Compact';
+  renderActivityLog();
+}
+
 function renderActivityLog(){
   const isAdmin = CU && CU.role==='admin';
   const seg = (document.getElementById('al-seg')||{value:''}).value;
@@ -6147,6 +6156,35 @@ function renderActivityLog(){
     return;
   }
 
+  // ── COMPACT VIEW ──
+  if(alViewMode==='compact'){
+    let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>RM</th><th>By</th><th>Summary</th></tr></thead><tbody>';
+    all.forEach(l=>{
+      const dt = l.date ? new Date(l.date).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      const typeBadge=`<span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:1px 6px;border-radius:8px;font-size:.72rem;font-weight:700">${typeLabel[l.type]||l.type}</span>`;
+      let summary='';
+      if(l.type==='call') summary=`${l.call_status||''}${l.next_call?' → '+fmtDate(l.next_call):''}${l.remarks?' | '+l.remarks:''}`;
+      else if(l.type==='add') summary='Naya client add kiya';
+      else if(l.changes&&l.changes.length) summary=l.changes.map(ch=>{
+        const fLabel={name:'Name',mobile:'Mobile',rm:'RM',status:'Status',code:'Code',asset_value:'AUM',followup_status:'Follow-up',remarks:'Remarks',pan:'PAN',aum:'AUM',next_call:'Next Call'}[ch.field]||ch.field;
+        return `${fLabel}: ${ch.old}→${ch.new}`;
+      }).join(' | ');
+      else summary='—';
+      rows+=`<tr style="font-size:.8rem">
+        <td style="white-space:nowrap;color:var(--gray)">${dt}</td>
+        <td>${typeBadge}</td>
+        <td style="font-weight:600">${l.client_name||'—'}</td>
+        <td>${l.rm||'—'}</td>
+        <td>${l.by||'—'}</td>
+        <td style="color:var(--gray);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${summary}">${summary}</td>
+      </tr>`;
+    });
+    rows+='</tbody>';
+    tbl.innerHTML=rows;
+    return;
+  }
+
+  // ── DETAILED VIEW (default) ──
   let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>Segment</th><th>RM</th><th>By</th><th>Changes / Details</th></tr></thead><tbody>';
   all.forEach(l=>{
     const dt = l.date ? new Date(l.date).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
