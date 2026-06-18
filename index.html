@@ -1557,7 +1557,12 @@ let activeNtTab='30', activeEqfTab='today', activeMffTab='today', activeRptTab='
 
 const MN = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-function today(){ return new Date().toISOString().split('T')[0]; }
+function today(){
+  // IST = UTC+5:30 — use local IST date, not UTC
+  const now = new Date();
+  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000) - (now.getTimezoneOffset() * 60 * 1000));
+  return ist.toISOString().split('T')[0];
+}
 function upc(v){ return v==null?'':String(v).toUpperCase(); }
 function fmtDate(d){ if(!d) return ''; try{const dt=new Date(d); if(isNaN(dt)) return d; return dt.getDate()+'-'+MN[dt.getMonth()+1]+'-'+dt.getFullYear();}catch(e){return d||'';} }
 function daysDiff(d){ if(!d) return null; const diff=new Date()-new Date(d); return Math.floor(diff/(1000*60*60*24)); }
