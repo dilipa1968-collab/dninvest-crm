@@ -3537,6 +3537,25 @@ async function saveClient(){
   if(!name){ toast('Client name is required','error'); return; }
   if(!rm){ toast('Please select RM','error'); return; }
 
+  // Mandatory field validation
+  if(seg==='equity'){
+    const code = (document.getElementById('f_code')||{value:''}).value.trim();
+    if(!code){
+      toast('⚠️ Client Code / UCC required hai — bina Client Code ke save nahi hoga','error');
+      const el = document.getElementById('f_code');
+      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
+      return;
+    }
+  } else {
+    const pan = (document.getElementById('f_pan')||{value:''}).value.trim();
+    if(!pan){
+      toast('⚠️ PAN Number required hai — bina PAN ke save nahi hoga','error');
+      const el = document.getElementById('f_pan');
+      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
+      return;
+    }
+  }
+
   const key = seg==='equity'?'eq_clients':'mf_clients';
   const clients = DB.get(key)||[];
 
