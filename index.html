@@ -4774,6 +4774,29 @@ function removeAnnouncementImage(){
   document.getElementById('ann-img-input').value='';
 }
 
+// ── Browser Notification Helpers ──
+function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'default'){
+    Notification.requestPermission();
+  }
+}
+
+function sendBrowserNotif(title, body, iconUrl){
+  if(!('Notification' in window)) return;
+  if(Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(title, {
+      body: body || '',
+      icon: iconUrl || '/favicon.ico',
+      tag: 'dninvest-ann',
+      renotify: true
+    });
+    n.onclick = function(){ window.focus(); n.close(); };
+    setTimeout(()=>n.close(), 8000);
+  } catch(e){ console.warn('Notification error', e); }
+}
+
 function sendAnnouncement(){
   const text = document.getElementById('ann-text').value.trim();
   const existing = DB.get('announcement');
@@ -4807,6 +4830,8 @@ function sendAnnouncement(){
   };
   DB.set('announcement', ann);
   toast('Announcement sent to: '+tgtLabel,'success');
+  // Browser notification for admin preview (self-test)
+  sendBrowserNotif('📢 DN Investment', ann.text ? ann.text.substring(0,80) : 'New Announcement');
   renderAnnouncementAdmin();
 }
 
@@ -4820,12 +4845,18 @@ function clearAnnouncement(){
 // Show popup if there's an unseen announcement for the current user
 function checkAnnouncement(){
   if(!CU) return;
+  // Request browser notification permission on first check (RM side)
+  if(CU.role !== 'admin') requestNotifPermission();
   const ann = DB.get('announcement');
   if(!ann || (!ann.text && !ann.image)) return;
   if(!announcementAppliesToMe(ann)) return;
   const seenKey = 'dninvest_ann_seen_' + CU.username;
   const seen = localStorage.getItem(seenKey);
   if(seen === ann.id) return;
+  // Send browser notification (works even if CRM is minimized)
+  if(CU.role !== 'admin'){
+    sendBrowserNotif('📢 DN Investment - Announcement', ann.text ? ann.text.substring(0,100) : 'New Announcement from Admin');
+  }
   showAnnouncementPopup(ann);
 }
 
