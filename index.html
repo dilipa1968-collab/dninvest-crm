@@ -266,6 +266,19 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .inbox-thread .reply-row{display:flex;gap:8px;margin-top:10px;}
 .inbox-thread .reply-row input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:.85rem;}
 .unread-dot{width:9px;height:9px;border-radius:50%;background:var(--red);display:inline-block;margin-left:6px;}
+/* RM Inbox Tabs */
+.rm-tab-bar{display:flex;gap:3px;overflow-x:auto;border-bottom:2px solid var(--border);margin-bottom:12px;scrollbar-width:none;padding-bottom:0;}
+.rm-tab-bar::-webkit-scrollbar{display:none;}
+.rm-tab-btn{flex-shrink:0;padding:6px 13px;border:1px solid transparent;border-bottom:none;border-radius:7px 7px 0 0;font-size:.82rem;cursor:pointer;background:transparent;color:var(--gray);font-family:inherit;transition:background .15s;white-space:nowrap;}
+.rm-tab-btn:hover{background:#f0f4ff;color:var(--navy);}
+.rm-tab-btn.active{background:#fff;border-color:var(--border);border-bottom-color:#fff;color:var(--navy);font-weight:600;margin-bottom:-2px;}
+.rm-tab-unread{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:var(--red);color:#fff;font-size:10px;margin-left:4px;font-weight:600;}
+.rm-tab-panel{display:none;}
+.rm-tab-panel.active{display:block;}
+.rm-chat-box{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;padding:10px;background:#f7f9fc;border-radius:8px;margin-bottom:10px;}
+.rm-reply-row{display:flex;gap:8px;}
+.rm-reply-row input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:.85rem;}
+.rm-empty{text-align:center;padding:20px 0;color:var(--gray);font-size:.85rem;}
 #announcementPopup .modal-body{padding:22px;text-align:center;}
 #announcementPopup .ann-pop-img{max-width:100%;max-height:320px;border-radius:10px;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto;}
 #announcementPopup .ann-pop-text{font-size:.95rem;color:var(--navy);white-space:pre-wrap;text-align:left;line-height:1.5;}
@@ -4969,28 +4982,51 @@ function renderInbox(){
     el.innerHTML = '<em style="color:var(--gray)">No messages from RMs yet.</em>';
     return;
   }
-  el.innerHTML = threads.map(t => {
+  // Remember active tab
+  const prevActive = el.querySelector('.rm-tab-btn.active');
+  const activeUser = prevActive ? prevActive.dataset.rm : threads[0].rmUsername;
+  // Build tab bar
+  const tabsHtml = threads.map((t,i) => {
+    const unread = (t.messages||[]).filter(m=>!m.isAdmin && !m.adminRead).length;
+    const badgeHtml = unread > 0 ? `<span class="rm-tab-unread">${unread}</span>` : '';
+    const isActive = t.rmUsername === activeUser;
+    return `<button class="rm-tab-btn${isActive?' active':''}" data-rm="${t.rmUsername}" onclick="switchInboxTab('${t.rmUsername}')">${t.rmName}${badgeHtml}</button>`;
+  }).join('');
+  // Build panels
+  const panelsHtml = threads.map(t => {
     const msgs = t.messages || [];
-    const hasUnread = msgs.some(m => !m.isAdmin);
-    const msgsHtml = msgs.map(m => {
+    const isActive = t.rmUsername === activeUser;
+    const msgsHtml = msgs.length ? msgs.map(m => {
       const side = m.isAdmin ? 'sent' : 'recv';
       const label = m.isAdmin ? '🔴 Admin' : `🟢 ${m.fromName}`;
       return `<div class="msg-wrap ${side}">
         <div class="msg-bubble ${side}">${escapeHtml(m.text).replace(/\n/g,'<br>')}</div>
         <div class="msg-meta">${label} · ${fmtDate(m.date)}</div>
       </div>`;
-    }).join('');
-    return `<div class="inbox-thread">
-      <div class="thread-hdr">
-        <span class="rm-name">👤 ${t.rmName} <span style="font-size:.75rem;color:var(--gray)">(@${t.rmUsername})</span>${hasUnread?'<span class="unread-dot"></span>':''}</span>
-      </div>
-      <div class="thread-msgs">${msgsHtml}</div>
-      <div class="reply-row">
+    }).join('') : `<div class="rm-empty">Koi message nahi abhi.</div>`;
+    return `<div class="rm-tab-panel${isActive?' active':''}" id="rm-panel-${t.rmUsername}">
+      <div class="rm-chat-box" id="rm-chatbox-${t.rmUsername}">${msgsHtml}</div>
+      <div class="rm-reply-row">
         <input type="text" id="admin-reply-${t.rmUsername}" placeholder="Reply to ${t.rmName}..." onkeydown="if(event.key==='Enter')adminReplyToRm('${t.rmUsername}')">
         <button class="btn btn-primary" style="padding:7px 14px;font-size:.82rem" onclick="adminReplyToRm('${t.rmUsername}')">Reply</button>
       </div>
     </div>`;
   }).join('');
+  el.innerHTML = `<div class="rm-tab-bar">${tabsHtml}</div>${panelsHtml}`;
+  // Scroll active chat to bottom
+  const activeChatBox = document.getElementById('rm-chatbox-' + activeUser);
+  if(activeChatBox) activeChatBox.scrollTop = activeChatBox.scrollHeight;
+}
+
+function switchInboxTab(rmUsername){
+  document.querySelectorAll('.rm-tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rm-tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.rm-tab-btn[data-rm="${rmUsername}"]`);
+  const panel = document.getElementById('rm-panel-' + rmUsername);
+  if(btn){ btn.classList.add('active'); const badge = btn.querySelector('.rm-tab-unread'); if(badge) badge.remove(); }
+  if(panel) panel.classList.add('active');
+  const chatBox = document.getElementById('rm-chatbox-' + rmUsername);
+  if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 
