@@ -133,6 +133,20 @@ tr:hover td{background:var(--surface2)}
 .today-banner h3{font-size:16px;font-weight:700;margin-bottom:2px}
 .today-banner p{font-size:12px;opacity:0.85}
 .today-banner .time-big{font-size:28px;font-weight:700;font-family:monospace;letter-spacing:-1px}
+
+/* COMPACT LAYOUT (Salary / Incentive pages) */
+.compact-page{font-size:13px}
+.compact-page .card{padding:0.85rem 1rem;margin-bottom:0.65rem}
+.compact-page .card-title{font-size:13px;margin-bottom:0.6rem}
+.compact-page .grid2{gap:0.65rem}
+.compact-page table tr td,.compact-page table tr th{padding:5px 8px;font-size:12.5px}
+.compact-page .form-row{gap:8px;margin-bottom:8px}
+.compact-page .field-inline label{font-size:11px;margin-bottom:3px}
+.compact-page .field-inline input,.compact-page .field-inline select{padding:6px 8px;font-size:12.5px}
+.compact-page .divider{margin:0.6rem 0}
+.compact-page .btn{padding:6px 14px;font-size:12.5px}
+.compact-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+@media (max-width:640px){.compact-grid3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -343,7 +357,7 @@ tr:hover td{background:var(--surface2)}
     </div>
 
     <!-- SALARY -->
-    <div id="page-salary" class="page">
+    <div id="page-salary" class="page compact-page">
       <div class="grid2">
         <div>
           <div class="card">
@@ -354,7 +368,7 @@ tr:hover td{background:var(--surface2)}
         <div class="admin-only" style="display:none">
           <div class="card">
             <div class="card-title">Salary calculator</div>
-            <div class="form-row">
+            <div class="compact-grid3">
               <div class="field-inline"><label>Employee</label>
                 <select id="sal-emp" onchange="calcSalary()">
                   <option value="Puja">Puja</option>
@@ -369,18 +383,14 @@ tr:hover td{background:var(--surface2)}
                 </select>
               </div>
               <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
-            </div>
-            <div class="form-row">
               <div class="field-inline"><label>Days present</label><input type="number" id="sal-days" value="17" min="0" max="26" onchange="calcSalary()"></div>
               <div class="field-inline"><label>Working days</label><input type="number" id="sal-wdays" value="26" min="20" max="27" onchange="calcSalary()"></div>
-            </div>
-            <div class="form-row">
               <div class="field-inline"><label>Deductions (₹)</label><input type="number" id="sal-ded" value="0" onchange="calcSalary()"></div>
               <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
             </div>
             <hr class="divider">
             <div id="sal-result"></div>
-            <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="alert('Salary slip generate ho gaya! (Demo)')">Salary slip download</button>
+            <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generate ho gaya! (Demo)')">Salary slip download</button>
           </div>
           <div class="card">
             <div class="card-title">Team salary summary</div>
@@ -396,7 +406,7 @@ tr:hover td{background:var(--surface2)}
     </div>
 
     <!-- INCENTIVE -->
-    <div id="page-incentive" class="page">
+    <div id="page-incentive" class="page compact-page">
       <div class="grid2">
         <div>
           <div class="card">
@@ -428,7 +438,7 @@ tr:hover td{background:var(--surface2)}
           <div class="card">
             <div class="card-title">March 2026 business figures</div>
             <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
-            <div class="form-row">
+            <div class="compact-grid3">
               <div class="field-inline"><label>Employee</label>
                 <select id="inc-emp" onchange="loadIncEmp()">
                   <option value="Riya">Riya</option>
@@ -442,13 +452,9 @@ tr:hover td{background:var(--surface2)}
                   <option value="Anjali">Anjali</option>
                 </select>
               </div>
-              <div class="field-inline"><label>Salary (Employees page se)</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
-            </div>
-            <div class="form-row">
+              <div class="field-inline"><label>Salary</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
               <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200"></div>
-              <div class="field-inline"><label>Demat accounts opened</label><input type="number" id="inc-demat" value="1"></div>
-            </div>
-            <div class="form-row">
+              <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="1"></div>
               <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
               <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
             </div>
