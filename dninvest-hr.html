@@ -208,7 +208,7 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard',this)">Dashboard</button>
     <button class="nav-tab" onclick="showPage('attendance',this)">Attendance</button>
-    <button class="nav-tab" onclick="showPage('leave',this)">Leave</button>
+    <button class="nav-tab" onclick="showPage('leave',this)">Holidays</button>
     <button class="nav-tab" onclick="showPage('salary',this)">Salary</button>
     <button class="nav-tab" onclick="showPage('incentive',this)">Incentive</button>
     <button class="nav-tab admin-only" onclick="showPage('employees',this)" style="display:none">Employees</button>
@@ -234,7 +234,7 @@ tr:hover td{background:var(--surface2)}
       <div class="grid4">
         <div class="metric"><div class="m-lbl">Present today</div><div class="m-val" style="color:var(--green)" id="d-present">—</div></div>
         <div class="metric"><div class="m-lbl">Absent</div><div class="m-val" style="color:var(--red)" id="d-absent">—</div></div>
-        <div class="metric"><div class="m-lbl">On leave</div><div class="m-val" style="color:var(--amber)" id="d-leave">—</div></div>
+        <div class="metric"><div class="m-lbl">Holiday</div><div class="m-val" style="color:var(--amber)" id="d-leave">—</div></div>
         <div class="metric"><div class="m-lbl">This month payroll</div><div class="m-val" style="font-size:16px" id="d-payroll">₹0</div></div>
       </div>
 
@@ -245,7 +245,7 @@ tr:hover td{background:var(--surface2)}
         </div>
         <div>
           <div class="card">
-            <div class="card-title">Pending leave approvals</div>
+            <div class="card-title">Holiday status</div>
             <div id="pending-leaves"></div>
           </div>
           <div class="card admin-only" style="display:none">
@@ -291,7 +291,7 @@ tr:hover td{background:var(--surface2)}
               </select>
             </div>
             <div class="field-inline"><label>Status</label>
-              <select id="man-status"><option>Present</option><option>Absent</option><option>Half day</option><option>Late</option><option>On leave</option></select>
+              <select id="man-status"><option>Present</option><option>Absent</option><option>Half day</option><option>Late</option><option>Holiday</option></select>
             </div>
           </div>
           <div class="form-row">
@@ -310,46 +310,22 @@ tr:hover td{background:var(--surface2)}
     <div id="page-leave" class="page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">Meri leave balance</div>
-          <div id="my-leave-balance"></div>
+          <div class="card-title">Holiday calendar</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Har Sunday automatically holiday hai. Iske alawa Stock Exchange (NSE/BSE) ki chuttiyan neeche list mein hain.</p>
+          <div id="holiday-list"></div>
         </div>
-        <div class="card">
-          <div class="card-title">Leave apply karein</div>
-          <div class="form-row single">
-            <div class="field-inline"><label>Leave type</label>
-              <select id="lv-type"><option>Casual leave</option><option>Sick leave</option><option>Earned leave</option></select>
-            </div>
-          </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Exchange holiday add karein</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">NSE/BSE jis din band rahega, woh date yahan add karein</p>
           <div class="form-row">
-            <div class="field-inline"><label>From date</label><input type="date" id="lv-from"></div>
-            <div class="field-inline"><label>To date</label><input type="date" id="lv-to"></div>
+            <div class="field-inline"><label>Date</label><input type="date" id="hol-date"></div>
+            <div class="field-inline"><label>Naam (e.g. Diwali)</label><input type="text" id="hol-name" placeholder="Holiday ka naam"></div>
           </div>
-          <div class="form-row single">
-            <div class="field-inline"><label>Reason</label><input type="text" id="lv-reason" placeholder="Short reason..."></div>
-          </div>
-          <button class="btn btn-primary" onclick="applyLeave()">Apply karein</button>
+          <button class="btn btn-primary" style="width:100%" onclick="addHoliday()">Holiday add karein</button>
         </div>
         <div class="card">
-          <div class="card-title">Leave history</div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
-              <tbody id="my-leave-history"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card admin-only" style="display:none">
-          <div class="card-title">Pending approvals</div>
-          <div id="admin-pending-leaves"></div>
-        </div>
-        <div class="card admin-only" style="display:none">
-          <div class="card-title">Team leave balance</div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>Employee</th><th>Casual</th><th>Sick</th><th>Used</th><th>Balance</th></tr></thead>
-              <tbody id="team-leave-table"></tbody>
-            </table>
-          </div>
+          <div class="card-title">Meri attendance — is mahine</div>
+          <div id="my-leave-summary"></div>
         </div>
       </div>
     </div>
@@ -552,7 +528,7 @@ const DEMAT_RATE = 600; // ₹ per demat account opened
 
 // localStorage keys
 const KEY_ATT = 'dnihr_attendance';    // {name: [{date,in,out,status}]}
-const KEY_LEAVE = 'dnihr_leaves';       // [{name,type,from,to,days,status,reason}]
+const KEY_HOLIDAYS = 'dnihr_holidays';  // [{date, name}] — Stock Exchange (NSE/BSE) holidays, admin-managed
 const KEY_USER = 'dnihr_user';
 const KEY_INC_SALARY = 'dnihr_inc_salary';   // {name: salary} for incentive calc — set once
 const KEY_INC_MFSIP = 'dnihr_inc_mfsip';     // {name: {mf, sip, demat}} monthly business figures
@@ -564,8 +540,15 @@ let isAdmin = false;
 // ─── STORAGE HELPERS ────────────────────────────────────────────────────────
 function getAtt(){try{return JSON.parse(localStorage.getItem(KEY_ATT)||'{}')}catch{return{}}}
 function saveAtt(d){localStorage.setItem(KEY_ATT,JSON.stringify(d))}
-function getLeaves(){try{return JSON.parse(localStorage.getItem(KEY_LEAVE)||'[]')}catch{return[]}}
-function saveLeaves(d){localStorage.setItem(KEY_LEAVE,JSON.stringify(d))}
+function getHolidays(){try{return JSON.parse(localStorage.getItem(KEY_HOLIDAYS)||'[]')}catch{return[]}}
+function saveHolidays(d){localStorage.setItem(KEY_HOLIDAYS,JSON.stringify(d))}
+function isSunday(dateStr){ return new Date(dateStr+'T00:00:00').getDay()===0; }
+function getHolidayName(dateStr){
+  if(isSunday(dateStr)) return 'Sunday';
+  const h=getHolidays().find(x=>x.date===dateStr);
+  return h?h.name:null;
+}
+function isHoliday(dateStr){ return getHolidayName(dateStr)!==null; }
 function getIncSalary(){try{return JSON.parse(localStorage.getItem(KEY_INC_SALARY)||'{}')}catch{return{}}}
 function saveIncSalary(d){localStorage.setItem(KEY_INC_SALARY,JSON.stringify(d))}
 
@@ -639,18 +622,27 @@ function doLogin(){
   if(pass!==emp.pass){alert('Wrong password');return}
   currentUser=name;isAdmin=false;
 
-  // Auto-record attendance: login time - 5 min
+  // Auto-record attendance: login time - 5 min (skip "Present" status on holidays)
   const att=getAtt();
   const td=today();
   if(!att[name]) att[name]=[];
   const already=att[name].find(r=>r.date===td);
   if(!already){
     const inTime=attTime5();
-    att[name].push({date:td,in:inTime,out:'',status:'Present'});
-    saveAtt(att);
-    const notice=document.getElementById('att-notice');
-    notice.style.display='block';
-    notice.textContent='✓ Aaj ki attendance automatically record ho gayi — in time: '+inTime;
+    const holidayName=getHolidayName(td);
+    if(holidayName){
+      att[name].push({date:td,in:inTime,out:'',status:'Holiday'});
+      saveAtt(att);
+      const notice=document.getElementById('att-notice');
+      notice.style.display='block';
+      notice.textContent='🎉 Aaj holiday hai ('+holidayName+'), attendance "Holiday" mark hui';
+    } else {
+      att[name].push({date:td,in:inTime,out:'',status:'Present'});
+      saveAtt(att);
+      const notice=document.getElementById('att-notice');
+      notice.style.display='block';
+      notice.textContent='✓ Aaj ki attendance automatically record ho gayi — in time: '+inTime;
+    }
   }
   startApp();
 }
@@ -719,13 +711,12 @@ function startClock(){
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
 function renderDashboard(){
   const att=getAtt(); const td=today();
+  const todayHoliday=getHolidayName(td);
   let present=0,absent=0,onleave=0;
-  const leaves=getLeaves();
 
   EMPLOYEES.forEach(e=>{
     const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
-    const onLv=leaves.find(l=>l.name===e.name&&l.status==='Approved'&&l.from<=td&&l.to>=td);
-    if(onLv) onleave++;
+    if(todayHoliday) onleave++;
     else if(rec&&rec.status==='Present') present++;
     else absent++;
   });
@@ -753,9 +744,8 @@ function renderDashboard(){
     tal.innerHTML='';
     EMPLOYEES.forEach(e=>{
       const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
-      const onLv=leaves.find(l=>l.name===e.name&&l.status==='Approved'&&l.from<=td&&l.to>=td);
       let badge='',inT='—';
-      if(onLv){badge='<span class="badge badge-amber">On leave</span>'}
+      if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge badge-green">Present</span>';inT=rec.in}
       else{badge='<span class="badge badge-red">Absent</span>'}
       tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
@@ -766,24 +756,26 @@ function renderDashboard(){
   const myAtt=att[currentUser]&&att[currentUser].find(r=>r.date===td);
   const as=document.getElementById('dash-att-status');
   if(as){
-    if(myAtt) as.innerHTML='✓ Aaj ki attendance recorded — In: '+myAtt.in;
+    if(todayHoliday) as.innerHTML='🎉 Aaj holiday hai — '+todayHoliday;
+    else if(myAtt) as.innerHTML='✓ Aaj ki attendance recorded — In: '+myAtt.in;
     else as.innerHTML='⚠ Aaj attendance record nahi hua';
   }
 
-  // Pending leaves
+  // Today's status / next holiday
   const pl=document.getElementById('pending-leaves');
   if(pl){
-    const pending=leaves.filter(l=>l.status==='Pending');
-    if(pending.length===0){pl.innerHTML='<p style="color:var(--text2);font-size:13px">Koi pending request nahi</p>'}
-    else{
-      pl.innerHTML=pending.map(l=>`
-        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;align-items:start">
-            <div><p style="font-size:13px;font-weight:500">${l.name} — ${l.type}</p><p style="font-size:11px;color:var(--text2)">${l.from} to ${l.to} (${l.days} days)</p></div>
-            ${isAdmin?`<div style="display:flex;gap:4px"><button class="btn btn-sm btn-primary" onclick="approveLeave('${l.name}','${l.from}')">✓</button><button class="btn btn-sm btn-danger" onclick="rejectLeave('${l.name}','${l.from}')">✗</button></div>`:'<span class="badge badge-amber">Pending</span>'}
-          </div>
-        </div>`).join('');
+    const holidays=getHolidays().filter(h=>h.date>=td).sort((a,b)=>a.date.localeCompare(b.date));
+    const next=holidays[0];
+    let html='';
+    if(todayHoliday){
+      html+=`<div class="alert alert-amber" style="margin-bottom:8px">🎉 Aaj (${td}) holiday hai: <strong>${todayHoliday}</strong></div>`;
     }
+    if(next){
+      html+=`<p style="font-size:13px">Agli holiday: <strong>${next.name}</strong> — ${next.date}</p>`;
+    } else if(!todayHoliday){
+      html+=`<p style="color:var(--text2);font-size:13px">Koi upcoming exchange holiday list mein nahi hai</p>`;
+    }
+    pl.innerHTML=html;
   }
 }
 
@@ -825,7 +817,7 @@ function renderAttendancePage(){
       const recs=att[e.name]||[];
       const p=recs.filter(r=>r.status==='Present').length;
       const lt=recs.filter(r=>r.status==='Late').length;
-      const lv=recs.filter(r=>r.status==='On leave').length;
+      const lv=recs.filter(r=>r.status==='Holiday').length;
       const ab=total-p-lt-lv;
       const pc=Math.round((p/total)*100);
       const bc=pc>=85?'badge-green':pc>=70?'badge-amber':'badge-red';
@@ -862,85 +854,89 @@ function saveManualAtt(){
 
 // ─── LEAVE ───────────────────────────────────────────────────────────────────
 function renderLeavePage(){
-  const leaves=getLeaves();
-  const myLeaves=leaves.filter(l=>l.name===currentUser);
-  const used=myLeaves.filter(l=>l.status==='Approved').reduce((s,l)=>s+l.days,0);
-  const casual=6,sick=4,earned=12,total=casual+sick+earned;
-  const balance=Math.max(0,total-used);
+  const td=today();
+  const holidays=getHolidays().slice().sort((a,b)=>a.date.localeCompare(b.date));
 
-  const mlb=document.getElementById('my-leave-balance');
-  if(mlb) mlb.innerHTML=`
-    <div class="grid4" style="margin-bottom:0">
-      <div class="metric"><div class="m-lbl">Casual</div><div class="m-val">${casual}</div></div>
-      <div class="metric"><div class="m-lbl">Sick</div><div class="m-val">${sick}</div></div>
-      <div class="metric"><div class="m-lbl">Used</div><div class="m-val" style="color:var(--amber)">${used}</div></div>
-      <div class="metric"><div class="m-lbl">Balance</div><div class="m-val" style="color:var(--green)">${balance}</div></div>
-    </div>`;
-
-  const mlh=document.getElementById('my-leave-history');
-  if(mlh){
-    if(myLeaves.length===0){mlh.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">Koi leave nahi li</td></tr>'}
-    else mlh.innerHTML=myLeaves.map(l=>{
-      const bc=l.status==='Approved'?'badge-green':l.status==='Rejected'?'badge-red':'badge-amber';
-      return `<tr><td>${l.type}</td><td>${l.from}</td><td>${l.to}</td><td>${l.days}</td><td><span class="badge ${bc}">${l.status}</span></td></tr>`;
-    }).join('');
-  }
-
-  if(isAdmin){
-    const apl=document.getElementById('admin-pending-leaves');
-    const pending=leaves.filter(l=>l.status==='Pending');
-    if(apl){
-      if(pending.length===0){apl.innerHTML='<p style="color:var(--text2);font-size:13px">Koi pending nahi</p>'}
-      else apl.innerHTML=pending.map(l=>`
-        <div style="padding:10px 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between">
-            <div><p style="font-size:13px;font-weight:500">${l.name} — ${l.type}</p><p style="font-size:11px;color:var(--text2)">${l.from} → ${l.to} (${l.days} days)</p><p style="font-size:11px;color:var(--text3);margin-top:2px">${l.reason}</p></div>
-            <div style="display:flex;gap:6px;align-items:start">
-              <button class="btn btn-sm btn-primary" onclick="approveLeave('${l.name}','${l.from}')">Approve</button>
-              <button class="btn btn-sm btn-danger" onclick="rejectLeave('${l.name}','${l.from}')">Reject</button>
-            </div>
-          </div>
-        </div>`).join('');
+  // Holiday list card (everyone sees this)
+  const hl=document.getElementById('holiday-list');
+  if(hl){
+    const upcoming=holidays.filter(h=>h.date>=td);
+    const past=holidays.filter(h=>h.date<td);
+    let html='<table style="width:100%;font-size:13px">';
+    html+='<tr><td colspan="3" style="padding:4px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Har Sunday</td></tr>';
+    html+='<tr><td colspan="3" style="padding:4px 0;color:var(--text2)">Weekly off — automatically applies</td></tr>';
+    if(upcoming.length){
+      html+='<tr><td colspan="3" style="padding:8px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Upcoming exchange holidays</td></tr>';
+      upcoming.forEach(h=>{
+        html+=`<tr><td style="padding:4px 0">${h.date}</td><td style="padding:4px 0">${h.name}</td>`;
+        html+= isAdmin ? `<td style="text-align:right"><button class="btn btn-sm btn-danger" onclick="removeHoliday('${h.date}')">Remove</button></td></tr>` : `<td></td></tr>`;
+      });
     }
+    if(past.length){
+      html+='<tr><td colspan="3" style="padding:8px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Past holidays</td></tr>';
+      past.slice(-5).reverse().forEach(h=>{
+        html+=`<tr><td style="padding:4px 0;color:var(--text3)">${h.date}</td><td style="padding:4px 0;color:var(--text3)">${h.name}</td><td></td></tr>`;
+      });
+    }
+    html+='</table>';
+    if(!upcoming.length && !past.length){
+      html+='<p style="font-size:12px;color:var(--text3);margin-top:6px">Koi exchange holiday abhi add nahi hui</p>';
+    }
+    hl.innerHTML=html;
+  }
 
-    const tlt=document.getElementById('team-leave-table');
-    if(tlt) tlt.innerHTML=EMPLOYEES.map(e=>{
-      const el=leaves.filter(l=>l.name===e.name&&l.status==='Approved').reduce((s,l)=>s+l.days,0);
-      const bal=Math.max(0,22-el);
-      const bc=bal>=10?'badge-green':bal>=5?'badge-amber':'badge-red';
-      return `<tr><td>${e.name}</td><td>6</td><td>4</td><td>${el}</td><td><span class="badge ${bc}">${bal}</span></td></tr>`;
-    }).join('');
+  // Holiday list for admin add form (mirrors same data, simpler list)
+  if(isAdmin){
+    // nothing extra needed — uses same #holiday-list rendering above
+  }
+
+  // My attendance summary this month
+  const mls=document.getElementById('my-leave-summary');
+  if(mls){
+    const att=getAtt();
+    const myRecs=att[currentUser]||[];
+    const present=myRecs.filter(r=>r.status==='Present'||r.status==='Late').length;
+    const month=td.slice(0,7);
+    const sundaysInMonth=countSundaysInMonth(month);
+    const holidaysInMonth=holidays.filter(h=>h.date.startsWith(month)).length;
+    mls.innerHTML=`
+      <table style="width:100%;font-size:13px">
+        <tr><td style="color:var(--text2);padding:5px 0">Present days</td><td style="text-align:right">${present}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Sundays is mahine</td><td style="text-align:right">${sundaysInMonth}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Exchange holidays is mahine</td><td style="text-align:right">${holidaysInMonth}</td></tr>
+      </table>`;
   }
 }
 
-function applyLeave(){
-  const type=document.getElementById('lv-type').value;
-  const from=document.getElementById('lv-from').value;
-  const to=document.getElementById('lv-to').value;
-  const reason=document.getElementById('lv-reason').value.trim();
-  if(!from||!to){alert('Dates chunein');return}
-  if(from>to){alert('From date, to date se pehle honi chahiye');return}
-  const days=daysBetween(from,to);
-  const leaves=getLeaves();
-  leaves.push({name:currentUser,type,from,to,days,reason,status:'Pending'});
-  saveLeaves(leaves);
-  renderLeavePage();renderDashboard();
-  document.getElementById('lv-from').value='';
-  document.getElementById('lv-to').value='';
-  document.getElementById('lv-reason').value='';
-  alert('Leave apply ho gayi! Admin se approval ka wait karein.');
+function countSundaysInMonth(yyyyMm){
+  const [y,m]=yyyyMm.split('-').map(Number);
+  const daysInMonth=new Date(y,m,0).getDate();
+  let count=0;
+  for(let d=1;d<=daysInMonth;d++){
+    if(new Date(y,m-1,d).getDay()===0) count++;
+  }
+  return count;
 }
 
-function approveLeave(name,from){
-  const leaves=getLeaves();
-  const idx=leaves.findIndex(l=>l.name===name&&l.from===from);
-  if(idx>=0){leaves[idx].status='Approved';saveLeaves(leaves);}
+function addHoliday(){
+  const date=document.getElementById('hol-date').value;
+  const name=document.getElementById('hol-name').value.trim();
+  if(!date||!name){alert('Date aur naam dono daalein');return}
+  if(isSunday(date)){alert('Yeh date pehle se Sunday hai, alag se add karne ki zaroorat nahi');return}
+  const holidays=getHolidays();
+  if(holidays.find(h=>h.date===date)){alert('Yeh date pehle se list mein hai');return}
+  holidays.push({date,name});
+  saveHolidays(holidays);
+  document.getElementById('hol-date').value='';
+  document.getElementById('hol-name').value='';
   renderLeavePage();renderDashboard();
+  alert('Holiday add ho gayi: '+name+' ('+date+')');
 }
-function rejectLeave(name,from){
-  const leaves=getLeaves();
-  const idx=leaves.findIndex(l=>l.name===name&&l.from===from);
-  if(idx>=0){leaves[idx].status='Rejected';saveLeaves(leaves);}
+
+function removeHoliday(date){
+  let holidays=getHolidays();
+  holidays=holidays.filter(h=>h.date!==date);
+  saveHolidays(holidays);
   renderLeavePage();renderDashboard();
 }
 
