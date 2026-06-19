@@ -64,6 +64,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .card-title{font-size:14px;font-weight:600;margin-bottom:1rem;color:var(--text)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
 .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1rem}
+/* grid-flat: every direct .card child sits in its own column — true side-by-side, no vertical stacking inside a column */
+.grid-flat{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;align-items:start}
+.grid-flat>.card{margin-bottom:0}
 
 /* METRICS */
 .metric{background:var(--surface2);border-radius:var(--radius-sm);padding:1rem;text-align:center}
@@ -252,105 +255,97 @@ tr:hover td{background:var(--surface2)}
 
     <!-- ATTENDANCE -->
     <div id="page-attendance" class="page">
-      <div class="grid2">
-        <div>
-          <div class="card">
-            <div class="card-title">Meri attendance — June 2026</div>
-            <div id="my-att-summary"></div>
-          </div>
-          <div class="card">
-            <div class="card-title">Is mahine ka log</div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th></tr></thead>
-                <tbody id="my-att-log"></tbody>
-              </table>
-            </div>
+      <div class="grid-flat">
+        <div class="card">
+          <div class="card-title">Meri attendance — June 2026</div>
+          <div id="my-att-summary"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Is mahine ka log</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th></tr></thead>
+              <tbody id="my-att-log"></tbody>
+            </table>
           </div>
         </div>
-        <div>
-          <div class="card admin-only" style="display:none">
-            <div class="card-title">Team attendance — June 2026</div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr><th>Employee</th><th>Present</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
-                <tbody id="team-att-table"></tbody>
-              </table>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Team attendance — June 2026</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Employee</th><th>Present</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
+              <tbody id="team-att-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Manual attendance mark karein</div>
+          <div class="form-row">
+            <div class="field-inline"><label>Employee</label>
+              <select id="man-emp">
+                <option>Puja</option><option>Rohit</option><option>Raju</option><option>Komal</option>
+                <option>Riya</option><option>Bharat</option><option>Khokhan</option><option>Megha</option><option>Anjali</option>
+              </select>
+            </div>
+            <div class="field-inline"><label>Status</label>
+              <select id="man-status"><option>Present</option><option>Absent</option><option>Half day</option><option>Late</option><option>On leave</option></select>
             </div>
           </div>
-          <div class="card admin-only" style="display:none">
-            <div class="card-title">Manual attendance mark karein</div>
-            <div class="form-row">
-              <div class="field-inline"><label>Employee</label>
-                <select id="man-emp">
-                  <option>Puja</option><option>Rohit</option><option>Raju</option><option>Komal</option>
-                  <option>Riya</option><option>Bharat</option><option>Khokhan</option><option>Megha</option><option>Anjali</option>
-                </select>
-              </div>
-              <div class="field-inline"><label>Status</label>
-                <select id="man-status"><option>Present</option><option>Absent</option><option>Half day</option><option>Late</option><option>On leave</option></select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="field-inline"><label>In time</label><input type="time" id="man-in" value="09:00"></div>
-              <div class="field-inline"><label>Out time</label><input type="time" id="man-out" value="18:00"></div>
-            </div>
-            <div class="form-row single">
-              <div class="field-inline"><label>Date</label><input type="date" id="man-date"></div>
-            </div>
-            <button class="btn btn-primary" onclick="saveManualAtt()">Attendance save karein</button>
+          <div class="form-row">
+            <div class="field-inline"><label>In time</label><input type="time" id="man-in" value="09:00"></div>
+            <div class="field-inline"><label>Out time</label><input type="time" id="man-out" value="18:00"></div>
           </div>
+          <div class="form-row single">
+            <div class="field-inline"><label>Date</label><input type="date" id="man-date"></div>
+          </div>
+          <button class="btn btn-primary" onclick="saveManualAtt()">Attendance save karein</button>
         </div>
       </div>
     </div>
 
     <!-- LEAVE -->
     <div id="page-leave" class="page">
-      <div class="grid2">
-        <div>
-          <div class="card">
-            <div class="card-title">Meri leave balance</div>
-            <div id="my-leave-balance"></div>
+      <div class="grid-flat">
+        <div class="card">
+          <div class="card-title">Meri leave balance</div>
+          <div id="my-leave-balance"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Leave apply karein</div>
+          <div class="form-row single">
+            <div class="field-inline"><label>Leave type</label>
+              <select id="lv-type"><option>Casual leave</option><option>Sick leave</option><option>Earned leave</option></select>
+            </div>
           </div>
-          <div class="card">
-            <div class="card-title">Leave apply karein</div>
-            <div class="form-row single">
-              <div class="field-inline"><label>Leave type</label>
-                <select id="lv-type"><option>Casual leave</option><option>Sick leave</option><option>Earned leave</option></select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="field-inline"><label>From date</label><input type="date" id="lv-from"></div>
-              <div class="field-inline"><label>To date</label><input type="date" id="lv-to"></div>
-            </div>
-            <div class="form-row single">
-              <div class="field-inline"><label>Reason</label><input type="text" id="lv-reason" placeholder="Short reason..."></div>
-            </div>
-            <button class="btn btn-primary" onclick="applyLeave()">Apply karein</button>
+          <div class="form-row">
+            <div class="field-inline"><label>From date</label><input type="date" id="lv-from"></div>
+            <div class="field-inline"><label>To date</label><input type="date" id="lv-to"></div>
+          </div>
+          <div class="form-row single">
+            <div class="field-inline"><label>Reason</label><input type="text" id="lv-reason" placeholder="Short reason..."></div>
+          </div>
+          <button class="btn btn-primary" onclick="applyLeave()">Apply karein</button>
+        </div>
+        <div class="card">
+          <div class="card-title">Leave history</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
+              <tbody id="my-leave-history"></tbody>
+            </table>
           </div>
         </div>
-        <div>
-          <div class="card">
-            <div class="card-title">Leave history</div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
-                <tbody id="my-leave-history"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="card admin-only" style="display:none">
-            <div class="card-title">Pending approvals</div>
-            <div id="admin-pending-leaves"></div>
-          </div>
-          <div class="card admin-only" style="display:none">
-            <div class="card-title">Team leave balance</div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr><th>Employee</th><th>Casual</th><th>Sick</th><th>Used</th><th>Balance</th></tr></thead>
-                <tbody id="team-leave-table"></tbody>
-              </table>
-            </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Pending approvals</div>
+          <div id="admin-pending-leaves"></div>
+        </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Team leave balance</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Employee</th><th>Casual</th><th>Sick</th><th>Used</th><th>Balance</th></tr></thead>
+              <tbody id="team-leave-table"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -358,48 +353,44 @@ tr:hover td{background:var(--surface2)}
 
     <!-- SALARY -->
     <div id="page-salary" class="page compact-page">
-      <div class="grid2">
-        <div>
-          <div class="card">
-            <div class="card-title">Meri salary — June 2026</div>
-            <div id="my-salary-card"></div>
-          </div>
+      <div class="grid-flat">
+        <div class="card">
+          <div class="card-title">Meri salary — June 2026</div>
+          <div id="my-salary-card"></div>
         </div>
-        <div class="admin-only" style="display:none">
-          <div class="card">
-            <div class="card-title">Salary calculator</div>
-            <div class="compact-grid3">
-              <div class="field-inline"><label>Employee</label>
-                <select id="sal-emp" onchange="calcSalary()">
-                  <option value="Puja">Puja</option>
-                  <option value="Rohit">Rohit</option>
-                  <option value="Raju">Raju</option>
-                  <option value="Komal">Komal</option>
-                  <option value="Riya">Riya</option>
-                  <option value="Bharat">Bharat</option>
-                  <option value="Khokhan">Khokhan</option>
-                  <option value="Megha">Megha</option>
-                  <option value="Anjali">Anjali</option>
-                </select>
-              </div>
-              <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
-              <div class="field-inline"><label>Days present</label><input type="number" id="sal-days" value="17" min="0" max="26" onchange="calcSalary()"></div>
-              <div class="field-inline"><label>Working days</label><input type="number" id="sal-wdays" value="26" min="20" max="27" onchange="calcSalary()"></div>
-              <div class="field-inline"><label>Deductions (₹)</label><input type="number" id="sal-ded" value="0" onchange="calcSalary()"></div>
-              <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Salary calculator</div>
+          <div class="compact-grid3">
+            <div class="field-inline"><label>Employee</label>
+              <select id="sal-emp" onchange="calcSalary()">
+                <option value="Puja">Puja</option>
+                <option value="Rohit">Rohit</option>
+                <option value="Raju">Raju</option>
+                <option value="Komal">Komal</option>
+                <option value="Riya">Riya</option>
+                <option value="Bharat">Bharat</option>
+                <option value="Khokhan">Khokhan</option>
+                <option value="Megha">Megha</option>
+                <option value="Anjali">Anjali</option>
+              </select>
             </div>
-            <hr class="divider">
-            <div id="sal-result"></div>
-            <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generate ho gaya! (Demo)')">Salary slip download</button>
+            <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
+            <div class="field-inline"><label>Days present</label><input type="number" id="sal-days" value="17" min="0" max="26" onchange="calcSalary()"></div>
+            <div class="field-inline"><label>Working days</label><input type="number" id="sal-wdays" value="26" min="20" max="27" onchange="calcSalary()"></div>
+            <div class="field-inline"><label>Deductions (₹)</label><input type="number" id="sal-ded" value="0" onchange="calcSalary()"></div>
+            <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
           </div>
-          <div class="card">
-            <div class="card-title">Team salary summary</div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr><th>Employee</th><th>Basic</th><th>Earned</th><th>Deduction</th><th>Net</th></tr></thead>
-                <tbody id="team-salary-table"></tbody>
-              </table>
-            </div>
+          <hr class="divider">
+          <div id="sal-result"></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generate ho gaya! (Demo)')">Salary slip download</button>
+        </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Team salary summary</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Earned</th><th>Deduction</th><th>Net</th></tr></thead>
+              <tbody id="team-salary-table"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -407,70 +398,66 @@ tr:hover td{background:var(--surface2)}
 
     <!-- INCENTIVE -->
     <div id="page-incentive" class="page compact-page">
-      <div class="grid2">
-        <div>
-          <div class="card">
-            <div class="card-title">Meri Incentive — March 2026</div>
-            <div id="my-incentive-card"></div>
-          </div>
-          <div class="card">
-            <div class="card-title">Incentive formula</div>
-            <table style="font-size:12.5px;width:100%">
-              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &lt; 3× Salary</td><td style="text-align:right">Incentive = ₹0</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">3× ≤ Brokerage &lt; 10× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 5%</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">Brokerage ≥ 10× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 7%</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">Demat account opening</td><td style="text-align:right">₹600 / account</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">MF Sale incentive</td><td style="text-align:right" id="formula-mf-rate">—</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">SIP incentive</td><td style="text-align:right" id="formula-sip-rate">—</td></tr>
-            </table>
-          </div>
+      <div class="grid-flat">
+        <div class="card">
+          <div class="card-title">Meri Incentive — March 2026</div>
+          <div id="my-incentive-card"></div>
         </div>
-        <div class="admin-only" style="display:none">
-          <div class="card">
-            <div class="card-title">MF / SIP incentive rates</div>
-            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Ek baar set karein, sab employees ke liye yahi rate use hoga</p>
-            <div class="form-row">
-              <div class="field-inline"><label>MF Sale incentive (%)</label><input type="number" step="0.1" id="mf-rate" placeholder="e.g. 0.5"></div>
-              <div class="field-inline"><label>SIP incentive (%)</label><input type="number" step="0.1" id="sip-rate" placeholder="e.g. 0.5"></div>
-            </div>
-            <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Rates save karein</button>
+        <div class="card">
+          <div class="card-title">Incentive formula</div>
+          <table style="font-size:12.5px;width:100%">
+            <tr><td style="color:var(--text2);padding:5px 0">Brokerage &lt; 3× Salary</td><td style="text-align:right">Incentive = ₹0</td></tr>
+            <tr><td style="color:var(--text2);padding:5px 0">3× ≤ Brokerage &lt; 10× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 5%</td></tr>
+            <tr><td style="color:var(--text2);padding:5px 0">Brokerage ≥ 10× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 7%</td></tr>
+            <tr><td style="color:var(--text2);padding:5px 0">Demat account opening</td><td style="text-align:right">₹600 / account</td></tr>
+            <tr><td style="color:var(--text2);padding:5px 0">MF Sale incentive</td><td style="text-align:right" id="formula-mf-rate">—</td></tr>
+            <tr><td style="color:var(--text2);padding:5px 0">SIP incentive</td><td style="text-align:right" id="formula-sip-rate">—</td></tr>
+          </table>
+        </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">MF / SIP incentive rates</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Ek baar set karein, sab employees ke liye yahi rate use hoga</p>
+          <div class="form-row">
+            <div class="field-inline"><label>MF Sale incentive (%)</label><input type="number" step="0.1" id="mf-rate" placeholder="e.g. 0.5"></div>
+            <div class="field-inline"><label>SIP incentive (%)</label><input type="number" step="0.1" id="sip-rate" placeholder="e.g. 0.5"></div>
           </div>
-          <div class="card">
-            <div class="card-title">March 2026 business figures</div>
-            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
-            <div class="compact-grid3">
-              <div class="field-inline"><label>Employee</label>
-                <select id="inc-emp" onchange="loadIncEmp()">
-                  <option value="Riya">Riya</option>
-                  <option value="Khokhan">Khokhan</option>
-                  <option value="Raju">Raju</option>
-                  <option value="Puja">Puja</option>
-                  <option value="Rohit">Rohit</option>
-                  <option value="Bharat">Bharat</option>
-                  <option value="Komal">Komal</option>
-                  <option value="Megha">Megha</option>
-                  <option value="Anjali">Anjali</option>
-                </select>
-              </div>
-              <div class="field-inline"><label>Salary</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
-              <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200"></div>
-              <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="1"></div>
-              <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
-              <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
+          <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Rates save karein</button>
+        </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">March 2026 business figures</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
+          <div class="compact-grid3">
+            <div class="field-inline"><label>Employee</label>
+              <select id="inc-emp" onchange="loadIncEmp()">
+                <option value="Riya">Riya</option>
+                <option value="Khokhan">Khokhan</option>
+                <option value="Raju">Raju</option>
+                <option value="Puja">Puja</option>
+                <option value="Rohit">Rohit</option>
+                <option value="Bharat">Bharat</option>
+                <option value="Komal">Komal</option>
+                <option value="Megha">Megha</option>
+                <option value="Anjali">Anjali</option>
+              </select>
             </div>
-            <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Business figures save karein</button>
-            <p style="font-size:11px;color:var(--text3);margin-top:8px">Salary change karne ke liye <a href="#" onclick="document.querySelector('.nav-tab[onclick*=employees]').click();return false" style="color:var(--accent)">Employees page</a> pe jaayein</p>
-            <hr class="divider">
-            <div id="inc-result"></div>
+            <div class="field-inline"><label>Salary</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
+            <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200"></div>
+            <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="1"></div>
+            <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
+            <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
           </div>
-          <div class="card">
-            <div class="card-title">Team incentive — March 2026</div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
-                <tbody id="team-incentive-table"></tbody>
-              </table>
-            </div>
+          <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Business figures save karein</button>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">Salary change karne ke liye <a href="#" onclick="document.querySelector('.nav-tab[onclick*=employees]').click();return false" style="color:var(--accent)">Employees page</a> pe jaayein</p>
+          <hr class="divider">
+          <div id="inc-result"></div>
+        </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Team incentive — March 2026</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
+              <tbody id="team-incentive-table"></tbody>
+            </table>
           </div>
         </div>
       </div>
