@@ -408,7 +408,7 @@ tr:hover td{background:var(--surface2)}
             <table style="font-size:12.5px;width:100%">
               <tr><td style="color:var(--text2);padding:5px 0">Brokerage ≤ 3× Salary</td><td style="text-align:right">Incentive = ₹0</td></tr>
               <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 3× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 5%</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 10× Salary</td><td style="text-align:right">+ Extra 2% on full Brokerage</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 10× Salary</td><td style="text-align:right">Excess × 7% (5%+2%)</td></tr>
             </table>
           </div>
         </div>
@@ -548,17 +548,22 @@ function getIncSalary(){try{return JSON.parse(localStorage.getItem(KEY_INC_SALAR
 function saveIncSalary(d){localStorage.setItem(KEY_INC_SALARY,JSON.stringify(d))}
 
 // Brokerage incentive formula:
-// Brokerage <= 3x Salary => 0
-// Brokerage > 3x Salary  => (Brokerage - 3xSalary) * 5%
-// Brokerage > 10x Salary => + extra 2% on full Brokerage
+// Brokerage <= 3x Salary             => Incentive = 0
+// 3x Salary < Brokerage <= 10x Salary => Excess(over 3x) * 5%
+// Brokerage > 10x Salary              => Excess(over 3x) * 7%  (5%+2% combined, both on same excess)
 function brokerageIncentive(salary, brokerage){
   salary=Number(salary)||0; brokerage=Number(brokerage)||0;
   const t3=salary*3, t10=salary*10;
-  let inc=0, base5=0, extra2=0;
-  if(brokerage>t3){ base5=(brokerage-t3)*0.05; }
-  if(brokerage>t10){ extra2=brokerage*0.02; }
-  inc=base5+extra2;
-  return {threshold3:t3, threshold10:t10, base5, extra2, total:inc};
+  const excess=Math.max(0,brokerage-t3);
+  let base5=0, extra2=0;
+  if(brokerage>t3 && brokerage<=t10){
+    base5=excess*0.05;
+  } else if(brokerage>t10){
+    base5=excess*0.05;
+    extra2=excess*0.02;
+  }
+  const inc=base5+extra2;
+  return {threshold3:t3, threshold10:t10, excess, base5, extra2, total:inc};
 }
 
 function fmt(n){return '₹'+Math.round(n).toLocaleString('en-IN')}
@@ -965,8 +970,9 @@ function renderIncentivePage(){
       <table style="font-size:13px;width:100%">
         <tr><td style="color:var(--text2);padding:5px 0">Total brokerage (Mar 2026)</td><td style="text-align:right">${fmt(myBrok)}</td></tr>
         <tr><td style="color:var(--text2);padding:5px 0">3× Salary threshold</td><td style="text-align:right">${fmt(r.threshold3)}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">5% on excess brokerage</td><td style="text-align:right">${fmt(r.base5)}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (if &gt;10× salary)</td><td style="text-align:right">${fmt(r.extra2)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Excess over 3× Salary</td><td style="text-align:right">${fmt(r.excess)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">5% incentive (on excess)</td><td style="text-align:right">${fmt(r.base5)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (on excess, if &gt;10× salary)</td><td style="text-align:right">${fmt(r.extra2)}</td></tr>
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.total)}</td></tr>
       </table>`;
   }
@@ -1026,9 +1032,9 @@ function calcIncentive(){
     <table style="font-size:13px;width:100%">
       <tr><td style="color:var(--text2);padding:5px 0">3× Salary</td><td style="text-align:right">${fmt(r.threshold3)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">10× Salary</td><td style="text-align:right">${fmt(r.threshold10)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Excess over 3×</td><td style="text-align:right">${fmt(Math.max(0,brok-r.threshold3))}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">5% incentive</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.base5)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (10× crossed)</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.extra2)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Excess over 3×</td><td style="text-align:right">${fmt(r.excess)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">5% incentive (on excess)</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.base5)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (on excess, 10× crossed)</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.extra2)}</td></tr>
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.total)}</td></tr>
     </table>`;
 }
