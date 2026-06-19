@@ -190,6 +190,7 @@ tr:hover td{background:var(--surface2)}
     <button class="nav-tab" onclick="showPage('attendance',this)">Attendance</button>
     <button class="nav-tab" onclick="showPage('leave',this)">Leave</button>
     <button class="nav-tab" onclick="showPage('salary',this)">Salary</button>
+    <button class="nav-tab" onclick="showPage('incentive',this)">Incentive</button>
     <button class="nav-tab admin-only" onclick="showPage('employees',this)" style="display:none">Employees</button>
     <button class="nav-tab admin-only" onclick="showPage('reports',this)" style="display:none">Reports</button>
   </div>
@@ -394,6 +395,63 @@ tr:hover td{background:var(--surface2)}
       </div>
     </div>
 
+    <!-- INCENTIVE -->
+    <div id="page-incentive" class="page">
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <div class="card-title">Meri Brokerage Incentive — March 2026</div>
+            <div id="my-incentive-card"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Incentive formula</div>
+            <table style="font-size:12.5px;width:100%">
+              <tr><td style="color:var(--text2);padding:5px 0">Brokerage ≤ 3× Salary</td><td style="text-align:right">Incentive = ₹0</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 3× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 5%</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 10× Salary</td><td style="text-align:right">+ Extra 2% on full Brokerage</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="admin-only" style="display:none">
+          <div class="card">
+            <div class="card-title">Incentive calculator</div>
+            <div class="form-row">
+              <div class="field-inline"><label>Employee</label>
+                <select id="inc-emp" onchange="loadIncEmp()">
+                  <option value="Riya">Riya</option>
+                  <option value="Khokhan">Khokhan</option>
+                  <option value="Raju">Raju</option>
+                  <option value="Puja">Puja</option>
+                  <option value="Rohit">Rohit</option>
+                  <option value="Bharat">Bharat</option>
+                  <option value="Komal">Komal</option>
+                  <option value="Megha">Megha</option>
+                  <option value="Anjali">Anjali</option>
+                </select>
+              </div>
+              <div class="field-inline"><label>Month</label><select><option>March 2026</option><option>June 2026</option></select></div>
+            </div>
+            <div class="form-row">
+              <div class="field-inline"><label>Monthly salary (₹)</label><input type="number" id="inc-salary" value="32000" onchange="calcIncentive()"></div>
+              <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200" onchange="calcIncentive()"></div>
+            </div>
+            <hr class="divider">
+            <div id="inc-result"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Team incentive — March 2026 (actual data)</div>
+            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Salary daalein, baaki sab auto-calculate hoga</p>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Employee</th><th>Brokerage</th><th>Salary</th><th>3× Salary</th><th>Incentive</th></tr></thead>
+                <tbody id="team-incentive-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- EMPLOYEES (admin only) -->
     <div id="page-employees" class="page">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -466,10 +524,17 @@ const EMPLOYEES = [
 ];
 const ADMIN_PASS = 'admin123';
 
+// March 2026 actual brokerage turnover (from INCENTIVE file, MAR2026 sheet)
+const BROKERAGE_MAR2026 = {
+  'Riya': 75200, 'Khokhan': 83183, 'Raju': 403815, 'Puja': 114148,
+  'Rohit': 77393, 'Bharat': 28564, 'Komal': 0, 'Megha': 0, 'Anjali': 0
+};
+
 // localStorage keys
 const KEY_ATT = 'dnihr_attendance';    // {name: [{date,in,out,status}]}
 const KEY_LEAVE = 'dnihr_leaves';       // [{name,type,from,to,days,status,reason}]
 const KEY_USER = 'dnihr_user';
+const KEY_INC_SALARY = 'dnihr_inc_salary'; // {name: salary} for incentive calc
 
 let currentUser = null;
 let isAdmin = false;
@@ -479,6 +544,23 @@ function getAtt(){try{return JSON.parse(localStorage.getItem(KEY_ATT)||'{}')}cat
 function saveAtt(d){localStorage.setItem(KEY_ATT,JSON.stringify(d))}
 function getLeaves(){try{return JSON.parse(localStorage.getItem(KEY_LEAVE)||'[]')}catch{return[]}}
 function saveLeaves(d){localStorage.setItem(KEY_LEAVE,JSON.stringify(d))}
+function getIncSalary(){try{return JSON.parse(localStorage.getItem(KEY_INC_SALARY)||'{}')}catch{return{}}}
+function saveIncSalary(d){localStorage.setItem(KEY_INC_SALARY,JSON.stringify(d))}
+
+// Brokerage incentive formula:
+// Brokerage <= 3x Salary => 0
+// Brokerage > 3x Salary  => (Brokerage - 3xSalary) * 5%
+// Brokerage > 10x Salary => + extra 2% on full Brokerage
+function brokerageIncentive(salary, brokerage){
+  salary=Number(salary)||0; brokerage=Number(brokerage)||0;
+  const t3=salary*3, t10=salary*10;
+  let inc=0, base5=0, extra2=0;
+  if(brokerage>t3){ base5=(brokerage-t3)*0.05; }
+  if(brokerage>t10){ extra2=brokerage*0.02; }
+  inc=base5+extra2;
+  return {threshold3:t3, threshold10:t10, base5, extra2, total:inc};
+}
+
 function fmt(n){return '₹'+Math.round(n).toLocaleString('en-IN')}
 function initials(n){return n.split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2)}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -549,6 +631,7 @@ function startApp(){
   renderAttendancePage();
   renderLeavePage();
   renderSalaryPage();
+  renderIncentivePage();
   if(isAdmin) renderEmployees();
   calcSalary();
 }
@@ -863,6 +946,93 @@ function calcSalary(){
     </table>`;
 }
 
+// ─── INCENTIVE ───────────────────────────────────────────────────────────────
+function renderIncentivePage(){
+  const incSal=getIncSalary();
+
+  // My incentive card
+  const mySalary=incSal[currentUser]||(EMPLOYEES.find(e=>e.name===currentUser)||{}).salary||0;
+  const myBrok=BROKERAGE_MAR2026[currentUser]||0;
+  const r=brokerageIncentive(mySalary,myBrok);
+  const mic=document.getElementById('my-incentive-card');
+  if(mic){
+    mic.innerHTML=`
+      <div class="form-row single" style="margin-bottom:10px">
+        <div class="field-inline"><label>Meri salary (₹) — edit kar sakte hain</label>
+          <input type="number" id="my-inc-salary" value="${mySalary}" onchange="updateMySalary(this.value)">
+        </div>
+      </div>
+      <table style="font-size:13px;width:100%">
+        <tr><td style="color:var(--text2);padding:5px 0">Total brokerage (Mar 2026)</td><td style="text-align:right">${fmt(myBrok)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">3× Salary threshold</td><td style="text-align:right">${fmt(r.threshold3)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">5% on excess brokerage</td><td style="text-align:right">${fmt(r.base5)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (if &gt;10× salary)</td><td style="text-align:right">${fmt(r.extra2)}</td></tr>
+        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.total)}</td></tr>
+      </table>`;
+  }
+
+  if(isAdmin){
+    const tit=document.getElementById('team-incentive-table');
+    if(tit){
+      tit.innerHTML=EMPLOYEES.map(e=>{
+        const sal=incSal[e.name]!==undefined?incSal[e.name]:e.salary;
+        const brok=BROKERAGE_MAR2026[e.name]||0;
+        const rr=brokerageIncentive(sal,brok);
+        return `<tr>
+          <td>${e.name}</td>
+          <td>${fmt(brok)}</td>
+          <td><input type="number" value="${sal}" style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px" onchange="updateTeamSalary('${e.name}',this.value)"></td>
+          <td>${fmt(rr.threshold3)}</td>
+          <td style="font-weight:600;color:${rr.total>0?'var(--green)':'var(--text3)'}">${fmt(rr.total)}</td>
+        </tr>`;
+      }).join('');
+    }
+    loadIncEmp();
+  }
+}
+
+function updateMySalary(val){
+  const incSal=getIncSalary();
+  incSal[currentUser]=parseInt(val)||0;
+  saveIncSalary(incSal);
+  renderIncentivePage();
+}
+
+function updateTeamSalary(name,val){
+  const incSal=getIncSalary();
+  incSal[name]=parseInt(val)||0;
+  saveIncSalary(incSal);
+  renderIncentivePage();
+}
+
+function loadIncEmp(){
+  const sel=document.getElementById('inc-emp');
+  if(!sel) return;
+  const name=sel.value;
+  const incSal=getIncSalary();
+  const sal=incSal[name]!==undefined?incSal[name]:(EMPLOYEES.find(e=>e.name===name)||{}).salary||32000;
+  const brok=BROKERAGE_MAR2026[name]||0;
+  document.getElementById('inc-salary').value=sal;
+  document.getElementById('inc-brok').value=brok;
+  calcIncentive();
+}
+
+function calcIncentive(){
+  const salary=parseInt(document.getElementById('inc-salary').value)||0;
+  const brok=parseInt(document.getElementById('inc-brok').value)||0;
+  const r=brokerageIncentive(salary,brok);
+  const el=document.getElementById('inc-result');
+  if(el) el.innerHTML=`
+    <table style="font-size:13px;width:100%">
+      <tr><td style="color:var(--text2);padding:5px 0">3× Salary</td><td style="text-align:right">${fmt(r.threshold3)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">10× Salary</td><td style="text-align:right">${fmt(r.threshold10)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Excess over 3×</td><td style="text-align:right">${fmt(Math.max(0,brok-r.threshold3))}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">5% incentive</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.base5)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (10× crossed)</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.extra2)}</td></tr>
+      <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.total)}</td></tr>
+    </table>`;
+}
+
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────
 function renderEmployees(){
   const et=document.getElementById('emp-table');
@@ -898,6 +1068,7 @@ function showPage(id,btn){
   if(id==='attendance') renderAttendancePage();
   if(id==='leave') renderLeavePage();
   if(id==='salary') renderSalaryPage();
+  if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
 }
