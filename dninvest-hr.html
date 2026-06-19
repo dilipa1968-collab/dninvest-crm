@@ -357,15 +357,15 @@ tr:hover td{background:var(--surface2)}
             <div class="form-row">
               <div class="field-inline"><label>Employee</label>
                 <select id="sal-emp" onchange="calcSalary()">
-                  <option value="Puja|32000">Puja — ₹32,000</option>
-                  <option value="Rohit|30000">Rohit — ₹30,000</option>
-                  <option value="Raju|35000">Raju — ₹35,000</option>
-                  <option value="Komal|31000">Komal — ₹31,000</option>
-                  <option value="Riya|28000">Riya — ₹28,000</option>
-                  <option value="Bharat|33000">Bharat — ₹33,000</option>
-                  <option value="Khokhan|36000">Khokhan — ₹36,000</option>
-                  <option value="Megha|29000">Megha — ₹29,000</option>
-                  <option value="Anjali|31500">Anjali — ₹31,500</option>
+                  <option value="Puja">Puja</option>
+                  <option value="Rohit">Rohit</option>
+                  <option value="Raju">Raju</option>
+                  <option value="Komal">Komal</option>
+                  <option value="Riya">Riya</option>
+                  <option value="Bharat">Bharat</option>
+                  <option value="Khokhan">Khokhan</option>
+                  <option value="Megha">Megha</option>
+                  <option value="Anjali">Anjali</option>
                 </select>
               </div>
               <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
@@ -426,7 +426,8 @@ tr:hover td{background:var(--surface2)}
             <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Rates save karein</button>
           </div>
           <div class="card">
-            <div class="card-title">Employee salary (set once)</div>
+            <div class="card-title">March 2026 business figures</div>
+            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
             <div class="form-row">
               <div class="field-inline"><label>Employee</label>
                 <select id="inc-emp" onchange="loadIncEmp()">
@@ -441,14 +442,8 @@ tr:hover td{background:var(--surface2)}
                   <option value="Anjali">Anjali</option>
                 </select>
               </div>
-              <div class="field-inline"><label>Monthly salary (₹)</label><input type="number" id="inc-salary" value="32000"></div>
+              <div class="field-inline"><label>Salary (Employees page se)</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
             </div>
-            <button class="btn btn-primary" style="width:100%" onclick="lockSalary()">Salary set karein (lock)</button>
-            <p id="salary-lock-status" style="font-size:11px;color:var(--text3);margin-top:8px"></p>
-          </div>
-          <div class="card">
-            <div class="card-title">March 2026 business figures</div>
-            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
             <div class="form-row">
               <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200"></div>
               <div class="field-inline"><label>Demat accounts opened</label><input type="number" id="inc-demat" value="1"></div>
@@ -458,6 +453,7 @@ tr:hover td{background:var(--surface2)}
               <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
             </div>
             <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Business figures save karein</button>
+            <p style="font-size:11px;color:var(--text3);margin-top:8px">Salary change karne ke liye <a href="#" onclick="document.querySelector('.nav-tab[onclick*=employees]').click();return false" style="color:var(--accent)">Employees page</a> pe jaayein</p>
             <hr class="divider">
             <div id="inc-result"></div>
           </div>
@@ -465,7 +461,7 @@ tr:hover td{background:var(--surface2)}
             <div class="card-title">Team incentive — March 2026</div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr><th>Employee</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
+                <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
                 <tbody id="team-incentive-table"></tbody>
               </table>
             </div>
@@ -576,6 +572,20 @@ function getLeaves(){try{return JSON.parse(localStorage.getItem(KEY_LEAVE)||'[]'
 function saveLeaves(d){localStorage.setItem(KEY_LEAVE,JSON.stringify(d))}
 function getIncSalary(){try{return JSON.parse(localStorage.getItem(KEY_INC_SALARY)||'{}')}catch{return{}}}
 function saveIncSalary(d){localStorage.setItem(KEY_INC_SALARY,JSON.stringify(d))}
+
+// Central salary getter — checks saved override first, else falls back to EMPLOYEES default.
+// Used everywhere (Salary page, Incentive page, Employees page) so salary stays in sync.
+function getEmpSalary(name){
+  const incSal=getIncSalary();
+  if(incSal[name]!==undefined) return incSal[name];
+  const e=EMPLOYEES.find(x=>x.name===name);
+  return e?e.salary:0;
+}
+function setEmpSalary(name,val){
+  const incSal=getIncSalary();
+  incSal[name]=parseInt(val)||0;
+  saveIncSalary(incSal);
+}
 function getMfSip(){try{return JSON.parse(localStorage.getItem(KEY_INC_MFSIP)||'{}')}catch{return{}}}
 function saveMfSip(d){localStorage.setItem(KEY_INC_MFSIP,JSON.stringify(d))}
 function getIncRates(){try{return JSON.parse(localStorage.getItem(KEY_INC_RATES)||'{"mfRate":0,"sipRate":0}')}catch{return{mfRate:0,sipRate:0}}}
@@ -930,14 +940,15 @@ function renderSalaryPage(){
   const emp=EMPLOYEES.find(e=>e.name===currentUser);
   const msc=document.getElementById('my-salary-card');
   if(msc&&emp){
+    const mySalary=getEmpSalary(currentUser);
     const att=getAtt();
     const myRecs=att[currentUser]||[];
     const present=myRecs.filter(r=>r.status==='Present'||r.status==='Late').length;
     const working=26;
-    const earned=Math.min((emp.salary/working)*present,emp.salary);
+    const earned=Math.min((mySalary/working)*present,mySalary);
     msc.innerHTML=`
       <table style="font-size:13px;width:100%">
-        <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(emp.salary)}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(mySalary)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Days present</td><td style="text-align:right">${present} / ${working}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Earned salary</td><td style="text-align:right">${fmt(earned)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Deductions</td><td style="text-align:right;color:var(--red)">— ₹0</td></tr>
@@ -951,10 +962,11 @@ function renderSalaryPage(){
     if(tst){
       const att=getAtt();
       tst.innerHTML=EMPLOYEES.map(e=>{
+        const sal=getEmpSalary(e.name);
         const recs=att[e.name]||[];
         const p=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
-        const earned=Math.min((e.salary/26)*p,e.salary);
-        return `<tr><td>${e.name}</td><td>${fmt(e.salary)}</td><td>${fmt(earned)}</td><td>₹0</td><td style="font-weight:600;color:var(--green)">${fmt(earned)}</td></tr>`;
+        const earned=Math.min((sal/26)*p,sal);
+        return `<tr><td>${e.name}</td><td>${fmt(sal)}</td><td>${fmt(earned)}</td><td>₹0</td><td style="font-weight:600;color:var(--green)">${fmt(earned)}</td></tr>`;
       }).join('');
     }
     calcSalary();
@@ -964,8 +976,8 @@ function renderSalaryPage(){
 function calcSalary(){
   const sel=document.getElementById('sal-emp');
   if(!sel) return;
-  const [,basic]=(sel.value||'Puja|32000').split('|');
-  const b=parseInt(basic)||32000;
+  const name=sel.value||'Puja';
+  const b=getEmpSalary(name);
   const days=parseInt(document.getElementById('sal-days').value)||17;
   const wdays=parseInt(document.getElementById('sal-wdays').value)||26;
   const ded=parseInt(document.getElementById('sal-ded').value)||0;
@@ -1004,7 +1016,6 @@ function totalIncentive(name, salary){
 }
 
 function renderIncentivePage(){
-  const incSal=getIncSalary();
   const rates=getIncRates();
 
   // Update formula card with current rates
@@ -1013,16 +1024,13 @@ function renderIncentivePage(){
   const fsipEl=document.getElementById('formula-sip-rate');
   if(fsipEl) fsipEl.textContent = rates.sipRate ? rates.sipRate+'% of SIP amount' : 'Not set';
 
-  // My incentive card
-  const mySalary=incSal[currentUser]!==undefined?incSal[currentUser]:((EMPLOYEES.find(e=>e.name===currentUser)||{}).salary||0);
+  // My incentive card — salary always pulled from central getEmpSalary (set on Employees page)
+  const mySalary=getEmpSalary(currentUser);
   const t=totalIncentive(currentUser,mySalary);
   const mic=document.getElementById('my-incentive-card');
   if(mic){
-    const lockMsg = incSal[currentUser]!==undefined
-      ? `<p style="font-size:11px;color:var(--text3);margin-bottom:10px">Salary: ${fmt(mySalary)} (admin se set)</p>`
-      : `<p style="font-size:11px;color:var(--amber-text);margin-bottom:10px">⚠ Salary abhi set nahi hui, default value use ho rahi hai</p>`;
     mic.innerHTML=`
-      ${lockMsg}
+      <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Salary: ${fmt(mySalary)}</p>
       <table style="font-size:13px;width:100%">
         <tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Brokerage incentive</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Total brokerage</td><td style="text-align:right">${fmt(t.brok)}</td></tr>
@@ -1040,10 +1048,11 @@ function renderIncentivePage(){
     const tit=document.getElementById('team-incentive-table');
     if(tit){
       tit.innerHTML=EMPLOYEES.map(e=>{
-        const sal=incSal[e.name]!==undefined?incSal[e.name]:e.salary;
+        const sal=getEmpSalary(e.name);
         const tt=totalIncentive(e.name,sal);
         return `<tr>
           <td>${e.name}</td>
+          <td>${fmt(sal)}</td>
           <td>${fmt(tt.brok)}</td>
           <td>${tt.demat}</td>
           <td>${fmt(tt.mf)}</td>
@@ -1073,34 +1082,15 @@ function loadIncEmp(){
   const sel=document.getElementById('inc-emp');
   if(!sel) return;
   const name=sel.value;
-  const incSal=getIncSalary();
-  const sal=incSal[name]!==undefined?incSal[name]:(EMPLOYEES.find(e=>e.name===name)||{}).salary||32000;
+  const sal=getEmpSalary(name);
   const mfsip=getMfSip()[name]||{};
-  document.getElementById('inc-salary').value=sal;
+  const dispEl=document.getElementById('inc-salary-display');
+  if(dispEl) dispEl.value=fmt(sal);
   document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:(BROKERAGE_MAR2026[name]||0);
   document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:(DEMAT_MAR2026[name]||0);
   document.getElementById('inc-mf').value = mfsip.mf||0;
   document.getElementById('inc-sip').value = mfsip.sip||0;
-
-  const lockStatus=document.getElementById('salary-lock-status');
-  if(lockStatus){
-    lockStatus.textContent = incSal[name]!==undefined
-      ? '✓ '+name+' ki salary set hai: '+fmt(sal)
-      : name+' ki salary abhi set nahi hui';
-  }
   calcIncentive();
-}
-
-function lockSalary(){
-  const sel=document.getElementById('inc-emp');
-  const name=sel.value;
-  const val=parseInt(document.getElementById('inc-salary').value)||0;
-  const incSal=getIncSalary();
-  incSal[name]=val;
-  saveIncSalary(incSal);
-  loadIncEmp();
-  renderIncentivePage();
-  alert(name+' ki salary set ho gayi: '+fmt(val));
 }
 
 function saveMfSipData(){
@@ -1122,8 +1112,7 @@ function calcIncentive(){
   const sel=document.getElementById('inc-emp');
   if(!sel) return;
   const name=sel.value;
-  const incSal=getIncSalary();
-  const salary=incSal[name]!==undefined?incSal[name]:(parseInt(document.getElementById('inc-salary').value)||0);
+  const salary=getEmpSalary(name);
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
@@ -1153,13 +1142,32 @@ function calcIncentive(){
 function renderEmployees(){
   const et=document.getElementById('emp-table');
   if(!et) return;
-  et.innerHTML=EMPLOYEES.map(e=>`
+  et.innerHTML=EMPLOYEES.map(e=>{
+    const sal=getEmpSalary(e.name);
+    return `
     <tr>
       <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
-      <td>${e.role}</td><td>${e.joined}</td><td>${fmt(e.salary)}</td>
+      <td>${e.role}</td><td>${e.joined}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span>₹</span>
+          <input type="number" value="${sal}" id="emp-sal-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')">Set</button>
+        </div>
+      </td>
       <td><span class="badge badge-green">Active</span></td>
-      <td><button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: ${fmt(e.salary)}')">View</button></td>
-    </tr>`).join('');
+      <td><button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}')))">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function saveEmpSalary(name){
+  const val=document.getElementById('emp-sal-'+name).value;
+  setEmpSalary(name,val);
+  renderEmployees();
+  renderSalaryPage();
+  renderIncentivePage();
+  alert(name+' ki salary set ho gayi: '+fmt(parseInt(val)||0)+'\n\nYeh Salary aur Incentive dono jagah use hogi.');
 }
 
 function toggleAddForm(){
