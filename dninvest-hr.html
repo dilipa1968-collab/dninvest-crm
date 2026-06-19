@@ -232,7 +232,7 @@ tr:hover td{background:var(--surface2)}
         <div class="metric"><div class="m-lbl">Present today</div><div class="m-val" style="color:var(--green)" id="d-present">—</div></div>
         <div class="metric"><div class="m-lbl">Absent</div><div class="m-val" style="color:var(--red)" id="d-absent">—</div></div>
         <div class="metric"><div class="m-lbl">On leave</div><div class="m-val" style="color:var(--amber)" id="d-leave">—</div></div>
-        <div class="metric"><div class="m-lbl">This month payroll</div><div class="m-val" style="font-size:16px">₹2,84,000</div></div>
+        <div class="metric"><div class="m-lbl">This month payroll</div><div class="m-val" style="font-size:16px" id="d-payroll">₹0</div></div>
       </div>
 
       <div class="grid2">
@@ -375,7 +375,7 @@ tr:hover td{background:var(--surface2)}
               </select>
             </div>
             <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
-            <div class="field-inline"><label>Days present</label><input type="number" id="sal-days" value="17" min="0" max="26" onchange="calcSalary()"></div>
+            <div class="field-inline"><label>Days present</label><input type="number" id="sal-days" value="0" min="0" max="26" onchange="calcSalary()"></div>
             <div class="field-inline"><label>Working days</label><input type="number" id="sal-wdays" value="26" min="20" max="27" onchange="calcSalary()"></div>
             <div class="field-inline"><label>Deductions (₹)</label><input type="number" id="sal-ded" value="0" onchange="calcSalary()"></div>
             <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
@@ -400,7 +400,7 @@ tr:hover td{background:var(--surface2)}
     <div id="page-incentive" class="page compact-page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">Meri Incentive — March 2026</div>
+          <div class="card-title">Meri Incentive</div>
           <div id="my-incentive-card"></div>
         </div>
         <div class="card">
@@ -424,7 +424,7 @@ tr:hover td{background:var(--surface2)}
           <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Rates save karein</button>
         </div>
         <div class="card admin-only" style="display:none">
-          <div class="card-title">March 2026 business figures</div>
+          <div class="card-title">Monthly business figures (data entry)</div>
           <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
           <div class="compact-grid3">
             <div class="field-inline"><label>Employee</label>
@@ -441,8 +441,8 @@ tr:hover td{background:var(--surface2)}
               </select>
             </div>
             <div class="field-inline"><label>Salary</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
-            <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200"></div>
-            <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="1"></div>
+            <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="0"></div>
+            <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="0"></div>
             <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
             <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
           </div>
@@ -452,7 +452,7 @@ tr:hover td{background:var(--surface2)}
           <div id="inc-result"></div>
         </div>
         <div class="card admin-only" style="display:none">
-          <div class="card-title">Team incentive — March 2026</div>
+          <div class="card-title">Team incentive</div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
@@ -535,15 +535,15 @@ const EMPLOYEES = [
 ];
 const ADMIN_PASS = 'admin123';
 
-// March 2026 actual brokerage turnover (from INCENTIVE file, MAR2026 sheet)
+// Brokerage turnover — empty by default. Admin enters monthly data from Incentive page (April 2026 onwards).
 const BROKERAGE_MAR2026 = {
-  'Riya': 75200, 'Khokhan': 83183, 'Raju': 403815, 'Puja': 114148,
-  'Rohit': 77393, 'Bharat': 28564, 'Komal': 0, 'Megha': 0, 'Anjali': 0
+  'Riya': 0, 'Khokhan': 0, 'Raju': 0, 'Puja': 0,
+  'Rohit': 0, 'Bharat': 0, 'Komal': 0, 'Megha': 0, 'Anjali': 0
 };
-// March 2026 demat accounts opened (from file, 'Demat open' column)
+// Demat accounts opened — empty by default, admin fills in monthly.
 const DEMAT_MAR2026 = {
-  'Riya': 1, 'Khokhan': 2, 'Raju': 1, 'Puja': 0,
-  'Rohit': 1, 'Bharat': 0, 'Komal': 0, 'Megha': 0, 'Anjali': 0
+  'Riya': 0, 'Khokhan': 0, 'Raju': 0, 'Puja': 0,
+  'Rohit': 0, 'Bharat': 0, 'Komal': 0, 'Megha': 0, 'Anjali': 0
 };
 const DEMAT_RATE = 600; // ₹ per demat account opened
 
@@ -730,6 +730,19 @@ function renderDashboard(){
   const dp=document.getElementById('d-present'); if(dp) dp.textContent=present;
   const da=document.getElementById('d-absent'); if(da) da.textContent=absent;
   const dl=document.getElementById('d-leave'); if(dl) dl.textContent=onleave;
+
+  // Real payroll: sum of each employee's earned salary this month (based on attendance)
+  const dpay=document.getElementById('d-payroll');
+  if(dpay){
+    let totalPayroll=0;
+    EMPLOYEES.forEach(e=>{
+      const sal=getEmpSalary(e.name);
+      const recs=att[e.name]||[];
+      const p=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
+      totalPayroll += Math.min((sal/26)*p, sal);
+    });
+    dpay.textContent=fmt(totalPayroll);
+  }
 
   // Today att list
   const tal=document.getElementById('today-att-list');
