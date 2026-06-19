@@ -1635,6 +1635,9 @@ async function doLogin(){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     initApp();
+    // Silently record HR attendance in the background (same as HR Portal login),
+    // so RMs don't need to open the HR Portal separately just to be marked present.
+    if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user); }
   } else {
     document.getElementById('lerr').style.display='block';
   }
@@ -1651,6 +1654,56 @@ async function isCrmBlockedForRm(){
     }
   }catch(e){ console.log('Access control check failed:',e); }
   return false;
+}
+
+// Auto-marks HR attendance the moment an RM logs into the CRM — silent,
+// background, no UI shown. In-time = login time minus 5 minutes (same rule
+// as the HR Portal's own login). Writes to the SAME Firestore collection
+// ('hr_data', doc 'attendance') that the HR Portal reads, so both stay in sync.
+// On Sunday or a Stock Exchange holiday (HR Portal's holiday calendar), the
+// status is recorded as "Holiday" instead of "Present".
+async function recordHrAttendanceOnCrmLogin(user){
+  try{
+    if(typeof fdb==='undefined') return;
+    const name = user.name || user.username;
+    const td = today();
+
+    // Skip if already recorded today (read current doc first)
+    const docRef = fdb.collection('hr_data').doc('attendance');
+    const snap = await docRef.get();
+    const existing = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
+    if(existing[name] && existing[name].some(r=>r.date===td)) return; // already marked today
+
+    // Determine in-time (login time - 5 min)
+    const inDate = new Date(Date.now() - 5*60*1000);
+    const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
+
+    // Check holiday calendar (Sunday or Stock Exchange holiday set from HR Portal)
+    let status = 'Present';
+    const dayOfWeek = new Date().getDay();
+    if(dayOfWeek===0){
+      status = 'Holiday';
+    } else {
+      try{
+        const holDoc = await fdb.collection('hr_data').doc('holidays').get();
+        const holidays = (holDoc.exists && holDoc.data() && holDoc.data().data) ? holDoc.data().data : [];
+        if(holidays.some(h=>h.date===td)) status='Holiday';
+      }catch(e){}
+    }
+
+    const record = {date:td, in:inTime, out:'', status};
+
+    await fdb.runTransaction(async (tx)=>{
+      const doc = await tx.get(docRef);
+      let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+      if(!latest[name]) latest[name]=[];
+      const idx = latest[name].findIndex(r=>r.date===td);
+      if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
+      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+    });
+  }catch(e){
+    console.log('CRM auto-attendance error:', e);
+  }
 }
 
 // Opens the HR Portal in a new tab, pre-filling the username so the person
