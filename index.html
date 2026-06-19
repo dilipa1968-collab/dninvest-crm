@@ -1665,7 +1665,17 @@ async function isCrmBlockedForRm(){
 async function recordHrAttendanceOnCrmLogin(user){
   try{
     if(typeof fdb==='undefined') return;
-    const name = user.name || user.username;
+    // Canonical HR employee names — MUST match dninvest-hr.html's EMPLOYEES list
+    // exactly, so attendance is saved under the same key the HR Portal reads.
+    const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+    const rawName = String(user.name || user.username || '').trim();
+    // Match by full name or first word, case-insensitive
+    const match = HR_NAMES.find(n =>
+      n.toLowerCase() === rawName.toLowerCase() ||
+      n.toLowerCase() === rawName.split(' ')[0].toLowerCase() ||
+      n.toLowerCase() === String(user.username||'').toLowerCase()
+    );
+    const name = match || rawName;
     const td = today();
 
     // Skip if already recorded today (read current doc first)
