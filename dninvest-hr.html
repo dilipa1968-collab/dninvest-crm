@@ -158,6 +158,11 @@ tr:hover td{background:var(--surface2)}
 .today-banner p{font-size:12px;opacity:0.85}
 .today-banner .time-big{font-size:28px;font-weight:700;font-family:monospace;letter-spacing:-1px}
 
+/* TOGGLE SWITCH (Access control) */
+input:checked + #crm-toggle-slider, input:checked + #hr-toggle-slider{background:var(--green)}
+#crm-toggle-slider:before, #hr-toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:before{transform:translateX(20px)}
+
 /* COMPACT LAYOUT (Salary / Incentive pages) */
 .compact-page{font-size:12.5px}
 .compact-page .card{padding:0.7rem 0.85rem;margin-bottom:0.5rem}
@@ -452,6 +457,32 @@ tr:hover td{background:var(--surface2)}
 
     <!-- EMPLOYEES (admin only) -->
     <div id="page-employees" class="page">
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-title">Access control — CRM aur HR Portal</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Yahan se aap CRM ya HR Portal ko RM ke liye band/chalu kar sakte hain. Aapka (Admin) access kabhi band nahi hoga.</p>
+        <div class="grid2" style="margin-bottom:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:var(--radius-sm)">
+            <div>
+              <p style="font-size:13px;font-weight:600">DNInvest CRM</p>
+              <p style="font-size:11px;color:var(--text2)" id="crm-status-label">Loading...</p>
+            </div>
+            <label style="position:relative;display:inline-block;width:46px;height:26px">
+              <input type="checkbox" id="toggle-crm" onchange="toggleCrmAccess(this.checked)" style="opacity:0;width:0;height:0">
+              <span id="crm-toggle-slider" style="position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:26px;transition:.2s"></span>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:var(--radius-sm)">
+            <div>
+              <p style="font-size:13px;font-weight:600">HR Portal</p>
+              <p style="font-size:11px;color:var(--text2)" id="hr-status-label">Loading...</p>
+            </div>
+            <label style="position:relative;display:inline-block;width:46px;height:26px">
+              <input type="checkbox" id="toggle-hr" onchange="toggleHrAccess(this.checked)" style="opacity:0;width:0;height:0">
+              <span id="hr-toggle-slider" style="position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:26px;transition:.2s"></span>
+            </label>
+          </div>
+        </div>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <h2 style="font-size:16px;font-weight:600">All employees</h2>
         <button class="btn btn-primary" onclick="toggleAddForm()">+ Add employee</button>
@@ -629,9 +660,44 @@ function getHolidayName(dateStr){
 }
 function isHoliday(dateStr){ return getHolidayName(dateStr)!==null; }
 
+// ─── ACCESS CONTROL (Admin master switch — independent for CRM & HR Portal) ───
+// Stored in a SHARED Firestore document so both apps read the same flags:
+// collection 'shared_control', doc 'access' => {crmEnabled:bool, hrEnabled:bool}
+function getAccessControl(){
+  return DB.get('access_control', {crmEnabled:true, hrEnabled:true}) || {crmEnabled:true, hrEnabled:true};
+}
+async function setAccessControl(partial){
+  // uses shared_control collection (not hr_data) so CRM can read/write the same doc
+  const local = getAccessControl();
+  Object.assign(local, partial);
+  DB.setLocal('access_control', local);
+  try{
+    if(typeof fdb!=='undefined'){
+      await fdb.collection('shared_control').doc('access').set({data:local, updated:new Date().toISOString()}, {merge:true});
+    }
+  }catch(e){ console.log('setAccessControl error:',e); }
+}
+async function fetchAccessControlOnce(){
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc=await fdb.collection('shared_control').doc('access').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        DB.setLocal('access_control', doc.data().data);
+        return doc.data().data;
+      }
+    }
+  }catch(e){ console.log('fetchAccessControlOnce error:',e); }
+  return getAccessControl();
+}
+
 // RM office-hours window check (Admin always bypasses this).
 // Mon-Fri: 11:30 AM - 6:00 PM | Sat: 10:00 AM - 2:00 PM | Sun & holidays: closed all day
+// Also blocks if Admin has manually disabled the HR portal via the master switch.
 function officeWindowStatus(){
+  const access=getAccessControl();
+  if(access.hrEnabled===false){
+    return {open:false, reason:'Admin ne HR Portal abhi ke liye band kar diya hai'};
+  }
   const now=new Date();
   const td=today();
   const holidayName=getHolidayName(td);
@@ -746,7 +812,9 @@ async function doLogin(){
     startApp();return;
   }
 
-  // Staff (RM) login is only allowed during office hours
+  // Staff (RM) login is only allowed during office hours, and only if Admin
+  // hasn't manually disabled the HR portal via the master switch.
+  await fetchAccessControlOnce();
   const win=officeWindowStatus();
   if(!win.open){
     alert('🔒 Office band hai\n\n'+win.reason+'\n\nKripya office time mein login karein.');
@@ -857,7 +925,8 @@ function updateOfficeStatusBanner(){
   }
 }
 updateOfficeStatusBanner();
-setInterval(updateOfficeStatusBanner, 60000);
+fetchAccessControlOnce().then(updateOfficeStatusBanner);
+setInterval(()=>{ fetchAccessControlOnce().then(updateOfficeStatusBanner); }, 60000);
 
 // ─── CLOCK ──────────────────────────────────────────────────────────────────
 function startClock(){
@@ -1314,6 +1383,7 @@ function calcIncentive(){
 
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────
 function renderEmployees(){
+  renderAccessControl();
   const et=document.getElementById('emp-table');
   if(!et) return;
   et.innerHTML=EMPLOYEES.map(e=>{
@@ -1334,6 +1404,37 @@ function renderEmployees(){
       <td><button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}')))">View</button></td>
     </tr>`;
   }).join('');
+}
+
+// ─── ACCESS CONTROL UI ──────────────────────────────────────────────────────
+async function renderAccessControl(){
+  await fetchAccessControlOnce();
+  const access=getAccessControl();
+  const crmOn=access.crmEnabled!==false;
+  const hrOn=access.hrEnabled!==false;
+
+  const crmToggle=document.getElementById('toggle-crm');
+  const hrToggle=document.getElementById('toggle-hr');
+  if(crmToggle) crmToggle.checked=crmOn;
+  if(hrToggle) hrToggle.checked=hrOn;
+
+  const crmLabel=document.getElementById('crm-status-label');
+  const hrLabel=document.getElementById('hr-status-label');
+  if(crmLabel){ crmLabel.textContent = crmOn ? 'RM ke liye chalu hai' : 'RM ke liye band hai'; crmLabel.style.color = crmOn ? 'var(--green)' : 'var(--red)'; }
+  if(hrLabel){ hrLabel.textContent = hrOn ? 'RM ke liye chalu hai' : 'RM ke liye band hai'; hrLabel.style.color = hrOn ? 'var(--green)' : 'var(--red)'; }
+}
+
+async function toggleCrmAccess(checked){
+  await setAccessControl({crmEnabled:checked});
+  renderAccessControl();
+  alert('CRM ab RM ke liye '+(checked?'chalu':'band')+' kar diya gaya hai.\n\nAapka (Admin) access hamesha chalu rahega.');
+}
+
+async function toggleHrAccess(checked){
+  await setAccessControl({hrEnabled:checked});
+  renderAccessControl();
+  updateOfficeStatusBanner();
+  alert('HR Portal ab RM ke liye '+(checked?'chalu':'band')+' kar diya gaya hai.\n\nAapka (Admin) access hamesha chalu rahega.');
 }
 
 async function saveEmpSalary(name){
