@@ -761,7 +761,11 @@ function brokerageIncentive(salary, brokerage){
 
 function fmt(n){return '₹'+Math.round(n).toLocaleString('en-IN')}
 function initials(n){return n.split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2)}
-function today(){return new Date().toISOString().slice(0,10)}
+function today(){
+  // Use device local date (matches CRM's today()) — avoids UTC vs local date mismatch
+  const n=new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+}
 function nowTime(){
   const n=new Date();
   return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
