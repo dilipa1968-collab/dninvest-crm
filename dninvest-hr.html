@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DN Investment — HR Portal</title>
+<!-- Firebase SDK (same project as DNInvest CRM) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
+  authDomain: "dninvest-crm.firebaseapp.com",
+  projectId: "dninvest-crm",
+  storageBucket: "dninvest-crm.firebasestorage.app",
+  messagingSenderId: "331999342266",
+  appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
+};
+try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -499,6 +513,85 @@ tr:hover td{background:var(--surface2)}
 
 <script>
 // ─── DATA ───────────────────────────────────────────────────────────────────
+const ADMIN_PASS = 'admin123';
+
+// ─── DB: Firestore (cross-device source of truth) + localStorage (instant local cache) ──
+// Uses the SAME Firestore project as DNInvest CRM, but its OWN collection ('hr_data')
+// so it never clashes with CRM's 'crm_data' collection.
+const DB = {
+  get(key, fallback){
+    try{ const v=localStorage.getItem('dnihr_'+key); return v?JSON.parse(v):fallback; }catch(e){ return fallback; }
+  },
+  setLocal(key, val){
+    try{ localStorage.setItem('dnihr_'+key, JSON.stringify(val)); }catch(e){}
+  },
+  set(key, val){
+    this.setLocal(key, val);
+    try{
+      if(typeof fdb!=='undefined'){
+        fdb.collection('hr_data').doc(key).set({data:val, updated:new Date().toISOString()})
+          .catch(e=>console.log('Firebase write error:',key,e));
+      }
+    }catch(e){}
+  },
+  // merge-on-write for object-map data (e.g. {employeeName: value, ...})
+  async setMerged(key, partial){
+    const local = this.get(key, {}) || {};
+    Object.assign(local, partial);
+    this.setLocal(key, local);
+    try{
+      if(typeof fdb!=='undefined'){
+        const docRef = fdb.collection('hr_data').doc(key);
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(docRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+          Object.assign(latest, partial);
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        });
+      }
+    }catch(e){ console.log('setMerged error:',key,e); }
+  },
+  // merge-on-write for attendance: {employeeName: [{date,in,out,status}, ...]}
+  async setAttendanceRecord(name, record){
+    const local = this.get('attendance', {}) || {};
+    if(!local[name]) local[name]=[];
+    let idx = local[name].findIndex(r=>r.date===record.date);
+    if(idx>=0) local[name][idx]=record; else local[name].push(record);
+    this.setLocal('attendance', local);
+    try{
+      if(typeof fdb!=='undefined'){
+        const docRef = fdb.collection('hr_data').doc('attendance');
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(docRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+          if(!latest[name]) latest[name]=[];
+          let lidx = latest[name].findIndex(r=>r.date===record.date);
+          if(lidx>=0) latest[name][lidx]=record; else latest[name].push(record);
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        });
+      }
+    }catch(e){ console.log('setAttendanceRecord error:',e); }
+  },
+  // Real-time listeners: when Firestore data changes (from ANY device), refresh local
+  // cache and re-render. This is how Admin's changes instantly reach every RM's screen.
+  _listenersStarted: false,
+  startListeners(onChange){
+    if(this._listenersStarted) return;
+    this._listenersStarted = true;
+    if(typeof fdb==='undefined') return;
+    const keys = ['attendance','holidays','salaries','pins','mfsip','inc_rates'];
+    keys.forEach(key=>{
+      fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
+        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+          this.setLocal(key, doc.data().data);
+          if(onChange) onChange(key);
+        }
+      }, err=>console.log('Listener error:',key,err));
+    });
+  }
+};
+
+// ─── EMPLOYEE DEFAULTS (fallback if no Firestore override exists yet) ──────────
 const EMPLOYEES = [
   {name:'Puja',   role:'RM', joined:'Mar 2022', salary:32000, pin:'1001'},
   {name:'Rohit',  role:'RM', joined:'Jan 2023', salary:30000, pin:'1002'},
@@ -510,22 +603,17 @@ const EMPLOYEES = [
   {name:'Megha',  role:'RM', joined:'Sep 2023', salary:29000, pin:'1008'},
   {name:'Anjali', role:'RM', joined:'Jul 2022', salary:31500, pin:'1009'},
 ];
-const ADMIN_PASS = 'admin123';
-const KEY_PINS = 'dnihr_pins'; // {name: pin} — admin can override default PINs
-function getPins(){try{return JSON.parse(localStorage.getItem(KEY_PINS)||'{}')}catch{return{}}}
-function savePins(d){localStorage.setItem(KEY_PINS,JSON.stringify(d))}
+
+function getPins(){ return DB.get('pins', {}) || {}; }
 function getEmpPin(name){
   const pins=getPins();
   if(pins[name]!==undefined) return pins[name];
   const e=EMPLOYEES.find(x=>x.name===name);
   return e?e.pin:'';
 }
-function setEmpPin(name,pin){
-  const pins=getPins();
-  pins[name]=pin;
-  savePins(pins);
+async function setEmpPin(name,pin){
+  await DB.setMerged('pins', {[name]: pin});
 }
-
 
 // Brokerage turnover — empty by default. Admin enters monthly data from Incentive page (April 2026 onwards).
 const BROKERAGE_MAR2026 = {
@@ -539,22 +627,16 @@ const DEMAT_MAR2026 = {
 };
 const DEMAT_RATE = 600; // ₹ per demat account opened
 
-// localStorage keys
-const KEY_ATT = 'dnihr_attendance';    // {name: [{date,in,out,status}]}
-const KEY_HOLIDAYS = 'dnihr_holidays';  // [{date, name}] — Stock Exchange (NSE/BSE) holidays, admin-managed
-const KEY_USER = 'dnihr_user';
-const KEY_INC_SALARY = 'dnihr_inc_salary';   // {name: salary} for incentive calc — set once
-const KEY_INC_MFSIP = 'dnihr_inc_mfsip';     // {name: {mf, sip, demat}} monthly business figures
-const KEY_INC_RATES = 'dnihr_inc_rates';     // {mfRate, sipRate} percentage rates
+const KEY_USER = 'dnihr_user'; // session only — stays in localStorage (per-device login state)
 
 let currentUser = null;
 let isAdmin = false;
 
-// ─── STORAGE HELPERS ────────────────────────────────────────────────────────
-function getAtt(){try{return JSON.parse(localStorage.getItem(KEY_ATT)||'{}')}catch{return{}}}
-function saveAtt(d){localStorage.setItem(KEY_ATT,JSON.stringify(d))}
-function getHolidays(){try{return JSON.parse(localStorage.getItem(KEY_HOLIDAYS)||'[]')}catch{return[]}}
-function saveHolidays(d){localStorage.setItem(KEY_HOLIDAYS,JSON.stringify(d))}
+// ─── DATA HELPERS (all backed by DB = Firestore + localStorage cache) ─────────
+function getAtt(){ return DB.get('attendance', {}) || {}; }
+async function saveAttRecord(name, record){ await DB.setAttendanceRecord(name, record); }
+function getHolidays(){ return DB.get('holidays', []) || []; }
+async function saveHolidays(d){ await DB.set('holidays', d); }
 function isSunday(dateStr){ return new Date(dateStr+'T00:00:00').getDay()===0; }
 function getHolidayName(dateStr){
   if(isSunday(dateStr)) return 'Sunday';
@@ -562,26 +644,24 @@ function getHolidayName(dateStr){
   return h?h.name:null;
 }
 function isHoliday(dateStr){ return getHolidayName(dateStr)!==null; }
-function getIncSalary(){try{return JSON.parse(localStorage.getItem(KEY_INC_SALARY)||'{}')}catch{return{}}}
-function saveIncSalary(d){localStorage.setItem(KEY_INC_SALARY,JSON.stringify(d))}
+function getIncSalary(){ return DB.get('salaries', {}) || {}; }
 
-// Central salary getter — checks saved override first, else falls back to EMPLOYEES default.
-// Used everywhere (Salary page, Incentive page, Employees page) so salary stays in sync.
+// Central salary getter — checks Firestore-synced override first, else EMPLOYEES default.
+// Used everywhere (Salary page, Incentive page, Employees page) so salary stays in sync
+// across every device the moment Admin changes it.
 function getEmpSalary(name){
   const incSal=getIncSalary();
   if(incSal[name]!==undefined) return incSal[name];
   const e=EMPLOYEES.find(x=>x.name===name);
   return e?e.salary:0;
 }
-function setEmpSalary(name,val){
-  const incSal=getIncSalary();
-  incSal[name]=parseInt(val)||0;
-  saveIncSalary(incSal);
+async function setEmpSalary(name,val){
+  await DB.setMerged('salaries', {[name]: parseInt(val)||0});
 }
-function getMfSip(){try{return JSON.parse(localStorage.getItem(KEY_INC_MFSIP)||'{}')}catch{return{}}}
-function saveMfSip(d){localStorage.setItem(KEY_INC_MFSIP,JSON.stringify(d))}
-function getIncRates(){try{return JSON.parse(localStorage.getItem(KEY_INC_RATES)||'{"mfRate":0,"sipRate":0}')}catch{return{mfRate:0,sipRate:0}}}
-function saveIncRates(d){localStorage.setItem(KEY_INC_RATES,JSON.stringify(d))}
+function getMfSip(){ return DB.get('mfsip', {}) || {}; }
+async function saveMfSip(d){ await DB.set('mfsip', d); }
+function getIncRates(){ return DB.get('inc_rates', {mfRate:0, sipRate:0}) || {mfRate:0, sipRate:0}; }
+async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
 // Brokerage incentive formula:
 // Brokerage < 3x Salary               => Incentive = 0
@@ -620,7 +700,7 @@ function daysBetween(f,t){
 }
 
 // ─── LOGIN ──────────────────────────────────────────────────────────────────
-function doLogin(){
+async function doLogin(){
   const name = document.getElementById('login-name').value;
   const pass = document.getElementById('login-pass').value.trim();
   if(!name){alert('Pehle apna naam chunein');return}
@@ -639,20 +719,17 @@ function doLogin(){
   // Auto-record attendance: login time - 5 min (skip "Present" status on holidays)
   const att=getAtt();
   const td=today();
-  if(!att[name]) att[name]=[];
-  const already=att[name].find(r=>r.date===td);
+  const already=(att[name]||[]).find(r=>r.date===td);
   if(!already){
     const inTime=attTime5();
     const holidayName=getHolidayName(td);
     if(holidayName){
-      att[name].push({date:td,in:inTime,out:'',status:'Holiday'});
-      saveAtt(att);
+      await saveAttRecord(name, {date:td,in:inTime,out:'',status:'Holiday'});
       const notice=document.getElementById('att-notice');
       notice.style.display='block';
       notice.textContent='🎉 Aaj holiday hai ('+holidayName+'), attendance "Holiday" mark hui';
     } else {
-      att[name].push({date:td,in:inTime,out:'',status:'Present'});
-      saveAtt(att);
+      await saveAttRecord(name, {date:td,in:inTime,out:'',status:'Present'});
       const notice=document.getElementById('att-notice');
       notice.style.display='block';
       notice.textContent='✓ Aaj ki attendance automatically record ho gayi — in time: '+inTime;
@@ -685,6 +762,18 @@ function startApp(){
   renderIncentivePage();
   if(isAdmin) renderEmployees();
   calcSalary();
+
+  // Real-time sync: whenever Admin (or anyone, on any device) changes data in
+  // Firestore, this fires and we re-render the relevant pages immediately —
+  // no refresh needed, no demo/stale data.
+  DB.startListeners(function(changedKey){
+    renderDashboard();
+    renderAttendancePage();
+    renderLeavePage();
+    renderSalaryPage();
+    renderIncentivePage();
+    if(isAdmin) renderEmployees();
+  });
 }
 
 function doLogout(){
@@ -847,19 +936,15 @@ function calcHrs(inT,outT){
   return Math.floor(mins/60)+'h '+( mins%60)+'m';
 }
 
-function saveManualAtt(){
+async function saveManualAtt(){
   const emp=document.getElementById('man-emp').value;
   const status=document.getElementById('man-status').value;
   const inT=document.getElementById('man-in').value;
   const outT=document.getElementById('man-out').value;
   const date=document.getElementById('man-date').value;
   if(!date){alert('Date chunein');return}
-  const att=getAtt();
-  if(!att[emp]) att[emp]=[];
-  const idx=att[emp].findIndex(r=>r.date===date);
   const rec={date,in:inT,out:outT,status};
-  if(idx>=0) att[emp][idx]=rec; else att[emp].push(rec);
-  saveAtt(att);
+  await saveAttRecord(emp, rec);
   renderDashboard();renderAttendancePage();
   alert(`${emp} ki ${date} ki attendance save ho gayi!`);
 }
@@ -930,7 +1015,7 @@ function countSundaysInMonth(yyyyMm){
   return count;
 }
 
-function addHoliday(){
+async function addHoliday(){
   const date=document.getElementById('hol-date').value;
   const name=document.getElementById('hol-name').value.trim();
   if(!date||!name){alert('Date aur naam dono daalein');return}
@@ -938,17 +1023,17 @@ function addHoliday(){
   const holidays=getHolidays();
   if(holidays.find(h=>h.date===date)){alert('Yeh date pehle se list mein hai');return}
   holidays.push({date,name});
-  saveHolidays(holidays);
+  await saveHolidays(holidays);
   document.getElementById('hol-date').value='';
   document.getElementById('hol-name').value='';
   renderLeavePage();renderDashboard();
   alert('Holiday add ho gayi: '+name+' ('+date+')');
 }
 
-function removeHoliday(date){
+async function removeHoliday(date){
   let holidays=getHolidays();
   holidays=holidays.filter(h=>h.date!==date);
-  saveHolidays(holidays);
+  await saveHolidays(holidays);
   renderLeavePage();renderDashboard();
 }
 
@@ -1094,10 +1179,10 @@ function renderIncentivePage(){
   }
 }
 
-function saveRates(){
+async function saveRates(){
   const mfRate=parseFloat(document.getElementById('mf-rate').value)||0;
   const sipRate=parseFloat(document.getElementById('sip-rate').value)||0;
-  saveIncRates({mfRate,sipRate});
+  await saveIncRates({mfRate,sipRate});
   renderIncentivePage();
   alert('Rates save ho gaye! MF: '+mfRate+'%, SIP: '+sipRate+'%');
 }
@@ -1117,7 +1202,7 @@ function loadIncEmp(){
   calcIncentive();
 }
 
-function saveMfSipData(){
+async function saveMfSipData(){
   const sel=document.getElementById('inc-emp');
   const name=sel.value;
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
@@ -1126,7 +1211,7 @@ function saveMfSipData(){
   const sip=parseInt(document.getElementById('inc-sip').value)||0;
   const mfsip=getMfSip();
   mfsip[name]={brok,demat,mf,sip};
-  saveMfSip(mfsip);
+  await saveMfSip(mfsip);
   calcIncentive();
   renderIncentivePage();
   alert(name+' ke business figures save ho gaye!');
@@ -1192,19 +1277,19 @@ function renderEmployees(){
   }).join('');
 }
 
-function saveEmpSalary(name){
+async function saveEmpSalary(name){
   const val=document.getElementById('emp-sal-'+name).value;
-  setEmpSalary(name,val);
+  await setEmpSalary(name,val);
   renderEmployees();
   renderSalaryPage();
   renderIncentivePage();
-  alert(name+' ki salary set ho gayi: '+fmt(parseInt(val)||0)+'\n\nYeh Salary aur Incentive dono jagah use hogi.');
+  alert(name+' ki salary set ho gayi: '+fmt(parseInt(val)||0)+'\n\nYeh sab RM ke device par turant update ho jayegi.');
 }
 
-function saveEmpPin(name){
+async function saveEmpPin(name){
   const val=document.getElementById('emp-pin-'+name).value.trim();
   if(!/^\d{4}$/.test(val)){alert('PIN exactly 4 digit ka hona chahiye');return}
-  setEmpPin(name,val);
+  await setEmpPin(name,val);
   renderEmployees();
   alert(name+' ka login PIN set ho gaya: '+val);
 }
