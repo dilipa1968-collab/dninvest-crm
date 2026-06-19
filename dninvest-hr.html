@@ -701,10 +701,19 @@ function getISTHour(){
   const ist = new Date(utc + 5.5*3600000);
   return ist.getHours() + ist.getMinutes()/60;
 }
-function officeWindowStatus(){
+function officeWindowStatus(crmUser){
   const access=getAccessControl();
   if(access.hrEnabled===false){
     return {open:false, reason:'Admin ne HR Portal abhi ke liye band kar diya hai'};
+  }
+  // If Admin has manually Activated/Deactivated this RM in CRM's Admin panel,
+  // that override takes priority over the 8AM-7PM auto-schedule — exactly
+  // like it already does inside the CRM itself.
+  if(crmUser && crmUser.manualOverride){
+    if(crmUser.active===false){
+      return {open:false, reason:'Admin ne aapko manually deactivate kiya hai'};
+    }
+    return {open:true};
   }
   const istHour=getISTHour();
   if(istHour<8 || istHour>=19){
@@ -770,6 +779,7 @@ function daysBetween(f,t){
 // ─── LOGIN ──────────────────────────────────────────────────────────────────
 document.getElementById('login-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('login-name').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
+document.getElementById('login-name').addEventListener('blur', ()=>{ if(typeof updateOfficeStatusBanner==='function') updateOfficeStatusBanner(); });
 
 async function doLogin(){
   const username = document.getElementById('login-name').value.trim().toLowerCase();
@@ -809,9 +819,10 @@ async function doLogin(){
   }
 
   // Staff (RM) login is only allowed during office hours, and only if Admin
-  // hasn't manually disabled the HR portal via the master switch.
+  // hasn't manually disabled the HR portal via the master switch. A manual
+  // Activate/Deactivate from the CRM Admin panel overrides the auto-schedule.
   await fetchAccessControlOnce();
-  const win=officeWindowStatus();
+  const win=officeWindowStatus(user);
   if(!win.open){
     alert('🔒 Office band hai\n\n'+win.reason+'\n\nKripya office time mein login karein.');
     return;
@@ -906,11 +917,26 @@ function doLogout(){
 })();
 
 // Show office-hours status banner on the login screen (RM-only restriction).
-// Refreshes every minute so the message updates live as the window opens/closes.
-function updateOfficeStatusBanner(){
+// If a username is already filled in (e.g. opened from CRM with ?u=), checks
+// that specific user's manual Activate/Deactivate override too. Refreshes
+// every minute so the message updates live as the window opens/closes.
+async function updateOfficeStatusBanner(){
   const banner=document.getElementById('office-status-banner');
   if(!banner) return;
-  const win=officeWindowStatus();
+
+  let crmUser=null;
+  const uname=document.getElementById('login-name').value.trim().toLowerCase();
+  if(uname){
+    try{
+      if(typeof fdb!=='undefined'){
+        const doc=await fdb.collection('crm_data').doc('users').get();
+        const list=(doc.exists && doc.data() && doc.data().data) ? doc.data().data : [];
+        crmUser=list.find(u=>u.username===uname);
+      }
+    }catch(e){}
+  }
+
+  const win=officeWindowStatus(crmUser);
   if(win.open){
     banner.style.display='none';
   } else {
