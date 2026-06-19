@@ -400,21 +400,33 @@ tr:hover td{background:var(--surface2)}
       <div class="grid2">
         <div>
           <div class="card">
-            <div class="card-title">Meri Brokerage Incentive — March 2026</div>
+            <div class="card-title">Meri Incentive — March 2026</div>
             <div id="my-incentive-card"></div>
           </div>
           <div class="card">
             <div class="card-title">Incentive formula</div>
             <table style="font-size:12.5px;width:100%">
-              <tr><td style="color:var(--text2);padding:5px 0">Brokerage ≤ 3× Salary</td><td style="text-align:right">Incentive = ₹0</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 3× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 5%</td></tr>
-              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &gt; 10× Salary</td><td style="text-align:right">Excess × 7% (5%+2%)</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">Brokerage &lt; 3× Salary</td><td style="text-align:right">Incentive = ₹0</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">3× ≤ Brokerage &lt; 10× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 5%</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">Brokerage ≥ 10× Salary</td><td style="text-align:right">(Brokerage − 3×Salary) × 7%</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">Demat account opening</td><td style="text-align:right">₹600 / account</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">MF Sale incentive</td><td style="text-align:right" id="formula-mf-rate">—</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">SIP incentive</td><td style="text-align:right" id="formula-sip-rate">—</td></tr>
             </table>
           </div>
         </div>
         <div class="admin-only" style="display:none">
           <div class="card">
-            <div class="card-title">Incentive calculator</div>
+            <div class="card-title">MF / SIP incentive rates</div>
+            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Ek baar set karein, sab employees ke liye yahi rate use hoga</p>
+            <div class="form-row">
+              <div class="field-inline"><label>MF Sale incentive (%)</label><input type="number" step="0.1" id="mf-rate" placeholder="e.g. 0.5"></div>
+              <div class="field-inline"><label>SIP incentive (%)</label><input type="number" step="0.1" id="sip-rate" placeholder="e.g. 0.5"></div>
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Rates save karein</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Employee salary (set once)</div>
             <div class="form-row">
               <div class="field-inline"><label>Employee</label>
                 <select id="inc-emp" onchange="loadIncEmp()">
@@ -429,21 +441,31 @@ tr:hover td{background:var(--surface2)}
                   <option value="Anjali">Anjali</option>
                 </select>
               </div>
-              <div class="field-inline"><label>Month</label><select><option>March 2026</option><option>June 2026</option></select></div>
+              <div class="field-inline"><label>Monthly salary (₹)</label><input type="number" id="inc-salary" value="32000"></div>
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="lockSalary()">Salary set karein (lock)</button>
+            <p id="salary-lock-status" style="font-size:11px;color:var(--text3);margin-top:8px"></p>
+          </div>
+          <div class="card">
+            <div class="card-title">March 2026 business figures</div>
+            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
+            <div class="form-row">
+              <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200"></div>
+              <div class="field-inline"><label>Demat accounts opened</label><input type="number" id="inc-demat" value="1"></div>
             </div>
             <div class="form-row">
-              <div class="field-inline"><label>Monthly salary (₹)</label><input type="number" id="inc-salary" value="32000" onchange="calcIncentive()"></div>
-              <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="75200" onchange="calcIncentive()"></div>
+              <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
+              <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
             </div>
+            <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Business figures save karein</button>
             <hr class="divider">
             <div id="inc-result"></div>
           </div>
           <div class="card">
-            <div class="card-title">Team incentive — March 2026 (actual data)</div>
-            <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Salary daalein, baaki sab auto-calculate hoga</p>
+            <div class="card-title">Team incentive — March 2026</div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr><th>Employee</th><th>Brokerage</th><th>Salary</th><th>3× Salary</th><th>Incentive</th></tr></thead>
+                <thead><tr><th>Employee</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
                 <tbody id="team-incentive-table"></tbody>
               </table>
             </div>
@@ -529,12 +551,20 @@ const BROKERAGE_MAR2026 = {
   'Riya': 75200, 'Khokhan': 83183, 'Raju': 403815, 'Puja': 114148,
   'Rohit': 77393, 'Bharat': 28564, 'Komal': 0, 'Megha': 0, 'Anjali': 0
 };
+// March 2026 demat accounts opened (from file, 'Demat open' column)
+const DEMAT_MAR2026 = {
+  'Riya': 1, 'Khokhan': 2, 'Raju': 1, 'Puja': 0,
+  'Rohit': 1, 'Bharat': 0, 'Komal': 0, 'Megha': 0, 'Anjali': 0
+};
+const DEMAT_RATE = 600; // ₹ per demat account opened
 
 // localStorage keys
 const KEY_ATT = 'dnihr_attendance';    // {name: [{date,in,out,status}]}
 const KEY_LEAVE = 'dnihr_leaves';       // [{name,type,from,to,days,status,reason}]
 const KEY_USER = 'dnihr_user';
-const KEY_INC_SALARY = 'dnihr_inc_salary'; // {name: salary} for incentive calc
+const KEY_INC_SALARY = 'dnihr_inc_salary';   // {name: salary} for incentive calc — set once
+const KEY_INC_MFSIP = 'dnihr_inc_mfsip';     // {name: {mf, sip, demat}} monthly business figures
+const KEY_INC_RATES = 'dnihr_inc_rates';     // {mfRate, sipRate} percentage rates
 
 let currentUser = null;
 let isAdmin = false;
@@ -546,19 +576,23 @@ function getLeaves(){try{return JSON.parse(localStorage.getItem(KEY_LEAVE)||'[]'
 function saveLeaves(d){localStorage.setItem(KEY_LEAVE,JSON.stringify(d))}
 function getIncSalary(){try{return JSON.parse(localStorage.getItem(KEY_INC_SALARY)||'{}')}catch{return{}}}
 function saveIncSalary(d){localStorage.setItem(KEY_INC_SALARY,JSON.stringify(d))}
+function getMfSip(){try{return JSON.parse(localStorage.getItem(KEY_INC_MFSIP)||'{}')}catch{return{}}}
+function saveMfSip(d){localStorage.setItem(KEY_INC_MFSIP,JSON.stringify(d))}
+function getIncRates(){try{return JSON.parse(localStorage.getItem(KEY_INC_RATES)||'{"mfRate":0,"sipRate":0}')}catch{return{mfRate:0,sipRate:0}}}
+function saveIncRates(d){localStorage.setItem(KEY_INC_RATES,JSON.stringify(d))}
 
 // Brokerage incentive formula:
-// Brokerage <= 3x Salary             => Incentive = 0
-// 3x Salary < Brokerage <= 10x Salary => Excess(over 3x) * 5%
-// Brokerage > 10x Salary              => Excess(over 3x) * 7%  (5%+2% combined, both on same excess)
+// Brokerage < 3x Salary               => Incentive = 0
+// 3x Salary <= Brokerage < 10x Salary => Excess(over 3x) * 5%   [starts AT 3x]
+// Brokerage >= 10x Salary             => Excess(over 3x) * 7%  (5%+2% combined, both on same excess) [starts AT 10x]
 function brokerageIncentive(salary, brokerage){
   salary=Number(salary)||0; brokerage=Number(brokerage)||0;
   const t3=salary*3, t10=salary*10;
   const excess=Math.max(0,brokerage-t3);
   let base5=0, extra2=0;
-  if(brokerage>t3 && brokerage<=t10){
+  if(brokerage>=t3 && brokerage<t10){
     base5=excess*0.05;
-  } else if(brokerage>t10){
+  } else if(brokerage>=t10){
     base5=excess*0.05;
     extra2=excess*0.02;
   }
@@ -952,28 +986,53 @@ function calcSalary(){
 }
 
 // ─── INCENTIVE ───────────────────────────────────────────────────────────────
+function totalIncentive(name, salary){
+  const mfsip=getMfSip()[name]||{};
+  const rates=getIncRates();
+  const brok = mfsip.brok!==undefined ? mfsip.brok : (BROKERAGE_MAR2026[name]||0);
+  const demat = mfsip.demat!==undefined ? mfsip.demat : (DEMAT_MAR2026[name]||0);
+  const mf = mfsip.mf||0;
+  const sip = mfsip.sip||0;
+
+  const br=brokerageIncentive(salary,brok);
+  const dematInc = demat*DEMAT_RATE;
+  const mfInc = mf*(rates.mfRate||0)/100;
+  const sipInc = sip*(rates.sipRate||0)/100;
+  const total = br.total + dematInc + mfInc + sipInc;
+
+  return {brok, demat, mf, sip, br, dematInc, mfInc, sipInc, total};
+}
+
 function renderIncentivePage(){
   const incSal=getIncSalary();
+  const rates=getIncRates();
+
+  // Update formula card with current rates
+  const fmfEl=document.getElementById('formula-mf-rate');
+  if(fmfEl) fmfEl.textContent = rates.mfRate ? rates.mfRate+'% of MF sale' : 'Not set';
+  const fsipEl=document.getElementById('formula-sip-rate');
+  if(fsipEl) fsipEl.textContent = rates.sipRate ? rates.sipRate+'% of SIP amount' : 'Not set';
 
   // My incentive card
-  const mySalary=incSal[currentUser]||(EMPLOYEES.find(e=>e.name===currentUser)||{}).salary||0;
-  const myBrok=BROKERAGE_MAR2026[currentUser]||0;
-  const r=brokerageIncentive(mySalary,myBrok);
+  const mySalary=incSal[currentUser]!==undefined?incSal[currentUser]:((EMPLOYEES.find(e=>e.name===currentUser)||{}).salary||0);
+  const t=totalIncentive(currentUser,mySalary);
   const mic=document.getElementById('my-incentive-card');
   if(mic){
+    const lockMsg = incSal[currentUser]!==undefined
+      ? `<p style="font-size:11px;color:var(--text3);margin-bottom:10px">Salary: ${fmt(mySalary)} (admin se set)</p>`
+      : `<p style="font-size:11px;color:var(--amber-text);margin-bottom:10px">⚠ Salary abhi set nahi hui, default value use ho rahi hai</p>`;
     mic.innerHTML=`
-      <div class="form-row single" style="margin-bottom:10px">
-        <div class="field-inline"><label>Meri salary (₹) — edit kar sakte hain</label>
-          <input type="number" id="my-inc-salary" value="${mySalary}" onchange="updateMySalary(this.value)">
-        </div>
-      </div>
+      ${lockMsg}
       <table style="font-size:13px;width:100%">
-        <tr><td style="color:var(--text2);padding:5px 0">Total brokerage (Mar 2026)</td><td style="text-align:right">${fmt(myBrok)}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">3× Salary threshold</td><td style="text-align:right">${fmt(r.threshold3)}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">Excess over 3× Salary</td><td style="text-align:right">${fmt(r.excess)}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">5% incentive (on excess)</td><td style="text-align:right">${fmt(r.base5)}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (on excess, if &gt;10× salary)</td><td style="text-align:right">${fmt(r.extra2)}</td></tr>
-        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.total)}</td></tr>
+        <tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Brokerage incentive</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Total brokerage</td><td style="text-align:right">${fmt(t.brok)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Excess over 3× Salary</td><td style="text-align:right">${fmt(t.br.excess)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Brokerage incentive</td><td style="text-align:right">${fmt(t.br.total)}</td></tr>
+        <tr><td colspan="2" style="padding:6px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Other incentives</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Demat opening (${t.demat} × ₹600)</td><td style="text-align:right">${fmt(t.dematInc)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
+        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
       </table>`;
   }
 
@@ -982,33 +1041,32 @@ function renderIncentivePage(){
     if(tit){
       tit.innerHTML=EMPLOYEES.map(e=>{
         const sal=incSal[e.name]!==undefined?incSal[e.name]:e.salary;
-        const brok=BROKERAGE_MAR2026[e.name]||0;
-        const rr=brokerageIncentive(sal,brok);
+        const tt=totalIncentive(e.name,sal);
         return `<tr>
           <td>${e.name}</td>
-          <td>${fmt(brok)}</td>
-          <td><input type="number" value="${sal}" style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px" onchange="updateTeamSalary('${e.name}',this.value)"></td>
-          <td>${fmt(rr.threshold3)}</td>
-          <td style="font-weight:600;color:${rr.total>0?'var(--green)':'var(--text3)'}">${fmt(rr.total)}</td>
+          <td>${fmt(tt.brok)}</td>
+          <td>${tt.demat}</td>
+          <td>${fmt(tt.mf)}</td>
+          <td>${fmt(tt.sip)}</td>
+          <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
         </tr>`;
       }).join('');
     }
+
+    // rate inputs
+    const mfr=document.getElementById('mf-rate'); if(mfr && !mfr.value) mfr.value=rates.mfRate||'';
+    const sipr=document.getElementById('sip-rate'); if(sipr && !sipr.value) sipr.value=rates.sipRate||'';
+
     loadIncEmp();
   }
 }
 
-function updateMySalary(val){
-  const incSal=getIncSalary();
-  incSal[currentUser]=parseInt(val)||0;
-  saveIncSalary(incSal);
+function saveRates(){
+  const mfRate=parseFloat(document.getElementById('mf-rate').value)||0;
+  const sipRate=parseFloat(document.getElementById('sip-rate').value)||0;
+  saveIncRates({mfRate,sipRate});
   renderIncentivePage();
-}
-
-function updateTeamSalary(name,val){
-  const incSal=getIncSalary();
-  incSal[name]=parseInt(val)||0;
-  saveIncSalary(incSal);
-  renderIncentivePage();
+  alert('Rates save ho gaye! MF: '+mfRate+'%, SIP: '+sipRate+'%');
 }
 
 function loadIncEmp(){
@@ -1017,25 +1075,77 @@ function loadIncEmp(){
   const name=sel.value;
   const incSal=getIncSalary();
   const sal=incSal[name]!==undefined?incSal[name]:(EMPLOYEES.find(e=>e.name===name)||{}).salary||32000;
-  const brok=BROKERAGE_MAR2026[name]||0;
+  const mfsip=getMfSip()[name]||{};
   document.getElementById('inc-salary').value=sal;
-  document.getElementById('inc-brok').value=brok;
+  document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:(BROKERAGE_MAR2026[name]||0);
+  document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:(DEMAT_MAR2026[name]||0);
+  document.getElementById('inc-mf').value = mfsip.mf||0;
+  document.getElementById('inc-sip').value = mfsip.sip||0;
+
+  const lockStatus=document.getElementById('salary-lock-status');
+  if(lockStatus){
+    lockStatus.textContent = incSal[name]!==undefined
+      ? '✓ '+name+' ki salary set hai: '+fmt(sal)
+      : name+' ki salary abhi set nahi hui';
+  }
   calcIncentive();
 }
 
-function calcIncentive(){
-  const salary=parseInt(document.getElementById('inc-salary').value)||0;
+function lockSalary(){
+  const sel=document.getElementById('inc-emp');
+  const name=sel.value;
+  const val=parseInt(document.getElementById('inc-salary').value)||0;
+  const incSal=getIncSalary();
+  incSal[name]=val;
+  saveIncSalary(incSal);
+  loadIncEmp();
+  renderIncentivePage();
+  alert(name+' ki salary set ho gayi: '+fmt(val));
+}
+
+function saveMfSipData(){
+  const sel=document.getElementById('inc-emp');
+  const name=sel.value;
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
-  const r=brokerageIncentive(salary,brok);
+  const demat=parseInt(document.getElementById('inc-demat').value)||0;
+  const mf=parseInt(document.getElementById('inc-mf').value)||0;
+  const sip=parseInt(document.getElementById('inc-sip').value)||0;
+  const mfsip=getMfSip();
+  mfsip[name]={brok,demat,mf,sip};
+  saveMfSip(mfsip);
+  calcIncentive();
+  renderIncentivePage();
+  alert(name+' ke business figures save ho gaye!');
+}
+
+function calcIncentive(){
+  const sel=document.getElementById('inc-emp');
+  if(!sel) return;
+  const name=sel.value;
+  const incSal=getIncSalary();
+  const salary=incSal[name]!==undefined?incSal[name]:(parseInt(document.getElementById('inc-salary').value)||0);
+  const brok=parseInt(document.getElementById('inc-brok').value)||0;
+  const demat=parseInt(document.getElementById('inc-demat').value)||0;
+  const mf=parseInt(document.getElementById('inc-mf').value)||0;
+  const sip=parseInt(document.getElementById('inc-sip').value)||0;
+  const rates=getIncRates();
+
+  const br=brokerageIncentive(salary,brok);
+  const dematInc=demat*DEMAT_RATE;
+  const mfInc=mf*(rates.mfRate||0)/100;
+  const sipInc=sip*(rates.sipRate||0)/100;
+  const total=br.total+dematInc+mfInc+sipInc;
+
   const el=document.getElementById('inc-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%">
-      <tr><td style="color:var(--text2);padding:5px 0">3× Salary</td><td style="text-align:right">${fmt(r.threshold3)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">10× Salary</td><td style="text-align:right">${fmt(r.threshold10)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Excess over 3×</td><td style="text-align:right">${fmt(r.excess)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">5% incentive (on excess)</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.base5)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Extra 2% (on excess, 10× crossed)</td><td style="text-align:right;color:var(--green)">+ ${fmt(r.extra2)}</td></tr>
-      <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.total)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">3× Salary / 10× Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Excess over 3×</td><td style="text-align:right">${fmt(br.excess)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Brokerage incentive</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.total)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ₹600)</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">MF incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">SIP incentive (${rates.sipRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(sipInc)}</td></tr>
+      <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(total)}</td></tr>
     </table>`;
 }
 
