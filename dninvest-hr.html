@@ -195,6 +195,7 @@ tr:hover td{background:var(--surface2)}
     </div>
     <button class="login-btn" onclick="doLogin()">Sign In →</button>
     <div class="att-notice" id="att-notice"></div>
+    <div id="office-status-banner" style="display:none;margin-top:14px;padding:10px 14px;border-radius:8px;font-size:12.5px;text-align:center"></div>
   </div>
 </div>
 
@@ -627,6 +628,28 @@ function getHolidayName(dateStr){
   return h?h.name:null;
 }
 function isHoliday(dateStr){ return getHolidayName(dateStr)!==null; }
+
+// RM office-hours window check (Admin always bypasses this).
+// Mon-Fri: 11:30 AM - 6:00 PM | Sat: 10:00 AM - 2:00 PM | Sun & holidays: closed all day
+function officeWindowStatus(){
+  const now=new Date();
+  const td=today();
+  const holidayName=getHolidayName(td);
+  if(holidayName){
+    return {open:false, reason: holidayName==='Sunday' ? 'Aaj Sunday hai — office band hai' : 'Aaj '+holidayName+' ki chutti hai'};
+  }
+  const day=now.getDay(); // 0=Sun .. 6=Sat
+  const mins=now.getHours()*60+now.getMinutes();
+  if(day===6){ // Saturday
+    const openM=10*60, closeM=14*60;
+    if(mins<openM || mins>=closeM) return {open:false, reason:'Saturday office time: 10:00 AM – 2:00 PM'};
+    return {open:true};
+  }
+  // Mon-Fri
+  const openM=11*60+30, closeM=18*60;
+  if(mins<openM || mins>=closeM) return {open:false, reason:'Office time: 11:30 AM – 6:00 PM (Mon–Fri)'};
+  return {open:true};
+}
 function getIncSalary(){ return DB.get('salaries', {}) || {}; }
 
 // Central salary getter — checks Firestore-synced override first, else EMPLOYEES default.
@@ -717,10 +740,17 @@ async function doLogin(){
 
   if(!user){ alert('Galat username ya password/PIN'); return; }
 
-  // Admin role in CRM => Admin in HR portal too
+  // Admin role in CRM => Admin in HR portal too — always allowed, no time restriction
   if(user.role==='admin'){
     currentUser=user.name||username;isAdmin=true;
     startApp();return;
+  }
+
+  // Staff (RM) login is only allowed during office hours
+  const win=officeWindowStatus();
+  if(!win.open){
+    alert('🔒 Office band hai\n\n'+win.reason+'\n\nKripya office time mein login karein.');
+    return;
   }
 
   // Match CRM's display name to HR's EMPLOYEES list
@@ -810,6 +840,24 @@ function doLogout(){
     }
   }catch{}
 })();
+
+// Show office-hours status banner on the login screen (RM-only restriction).
+// Refreshes every minute so the message updates live as the window opens/closes.
+function updateOfficeStatusBanner(){
+  const banner=document.getElementById('office-status-banner');
+  if(!banner) return;
+  const win=officeWindowStatus();
+  if(win.open){
+    banner.style.display='none';
+  } else {
+    banner.style.display='block';
+    banner.style.background='var(--red-bg)';
+    banner.style.color='var(--red-text)';
+    banner.innerHTML='🔒 <b>Office band hai</b><br>'+win.reason+'<br><span style="font-size:11px;opacity:0.8">Admin login hamesha allowed hai</span>';
+  }
+}
+updateOfficeStatusBanner();
+setInterval(updateOfficeStatusBanner, 60000);
 
 // ─── CLOCK ──────────────────────────────────────────────────────────────────
 function startClock(){
