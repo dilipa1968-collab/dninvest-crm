@@ -1619,6 +1619,16 @@ async function doLogin(){
     return false;
   });
   if(user){
+    // Admin always allowed. RM is blocked if Admin has disabled CRM access
+    // via the master switch on the HR Portal (shared Firestore document).
+    if(user.role!=='admin'){
+      const blocked = await isCrmBlockedForRm();
+      if(blocked){
+        document.getElementById('lerr').textContent='🔒 CRM abhi Admin ne band kar rakha hai. Kripya baad mein try karein.';
+        document.getElementById('lerr').style.display='block';
+        return;
+      }
+    }
     CU = user;
     sessionStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p}));
     document.getElementById('lerr').style.display='none';
@@ -1628,6 +1638,19 @@ async function doLogin(){
   } else {
     document.getElementById('lerr').style.display='block';
   }
+}
+
+// Checks the shared access-control document (managed from the HR Portal's
+// Employees page) to see if Admin has disabled CRM access for RMs.
+async function isCrmBlockedForRm(){
+  try{
+    if(typeof fdb==='undefined') return false;
+    const doc = await fdb.collection('shared_control').doc('access').get();
+    if(doc.exists && doc.data() && doc.data().data){
+      return doc.data().data.crmEnabled===false;
+    }
+  }catch(e){ console.log('Access control check failed:',e); }
+  return false;
 }
 
 // Opens the HR Portal in a new tab, pre-filling the username so the person
