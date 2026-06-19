@@ -562,6 +562,13 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
           <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
+          <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 100%);color:#fff" onclick="openHrPortal()">
+            <div style="text-align:center">
+              <div style="font-size:2rem;margin-bottom:8px">👥</div>
+              <h3 style="color:#fff;margin:0">HR Portal</h3>
+              <p style="font-size:.78rem;color:var(--gold2);margin-top:4px">Attendance · Salary · Incentive</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1621,6 +1628,14 @@ async function doLogin(){
   } else {
     document.getElementById('lerr').style.display='block';
   }
+}
+
+// Opens the HR Portal in a new tab, pre-filling the username so the person
+// only needs to type their password/PIN once more (browser security means
+// we can't auto-login across tabs, but this saves the username step).
+function openHrPortal(){
+  if(!CU || !CU.username){ alert('Pehle login karein'); return; }
+  window.open('dninvest-hr.html?u='+encodeURIComponent(CU.username), '_blank');
 }
 
 function doLogout(){
