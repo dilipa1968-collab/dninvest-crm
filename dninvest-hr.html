@@ -690,30 +690,26 @@ async function fetchAccessControlOnce(){
   return getAccessControl();
 }
 
-// RM office-hours window check (Admin always bypasses this).
-// Mon-Fri: 11:30 AM - 6:00 PM | Sat: 10:00 AM - 2:00 PM | Sun & holidays: closed all day
+// RM access window check (Admin always bypasses this).
+// Matches DNInvest CRM's auto-schedule exactly: 8:00 AM – 7:00 PM IST, every day
+// (no Saturday/Sunday distinction, no holiday-calendar block — same as CRM).
 // Also blocks if Admin has manually disabled the HR portal via the master switch.
+function getISTHour(){
+  // IST = UTC+5:30 — identical calculation to the one used in CRM
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset()*60000;
+  const ist = new Date(utc + 5.5*3600000);
+  return ist.getHours() + ist.getMinutes()/60;
+}
 function officeWindowStatus(){
   const access=getAccessControl();
   if(access.hrEnabled===false){
     return {open:false, reason:'Admin ne HR Portal abhi ke liye band kar diya hai'};
   }
-  const now=new Date();
-  const td=today();
-  const holidayName=getHolidayName(td);
-  if(holidayName){
-    return {open:false, reason: holidayName==='Sunday' ? 'Aaj Sunday hai — office band hai' : 'Aaj '+holidayName+' ki chutti hai'};
+  const istHour=getISTHour();
+  if(istHour<8 || istHour>=19){
+    return {open:false, reason:'Office time: 8:00 AM – 7:00 PM (roz)'};
   }
-  const day=now.getDay(); // 0=Sun .. 6=Sat
-  const mins=now.getHours()*60+now.getMinutes();
-  if(day===6){ // Saturday
-    const openM=10*60, closeM=14*60;
-    if(mins<openM || mins>=closeM) return {open:false, reason:'Saturday office time: 10:00 AM – 2:00 PM'};
-    return {open:true};
-  }
-  // Mon-Fri
-  const openM=11*60+30, closeM=18*60;
-  if(mins<openM || mins>=closeM) return {open:false, reason:'Office time: 11:30 AM – 6:00 PM (Mon–Fri)'};
   return {open:true};
 }
 function getIncSalary(){ return DB.get('salaries', {}) || {}; }
