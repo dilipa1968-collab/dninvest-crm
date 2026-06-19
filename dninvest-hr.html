@@ -181,8 +181,8 @@ tr:hover td{background:var(--surface2)}
       </select>
     </div>
     <div class="field">
-      <label>Password</label>
-      <input type="password" id="login-pass" placeholder="••••••">
+      <label>PIN (4 digit)</label>
+      <input type="password" id="login-pass" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" style="letter-spacing:6px;font-size:18px;text-align:center" onkeypress="return /[0-9]/.test(event.key)">
     </div>
     <button class="login-btn" onclick="doLogin()">Login karein</button>
     <div class="att-notice" id="att-notice"></div>
@@ -354,9 +354,7 @@ tr:hover td{background:var(--surface2)}
               </select>
             </div>
             <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
-            <div class="field-inline"><label>Days present</label><input type="number" id="sal-days" value="0" min="0" max="26" onchange="calcSalary()"></div>
-            <div class="field-inline"><label>Working days</label><input type="number" id="sal-wdays" value="26" min="20" max="27" onchange="calcSalary()"></div>
-            <div class="field-inline"><label>Deductions (₹)</label><input type="number" id="sal-ded" value="0" onchange="calcSalary()"></div>
+            <div class="field-inline"><label>Absent days</label><input type="number" id="sal-absent" value="0" min="0" max="30" onchange="calcSalary()"></div>
             <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
           </div>
           <hr class="divider">
@@ -367,7 +365,7 @@ tr:hover td{background:var(--surface2)}
           <div class="card-title">Team salary summary</div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Basic</th><th>Earned</th><th>Deduction</th><th>Net</th></tr></thead>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Net</th></tr></thead>
               <tbody id="team-salary-table"></tbody>
             </table>
           </div>
@@ -460,7 +458,7 @@ tr:hover td{background:var(--surface2)}
         </div>
         <div class="form-row">
           <div class="field-inline"><label>Basic salary (₹/month)</label><input type="number" id="ne-sal" placeholder="30000"></div>
-          <div class="field-inline"><label>Password (login)</label><input type="text" id="ne-pass" placeholder="Set password"></div>
+          <div class="field-inline"><label>Login PIN (4 digit)</label><input type="text" inputmode="numeric" maxlength="4" id="ne-pin" placeholder="1234" style="letter-spacing:2px;text-align:center" onkeypress="return /[0-9]/.test(event.key)"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:4px">
           <button class="btn btn-primary" onclick="addEmployee()">Save</button>
@@ -469,7 +467,7 @@ tr:hover td{background:var(--surface2)}
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Login PIN</th><th>Status</th><th></th></tr></thead>
           <tbody id="emp-table"></tbody>
         </table>
       </div>
@@ -502,17 +500,32 @@ tr:hover td{background:var(--surface2)}
 <script>
 // ─── DATA ───────────────────────────────────────────────────────────────────
 const EMPLOYEES = [
-  {name:'Puja',   role:'RM', joined:'Mar 2022', salary:32000, pass:'puja123'},
-  {name:'Rohit',  role:'RM', joined:'Jan 2023', salary:30000, pass:'rohit123'},
-  {name:'Raju',   role:'RM', joined:'Jun 2021', salary:35000, pass:'raju123'},
-  {name:'Komal',  role:'RM', joined:'Aug 2022', salary:31000, pass:'komal123'},
-  {name:'Riya',   role:'RM', joined:'Nov 2023', salary:28000, pass:'riya123'},
-  {name:'Bharat', role:'RM', joined:'Feb 2022', salary:33000, pass:'bharat123'},
-  {name:'Khokhan',role:'RM', joined:'May 2021', salary:36000, pass:'khokhan123'},
-  {name:'Megha',  role:'RM', joined:'Sep 2023', salary:29000, pass:'megha123'},
-  {name:'Anjali', role:'RM', joined:'Jul 2022', salary:31500, pass:'anjali123'},
+  {name:'Puja',   role:'RM', joined:'Mar 2022', salary:32000, pin:'1001'},
+  {name:'Rohit',  role:'RM', joined:'Jan 2023', salary:30000, pin:'1002'},
+  {name:'Raju',   role:'RM', joined:'Jun 2021', salary:35000, pin:'1003'},
+  {name:'Komal',  role:'RM', joined:'Aug 2022', salary:31000, pin:'1004'},
+  {name:'Riya',   role:'RM', joined:'Nov 2023', salary:28000, pin:'1005'},
+  {name:'Bharat', role:'RM', joined:'Feb 2022', salary:33000, pin:'1006'},
+  {name:'Khokhan',role:'RM', joined:'May 2021', salary:36000, pin:'1007'},
+  {name:'Megha',  role:'RM', joined:'Sep 2023', salary:29000, pin:'1008'},
+  {name:'Anjali', role:'RM', joined:'Jul 2022', salary:31500, pin:'1009'},
 ];
 const ADMIN_PASS = 'admin123';
+const KEY_PINS = 'dnihr_pins'; // {name: pin} — admin can override default PINs
+function getPins(){try{return JSON.parse(localStorage.getItem(KEY_PINS)||'{}')}catch{return{}}}
+function savePins(d){localStorage.setItem(KEY_PINS,JSON.stringify(d))}
+function getEmpPin(name){
+  const pins=getPins();
+  if(pins[name]!==undefined) return pins[name];
+  const e=EMPLOYEES.find(x=>x.name===name);
+  return e?e.pin:'';
+}
+function setEmpPin(name,pin){
+  const pins=getPins();
+  pins[name]=pin;
+  savePins(pins);
+}
+
 
 // Brokerage turnover — empty by default. Admin enters monthly data from Incentive page (April 2026 onwards).
 const BROKERAGE_MAR2026 = {
@@ -613,13 +626,14 @@ function doLogin(){
   if(!name){alert('Pehle apna naam chunein');return}
 
   if(name==='__admin__'){
-    if(pass!==ADMIN_PASS){alert('Wrong password');return}
+    if(pass!==ADMIN_PASS){alert('Wrong PIN');return}
     currentUser='Admin';isAdmin=true;
     startApp();return;
   }
   const emp=EMPLOYEES.find(e=>e.name===name);
   if(!emp){alert('Employee nahi mila');return}
-  if(pass!==emp.pass){alert('Wrong password');return}
+  const correctPin=getEmpPin(name);
+  if(pass!==correctPin){alert('Galat PIN');return}
   currentUser=name;isAdmin=false;
 
   // Auto-record attendance: login time - 5 min (skip "Present" status on holidays)
@@ -725,15 +739,13 @@ function renderDashboard(){
   const da=document.getElementById('d-absent'); if(da) da.textContent=absent;
   const dl=document.getElementById('d-leave'); if(dl) dl.textContent=onleave;
 
-  // Real payroll: sum of each employee's earned salary this month (based on attendance)
+  // Real payroll: sum of each employee's net salary this month (Salary - absent deduction)
   const dpay=document.getElementById('d-payroll');
   if(dpay){
     let totalPayroll=0;
+    const month=td.slice(0,7);
     EMPLOYEES.forEach(e=>{
-      const sal=getEmpSalary(e.name);
-      const recs=att[e.name]||[];
-      const p=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
-      totalPayroll += Math.min((sal/26)*p, sal);
+      totalPayroll += calcMonthlySalary(e.name,month).net;
     });
     dpay.textContent=fmt(totalPayroll);
   }
@@ -941,37 +953,46 @@ function removeHoliday(date){
 }
 
 // ─── SALARY ──────────────────────────────────────────────────────────────────
+// Calculate salary with absent-day deduction.
+// Per-day rate = Salary / 30. Each Absent day deducts one per-day rate.
+// Holiday-status days are NOT counted as absent.
+function calcMonthlySalary(name, monthPrefix){
+  const sal=getEmpSalary(name);
+  const att=getAtt();
+  const recs=(att[name]||[]).filter(r=>!monthPrefix || r.date.startsWith(monthPrefix));
+  const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
+  const absentDays=recs.filter(r=>r.status==='Absent').length;
+  const perDay=sal/30;
+  const deduction=perDay*absentDays;
+  const net=Math.max(0,sal-deduction);
+  return {salary:sal, perDay, presentDays, absentDays, deduction, net};
+}
+
 function renderSalaryPage(){
   const emp=EMPLOYEES.find(e=>e.name===currentUser);
   const msc=document.getElementById('my-salary-card');
   if(msc&&emp){
-    const mySalary=getEmpSalary(currentUser);
-    const att=getAtt();
-    const myRecs=att[currentUser]||[];
-    const present=myRecs.filter(r=>r.status==='Present'||r.status==='Late').length;
-    const working=26;
-    const earned=Math.min((mySalary/working)*present,mySalary);
+    const month=today().slice(0,7);
+    const r=calcMonthlySalary(currentUser,month);
     msc.innerHTML=`
       <table style="font-size:13px;width:100%">
-        <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(mySalary)}</td></tr>
-        <tr><td style="color:var(--text2);padding:6px 0">Days present</td><td style="text-align:right">${present} / ${working}</td></tr>
-        <tr><td style="color:var(--text2);padding:6px 0">Earned salary</td><td style="text-align:right">${fmt(earned)}</td></tr>
-        <tr><td style="color:var(--text2);padding:6px 0">Deductions</td><td style="text-align:right;color:var(--red)">— ₹0</td></tr>
-        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(earned)}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(r.salary)}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷30)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent × per-day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
+        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.net)}</td></tr>
       </table>
-      <p style="font-size:11px;color:var(--text3);margin-top:8px">June 2026 — estimated (final admin se confirm hoga)</p>`;
+      <p style="font-size:11px;color:var(--text3);margin-top:8px">Is mahine ka estimate — final admin se confirm hoga</p>`;
   }
 
   if(isAdmin){
     const tst=document.getElementById('team-salary-table');
     if(tst){
-      const att=getAtt();
+      const month=today().slice(0,7);
       tst.innerHTML=EMPLOYEES.map(e=>{
-        const sal=getEmpSalary(e.name);
-        const recs=att[e.name]||[];
-        const p=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
-        const earned=Math.min((sal/26)*p,sal);
-        return `<tr><td>${e.name}</td><td>${fmt(sal)}</td><td>${fmt(earned)}</td><td>₹0</td><td style="font-weight:600;color:var(--green)">${fmt(earned)}</td></tr>`;
+        const r=calcMonthlySalary(e.name,month);
+        return `<tr><td>${e.name}</td><td>${fmt(r.salary)}</td><td>${r.absentDays}</td><td style="color:var(--red)">− ${fmt(r.deduction)}</td><td style="font-weight:600;color:var(--green)">${fmt(r.net)}</td></tr>`;
       }).join('');
     }
     calcSalary();
@@ -983,21 +1004,19 @@ function calcSalary(){
   if(!sel) return;
   const name=sel.value||'Puja';
   const b=getEmpSalary(name);
-  const days=parseInt(document.getElementById('sal-days').value)||17;
-  const wdays=parseInt(document.getElementById('sal-wdays').value)||26;
-  const ded=parseInt(document.getElementById('sal-ded').value)||0;
+  const absentDays=parseInt(document.getElementById('sal-absent').value)||0;
   const bonus=parseInt(document.getElementById('sal-bonus').value)||0;
-  const perday=b/wdays;
-  const earned=Math.min(perday*days,b);
-  const net=earned+bonus-ded;
+  const perday=b/30;
+  const deduction=perday*absentDays;
+  const net=Math.max(0,b-deduction)+bonus;
   const el=document.getElementById('sal-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
       <tr><td style="color:var(--text2);padding:5px 0">Basic</td><td style="text-align:right">${fmt(b)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Per day</td><td style="text-align:right">${fmt(perday)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Earned (${days}/${wdays} days)</td><td style="text-align:right">${fmt(earned)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Per day (Salary÷30)</td><td style="text-align:right">${fmt(perday)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(deduction)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Bonus</td><td style="text-align:right;color:var(--green)">+ ${fmt(bonus)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Deductions</td><td style="text-align:right;color:var(--red)">− ${fmt(ded)}</td></tr>
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(net)}</td></tr>
     </table>`;
 }
@@ -1149,6 +1168,7 @@ function renderEmployees(){
   if(!et) return;
   et.innerHTML=EMPLOYEES.map(e=>{
     const sal=getEmpSalary(e.name);
+    const pin=getEmpPin(e.name);
     return `
     <tr>
       <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
@@ -1158,6 +1178,12 @@ function renderEmployees(){
           <span>₹</span>
           <input type="number" value="${sal}" id="emp-sal-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
           <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')">Set</button>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="text" inputmode="numeric" maxlength="4" value="${pin}" id="emp-pin-${e.name}" style="width:60px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;letter-spacing:2px;text-align:center" onkeypress="return /[0-9]/.test(event.key)">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpPin('${e.name}')">Set</button>
         </div>
       </td>
       <td><span class="badge badge-green">Active</span></td>
@@ -1175,6 +1201,14 @@ function saveEmpSalary(name){
   alert(name+' ki salary set ho gayi: '+fmt(parseInt(val)||0)+'\n\nYeh Salary aur Incentive dono jagah use hogi.');
 }
 
+function saveEmpPin(name){
+  const val=document.getElementById('emp-pin-'+name).value.trim();
+  if(!/^\d{4}$/.test(val)){alert('PIN exactly 4 digit ka hona chahiye');return}
+  setEmpPin(name,val);
+  renderEmployees();
+  alert(name+' ka login PIN set ho gaya: '+val);
+}
+
 function toggleAddForm(){
   const f=document.getElementById('add-emp-form');
   f.style.display=f.style.display==='none'?'block':'none';
@@ -1182,9 +1216,11 @@ function toggleAddForm(){
 function addEmployee(){
   const name=document.getElementById('ne-name').value.trim();
   if(!name){alert('Naam daalen');return}
-  EMPLOYEES.push({name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000,pass:document.getElementById('ne-pass').value||'pass123'});
+  const pin=document.getElementById('ne-pin').value.trim();
+  if(!/^\d{4}$/.test(pin)){alert('PIN exactly 4 digit ka hona chahiye');return}
+  EMPLOYEES.push({name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000,pin});
   toggleAddForm();renderEmployees();
-  alert(name+' add ho gaya!');
+  alert(name+' add ho gaya! Login PIN: '+pin);
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
