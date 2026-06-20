@@ -423,6 +423,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       <div class="grid-flat">
         <div class="card">
           <div class="card-title">Meri Incentive</div>
+          <div class="field-inline" style="margin-bottom:8px"><label>Month dekhein</label><input type="month" id="view-inc-month" onchange="renderIncentivePage()"></div>
           <div id="my-incentive-card"></div>
         </div>
         <div class="card">
@@ -475,7 +476,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div id="inc-result"></div>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
-          <div class="card-title">Team incentive</div>
+          <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
@@ -953,6 +954,7 @@ function startApp(){
   // Default month pickers (Salary & Incentive) to current month
   const curMonth=today().slice(0,7);
   const incM=document.getElementById('inc-month'); if(incM && !incM.value) incM.value=curMonth;
+  const viewIncM=document.getElementById('view-inc-month'); if(viewIncM && !viewIncM.value) viewIncM.value=curMonth;
   const salM=document.getElementById('sal-month'); if(salM && !salM.value) salM.value=curMonth;
 
   startClock();
@@ -1632,9 +1634,17 @@ function totalIncentive(name, salary, month){
   return {brok, demat, mf, sip, br, dematInc, mfInc, sipInc, total};
 }
 
+function viewIncMonth(){
+  const el=document.getElementById('view-inc-month');
+  if(el && el.value) return el.value;
+  return today().slice(0,7); // YYYY-MM
+}
+
 function renderIncentivePage(){
   const rates=getIncRates();
-  const selMonth=currentIncMonth();
+  const vEl=document.getElementById('view-inc-month');
+  if(vEl && !vEl.value) vEl.value=today().slice(0,7);
+  const selMonth=viewIncMonth();
 
   // Update formula card with current rates
   const fmfEl=document.getElementById('formula-mf-rate');
@@ -1663,6 +1673,11 @@ function renderIncentivePage(){
   }
 
   if(isAdmin){
+    const tlbl=document.getElementById('team-inc-month-label');
+    if(tlbl){
+      const mLabel=new Date(selMonth+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+      tlbl.textContent='— '+mLabel;
+    }
     const tit=document.getElementById('team-incentive-table');
     if(tit){
       tit.innerHTML=EMPLOYEES.map(e=>{
