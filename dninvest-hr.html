@@ -319,6 +319,35 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <button class="btn btn-primary" onclick="saveManualAtt()">Attendance save karein</button>
         </div>
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">Bulk attendance mark karein (multiple dates)</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Ek employee, ek status, multiple dates ek saath. Sunday aur Exchange holidays list me dikhenge lekin auto-uncheck honge.</p>
+          <div class="form-row">
+            <div class="field-inline"><label>Employee</label>
+              <select id="bulk-emp">
+                <option>Puja</option><option>Rohit</option><option>Raju</option><option>Komal</option>
+                <option>Riya</option><option>Bharat</option><option>Khokhan</option><option>Megha</option><option>Anjali</option>
+              </select>
+            </div>
+            <div class="field-inline"><label>Status</label>
+              <select id="bulk-status"><option>Present</option><option>Absent</option><option>Half day</option><option>Late</option><option>Holiday</option></select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field-inline"><label>In time</label><input type="time" id="bulk-in" value="08:45"></div>
+            <div class="field-inline"><label>Out time</label><input type="time" id="bulk-out" value="18:00"></div>
+          </div>
+          <div class="form-row">
+            <div class="field-inline"><label>From date</label><input type="date" id="bulk-from" onchange="renderBulkDateList()"></div>
+            <div class="field-inline"><label>To date</label><input type="date" id="bulk-to" onchange="renderBulkDateList()"></div>
+          </div>
+          <div id="bulk-date-list" style="margin:10px 0;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;display:none"></div>
+          <div id="bulk-date-actions" style="display:none;margin-bottom:10px">
+            <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="bulkToggleAll(true)">Sab select karein</button>
+            <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="bulkToggleAll(false)">Sab hatayein</button>
+          </div>
+          <button class="btn btn-primary" onclick="saveBulkAtt()">Selected dates ki attendance save karein</button>
+        </div>
       </div>
     </div>
 
@@ -1352,6 +1381,64 @@ async function saveManualAtt(){
   await saveAttRecord(emp, rec);
   renderDashboard();renderAttendancePage();
   alert(`${emp} ki ${date} ki attendance save ho gayi!`);
+}
+
+// ─── BULK ATTENDANCE (multiple dates, one employee, one status) ──────────────
+// Builds a checkbox list of every date in the From–To range. Sundays and
+// Exchange holidays (from the Holidays list) are shown but auto-unchecked,
+// since those normally shouldn't be marked "Present" in bulk — admin can
+// still tick them manually if needed (e.g. someone genuinely worked a Sunday).
+function renderBulkDateList(){
+  const fromStr=document.getElementById('bulk-from').value;
+  const toStr=document.getElementById('bulk-to').value;
+  const listEl=document.getElementById('bulk-date-list');
+  const actEl=document.getElementById('bulk-date-actions');
+  if(!fromStr || !toStr){ listEl.style.display='none'; actEl.style.display='none'; listEl.innerHTML=''; return; }
+  if(toStr<fromStr){ alert('To date, From date se pehle nahi ho sakti'); listEl.style.display='none'; actEl.style.display='none'; return; }
+  const holidaySet=new Set(getHolidays().map(h=>h.date));
+  const holidayNameMap={}; getHolidays().forEach(h=>holidayNameMap[h.date]=h.name);
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let cur=new Date(fromStr+'T00:00:00');
+  const end=new Date(toStr+'T00:00:00');
+  let html='';
+  let count=0;
+  while(cur<=end){
+    const dStr=cur.toISOString().split('T')[0];
+    const dow=cur.getDay(); // 0=Sun
+    const isSunday=dow===0;
+    const isHoliday=holidaySet.has(dStr);
+    const skip=isSunday||isHoliday;
+    const label=dayNames[dow]+', '+cur.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    const tag=isHoliday?` <span style="color:var(--red);font-size:10px">(Holiday: ${holidayNameMap[dStr]})</span>`:isSunday?' <span style="color:var(--text3);font-size:10px">(Sunday)</span>':'';
+    html+=`<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:12px;cursor:pointer">
+      <input type="checkbox" class="bulk-date-chk" value="${dStr}" ${skip?'':'checked'}>
+      <span>${label}${tag}</span>
+    </label>`;
+    count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  listEl.innerHTML=html;
+  listEl.style.display='block';
+  actEl.style.display=count?'block':'none';
+}
+
+function bulkToggleAll(state){
+  document.querySelectorAll('.bulk-date-chk').forEach(cb=>cb.checked=state);
+}
+
+async function saveBulkAtt(){
+  const emp=document.getElementById('bulk-emp').value;
+  const status=document.getElementById('bulk-status').value;
+  const inT=document.getElementById('bulk-in').value;
+  const outT=document.getElementById('bulk-out').value;
+  const dates=Array.from(document.querySelectorAll('.bulk-date-chk:checked')).map(cb=>cb.value);
+  if(!dates.length){ alert('Kam se kam ek date select karein'); return; }
+  if(!confirm(`${emp} ki ${dates.length} date(s) ki attendance "${status}" mark ho jayegi. Confirm karein?`)) return;
+  for(const d of dates){
+    await saveAttRecord(emp, {date:d, in:inT, out:outT, status});
+  }
+  renderDashboard(); renderAttendancePage();
+  alert(`${emp} ki ${dates.length} date(s) ki attendance save ho gayi!`);
 }
 
 // ─── LEAVE ───────────────────────────────────────────────────────────────────
