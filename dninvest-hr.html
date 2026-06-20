@@ -518,14 +518,32 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
 
     <!-- REPORTS (admin only) -->
     <div id="page-reports" class="page">
-      <div class="grid2">
-        <div class="card">
-          <div class="card-title">Monthly attendance report</div>
+      <div class="grid-flat">
+        <div class="card admin-only" style="display:none">
+          <div class="card-title">RM-wise date-wise attendance sheet</div>
           <div class="form-row">
-            <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option><option>April 2026</option></select></div>
-            <div class="field-inline"><label>Employee</label><select><option>All</option><option>Puja</option><option>Rohit</option><option>Raju</option></select></div>
+            <div class="field-inline"><label>Month</label>
+              <select id="att-rpt-month" onchange="renderAttendanceSheet()"></select>
+            </div>
+            <div class="field-inline"><label>Employee</label>
+              <select id="att-rpt-emp" onchange="renderAttendanceSheet()">
+                <option value="">All</option>
+                <option>Puja</option><option>Rohit</option><option>Raju</option><option>Komal</option>
+                <option>Riya</option><option>Bharat</option><option>Khokhan</option><option>Megha</option><option>Anjali</option>
+              </select>
+            </div>
           </div>
-          <button class="btn btn-primary" onclick="alert('Report download ho raha hai... (Demo)')">Download Excel</button>
+          <div class="tbl-wrap" style="max-height:480px;overflow-y:auto">
+            <table>
+              <thead><tr id="att-sheet-head"></tr></thead>
+              <tbody id="att-sheet-body"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="downloadAttendanceSheet()">Excel download karein</button>
+            <button class="btn btn-danger" onclick="clearTodayAttendance()">Aaj ka attendance clear karein</button>
+          </div>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">"Aaj ka attendance clear karein" sirf <b id="att-clear-today-label"></b> ka data sabhi RMs ke liye hata dega. Is ke baad jo RM login karega uska attendance fresh auto-record hoga — purani dates is se affect nahi hongi.</p>
         </div>
         <div class="card">
           <div class="card-title">Salary report</div>
@@ -1119,6 +1137,143 @@ function calcHrs(inT,outT){
   return Math.floor(mins/60)+'h '+( mins%60)+'m';
 }
 
+// ─── REPORTS: RM-wise date-wise attendance sheet (admin) ─────────────────────
+const ATT_STATUS_SHORT = {Present:'P', Late:'L', 'Half day':'H', Absent:'A', Holiday:'—'};
+const ATT_STATUS_BADGE = {Present:'badge-green', Late:'badge-amber', 'Half day':'badge-blue', Absent:'badge-red', Holiday:'badge-gray'};
+
+// Builds "June 2026" style month list: current month + previous 5 months
+function attMonthOptions(){
+  const out=[];
+  const n=new Date();
+  for(let i=0;i<6;i++){
+    const d=new Date(n.getFullYear(), n.getMonth()-i, 1);
+    out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+  return out;
+}
+function attMonthLabel(ym){
+  const [y,m]=ym.split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleString('en-IN',{month:'long',year:'numeric'});
+}
+function populateAttMonthSelect(){
+  const sel=document.getElementById('att-rpt-month');
+  if(!sel || sel.options.length) return; // already populated
+  attMonthOptions().forEach(ym=>{
+    const o=document.createElement('option');
+    o.value=ym; o.textContent=attMonthLabel(ym);
+    sel.appendChild(o);
+  });
+}
+function attDaysInMonth(ym){
+  const [y,m]=ym.split('-').map(Number);
+  return new Date(y,m,0).getDate();
+}
+
+function renderAttendanceSheet(){
+  if(!isAdmin) return;
+  populateAttMonthSelect();
+  const monthSel=document.getElementById('att-rpt-month');
+  const empSel=document.getElementById('att-rpt-emp');
+  if(!monthSel || !empSel) return;
+  const lbl=document.getElementById('att-clear-today-label');
+  if(lbl) lbl.textContent=today();
+  const ym=monthSel.value || attMonthOptions()[0];
+  const empFilter=empSel.value;
+  const att=getAtt();
+  const numDays=attDaysInMonth(ym);
+  const emps = empFilter ? EMPLOYEES.filter(e=>e.name===empFilter) : EMPLOYEES;
+
+  // Header row: Employee + one column per date
+  const head=document.getElementById('att-sheet-head');
+  let headHtml='<th style="position:sticky;left:0;background:var(--surface)">Employee</th>';
+  for(let d=1; d<=numDays; d++){ headHtml+=`<th style="text-align:center;font-weight:500">${d}</th>`; }
+  head.innerHTML=headHtml;
+
+  // Body rows
+  const body=document.getElementById('att-sheet-body');
+  body.innerHTML = emps.map(e=>{
+    const recs=att[e.name]||[];
+    const byDate={};
+    recs.forEach(r=>{ byDate[r.date]=r; });
+    let row=`<td style="position:sticky;left:0;background:var(--surface)"><div class="emp-row"><div class="avatar" style="width:22px;height:22px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td>`;
+    for(let d=1; d<=numDays; d++){
+      const dateStr=ym+'-'+String(d).padStart(2,'0');
+      const r=byDate[dateStr];
+      if(r){
+        const short=ATT_STATUS_SHORT[r.status]||r.status[0];
+        const badge=ATT_STATUS_BADGE[r.status]||'badge-gray';
+        row+=`<td style="text-align:center" title="${r.status}${r.in?' — In: '+r.in:''}${r.out?', Out: '+r.out:''}"><span class="badge ${badge}" style="padding:1px 6px">${short}</span></td>`;
+      } else {
+        row+='<td style="text-align:center;color:var(--text3)">·</td>';
+      }
+    }
+    return `<tr>${row}</tr>`;
+  }).join('');
+}
+
+function downloadAttendanceSheet(){
+  if(!isAdmin) return;
+  const monthSel=document.getElementById('att-rpt-month');
+  const empSel=document.getElementById('att-rpt-emp');
+  const ym=monthSel.value || attMonthOptions()[0];
+  const empFilter=empSel.value;
+  const att=getAtt();
+  const numDays=attDaysInMonth(ym);
+  const emps = empFilter ? EMPLOYEES.filter(e=>e.name===empFilter) : EMPLOYEES;
+
+  let csv='Employee,'+Array.from({length:numDays},(_,i)=>i+1).join(',')+'\n';
+  emps.forEach(e=>{
+    const recs=att[e.name]||[];
+    const byDate={};
+    recs.forEach(r=>{ byDate[r.date]=r; });
+    const cells=[e.name];
+    for(let d=1; d<=numDays; d++){
+      const dateStr=ym+'-'+String(d).padStart(2,'0');
+      const r=byDate[dateStr];
+      cells.push(r ? (ATT_STATUS_SHORT[r.status]||r.status) : '');
+    }
+    csv+=cells.join(',')+'\n';
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='attendance-'+ym+(empFilter?'-'+empFilter:'')+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Removes TODAY's attendance record for every employee (all RMs), keeping all
+// past history intact. After this, the next time each RM logs in (CRM or HR
+// Portal), the existing "already marked today?" check will find nothing for
+// today and will auto-record a fresh entry — exactly like a normal day.
+async function clearTodayAttendance(){
+  if(!isAdmin) return;
+  const td=today();
+  if(!confirm('Aaj ('+td+') ka attendance data SABHI RMs ke liye clear ho jayega.\n\nPurani dates ka data safe rahega. Aage RM jab login karenge to unka attendance fresh auto-record ho jayega.\n\nConfirm karein?')) return;
+
+  const att=getAtt();
+  let changed=false;
+  EMPLOYEES.forEach(e=>{
+    const recs=att[e.name];
+    if(recs && recs.some(r=>r.date===td)){
+      att[e.name]=recs.filter(r=>r.date!==td);
+      changed=true;
+    }
+  });
+  if(!changed){ alert('Aaj ka koi attendance record mila hi nahi — pehle se clear hai.'); return; }
+
+  DB.setLocal('attendance', att);
+  try{
+    if(typeof fdb!=='undefined'){
+      await fdb.collection('hr_data').doc('attendance').set({data:att, updated:new Date().toISOString()});
+    }
+  }catch(e){ console.log('clearTodayAttendance sync error:', e); }
+
+  alert('Aaj ka attendance clear ho gaya. RM dobara login karenge to fresh mark hoga.');
+  renderAttendanceSheet();
+  renderAttendancePage();
+}
+
 // When admin picks a date in the manual attendance form, auto-fill the default
 // in/out times: Mon-Fri => 8:45 AM – 6:00 PM, Saturday => 9:30 AM – 2:00 PM.
 function setManualTimesByDate(){
@@ -1557,6 +1712,7 @@ function showPage(id,btn){
   if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
+  if(id==='reports') renderAttendanceSheet();
 }
 </script>
 </body>
