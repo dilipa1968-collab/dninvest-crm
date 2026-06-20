@@ -4230,6 +4230,19 @@ function declineBusinessEntry(id){
   renderMfTxnTable();
 }
 
+function markPendingBusinessEntry(id){
+  if(CU.role!=='admin') return;
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Pending';
+  e.decline_reason = '';
+  setMfBizEntries(entries);
+  toast('Status reset to Pending','success');
+  if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
+  renderMfTxnTable();
+}
+
 // ══════════════════════════════════════════
 // MF TRANSACTIONS (dedicated entry page — Redemption/Switch/SWP/SIP/Lumpsum)
 // All RM-wise, all client-wise. Uses the same 'mf_business' store as the
@@ -4404,6 +4417,7 @@ function renderMfTxnTable(){
           <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
+            ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
             <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
         </tr>`;
       }).join('')}
@@ -4932,6 +4946,7 @@ function newBusinessMonthlyReport(){
       h+=`<td style="white-space:nowrap">
         ${CU.role==='admin'&&status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
         ${CU.role==='admin'&&status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
+        ${CU.role==='admin'&&status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
         <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="deleteBusinessEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>
       </td>`;
