@@ -487,6 +487,32 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             </table>
           </div>
         </div>
+        <div class="card admin-only" style="display:none;grid-column:1/-1">
+          <div class="card-title">Multi-month combined payment</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Jab ek saath kai mahine ka incentive pay karte ho (jaise May 1st week mein Jan+Feb+March ka), yahan se ek baar mein amount baant kar save karein. Payment pehle sabse purane mahine ke balance mein adjust hoga, phir uske baad wale mahine mein.</p>
+          <div class="compact-grid3">
+            <div class="field-inline"><label>Employee</label>
+              <select id="mm-emp" onchange="renderMultiMonthSummary()">
+                <option value="Riya">Riya</option>
+                <option value="Khokhan">Khokhan</option>
+                <option value="Raju">Raju</option>
+                <option value="Puja">Puja</option>
+                <option value="Rohit">Rohit</option>
+                <option value="Bharat">Bharat</option>
+                <option value="Komal">Komal</option>
+                <option value="Megha">Megha</option>
+                <option value="Anjali">Anjali</option>
+              </select>
+            </div>
+            <div class="field-inline"><label>From month</label><input type="month" id="mm-from" onchange="renderMultiMonthSummary()"></div>
+            <div class="field-inline"><label>To month</label><input type="month" id="mm-to" onchange="renderMultiMonthSummary()"></div>
+          </div>
+          <hr class="divider">
+          <div id="mm-summary"></div>
+          <div class="field-inline" style="margin-top:10px"><label>Ab pay kar rahe hain (₹)</label><input type="number" id="mm-pay-amount" value="0" min="0" onchange="previewMultiMonthSplit()"></div>
+          <div id="mm-split-preview" style="margin-top:8px"></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="applyMultiMonthPayment()">Combined payment save karein</button>
+        </div>
       </div>
     </div>
 
@@ -977,6 +1003,11 @@ function startApp(){
   const viewIncM=document.getElementById('view-inc-month'); if(viewIncM && !viewIncM.value) viewIncM.value=curMonth;
   const salM=document.getElementById('sal-month'); if(salM && !salM.value) salM.value=curMonth;
   const viewSalM=document.getElementById('view-sal-month'); if(viewSalM && !viewSalM.value) viewSalM.value=curMonth;
+  const mmFrom=document.getElementById('mm-from'); if(mmFrom && !mmFrom.value){
+    const d=new Date(); d.setMonth(d.getMonth()-2);
+    mmFrom.value=d.toISOString().slice(0,7);
+  }
+  const mmTo=document.getElementById('mm-to'); if(mmTo && !mmTo.value) mmTo.value=curMonth;
 
   startClock();
   renderDashboard();
@@ -1779,6 +1810,7 @@ function renderIncentivePage(){
     const sipr=document.getElementById('sip-rate'); if(sipr && !sipr.value) sipr.value=rates.sipRate||'';
 
     loadIncEmp();
+    renderMultiMonthSummary();
   }
 }
 
@@ -1788,6 +1820,113 @@ async function markIncentivePaid(name){
   const input=document.getElementById('inc-paid-'+safeId);
   const amount=input?parseInt(input.value)||0:0;
   await setPaidAmount(name, month, 'incPaid', amount);
+  renderIncentivePage();
+}
+
+// ─── MULTI-MONTH COMBINED PAYMENT ──────────────────────────────────────────
+// Returns ["2026-01","2026-02","2026-03"] style list, inclusive, chronological.
+function monthsInRange(from, to){
+  if(!from || !to) return [];
+  const months=[];
+  let [y,m]=from.split('-').map(Number);
+  const [ey,em]=to.split('-').map(Number);
+  if(y>ey || (y===ey && m>em)) return []; // invalid range
+  while(y<ey || (y===ey && m<=em)){
+    months.push(y+'-'+String(m).padStart(2,'0'));
+    m++; if(m>12){m=1;y++;}
+  }
+  return months;
+}
+
+function getMonthIncentiveInfo(name, month){
+  const sal=getEmpSalary(name);
+  const tt=totalIncentive(name,sal,month);
+  const pay=getPaymentsForMonth(month)[name]||{};
+  const paid=pay.incPaid||0;
+  const balance=Math.max(0, tt.total-paid);
+  return {month, total:tt.total, paid, balance};
+}
+
+function renderMultiMonthSummary(){
+  const sel=document.getElementById('mm-emp');
+  const from=document.getElementById('mm-from');
+  const to=document.getElementById('mm-to');
+  const out=document.getElementById('mm-summary');
+  if(!sel||!from||!to||!out) return;
+  const months=monthsInRange(from.value, to.value);
+  if(months.length===0){
+    out.innerHTML='<p style="font-size:12px;color:var(--text3)">From aur To month select karein</p>';
+    return;
+  }
+  const name=sel.value;
+  const rows=months.map(m=>getMonthIncentiveInfo(name,m));
+  const totalBalance=rows.reduce((s,r)=>s+r.balance,0);
+  const mLabel=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+  out.innerHTML=`
+    <table style="font-size:12.5px;width:100%">
+      <thead><tr><th style="text-align:left">Month</th><th style="text-align:right">Total Incentive</th><th style="text-align:right">Already Paid</th><th style="text-align:right">Balance</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr><td>${mLabel(r.month)}</td><td style="text-align:right">${fmt(r.total)}</td><td style="text-align:right;color:var(--green)">${fmt(r.paid)}</td><td style="text-align:right;color:${r.balance>0?'var(--red)':'var(--green)'}">${fmt(r.balance)}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr style="border-top:1px solid var(--border)"><td style="padding-top:6px;font-weight:600">Total balance (${months.length} mahine)</td><td></td><td></td><td style="text-align:right;padding-top:6px;font-weight:700;font-size:15px;color:var(--red)">${fmt(totalBalance)}</td></tr></tfoot>
+    </table>`;
+  previewMultiMonthSplit();
+}
+
+// Chronologically fills oldest month's balance first, then next, etc.
+function computeMultiMonthSplit(name, months, payAmount){
+  let remaining=Math.max(0, Number(payAmount)||0);
+  const rows=months.map(m=>getMonthIncentiveInfo(name,m));
+  const allocation=rows.map(r=>{
+    const alloc=Math.min(r.balance, remaining);
+    remaining-=alloc;
+    return {month:r.month, total:r.total, prevPaid:r.paid, balance:r.balance, allocated:alloc, newPaid:r.paid+alloc, newBalance:r.balance-alloc};
+  });
+  return {allocation, leftover:remaining};
+}
+
+function previewMultiMonthSplit(){
+  const sel=document.getElementById('mm-emp');
+  const from=document.getElementById('mm-from');
+  const to=document.getElementById('mm-to');
+  const payEl=document.getElementById('mm-pay-amount');
+  const out=document.getElementById('mm-split-preview');
+  if(!sel||!from||!to||!payEl||!out) return;
+  const months=monthsInRange(from.value, to.value);
+  if(months.length===0){ out.innerHTML=''; return; }
+  const name=sel.value;
+  const payAmount=parseInt(payEl.value)||0;
+  const {allocation, leftover}=computeMultiMonthSplit(name, months, payAmount);
+  const mLabel=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+  out.innerHTML=`
+    <p style="font-size:11px;color:var(--text3);margin-bottom:4px">Ye amount is tarah baatega:</p>
+    <table style="font-size:12.5px;width:100%">
+      <tbody>
+        ${allocation.map(a=>`<tr><td>${mLabel(a.month)}</td><td style="text-align:right;color:${a.allocated>0?'var(--green)':'var(--text3)'}">${a.allocated>0?'+ '+fmt(a.allocated):'—'}</td><td style="text-align:right;color:var(--text3);font-size:11px">naya balance: ${fmt(a.newBalance)}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    ${leftover>0?`<p style="font-size:11.5px;color:var(--accent);margin-top:6px">Extra ${fmt(leftover)} bach raha hai (sabhi mahino ka balance clear ho chuka). Ye allocate nahi hoga.</p>`:''}`;
+}
+
+async function applyMultiMonthPayment(){
+  const sel=document.getElementById('mm-emp');
+  const from=document.getElementById('mm-from');
+  const to=document.getElementById('mm-to');
+  const payEl=document.getElementById('mm-pay-amount');
+  const months=monthsInRange(from.value, to.value);
+  if(months.length===0){ alert('Pehle From aur To month select karein'); return; }
+  const name=sel.value;
+  const payAmount=parseInt(payEl.value)||0;
+  if(payAmount<=0){ alert('Payment amount 0 se zyada honi chahiye'); return; }
+  const {allocation}=computeMultiMonthSplit(name, months, payAmount);
+  for(const a of allocation){
+    if(a.allocated>0){
+      await setPaidAmount(name, a.month, 'incPaid', a.newPaid);
+    }
+  }
+  const mLabel=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+  alert(name+' ke liye '+fmt(payAmount)+' ('+mLabel(months[0])+' se '+mLabel(months[months.length-1])+') save ho gaya!');
+  renderMultiMonthSummary();
   renderIncentivePage();
 }
 
