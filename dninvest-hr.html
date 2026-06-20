@@ -379,7 +379,8 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
     <div id="page-salary" class="page compact-page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">Meri salary — June 2026</div>
+          <div class="card-title">Meri Salary</div>
+          <div class="field-inline" style="margin-bottom:8px"><label>Month dekhein</label><input type="month" id="view-sal-month" onchange="renderSalaryPage()"></div>
           <div id="my-salary-card"></div>
         </div>
         <div class="card admin-only" style="display:none">
@@ -407,10 +408,10 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generate ho gaya! (Demo)')">Salary slip download</button>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
-          <div class="card-title">Team salary summary</div>
+          <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Net</th></tr></thead>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-salary-table"></tbody>
             </table>
           </div>
@@ -479,7 +480,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th></tr></thead>
+              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -817,6 +818,23 @@ function getMfSipForMonth(month){
   return all[month] || {};
 }
 
+// Payment tracking — month-wise Paid amounts for Salary & Incentive.
+// payments_by_month = { "2026-04": { Riya: {salaryPaid, incPaid}, ... }, ... }
+function getPaymentsByMonth(){ return DB.get('payments_by_month', {}) || {}; }
+async function savePaymentsByMonth(d){ await DB.set('payments_by_month', d); }
+function getPaymentsForMonth(month){
+  const all=getPaymentsByMonth();
+  return all[month] || {};
+}
+async function setPaidAmount(name, month, field, amount){
+  // field is 'salaryPaid' or 'incPaid'
+  const all=getPaymentsByMonth();
+  if(!all[month]) all[month]={};
+  if(!all[month][name]) all[month][name]={};
+  all[month][name][field]=Math.max(0, Number(amount)||0);
+  await savePaymentsByMonth(all);
+}
+
 function getIncRates(){ return DB.get('inc_rates', {mfRate:0, sipRate:0}) || {mfRate:0, sipRate:0}; }
 async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
@@ -956,6 +974,7 @@ function startApp(){
   const incM=document.getElementById('inc-month'); if(incM && !incM.value) incM.value=curMonth;
   const viewIncM=document.getElementById('view-inc-month'); if(viewIncM && !viewIncM.value) viewIncM.value=curMonth;
   const salM=document.getElementById('sal-month'); if(salM && !salM.value) salM.value=curMonth;
+  const viewSalM=document.getElementById('view-sal-month'); if(viewSalM && !viewSalM.value) viewSalM.value=curMonth;
 
   startClock();
   renderDashboard();
@@ -1547,13 +1566,27 @@ function calcMonthlySalary(name, monthPrefix){
   return {salary:sal, perDay, presentDays, absentDays, deduction, net};
 }
 
+function viewSalMonth(){
+  const el=document.getElementById('view-sal-month');
+  if(el && el.value) return el.value;
+  return today().slice(0,7); // YYYY-MM
+}
+
 function renderSalaryPage(){
   const emp=EMPLOYEES.find(e=>e.name===currentUser);
+  const vEl=document.getElementById('view-sal-month');
+  if(vEl && !vEl.value) vEl.value=today().slice(0,7);
+  const month=viewSalMonth();
+
   const msc=document.getElementById('my-salary-card');
   if(msc&&emp){
-    const month=today().slice(0,7);
     const r=calcMonthlySalary(currentUser,month);
+    const pay=getPaymentsForMonth(month)[currentUser]||{};
+    const paid=pay.salaryPaid||0;
+    const balance=Math.max(0, r.net-paid);
+    const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
     msc.innerHTML=`
+      <p style="font-size:11px;color:var(--text3);margin-bottom:6px">${mLabel}</p>
       <table style="font-size:13px;width:100%">
         <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(r.salary)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷30)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
@@ -1561,21 +1594,49 @@ function renderSalaryPage(){
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent × per-day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.net)}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(paid)}</td></tr>
+        <tr><td style="padding:6px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td></tr>
       </table>
       <p style="font-size:11px;color:var(--text3);margin-top:8px">Is mahine ka estimate — final admin se confirm hoga</p>`;
   }
 
   if(isAdmin){
+    const tlbl=document.getElementById('team-sal-month-label');
+    if(tlbl){
+      const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+      tlbl.textContent='— '+mLabel;
+    }
     const tst=document.getElementById('team-salary-table');
     if(tst){
-      const month=today().slice(0,7);
+      const payments=getPaymentsForMonth(month);
       tst.innerHTML=EMPLOYEES.map(e=>{
         const r=calcMonthlySalary(e.name,month);
-        return `<tr><td>${e.name}</td><td>${fmt(r.salary)}</td><td>${r.absentDays}</td><td style="color:var(--red)">− ${fmt(r.deduction)}</td><td style="font-weight:600;color:var(--green)">${fmt(r.net)}</td></tr>`;
+        const paid=(payments[e.name]&&payments[e.name].salaryPaid)||0;
+        const balance=Math.max(0, r.net-paid);
+        const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
+        return `<tr>
+          <td>${e.name}</td>
+          <td>${fmt(r.salary)}</td>
+          <td>${r.absentDays}</td>
+          <td style="color:var(--red)">− ${fmt(r.deduction)}</td>
+          <td style="font-weight:600;color:var(--green)">${fmt(r.net)}</td>
+          <td><input type="number" id="sal-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
+          <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
+          <td><button class="btn btn-sm" onclick="markSalaryPaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
+        </tr>`;
       }).join('');
     }
     calcSalary();
   }
+}
+
+async function markSalaryPaid(name){
+  const month=viewSalMonth();
+  const safeId=name.replace(/[^a-zA-Z0-9]/g,'');
+  const input=document.getElementById('sal-paid-'+safeId);
+  const amount=input?parseInt(input.value)||0:0;
+  await setPaidAmount(name, month, 'salaryPaid', amount);
+  renderSalaryPage();
 }
 
 function calcSalary(){
@@ -1655,6 +1716,9 @@ function renderIncentivePage(){
   // My incentive card — salary always pulled from central getEmpSalary (set on Employees page)
   const mySalary=getEmpSalary(currentUser);
   const t=totalIncentive(currentUser,mySalary,selMonth);
+  const myPay=getPaymentsForMonth(selMonth)[currentUser]||{};
+  const myIncPaid=myPay.incPaid||0;
+  const myIncBalance=Math.max(0, t.total-myIncPaid);
   const mic=document.getElementById('my-incentive-card');
   if(mic){
     mic.innerHTML=`
@@ -1669,6 +1733,8 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
+        <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
       </table>`;
   }
 
@@ -1680,9 +1746,13 @@ function renderIncentivePage(){
     }
     const tit=document.getElementById('team-incentive-table');
     if(tit){
+      const payments=getPaymentsForMonth(selMonth);
       tit.innerHTML=EMPLOYEES.map(e=>{
         const sal=getEmpSalary(e.name);
         const tt=totalIncentive(e.name,sal,selMonth);
+        const paid=(payments[e.name]&&payments[e.name].incPaid)||0;
+        const balance=Math.max(0, tt.total-paid);
+        const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
         return `<tr>
           <td>${e.name}</td>
           <td>${fmt(sal)}</td>
@@ -1691,6 +1761,9 @@ function renderIncentivePage(){
           <td>${fmt(tt.mf)}</td>
           <td>${fmt(tt.sip)}</td>
           <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
+          <td><input type="number" id="inc-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
+          <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
+          <td><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
         </tr>`;
       }).join('');
     }
@@ -1701,6 +1774,15 @@ function renderIncentivePage(){
 
     loadIncEmp();
   }
+}
+
+async function markIncentivePaid(name){
+  const month=viewIncMonth();
+  const safeId=name.replace(/[^a-zA-Z0-9]/g,'');
+  const input=document.getElementById('inc-paid-'+safeId);
+  const amount=input?parseInt(input.value)||0:0;
+  await setPaidAmount(name, month, 'incPaid', amount);
+  renderIncentivePage();
 }
 
 async function saveRates(){
