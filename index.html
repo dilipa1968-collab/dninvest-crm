@@ -802,12 +802,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="form-row" style="flex-wrap:wrap;gap:10px">
             <div class="form-field" style="min-width:260px;position:relative">
               <label>Client *</label>
-              <input type="text" id="mftxn-client-search" placeholder="🔍 Name / PAN / mobile se search karein..." autocomplete="off" oninput="searchMfTxnClient()" onfocus="searchMfTxnClient()">
+              <input type="text" id="mftxn-client-search" placeholder="🔍 Search by Name / PAN / mobile..." autocomplete="off" oninput="searchMfTxnClient()" onfocus="searchMfTxnClient()">
               <div id="mftxn-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Selected Client</label>
-              <input type="text" id="mftxn-client-selected" placeholder="Koi client select nahi hua" readonly style="background:#f7f7f7">
+              <input type="text" id="mftxn-client-selected" placeholder="No client selected" readonly style="background:#f7f7f7">
             </div>
             <div class="form-field" style="min-width:120px">
               <label>RM</label>
@@ -882,12 +882,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="form-row" style="flex-wrap:wrap;gap:10px">
             <div class="form-field" style="min-width:260px;position:relative">
               <label>Client *</label>
-              <input type="text" id="eqdemat-client-search" placeholder="🔍 Name / Code / mobile se search karein..." autocomplete="off" oninput="searchEqDematClient()" onfocus="searchEqDematClient()">
+              <input type="text" id="eqdemat-client-search" placeholder="🔍 Search by Name / Code / mobile..." autocomplete="off" oninput="searchEqDematClient()" onfocus="searchEqDematClient()">
               <div id="eqdemat-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Selected Client</label>
-              <input type="text" id="eqdemat-client-selected" placeholder="Koi client select nahi hua" readonly style="background:#f7f7f7">
+              <input type="text" id="eqdemat-client-selected" placeholder="No client selected" readonly style="background:#f7f7f7">
             </div>
             <div class="form-field" style="min-width:120px">
               <label>RM</label>
@@ -1063,14 +1063,14 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <div id="brk-eq-status" style="margin-top:6px;font-size:.78rem;color:var(--gray)"></div>
             </div>
           </div>
-          <p style="font-size:.78rem;color:var(--gray);margin:4px 0 10px">Columns ko map karein - Client Code/UCC ya PAN se aapke existing Equity clients (Clients page) ke saath match karke RM mil jayega.</p>
+          <p style="font-size:.78rem;color:var(--gray);margin:4px 0 10px">Map the columns — RM will be found by matching Client Code/UCC or PAN against your existing Equity clients (Clients page).</p>
           <div id="brk-eq-map"></div>
         </div>
 
         <div class="tab-panel" id="brk-results">
           <div id="brk-rm-filter" style="display:none;margin-bottom:14px;padding:14px 16px;background:#fff;border-radius:10px;box-shadow:var(--shadow)">
             <div style="font-size:.78rem;font-weight:800;color:var(--navy);margin-bottom:10px">📋 RM Filter (Admin)
-              <span style="font-weight:400;color:var(--gray);margin-left:8px">— Results me sirf selected RMs ka data dikhega</span>
+              <span style="font-weight:400;color:var(--gray);margin-left:8px">— Results will show data only for selected RMs</span>
               <button onclick="brkSelectAllRMs(true)" class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;margin-left:12px">All Select</button>
               <button onclick="brkSelectAllRMs(false)" class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;margin-left:4px">All Deselect</button>
             </div>
@@ -1210,11 +1210,11 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Excel upload karo jisme columns ho: <b>Name</b> (required), <b>Mobile</b>, <b>RM</b>, <b>Next Call</b> (date), <b>Follow-up Status</b>, <b>Remarks</b>.
-        Column naam alag-alag ho sakte hain (e.g. "Name"/"Lead Name", "Mobile"/"Phone", "RM"/"Assigned To").
+        Upload an Excel file with columns: <b>Name</b> (required), <b>Mobile</b>, <b>RM</b>, <b>Next Call</b> (date), <b>Follow-up Status</b>, <b>Remarks</b>.
+        Column names can vary (e.g. "Name"/"Lead Name", "Mobile"/"Phone", "RM"/"Assigned To").
       </p>
       <div class="import-zone" id="leads-zone" onclick="document.getElementById('leads-import-file').click()">
-        🧲 Leads Excel file yahan drag karo ya click karo
+        🧲 Drag the Leads Excel file here or click to browse
         <input type="file" id="leads-import-file" accept=".xlsx,.xls" style="display:none" onchange="handleLeadsImportFile(this)">
       </div>
       <div id="leads-import-preview" style="margin-top:12px"></div>
@@ -1285,7 +1285,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="tbl-wrap"><div class="tbl-scroll" id="attendee-search-results" style="max-height:340px"></div></div>
 
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <div style="font-weight:700;color:var(--navy);font-size:.85rem;margin-bottom:8px">➕ Naya Guest Add Karein (list mein nahi hai)</div>
+        <div style="font-weight:700;color:var(--navy);font-size:.85rem;margin-bottom:8px">➕ Add New Guest (not in list)</div>
         <div class="form-row three">
           <div class="form-field"><label>Name *</label><input id="guest_name" placeholder="Guest name"></div>
           <div class="form-field"><label>Mobile</label><input id="guest_mobile" placeholder="Mobile number"></div>
@@ -1385,7 +1385,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="modal-body" style="padding:16px">
       <div id="rm-conversation" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:14px;padding-right:4px"></div>
       <div style="display:flex;gap:8px">
-        <textarea id="rm-msg-text" placeholder="Admin ko message likhein..." style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.88rem;resize:vertical;min-height:60px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendRmMessage();}"></textarea>
+        <textarea id="rm-msg-text" placeholder="Write a message to Admin..." style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.88rem;resize:vertical;min-height:60px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendRmMessage();}"></textarea>
         <button class="btn btn-primary" style="align-self:flex-end;padding:8px 16px" onclick="sendRmMessage()">Send</button>
       </div>
       <div style="font-size:.72rem;color:var(--gray);margin-top:6px">Enter to send, Shift+Enter for new line</div>
@@ -1402,11 +1402,11 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <div class="modal-body" style="padding:18px">
       <div style="font-size:.85rem;color:var(--gray);margin-bottom:14px">
-        <b id="ta-rm-name"></b> ko aaj ke liye kisi absent RM ke clients access karne do.<br>
-        <span style="color:var(--red);font-size:.78rem">⏰ Aaj midnight (IST) pe auto-expire ho jayega.</span>
+        <b id="ta-rm-name"></b> can access an absent RM's clients for today.<br>
+        <span style="color:var(--red);font-size:.78rem">⏰ This will auto-expire at midnight (IST) today.</span>
       </div>
       <div class="form-field" style="margin-bottom:14px">
-        <label>Absent RM select karo (jiske clients access karne hain):</label>
+        <label>Select the absent RM (whose clients to grant access to):</label>
         <div id="ta-rm-list" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
       </div>
       <div id="ta-current" style="font-size:.8rem;color:var(--gray);margin-bottom:12px"></div>
@@ -1492,25 +1492,25 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       </div>
       
       <div id="imp-aum">
-        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">Wealth Elite / CAMS se <b>AUM By Client</b> Excel upload karo</p>
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">Upload the <b>AUM By Client</b> Excel from Wealth Elite / CAMS</p>
         <div class="import-zone" id="aum-zone" onclick="document.getElementById('aum-file').click()">
-          📊 AUM Excel file yahan drag karo ya click karo
+          📊 Drag the AUM Excel file here or click to browse
           <input type="file" id="aum-file" accept=".xlsx,.xls" style="display:none" onchange="handleAumFile(this)">
         </div>
         <div id="aum-preview" style="margin-top:12px"></div>
       </div>
       
       <div id="imp-sip" style="display:none">
-        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">Wealth Elite se <b>Running SIP Report</b> Excel upload karo</p>
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">Upload the <b>Running SIP Report</b> Excel from Wealth Elite</p>
         <div class="import-zone" id="sip-zone" onclick="document.getElementById('sip-file').click()">
-          🔄 SIP Excel file yahan drag karo ya click karo
+          🔄 Drag the SIP Excel file here or click to browse
           <input type="file" id="sip-file" accept=".xlsx,.xls" style="display:none" onchange="handleSipFile(this)">
         </div>
         <div id="sip-preview" style="margin-top:12px"></div>
       </div>
       
       <div id="imp-both" style="display:none">
-        <p style="color:var(--gray);font-size:.85rem;margin-bottom:16px">Dono files upload karo — AUM + SIP merge ho jayega</p>
+        <p style="color:var(--gray);font-size:.85rem;margin-bottom:16px">Upload both files — AUM + SIP will be merged</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
             <div style="font-size:.78rem;font-weight:700;color:var(--gray);margin-bottom:6px">1. AUM Report</div>
@@ -1532,10 +1532,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 
       <div id="imp-contact" style="display:none">
         <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-          Excel upload karo jisme <b>Name</b>, <b>Mobile</b>, <b>PAN</b> columns ho. Matching <b>Name</b> (ya PAN) se hoga — existing investor ka Mobile/PAN update ho jayega. Naye investor add nahi honge.
+          Upload an Excel file with <b>Name</b>, <b>Mobile</b>, <b>PAN</b> columns. Matching will be done on <b>Name</b> (or PAN) — existing investor's Mobile/PAN will be updated. New investors won't be added.
         </p>
         <div class="import-zone" id="contact-zone" onclick="document.getElementById('contact-file').click()">
-          📇 Contact Info Excel file yahan drag karo ya click karo
+          📇 Drag the Contact Info Excel file here or click to browse
           <input type="file" id="contact-file" accept=".xlsx,.xls" style="display:none" onchange="handleContactFile(this)">
         </div>
         <div id="contact-preview" style="margin-top:12px"></div>
@@ -1558,13 +1558,13 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px" id="eqImportDesc1">
-        Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> ya <b>Mobile</b> se hoga — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega.
+        Upload an Excel file with <b>Asset Value</b> and <b>Last Trade Date</b>. Matching will be done on <b>Client Code</b> or <b>Mobile</b> — if a match is found, the existing client will be updated; if not, a <b>new client will be added</b>.
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px" id="eqImportDesc2">
-        Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (naye clients ke liye zaroori), <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)
+        Expected columns (header names flexible/auto-detect): <b>Code</b> (or Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (required for new clients), <b>Asset Value</b> (or Holding/Portfolio Value), <b>Last Trade Date</b> (or Last Trade)
       </p>
       <div class="import-zone" id="eq-zone" onclick="document.getElementById('eq-file').click()">
-        📊 Equity Excel file yahan drag karo ya click karo
+        📊 Drag the Equity Excel file here or click to browse
         <input type="file" id="eq-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqFile(this)">
       </div>
       <div id="eq-preview" style="margin-top:12px"></div>
@@ -1585,16 +1585,16 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Excel upload karo jisme sirf <b>Client Code</b> aur <b>New RM</b> ho. Match <b>Client Code</b> se hoga (exact) — sirf <b>RM field update</b> hoga, baaki kuch (Asset Value, Status, Remarks etc.) touch nahi hoga.
+        Upload an Excel file with only <b>Client Code</b> and <b>New RM</b>. Matching will be done on <b>Client Code</b> (exact) — only the <b>RM field will be updated</b>, nothing else (Asset Value, Status, Remarks etc.) will be touched.
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>New RM</b> (Name column optional, ignore hota hai)
+        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>New RM</b> (Name column is optional and will be ignored)
       </p>
       <div style="margin-bottom:12px">
         <a href="#" onclick="downloadEqRmUpdateTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
       </div>
       <div class="import-zone" id="eq-rm-zone" onclick="document.getElementById('eq-rm-file').click()">
-        📊 Excel file yahan drag karo ya click karo
+        📊 Drag the Excel file here or click to browse
         <input type="file" id="eq-rm-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqRmUpdateFile(this)">
       </div>
       <div id="eq-rm-preview" style="margin-top:12px"></div>
@@ -1840,13 +1840,13 @@ async function doLogin(){
     if(user.role!=='admin'){
       const blocked = await isCrmBlockedForRm();
       if(blocked){
-        document.getElementById('lerr').textContent='🔒 CRM abhi Admin ne band kar rakha hai. Kripya baad mein try karein.';
+        document.getElementById('lerr').textContent='🔒 Admin has temporarily closed the CRM. Please try again later.';
         document.getElementById('lerr').style.display='block';
         return;
       }
       // RM can only login from desktop — mobile devices are blocked.
       if(isMobileDevice()){
-        document.getElementById('lerr').textContent='💻 CRM sirf Desktop/Laptop se login hoga. Mobile se login allowed nahi hai.';
+        document.getElementById('lerr').textContent='💻 CRM login is only allowed from Desktop/Laptop. Mobile login is not permitted.';
         document.getElementById('lerr').style.display='block';
         return;
       }
@@ -1942,7 +1942,7 @@ async function recordHrAttendanceOnCrmLogin(user){
 // only needs to type their password/PIN once more (browser security means
 // we can't auto-login across tabs, but this saves the username step).
 function openHrPortal(){
-  if(!CU || !CU.username){ alert('Pehle login karein'); return; }
+  if(!CU || !CU.username){ alert('Please login first'); return; }
   window.open('dninvest-hr.html?u='+encodeURIComponent(CU.username), '_blank');
 }
 
@@ -1985,12 +1985,12 @@ async function doResetPassword(){
   okEl.style.display='none';
 
   if(!username || !code || !newpass){
-    errEl.textContent='Saare fields bharein';
+    errEl.textContent='Please fill all fields';
     errEl.style.display='block';
     return;
   }
   if(newpass.length<4){
-    errEl.textContent='Password kam se kam 4 characters ka ho';
+    errEl.textContent='Password must be at least 4 characters';
     errEl.style.display='block';
     return;
   }
@@ -2009,7 +2009,7 @@ async function doResetPassword(){
   const users = DB.get('users') || DEFAULT_USERS;
   const idx = users.findIndex(x=>x.username===username);
   if(idx===-1){
-    errEl.textContent='Username nahi mila';
+    errEl.textContent='Username not found';
     errEl.style.display='block';
     return;
   }
@@ -3250,7 +3250,7 @@ function handleLeadsImportFile(input){
     if(err){ toast('File read error: '+err.message,'error'); return; }
     const data=parseLeadsExcel(rows);
     if(!data || !data.length){
-      toast('Header row nahi mil paya. Excel me kam se kam "Name" column hona chahiye.','error');
+      toast('Header row not found. Excel must have at least a "Name" column.','error');
       return;
     }
     leadsImportData=data;
@@ -3727,7 +3727,7 @@ async function addGuestAttendee(){
   const name=document.getElementById('guest_name').value.trim();
   const mobile=document.getElementById('guest_mobile').value.trim();
   const rm=document.getElementById('guest_rm').value;
-  if(!name){ toast('Guest ka naam likhein','error'); return; }
+  if(!name){ toast('Please enter the guest name','error'); return; }
 
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
@@ -3905,7 +3905,7 @@ async function saveClient(){
   if(seg==='equity'){
     const code = (document.getElementById('f_code')||{value:''}).value.trim();
     if(!code){
-      toast('⚠️ Client Code / UCC required hai — bina Client Code ke save nahi hoga','error');
+      toast('⚠️ Client Code / UCC is required — cannot save without Client Code','error');
       const el = document.getElementById('f_code');
       if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
       return;
@@ -3913,7 +3913,7 @@ async function saveClient(){
   } else {
     const pan = (document.getElementById('f_pan')||{value:''}).value.trim();
     if(!pan){
-      toast('⚠️ PAN Number required hai — bina PAN ke save nahi hoga','error');
+      toast('⚠️ PAN Number is required — cannot save without PAN','error');
       const el = document.getElementById('f_pan');
       if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
       return;
@@ -3925,7 +3925,7 @@ async function saveClient(){
 
   const gv2 = id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
 
-  // Duplicate check - MF: PAN se, Equity: Client Code se (mobile same ho sakta hai family accounts me)
+  // Duplicate check - MF: by PAN, Equity: by Client Code (mobile can be the same for family accounts)
   if(!currentEditId){
     if(seg==='mf'){
       const pan = gv2('f_pan').toUpperCase();
@@ -3937,7 +3937,7 @@ async function saveClient(){
         }
       }
     } else {
-      // Equity - Client Code se check (agar code diya ho)
+      // Equity - check by Client Code (if code given)
       const code = gv2('f_code').toUpperCase();
       if(code){
         const dup = clients.find(c=>c.code && c.code.trim().toUpperCase()===code);
@@ -4246,8 +4246,8 @@ function saveBusinessEntry(){
   const date = document.getElementById('biz_date').value;
   const remarks = document.getElementById('biz_remarks').value.trim();
 
-  if(!amount || amount<=0){ toast('Amount daalein','error'); return; }
-  if(!date){ toast('Date daalein','error'); return; }
+  if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
+  if(!date){ toast('Please enter the date','error'); return; }
 
   const biz = DB.get('mf_business');
   const entries = Array.isArray(biz) ? biz : (biz?.entries || []);
@@ -4392,7 +4392,7 @@ function searchMfTxnClient(){
   ).slice(0,30);
 
   if(matches.length===0){
-    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Koi client nahi mila</div>';
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found</div>';
     out.style.display='block';
     return;
   }
@@ -4426,14 +4426,14 @@ document.addEventListener('click', e=>{
 });
 
 function saveMfTxnEntry(){
-  if(!mfTxnSelectedClient){ toast('Pehle client select karein','error'); return; }
+  if(!mfTxnSelectedClient){ toast('Please select a client first','error'); return; }
   const type=document.getElementById('mftxn-type').value;
   const amount=parseFloat(document.getElementById('mftxn-amount').value);
   const date=document.getElementById('mftxn-date').value;
   const remarks=document.getElementById('mftxn-remarks').value.trim();
 
-  if(!amount || amount<=0){ toast('Amount daalein','error'); return; }
-  if(!date){ toast('Date daalein','error'); return; }
+  if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
+  if(!date){ toast('Please enter the date','error'); return; }
 
   const entries=getMfBizEntries();
   entries.push({
@@ -4495,7 +4495,7 @@ function renderMfTxnTable(){
   if(cnt) cnt.textContent=entries.length+' entries';
 
   if(entries.length===0){
-    wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">Koi transaction nahi mila</div>';
+    wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">No transactions found</div>';
     return;
   }
 
@@ -4526,7 +4526,7 @@ function renderMfTxnTable(){
 
 function deleteMfTxnEntry(id){
   if(CU.role!=='admin') return;
-  if(!confirm('Ye transaction entry delete karein?')) return;
+  if(!confirm('Delete this transaction entry?')) return;
   const entries=getMfBizEntries().filter(e=>e.id!==id);
   setMfBizEntries(entries);
   toast('Entry deleted','success');
@@ -4535,7 +4535,7 @@ function deleteMfTxnEntry(id){
 
 function exportMfTxns(){
   const entries=getFilteredMfTxns();
-  if(entries.length===0){ toast('Export karne ke liye koi data nahi','error'); return; }
+  if(entries.length===0){ toast('No data to export','error'); return; }
   const rows=[['Date','Client Name','RM','Type','Amount','Remarks']];
   entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.rm||'',e.type||'',e.amount||0,e.remarks||'']));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -4599,7 +4599,7 @@ function searchEqDematClient(){
   ).slice(0,30);
 
   if(matches.length===0){
-    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Koi client nahi mila</div>';
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found</div>';
     out.style.display='block';
     return;
   }
@@ -4634,12 +4634,12 @@ document.addEventListener('click', e=>{
 });
 
 function saveEqDematEntry(){
-  if(!eqDematSelectedClient){ toast('Pehle client select karein','error'); return; }
+  if(!eqDematSelectedClient){ toast('Please select a client first','error'); return; }
   const code=document.getElementById('eqdemat-code').value.trim().toUpperCase();
   const date=document.getElementById('eqdemat-date').value;
   const remarks=document.getElementById('eqdemat-remarks').value.trim();
 
-  if(!date){ toast('Date daalein','error'); return; }
+  if(!date){ toast('Please enter the date','error'); return; }
 
   const eqEntries=getEqDematEntries();
   eqEntries.push({
@@ -4699,7 +4699,7 @@ function renderEqDematTable(){
   if(cnt) cnt.textContent=entries.length+' entries';
 
   if(entries.length===0){
-    wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">Koi Demat account entry nahi mili</div>';
+    wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">No Demat account entries found</div>';
     return;
   }
 
@@ -4765,7 +4765,7 @@ function markPendingEqDematEntry(id){
 
 function deleteEqDematEntry(id){
   if(CU.role!=='admin') return;
-  if(!confirm('Ye Demat account entry delete karein?')) return;
+  if(!confirm('Delete this Demat account entry?')) return;
   const entries = getEqDematEntries().filter(e=>e.id!==id);
   setEqDematEntries(entries);
   toast('Entry deleted','success');
@@ -4774,7 +4774,7 @@ function deleteEqDematEntry(id){
 
 function exportEqDemat(){
   const entries=getFilteredEqDemat();
-  if(entries.length===0){ toast('Export karne ke liye koi data nahi','error'); return; }
+  if(entries.length===0){ toast('No data to export','error'); return; }
   const rows=[['Date','Client Name','Client Code','RM','Remarks','Status']];
   entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.remarks||'',e.status||'Pending']));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -4926,7 +4926,7 @@ function renderNoCall(seg){
   const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
   const clients = seg==='equity'?getActiveEqClients():getMyMfClients();
   let data = clients.filter(c=>{
-    if(c.do_not_call) return false; // DNC clients exclude karo
+    if(c.do_not_call) return false; // exclude DNC clients
     const d = daysDiff(c.last_call_date);
     return d===null || d>=days; // never called, or not called in N+ days
   }).map(c=>({...c,daysAgo:daysDiff(c.last_call_date)}))
@@ -5079,7 +5079,7 @@ function renderReports(){
     {icon:'⚫',title:'No Trade — 90/180 Days',desc:'Clients inactive 90/180+ days',fn:'noTrade90'},
     {icon:'📞',title:'Follow-up Pending',desc:'Clients with pending follow-ups',fn:'fuPendingEq'},
     {icon:'💰',title:'Revenue Report',desc:'RM-wise brokerage/revenue',fn:'revenueReport'},
-    {icon:'🆕',title:'New Business — Demat Accounts',desc:'Lead se convert hue Demat accounts (month-wise)',fn:'eqNewBusinessReport'},
+    {icon:'🆕',title:'New Business — Demat Accounts',desc:'Demat accounts converted from Leads (month-wise)',fn:'eqNewBusinessReport'},
     {icon:'🚫',title:'DNC List — Equity',desc:'Do Not Call clients (Equity)',fn:'showDncReportEq'},
   ];
   const mfCards=[
@@ -5328,7 +5328,7 @@ function eqNewBusinessReport(){
   const filtered = isAdmin ? entries : entries.filter(e=>(e.rm||'').toLowerCase()===(CU.name||'').toLowerCase());
 
   if(!filtered.length){
-    toast('Koi Demat account entry nahi mili. Leads convert karein.','error');
+    toast('No Demat account entries found. Convert Leads.','error');
     return;
   }
 
@@ -5474,7 +5474,7 @@ function saveUser(){
   const role=document.getElementById('uf_role').value;
   const pinVal=document.getElementById('uf_pin')?.value||'';
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
-    toast('PIN 4 digit ka hona chahiye (0-9)','error'); return;
+    toast('PIN must be 4 digits (0-9)','error'); return;
   }
   const segs=[];
   if(document.getElementById('uf_eq').checked) segs.push('equity');
@@ -5523,7 +5523,7 @@ function toggleUser(id){
   users[idx].manualOverrideActive = newActive;
   DB.set('users', users);
   renderAdmin();
-  toast((newActive ? '✅ Activated' : '🔴 Deactivated') + ' — Auto-schedule next boundary pe resume hoga', 'success');
+  toast((newActive ? '✅ Activated' : '🔴 Deactivated') + ' — will resume at the next auto-schedule boundary', 'success');
 }
 
 // ── Auto Schedule ──
@@ -5914,7 +5914,7 @@ function renderRmMessages(){
   const el = document.getElementById('rm-conversation');
   if(!el) return;
   if(!thread || !thread.messages.length){
-    el.innerHTML = '<em style="color:var(--gray);font-size:.85rem">Abhi koi message nahi hai. Admin ko message karein.</em>';
+    el.innerHTML = '<em style="color:var(--gray);font-size:.85rem">No messages yet. Message the Admin.</em>';
     return;
   }
   el.innerHTML = thread.messages.map(m => {
@@ -5974,7 +5974,7 @@ function renderInbox(){
         <div class="msg-bubble ${side}${newCls}">${escapeHtml(m.text).replace(/\n/g,'<br>')}</div>
         <div class="msg-meta">${label} · ${fmtDate(m.date)}</div>
       </div>`;
-    }).join('') : `<div class="rm-empty">Koi message nahi abhi.</div>`;
+    }).join('') : `<div class="rm-empty">No messages yet.</div>`;
     return `<div class="rm-tab-panel${isActive?' active':''}" id="rm-panel-${t.rmUsername}">
       <div class="rm-chat-box" id="rm-chatbox-${t.rmUsername}">${msgsHtml}</div>
       <div class="rm-reply-row">
@@ -6090,7 +6090,7 @@ function showRmReplyNotif(msg){
   const body = document.getElementById('announcementPopupBody');
   const popup = document.getElementById('announcementPopup');
   body.innerHTML = `<div style="text-align:left">
-    <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">📨 Admin ka jawab aaya:</div>
+    <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">📨 Admin's reply:</div>
     <div class="msg-bubble recv" style="max-width:100%">${escapeHtml(msg.text).replace(/\n/g,'<br>')}</div>
     <div style="font-size:.72rem;color:var(--gray);margin-top:8px;text-align:right">${fmtDate(msg.date)}</div>
   </div>`;
@@ -6115,7 +6115,7 @@ function showRmReplyNotif(msg){
 let _taTargetUserId = null;
 
 function openTempAccessModal(userId){
-  if(!CU || CU.role!=='admin'){ toast('Sirf admin kar sakta hai','error'); return; }
+  if(!CU || CU.role!=='admin'){ toast('Only admin can do this','error'); return; }
   _taTargetUserId = userId;
   const users = DB.get('users')||[];
   const targetUser = users.find(u=>u.id===userId);
@@ -6136,7 +6136,7 @@ function openTempAccessModal(userId){
       <span><b>${u.name}</b> <span style="color:var(--gray);font-size:.78rem">(${(u.eq_dealers||[]).concat(u.mf_dealers||[]).filter((v,i,a)=>a.indexOf(v)===i).join(', ')})</span></span>
     </label>`;
   });
-  document.getElementById('ta-rm-list').innerHTML = listHtml || '<em style="color:var(--gray)">Koi doosra RM nahi mila</em>';
+  document.getElementById('ta-rm-list').innerHTML = listHtml || '<em style="color:var(--gray)">No other RM found</em>';
 
   // Show current access
   if(existing.length){
@@ -6173,9 +6173,9 @@ function saveTempAccess(){
   renderAdmin();
   if(selected.length){
     const names = selected.map(s=>(users.find(u=>u.id===s.absentUserId)||{}).name||'').join(', ');
-    toast(`✅ ${users[idx].name} ko aaj ke liye ${names} ka access diya gaya!`, 'success');
+    toast(`✅ ${users[idx].name} has been given access to ${names} for today!`, 'success');
   } else {
-    toast(`🔄 ${users[idx].name} ka temp access hata diya`, 'info');
+    toast(`🔄 Removed ${users[idx].name}'s temporary access`, 'info');
   }
 }
 
@@ -6213,18 +6213,18 @@ function saveChangeCred(){
 
   // Verify current password
   if(current !== CU.password){
-    errEl.textContent = '❌ Current password galat hai';
+    errEl.textContent = '❌ Current password is incorrect';
     errEl.style.display = '';
     return;
   }
   // Validate new PIN if entered
   if(newPin && !/^[0-9]{4}$/.test(newPin)){
-    errEl.textContent = '❌ PIN 4 digit ka hona chahiye (0-9)';
+    errEl.textContent = '❌ PIN must be 4 digits (0-9)';
     errEl.style.display = '';
     return;
   }
   if(!newPass && !newPin){
-    errEl.textContent = '❌ Kuch toh change karo — password ya PIN';
+    errEl.textContent = '❌ Change something — password or PIN';
     errEl.style.display = '';
     return;
   }
@@ -6242,7 +6242,7 @@ function saveChangeCred(){
 
   DB.set('users', users);
   closeModal('changeCredModal');
-  toast('✅ Password/PIN update ho gaya!', 'success');
+  toast('✅ Password/PIN updated!', 'success');
 }
 
 
@@ -6273,7 +6273,7 @@ function showDncReport(seg){
   const data = seg==='equity'
     ? getActiveEqClients().filter(c=>c.do_not_call)
     : getMyMfClients().filter(c=>c.do_not_call);
-  if(!data.length){ toast('Koi DNC client nahi mila','info'); return; }
+  if(!data.length){ toast('No DNC clients found','info'); return; }
   const cols = seg==='equity'
     ? ['Code','Name','Mobile','RM','Follow-up','Remarks']
     : ['Name','Mobile','PAN','RM','AUM','Follow-up','Remarks'];
@@ -6499,7 +6499,7 @@ function handleContactFile(input){
     if(err){ toast('File read error: '+err.message,'error'); return; }
     const data = parseContactExcel(rows);
     if(!data){
-      toast('Header row nahi mil paya. Excel me Name aur Mobile/PAN columns hone chahiye.','error');
+      toast('Header row not found. Excel must have Name and Mobile/PAN columns.','error');
       return;
     }
     importData.contact = data;
@@ -6634,14 +6634,14 @@ function openEqImportModal(){
   document.getElementById('eq-file').value='';
   if(CU.role!=='admin'){
     document.getElementById('eqImportDesc1').innerHTML =
-      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> se hoga (mobile se nahi — family accounts me same mobile ho sakta hai) — match mila to existing client update hoga, match nahi mila to naya client <b>aapke naam (${CU.name}) ke RM</b> ke saath add ho jayega.`;
+      `Upload an Excel file with <b>Asset Value</b> and <b>Last Trade Date</b>. Matching will be done on <b>Client Code</b> (not mobile — family accounts can share the same mobile) — if a match is found, the existing client will be updated; if not, a new client will be added under <b>your (${CU.name}) RM name</b>.`;
     document.getElementById('eqImportDesc2').innerHTML =
-      `Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)`;
+      `Expected columns (header names flexible/auto-detect): <b>Code</b> (or Client Code), <b>Name</b>, <b>Mobile</b>, <b>Asset Value</b> (or Holding/Portfolio Value), <b>Last Trade Date</b> (or Last Trade)`;
   } else {
     document.getElementById('eqImportDesc1').innerHTML =
-      `Excel upload karo jisme <b>Asset Value</b> aur <b>Last Trade Date</b> ho. Matching <b>Client Code</b> se hoga (mobile se nahi — family accounts me same mobile ho sakta hai) — match mila to existing client update hoga, match nahi mila to <b>naya client add</b> ho jayega.`;
+      `Upload an Excel file with <b>Asset Value</b> and <b>Last Trade Date</b>. Matching will be done on <b>Client Code</b> (not mobile — family accounts can share the same mobile) — if a match is found, the existing client will be updated; if not, a <b>new client will be added</b>.`;
     document.getElementById('eqImportDesc2').innerHTML =
-      `Expected columns (header names flexible/auto-detect): <b>Code</b> (ya Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (naye clients ke liye zaroori), <b>Asset Value</b> (ya Holding/Portfolio Value), <b>Last Trade Date</b> (ya Last Trade)`;
+      `Expected columns (header names flexible/auto-detect): <b>Code</b> (or Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (required for new clients), <b>Asset Value</b> (or Holding/Portfolio Value), <b>Last Trade Date</b> (or Last Trade)`;
   }
   document.getElementById('eqImportModal').classList.add('open');
 }
@@ -6694,7 +6694,7 @@ function handleEqFile(input){
       }
     }
     if(hdrIdx===-1){
-      toast('Header row nahi mil paya. Excel me Code/Mobile aur Name columns hone chahiye.','error');
+      toast('Header row not found. Excel must have Code/Mobile and Name columns.','error');
       return;
     }
     const data = rows.slice(hdrIdx+1)
@@ -6731,7 +6731,7 @@ async function doEqImport(){
   let updated=0, added=0, skipped=0;
   const touched = [];
   eqImportData.forEach(row=>{
-    // Match by Client Code first, then by Name (mobile match removed - family accounts me same mobile hota hai)
+    // Match by Client Code first, then by Name (mobile match removed - family accounts can share the same mobile)
     let ex = (row.code && byCode[String(row.code).trim().toUpperCase()]) || (row.name && byName[String(row.name).trim().toUpperCase()]);
     if(ex){
       if(row.asset_value!==null) ex.asset_value = row.asset_value;
@@ -6819,7 +6819,7 @@ function handleEqRmUpdateFile(input){
       }
     }
     if(hdrIdx===-1){
-      toast('Header row nahi mil paya. Excel me Client Code aur New RM columns hone chahiye.','error');
+      toast('Header row not found. Excel must have Client Code and New RM columns.','error');
       return;
     }
     const data = rows.slice(hdrIdx+1)
@@ -6831,7 +6831,7 @@ function handleEqRmUpdateFile(input){
       .filter(r=>r.code && r.rm);
 
     if(!data.length){
-      toast('Koi valid row nahi mili (Client Code aur New RM dono zaroori hain).','error');
+      toast('No valid rows found (both Client Code and New RM are required).','error');
       return;
     }
 
@@ -6845,7 +6845,7 @@ function handleEqRmUpdateFile(input){
     if(invalidRows.length){
       const names = [...new Set(invalidRows.map(r=>r.rm))].join(', ');
       html += `<div style="background:#fdecea;color:var(--red);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
-       ⚠️ ${invalidRows.length} row(s) me RM naam CRM ki list se match nahi kar raha: <b>${names}</b>. In rows ko skip kiya jayega — RM naam exact match hona chahiye (e.g. Komal, Bharat).</div>`;
+       ⚠️ ${invalidRows.length} row(s) have an RM name that doesn't match the CRM's list: <b>${names}</b>. These rows will be skipped — RM name must match exactly (e.g. Komal, Bharat).</div>`;
     }
     document.getElementById('eq-rm-preview').innerHTML = html;
     document.getElementById('eqRmUpdateBtnGo').disabled = data.length===0;
@@ -7163,7 +7163,7 @@ function renderActivityLog(){
   const typeColor={add:'#065f46',edit:'#92400e',call:'#0369a1',call_update:'#6d28d9'};
 
   if(!all.length){
-    tbl.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray)">Koi log nahi mila. Filters reset karein.</td></tr>`;
+    tbl.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray)">No logs found. Reset filters.</td></tr>`;
     return;
   }
 
@@ -7175,7 +7175,7 @@ function renderActivityLog(){
       const typeBadge=`<span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:1px 6px;border-radius:8px;font-size:.72rem;font-weight:700">${typeLabel[l.type]||l.type}</span>`;
       let summary='';
       if(l.type==='call') summary=`${l.call_status||''}${l.next_call?' → '+fmtDate(l.next_call):''}${l.remarks?' | '+l.remarks:''}`;
-      else if(l.type==='add') summary='Naya client add kiya';
+      else if(l.type==='add') summary='Added a new client';
       else if(l.changes&&l.changes.length) summary=l.changes.map(ch=>{
         const fLabel={name:'Name',mobile:'Mobile',rm:'RM',status:'Status',code:'Code',asset_value:'AUM',followup_status:'Follow-up',remarks:'Remarks',pan:'PAN',aum:'AUM',next_call:'Next Call'}[ch.field]||ch.field;
         return `${fLabel}: ${ch.old}→${ch.new}`;
@@ -7203,7 +7203,7 @@ function renderActivityLog(){
     if(l.type==='call'){
       detail=`<span style="color:var(--gray);font-size:.8rem">Status: <b>${l.call_status||'—'}</b>${l.next_call?` | Next Call: <b>${fmtDate(l.next_call)}</b>`:''} ${l.remarks?`| <i>${l.remarks}</i>`:''}</span>`;
     } else if(l.type==='add'){
-      detail=`<span style="color:var(--gray);font-size:.8rem">Naya client add kiya</span>`;
+      detail=`<span style="color:var(--gray);font-size:.8rem">Added a new client</span>`;
     } else if(l.changes && l.changes.length){
       detail=l.changes.map(ch=>{
         const fLabel={name:'Name',mobile:'Mobile',email:'Email',rm:'RM',status:'Status',code:'Client Code',asset_value:'Asset Value',revenue:'Revenue',last_trade_date:'Last Trade',last_call_date:'Last Call',next_call:'Next Call',followup_status:'Follow-up Status',remarks:'Remarks',pan:'PAN',aum:'AUM',sip_amount:'SIP Amount',sip_count:'SIP Count',last_invest_date:'Last Invest'}[ch.field]||ch.field;
@@ -7228,7 +7228,7 @@ function renderActivityLog(){
 
 function exportActivityLog(){
   const tbl=document.getElementById('al-table');
-  if(!tbl||!tbl.rows.length){ toast('Koi data nahi hai export ke liye','error'); return; }
+  if(!tbl||!tbl.rows.length){ toast('No data to export','error'); return; }
   const wb=XLSX.utils.book_new();
   const rows=[['Date & Time','Type','Client Name','Segment','RM','By','Field','Old Value','New Value','Remarks']];
   const isAdmin = CU && CU.role==='admin';
@@ -7358,8 +7358,8 @@ function brkRenderMapping(key){
       <select onchange="brkSetMapping('${key}',${i},this.value)" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.8rem">${o}</select>
     </div>`;
   }).join('');
-  const req = d.kind==='equity' ? 'Client Code/UCC ya PAN, Turnover, Brokerage' : 'Folio/PAN, Amount, Brokerage, Transaction Type';
-  container.innerHTML = `<div style="font-size:.78rem;color:var(--gray);margin:10px 0 6px">Columns map karein (zaroori: <b>${req}</b>):</div>${rows}`;
+  const req = d.kind==='equity' ? 'Client Code/UCC or PAN, Turnover, Brokerage' : 'Folio/PAN, Amount, Brokerage, Transaction Type';
+  container.innerHTML = `<div style="font-size:.78rem;color:var(--gray);margin:10px 0 6px">Map the columns (required: <b>${req}</b>):</div>${rows}`;
 }
 
 function brkSetMapping(key, colIndex, field){
@@ -7540,7 +7540,7 @@ function brkRender(){
   const r=brkCompute();
   if(!r){
     statsEl.innerHTML='';
-    rmTbl.innerHTML='<tr><td style="padding:16px;color:var(--gray)">CAMS/KFintech/Equity file upload karein.</td></tr>';
+    rmTbl.innerHTML='<tr><td style="padding:16px;color:var(--gray)">Please upload a CAMS/KFintech/Equity file.</td></tr>';
     clTbl.innerHTML='';
     return;
   }
@@ -7551,7 +7551,7 @@ function brkRender(){
     brkInitRMFilter(allDataRMs);
   }
   // Role label
-  const roleNote = isAdmin ? '' : `<div style="margin-bottom:12px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:.8rem;color:var(--gray)">👤 Aap sirf apne clients ka brokerage dekh rahe hain (${CU.name})</div>`;
+  const roleNote = isAdmin ? '' : `<div style="margin-bottom:12px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:.8rem;color:var(--gray)">👤 You're viewing brokerage for your own clients only (${CU.name})</div>`;
 
   statsEl.innerHTML= roleNote + `
     <div class="stat-card teal"><div class="stat-n">₹${brkFmt(r.totals.mfBrokerage)}</div><div class="stat-l">MF Brokerage</div></div>
@@ -7563,7 +7563,7 @@ function brkRender(){
   `;
   const totRm=r.rmRows.reduce((a,x)=>({clientCount:a.clientCount+x.clientCount,mfBrokerage:a.mfBrokerage+x.mfBrokerage,eqBrokerage:a.eqBrokerage+x.eqBrokerage,totalBrokerage:a.totalBrokerage+x.totalBrokerage,newBusiness:a.newBusiness+x.newBusiness,eqTurnover:a.eqTurnover+x.eqTurnover}),{clientCount:0,mfBrokerage:0,eqBrokerage:0,totalBrokerage:0,newBusiness:0,eqTurnover:0});
 
-  // RM summary - admin ko sab RMs, staff ko sirf apna
+  // RM summary - admin sees all RMs, staff sees only their own
   if(isAdmin){
     rmTbl.innerHTML=`<thead><tr><th>RM</th><th style="text-align:right">Clients</th><th style="text-align:right">MF Brok.</th><th style="text-align:right">Equity Brok.</th><th style="text-align:right">Total Brok.</th><th style="text-align:right">New Business</th><th style="text-align:right">Eq Turnover</th></tr></thead>
       <tbody>${r.rmRows.map(x=>`<tr><td>${x.rm}${x.rm==='Unmatched'?' <span style="color:var(--red);font-size:.7rem">(check master)</span>':''}</td><td style="text-align:right">${x.clientCount}</td><td style="text-align:right">${brkFmt(x.mfBrokerage)}</td><td style="text-align:right">${brkFmt(x.eqBrokerage)}</td><td style="text-align:right">${brkFmt(x.totalBrokerage)}</td><td style="text-align:right">${brkFmt(x.newBusiness)}</td><td style="text-align:right">${brkFmt(x.eqTurnover)}</td></tr>`).join('')}
@@ -7588,7 +7588,7 @@ function renderBrokeragePage(){
 
 function brkExport(){
   const r=brkCompute();
-  if(!r){ toast('Pehle file upload karein','error'); return; }
+  if(!r){ toast('Please upload a file first','error'); return; }
   const wb=XLSX.utils.book_new();
   const clientData=[
     ['Client Name','PAN','Client Code','RM','MF Brokerage','Equity Brokerage','Total Brokerage','New Business (MF)','Equity Turnover','Matched'],
