@@ -698,11 +698,12 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates'];
+    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           this.setLocal(key, doc.data().data);
+          if(key==='employee_changes') applyEmployeeChanges();
           if(onChange) onChange(key);
         }
       }, err=>console.log('Listener error:',key,err));
@@ -711,7 +712,7 @@ const DB = {
 };
 
 // ─── EMPLOYEE DEFAULTS (fallback if no Firestore override exists yet) ──────────
-const EMPLOYEES = [
+const EMPLOYEES_BASE = [
   {name:'Puja',   role:'RM', joined:'Mar 2022', salary:32000},
   {name:'Rohit',  role:'RM', joined:'Jan 2023', salary:30000},
   {name:'Raju',   role:'RM', joined:'Jun 2021', salary:35000},
@@ -722,6 +723,45 @@ const EMPLOYEES = [
   {name:'Megha',  role:'RM', joined:'Sep 2023', salary:29000},
   {name:'Anjali', role:'RM', joined:'Jul 2022', salary:31500},
 ];
+
+// EMPLOYEES = live working list (base + added employees, minus deleted ones).
+// Kept as a mutable array so all existing code that reads EMPLOYEES directly
+// keeps working unchanged. Synced with Firestore via the 'employee_changes' key.
+let EMPLOYEES = EMPLOYEES_BASE.slice();
+
+function getEmployeeChanges(){
+  return DB.get('employee_changes', {added:[], removed:[]}) || {added:[], removed:[]};
+}
+
+// Rebuilds EMPLOYEES in-place from EMPLOYEES_BASE + Firestore-synced added/removed lists.
+function applyEmployeeChanges(){
+  const changes=getEmployeeChanges();
+  const added=changes.added||[];
+  const removed=changes.removed||[];
+  const merged=EMPLOYEES_BASE.concat(added).filter(e=>removed.indexOf(e.name)===-1);
+  EMPLOYEES.length=0;
+  merged.forEach(e=>EMPLOYEES.push(e));
+}
+applyEmployeeChanges();
+
+// Persist a newly added employee to Firestore so it survives refresh / syncs to all devices.
+async function persistAddEmployee(emp){
+  const changes=getEmployeeChanges();
+  const added=(changes.added||[]).filter(e=>e.name!==emp.name);
+  added.push(emp);
+  await DB.set('employee_changes', {added, removed:changes.removed||[]});
+  applyEmployeeChanges();
+}
+
+// Persist an employee removal to Firestore (soft-delete: removes from active list,
+// does NOT touch their historical attendance/salary/incentive records).
+async function persistRemoveEmployee(name){
+  const changes=getEmployeeChanges();
+  const added=(changes.added||[]).filter(e=>e.name!==name);
+  const removed=(changes.removed||[]).indexOf(name)===-1 ? (changes.removed||[]).concat([name]) : (changes.removed||[]);
+  await DB.set('employee_changes', {added, removed});
+  applyEmployeeChanges();
+}
 
 // Brokerage turnover — empty by default. Admin enters monthly data from Incentive page (April 2026 onwards).
 const BROKERAGE_MAR2026 = {
@@ -781,6 +821,20 @@ async function fetchAccessControlOnce(){
     }
   }catch(e){ console.log('fetchAccessControlOnce error:',e); }
   return getAccessControl();
+}
+
+// One-time fetch (e.g. fresh device, no listener started yet) so EMPLOYEES reflects
+// the latest admin-added/removed employees before login name-matching happens.
+async function fetchEmployeeChangesOnce(){
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc=await fdb.collection('hr_data').doc('employee_changes').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        DB.setLocal('employee_changes', doc.data().data);
+      }
+    }
+  }catch(e){ console.log('fetchEmployeeChangesOnce error:',e); }
+  applyEmployeeChanges();
 }
 
 // RM access window check (Admin always bypasses this).
@@ -960,6 +1014,9 @@ async function doLogin(){
   });
 
   if(!user){ alert('Incorrect username or password/PIN'); return; }
+
+  // Refresh employee list (added/removed) from Firestore before matching name
+  await fetchEmployeeChangesOnce();
 
   // Admin role in CRM => Admin in HR portal too — always allowed, no time restriction
   if(user.role==='admin'){
@@ -2049,7 +2106,12 @@ function renderEmployees(){
       </td>
       <td><span style="font-size:11px;color:var(--text3)">CRM credentials</span></td>
       <td><span class="badge badge-green">Active</span></td>
-      <td><button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}')))">View</button></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}')))">View</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.name}')">Delete</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -2098,12 +2160,21 @@ function toggleAddForm(){
   const f=document.getElementById('add-emp-form');
   f.style.display=f.style.display==='none'?'block':'none';
 }
-function addEmployee(){
+async function addEmployee(){
   const name=document.getElementById('ne-name').value.trim();
   if(!name){alert('Please enter a name');return}
-  EMPLOYEES.push({name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000});
+  if(EMPLOYEES.find(e=>e.name.toLowerCase()===name.toLowerCase())){alert('An employee with this name already exists');return}
+  const emp={name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000};
+  await persistAddEmployee(emp);
   toggleAddForm();renderEmployees();
   alert(name+' added!\n\nAlso create a new user in CRM for login, so they can log in here too.');
+}
+
+async function deleteEmployee(name){
+  if(!confirm('Remove '+name+' from the employee list?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed.\n\nThis cannot be undone from here.')) return;
+  await persistRemoveEmployee(name);
+  renderEmployees();
+  alert(name+' has been removed from the employee list.');
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
