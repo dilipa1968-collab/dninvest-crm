@@ -513,6 +513,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">🔄</span> SIP Tracker
         <span class="nav-badge" id="nb-sip">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('mf-txns')" id="nav-mf-txns">
+        <span class="icon">💼</span> MF Transactions
+      </div>
       <div class="nav-item" onclick="showPage('mf-nocall')" id="nav-mf-nocall">
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-mfnc">0</span>
@@ -759,6 +762,86 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
         <div class="stats-row" id="sipStats"></div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="sip-table"></div></div>
+      </div>
+
+      <!-- ── MF TRANSACTIONS ── -->
+      <div class="page" id="page-mf-txns">
+        <div class="page-hdr">
+          <div class="page-title">MF Transactions</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="exportMfTxns()">⬇️ Export</button>
+          </div>
+        </div>
+
+        <div class="tbl-wrap" style="padding:16px;margin-bottom:14px">
+          <div class="form-row" style="flex-wrap:wrap;gap:10px">
+            <div class="form-field" style="min-width:260px;position:relative">
+              <label>Client *</label>
+              <input type="text" id="mftxn-client-search" placeholder="🔍 Name / PAN / mobile se search karein..." autocomplete="off" oninput="searchMfTxnClient()" onfocus="searchMfTxnClient()">
+              <div id="mftxn-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+            </div>
+            <div class="form-field" style="min-width:160px">
+              <label>Selected Client</label>
+              <input type="text" id="mftxn-client-selected" placeholder="Koi client select nahi hua" readonly style="background:#f7f7f7">
+            </div>
+            <div class="form-field" style="min-width:120px">
+              <label>RM</label>
+              <input type="text" id="mftxn-client-rm" readonly style="background:#f7f7f7">
+            </div>
+          </div>
+          <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
+            <div class="form-field" style="min-width:160px">
+              <label>Type *</label>
+              <select id="mftxn-type">
+                <option value="Lumpsum">Lumpsum</option>
+                <option value="SIP">New SIP</option>
+                <option value="SIP Stop">SIP Stop</option>
+                <option value="Switch">Switch</option>
+                <option value="Redemption">Redemption</option>
+                <option value="SWP">SWP</option>
+                <option value="Resumption">Resumption</option>
+              </select>
+            </div>
+            <div class="form-field" style="min-width:160px">
+              <label>Amount (₹) *</label>
+              <input type="number" id="mftxn-amount" placeholder="e.g. 25000">
+            </div>
+            <div class="form-field" style="min-width:160px">
+              <label>Date *</label>
+              <input type="date" id="mftxn-date">
+            </div>
+            <div class="form-field" style="min-width:220px">
+              <label>Remarks</label>
+              <input type="text" id="mftxn-remarks" placeholder="Optional notes">
+            </div>
+            <div class="form-field" style="justify-content:flex-end">
+              <label>&nbsp;</label>
+              <button class="btn btn-success" onclick="saveMfTxnEntry()">Save Transaction</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="filters">
+          <input type="text" placeholder="🔍 Search client / RM..." oninput="renderMfTxnTable()" id="mftxn-search">
+          <select onchange="renderMfTxnTable()" id="mftxn-rm-filter"><option value="">All RMs</option></select>
+          <select onchange="renderMfTxnTable()" id="mftxn-type-filter">
+            <option value="">All Types</option>
+            <option value="Lumpsum">Lumpsum</option>
+            <option value="SIP">New SIP</option>
+            <option value="SIP Stop">SIP Stop</option>
+            <option value="Switch">Switch</option>
+            <option value="Redemption">Redemption</option>
+            <option value="SWP">SWP</option>
+            <option value="Resumption">Resumption</option>
+          </select>
+          <div class="filter-sep"></div>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
+            <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:6px;font-size:.78rem"></label>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">To:
+            <input type="date" onchange="renderMfTxnTable()" id="mftxn-to-date" style="padding:6px;font-size:.78rem"></label>
+          <span class="res-count" id="mftxn-count"></span>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
       </div>
 
       <!-- ── MF NO-CALL ALERTS ── -->
@@ -1169,6 +1252,8 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="SIP">New SIP</option>
             <option value="SIP Stop">SIP Stop</option>
             <option value="Switch">Switch</option>
+            <option value="Redemption">Redemption</option>
+            <option value="SWP">SWP</option>
             <option value="Resumption">Resumption</option>
           </select>
         </div>
@@ -2149,6 +2234,7 @@ function showPage(id){
   else if(id==='eq-nocall') renderNoCall('equity');
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
+  else if(id==='mf-txns'){ renderMfTxnPage(); }
   else if(id==='reports') renderReports();
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
@@ -4101,6 +4187,203 @@ function saveBusinessEntry(){
   DB.set('mf_business', {entries, eq_entries: eqEntries2});
   closeModal('businessModal');
   toast('Business entry saved!','success');
+}
+
+// ══════════════════════════════════════════
+// MF TRANSACTIONS (dedicated entry page — Redemption/Switch/SWP/SIP/Lumpsum)
+// All RM-wise, all client-wise. Uses the same 'mf_business' store as the
+// per-client "Add Business" button, so both feed the same New Business report.
+// ══════════════════════════════════════════
+let mfTxnSelectedClient = null;
+
+function getMfBizEntries(){
+  const biz = DB.get('mf_business');
+  return Array.isArray(biz) ? biz : (biz?.entries || []);
+}
+function setMfBizEntries(entries){
+  const biz = DB.get('mf_business');
+  const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
+  DB.set('mf_business', {entries, eq_entries: eqEntries});
+}
+
+function renderMfTxnPage(){
+  mfTxnSelectedClient = null;
+  const sel=document.getElementById('mftxn-client-selected'); if(sel) sel.value='';
+  const rmEl=document.getElementById('mftxn-client-rm'); if(rmEl) rmEl.value='';
+  const srch=document.getElementById('mftxn-client-search'); if(srch) srch.value='';
+  const res=document.getElementById('mftxn-client-results'); if(res){ res.style.display='none'; res.innerHTML=''; }
+  const dateEl=document.getElementById('mftxn-date'); if(dateEl && !dateEl.value) dateEl.value=today();
+
+  // Populate RM filter dropdown (admin sees all MF RMs, RM sees just themself)
+  const rmFilter=document.getElementById('mftxn-rm-filter');
+  if(rmFilter){
+    const mfRMs = CU.role==='admin' ? getSegRMs('mf') : [CU.name];
+    rmFilter.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
+    if(CU.role!=='admin'){ rmFilter.value=CU.name; rmFilter.disabled=true; }
+  }
+
+  renderMfTxnTable();
+}
+
+function searchMfTxnClient(){
+  const q=(document.getElementById('mftxn-client-search').value||'').trim().toLowerCase();
+  const out=document.getElementById('mftxn-client-results');
+  if(!out) return;
+  if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
+
+  const clients=getMyMfClients();
+  const matches=clients.filter(c=>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.pan||'').toLowerCase().includes(q) ||
+    (c.mobile||'').toLowerCase().includes(q)
+  ).slice(0,30);
+
+  if(matches.length===0){
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Koi client nahi mila</div>';
+    out.style.display='block';
+    return;
+  }
+  out.innerHTML=matches.map(c=>`
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectMfTxnClient('${c.id}')">
+      <div style="font-weight:600;font-size:.88rem">${escapeHtml(c.name||'')}</div>
+      <div style="font-size:.75rem;color:var(--gray)">${escapeHtml(c.pan||'—')} · ${escapeHtml(c.mobile||'—')} · RM: ${escapeHtml(c.rm||'—')}</div>
+    </div>`).join('');
+  out.style.display='block';
+}
+
+function selectMfTxnClient(clientId){
+  const clients=getMyMfClients();
+  const c=clients.find(x=>x.id===clientId);
+  if(!c) return;
+  mfTxnSelectedClient = {id:c.id, name:c.name, rm:c.rm||''};
+  document.getElementById('mftxn-client-selected').value=c.name;
+  document.getElementById('mftxn-client-rm').value=c.rm||'—';
+  document.getElementById('mftxn-client-search').value='';
+  const out=document.getElementById('mftxn-client-results');
+  out.style.display='none'; out.innerHTML='';
+}
+
+// Close the results dropdown when clicking elsewhere
+document.addEventListener('click', e=>{
+  const wrap=document.getElementById('mftxn-client-search');
+  const out=document.getElementById('mftxn-client-results');
+  if(wrap && out && !wrap.contains(e.target) && !out.contains(e.target)){
+    out.style.display='none';
+  }
+});
+
+function saveMfTxnEntry(){
+  if(!mfTxnSelectedClient){ toast('Pehle client select karein','error'); return; }
+  const type=document.getElementById('mftxn-type').value;
+  const amount=parseFloat(document.getElementById('mftxn-amount').value);
+  const date=document.getElementById('mftxn-date').value;
+  const remarks=document.getElementById('mftxn-remarks').value.trim();
+
+  if(!amount || amount<=0){ toast('Amount daalein','error'); return; }
+  if(!date){ toast('Date daalein','error'); return; }
+
+  const entries=getMfBizEntries();
+  entries.push({
+    id: uid(),
+    client_id: mfTxnSelectedClient.id,
+    client_name: mfTxnSelectedClient.name,
+    rm: mfTxnSelectedClient.rm,
+    type, amount, date, remarks,
+    created_by: CU.name,
+    created: today()
+  });
+  setMfBizEntries(entries);
+  toast(`${type} entry saved — ${mfTxnSelectedClient.name}`,'success');
+
+  // Reset form for next entry but keep date/type for fast repeated entry
+  mfTxnSelectedClient=null;
+  document.getElementById('mftxn-client-selected').value='';
+  document.getElementById('mftxn-client-rm').value='';
+  document.getElementById('mftxn-client-search').value='';
+  document.getElementById('mftxn-amount').value='';
+  document.getElementById('mftxn-remarks').value='';
+
+  renderMfTxnTable();
+}
+
+function getFilteredMfTxns(){
+  let entries=getMfBizEntries();
+  // RM scoping — non-admin only sees their own entries
+  if(CU.role!=='admin'){
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
+  }
+  const q=(document.getElementById('mftxn-search')?.value||'').trim().toLowerCase();
+  const rmF=document.getElementById('mftxn-rm-filter')?.value||'';
+  const typeF=document.getElementById('mftxn-type-filter')?.value||'';
+  const fromD=document.getElementById('mftxn-from-date')?.value||'';
+  const toD=document.getElementById('mftxn-to-date')?.value||'';
+
+  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q));
+  if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
+  if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
+  if(fromD) entries=entries.filter(e=>e.date>=fromD);
+  if(toD) entries=entries.filter(e=>e.date<=toD);
+
+  return entries.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||'').localeCompare(a.created||''));
+}
+
+const MFTXN_TYPE_COLOR = {
+  Lumpsum:'#1D9E75', SIP:'#185FA5', 'SIP Stop':'#C0392B', Switch:'#B7950B',
+  Redemption:'#C0392B', SWP:'#D35400', Resumption:'#7D3C98'
+};
+
+function renderMfTxnTable(){
+  const wrap=document.getElementById('mftxn-table');
+  if(!wrap) return;
+  const entries=getFilteredMfTxns();
+  const cnt=document.getElementById('mftxn-count');
+  if(cnt) cnt.textContent=entries.length+' entries';
+
+  if(entries.length===0){
+    wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">Koi transaction nahi mila</div>';
+    return;
+  }
+
+  wrap.innerHTML=`<table>
+    <thead><tr><th>Date</th><th>Client</th><th>RM</th><th>Type</th><th style="text-align:right">Amount (₹)</th><th>Remarks</th><th></th></tr></thead>
+    <tbody>
+      ${entries.map(e=>{
+        const color=MFTXN_TYPE_COLOR[e.type]||'#777';
+        return `<tr>
+          <td>${e.date||'—'}</td>
+          <td>${escapeHtml(e.client_name||'—')}</td>
+          <td>${escapeHtml(e.rm||'—')}</td>
+          <td><span class="badge" style="background:${color}22;color:${color}">${escapeHtml(e.type||'—')}</span></td>
+          <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
+          <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
+          <td>${CU.role==='admin'?`<button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function deleteMfTxnEntry(id){
+  if(CU.role!=='admin') return;
+  if(!confirm('Ye transaction entry delete karein?')) return;
+  const entries=getMfBizEntries().filter(e=>e.id!==id);
+  setMfBizEntries(entries);
+  toast('Entry deleted','success');
+  renderMfTxnTable();
+}
+
+function exportMfTxns(){
+  const entries=getFilteredMfTxns();
+  if(entries.length===0){ toast('Export karne ke liye koi data nahi','error'); return; }
+  const rows=[['Date','Client Name','RM','Type','Amount','Remarks']];
+  entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.rm||'',e.type||'',e.amount||0,e.remarks||'']));
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='MF_Transactions_'+today()+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ══════════════════════════════════════════
