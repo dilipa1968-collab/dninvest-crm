@@ -3341,6 +3341,13 @@ async function saveSeminarAttendeeChanges(){
     if(!id) return;
     const a=(s.attendees||[]).find(x=>x.id===id);
     if(!a) return;
+    // Only save changes for attendees this user is actually allowed to edit.
+    // Other RMs' rows are rendered disabled (read-only) in this table, but
+    // their <select>/<input> elements still exist in the DOM — reading and
+    // re-saving their values here was silently overwriting other RMs'
+    // attendance status (e.g. resetting "Attended" back to "Pending").
+    const isMyAttendee = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+    if(!isMyAttendee) return;
     const rsvpEl=row.querySelector('.att-rsvp');
     const countEl=row.querySelector('.att-count');
     const statusEl=row.querySelector('.att-status');
