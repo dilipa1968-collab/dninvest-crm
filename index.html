@@ -487,6 +487,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">👥</span> Clients
         <span class="nav-badge" id="nb-eq">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('eq-demat')" id="nav-eq-demat">
+        <span class="icon">💼</span> Demat A/c Opening
+      </div>
       <div class="nav-item" onclick="showPage('eq-followup')" id="nav-eq-followup">
         <span class="icon">📞</span> Follow-ups
         <span class="nav-badge red" id="nb-eqf">0</span>
@@ -842,6 +845,70 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <span class="res-count" id="mftxn-count"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
+      </div>
+
+      <!-- ── EQUITY: DEMAT ACCOUNT OPENING ── -->
+      <div class="page" id="page-eq-demat">
+        <div class="page-hdr">
+          <div class="page-title">Demat Account Opening</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="exportEqDemat()">⬇️ Export</button>
+          </div>
+        </div>
+
+        <div class="tbl-wrap" style="padding:16px;margin-bottom:14px">
+          <div class="form-row" style="flex-wrap:wrap;gap:10px">
+            <div class="form-field" style="min-width:260px;position:relative">
+              <label>Client *</label>
+              <input type="text" id="eqdemat-client-search" placeholder="🔍 Name / Code / mobile se search karein..." autocomplete="off" oninput="searchEqDematClient()" onfocus="searchEqDematClient()">
+              <div id="eqdemat-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+            </div>
+            <div class="form-field" style="min-width:160px">
+              <label>Selected Client</label>
+              <input type="text" id="eqdemat-client-selected" placeholder="Koi client select nahi hua" readonly style="background:#f7f7f7">
+            </div>
+            <div class="form-field" style="min-width:120px">
+              <label>RM</label>
+              <input type="text" id="eqdemat-client-rm" readonly style="background:#f7f7f7">
+            </div>
+          </div>
+          <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
+            <div class="form-field" style="min-width:160px">
+              <label>Client Code / UCC</label>
+              <input type="text" id="eqdemat-code" placeholder="e.g. ABC1234">
+            </div>
+            <div class="form-field" style="min-width:160px">
+              <label>Date *</label>
+              <input type="date" id="eqdemat-date">
+            </div>
+            <div class="form-field" style="min-width:220px">
+              <label>Remarks</label>
+              <input type="text" id="eqdemat-remarks" placeholder="Optional notes">
+            </div>
+            <div class="form-field" style="justify-content:flex-end">
+              <label>&nbsp;</label>
+              <button class="btn btn-success" onclick="saveEqDematEntry()">Save Entry</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="filters">
+          <input type="text" placeholder="🔍 Search client / RM..." oninput="renderEqDematTable()" id="eqdemat-search">
+          <select onchange="renderEqDematTable()" id="eqdemat-rm-filter"><option value="">All RMs</option></select>
+          <select onchange="renderEqDematTable()" id="eqdemat-status-filter">
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Declined">Declined</option>
+          </select>
+          <div class="filter-sep"></div>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
+            <input type="date" onchange="renderEqDematTable()" id="eqdemat-from-date" style="padding:6px;font-size:.78rem"></label>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">To:
+            <input type="date" onchange="renderEqDematTable()" id="eqdemat-to-date" style="padding:6px;font-size:.78rem"></label>
+          <span class="res-count" id="eqdemat-count"></span>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="eqdemat-table"></div></div>
       </div>
 
       <!-- ── MF NO-CALL ALERTS ── -->
@@ -2235,6 +2302,7 @@ function showPage(id){
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
   else if(id==='mf-txns'){ renderMfTxnPage(); }
+  else if(id==='eq-demat'){ renderEqDematPage(); }
   else if(id==='reports') renderReports();
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
@@ -3081,7 +3149,10 @@ async function convertLead(id,seg){
         date: today(),
         mobile: lead.mobile||'',
         remarks: 'Converted from Lead',
-        created: today()
+        created_by: CU.name,
+        created: today(),
+        status: CU.role==='admin' ? 'Approved' : 'Pending',
+        decline_reason: ''
       });
       const newBiz = { entries: mfEntries, eq_entries: eqEntries };
       await DB.set('mf_business', newBiz);
@@ -4449,6 +4520,245 @@ function exportMfTxns(){
 }
 
 // ══════════════════════════════════════════
+// EQUITY: DEMAT ACCOUNT OPENING (dedicated entry page — mirrors MF Transactions)
+// Uses the same 'mf_business' store's eq_entries array, so it feeds the same
+// "New Business — Demat Accounts" report. Each entry has an Approve/Decline/
+// Pending status, same workflow as MF business entries.
+// ══════════════════════════════════════════
+let eqDematSelectedClient = null;
+
+function getEqDematEntries(){
+  const biz = DB.get('mf_business');
+  return Array.isArray(biz) ? [] : (biz?.eq_entries || []);
+}
+function setEqDematEntries(eqEntries){
+  const biz = DB.get('mf_business');
+  const entries = Array.isArray(biz) ? biz : (biz?.entries||[]);
+  DB.set('mf_business', {entries, eq_entries: eqEntries});
+}
+
+function renderEqDematPage(){
+  eqDematSelectedClient = null;
+  const sel=document.getElementById('eqdemat-client-selected'); if(sel) sel.value='';
+  const rmEl=document.getElementById('eqdemat-client-rm'); if(rmEl) rmEl.value='';
+  const srch=document.getElementById('eqdemat-client-search'); if(srch) srch.value='';
+  const codeEl=document.getElementById('eqdemat-code'); if(codeEl) codeEl.value='';
+  const res=document.getElementById('eqdemat-client-results'); if(res){ res.style.display='none'; res.innerHTML=''; }
+  const dateEl=document.getElementById('eqdemat-date'); if(dateEl && !dateEl.value) dateEl.value=today();
+
+  // Populate RM filter dropdown (admin sees all Equity RMs, RM sees just themself)
+  const rmFilter=document.getElementById('eqdemat-rm-filter');
+  if(rmFilter){
+    const eqRMs = CU.role==='admin' ? getSegRMs('equity') : [CU.name];
+    rmFilter.innerHTML='<option value="">All RMs</option>'+eqRMs.map(r=>`<option>${r}</option>`).join('');
+    if(CU.role!=='admin'){ rmFilter.value=CU.name; rmFilter.disabled=true; }
+  }
+
+  renderEqDematTable();
+}
+
+function searchEqDematClient(){
+  const q=(document.getElementById('eqdemat-client-search').value||'').trim().toLowerCase();
+  const out=document.getElementById('eqdemat-client-results');
+  if(!out) return;
+  if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
+
+  const clients=getMyEqClients();
+  const matches=clients.filter(c=>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.code||'').toLowerCase().includes(q) ||
+    (c.mobile||'').toLowerCase().includes(q)
+  ).slice(0,30);
+
+  if(matches.length===0){
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Koi client nahi mila</div>';
+    out.style.display='block';
+    return;
+  }
+  out.innerHTML=matches.map(c=>`
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectEqDematClient('${c.id}')">
+      <div style="font-weight:600;font-size:.88rem">${escapeHtml(c.name||'')}</div>
+      <div style="font-size:.75rem;color:var(--gray)">${escapeHtml(c.code||'—')} · ${escapeHtml(c.mobile||'—')} · RM: ${escapeHtml(c.rm||'—')}</div>
+    </div>`).join('');
+  out.style.display='block';
+}
+
+function selectEqDematClient(clientId){
+  const clients=getMyEqClients();
+  const c=clients.find(x=>x.id===clientId);
+  if(!c) return;
+  eqDematSelectedClient = {id:c.id, name:c.name, rm:c.rm||''};
+  document.getElementById('eqdemat-client-selected').value=c.name;
+  document.getElementById('eqdemat-client-rm').value=c.rm||'—';
+  document.getElementById('eqdemat-client-search').value='';
+  if(c.code) document.getElementById('eqdemat-code').value=c.code;
+  const out=document.getElementById('eqdemat-client-results');
+  out.style.display='none'; out.innerHTML='';
+}
+
+// Close the results dropdown when clicking elsewhere
+document.addEventListener('click', e=>{
+  const wrap=document.getElementById('eqdemat-client-search');
+  const out=document.getElementById('eqdemat-client-results');
+  if(wrap && out && !wrap.contains(e.target) && !out.contains(e.target)){
+    out.style.display='none';
+  }
+});
+
+function saveEqDematEntry(){
+  if(!eqDematSelectedClient){ toast('Pehle client select karein','error'); return; }
+  const code=document.getElementById('eqdemat-code').value.trim().toUpperCase();
+  const date=document.getElementById('eqdemat-date').value;
+  const remarks=document.getElementById('eqdemat-remarks').value.trim();
+
+  if(!date){ toast('Date daalein','error'); return; }
+
+  const eqEntries=getEqDematEntries();
+  eqEntries.push({
+    id: uid(),
+    client_id: eqDematSelectedClient.id,
+    client_name: eqDematSelectedClient.name,
+    client_code: code,
+    rm: eqDematSelectedClient.rm,
+    type: 'Open Demat Account',
+    date, remarks,
+    mobile: '',
+    created_by: CU.name,
+    created: today(),
+    status: CU.role==='admin' ? 'Approved' : 'Pending',
+    decline_reason: ''
+  });
+  setEqDematEntries(eqEntries);
+  toast(`Demat entry saved — ${eqDematSelectedClient.name}`,'success');
+
+  // Reset form for next entry but keep date for fast repeated entry
+  eqDematSelectedClient=null;
+  document.getElementById('eqdemat-client-selected').value='';
+  document.getElementById('eqdemat-client-rm').value='';
+  document.getElementById('eqdemat-client-search').value='';
+  document.getElementById('eqdemat-code').value='';
+  document.getElementById('eqdemat-remarks').value='';
+
+  renderEqDematTable();
+}
+
+function getFilteredEqDemat(){
+  let entries=getEqDematEntries();
+  // RM scoping — non-admin only sees their own entries
+  if(CU.role!=='admin'){
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
+  }
+  const q=(document.getElementById('eqdemat-search')?.value||'').trim().toLowerCase();
+  const rmF=document.getElementById('eqdemat-rm-filter')?.value||'';
+  const statusF=document.getElementById('eqdemat-status-filter')?.value||'';
+  const fromD=document.getElementById('eqdemat-from-date')?.value||'';
+  const toD=document.getElementById('eqdemat-to-date')?.value||'';
+
+  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.client_code||'').toLowerCase().includes(q));
+  if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
+  if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
+  if(fromD) entries=entries.filter(e=>e.date>=fromD);
+  if(toD) entries=entries.filter(e=>e.date<=toD);
+
+  return entries.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||'').localeCompare(a.created||''));
+}
+
+function renderEqDematTable(){
+  const wrap=document.getElementById('eqdemat-table');
+  if(!wrap) return;
+  const entries=getFilteredEqDemat();
+  const cnt=document.getElementById('eqdemat-count');
+  if(cnt) cnt.textContent=entries.length+' entries';
+
+  if(entries.length===0){
+    wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">Koi Demat account entry nahi mili</div>';
+    return;
+  }
+
+  wrap.innerHTML=`<table>
+    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th><th>RM</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      ${entries.map(e=>{
+        const status = e.status||'Pending';
+        return `<tr>
+          <td>${e.date||'—'}</td>
+          <td>${escapeHtml(e.client_name||'—')}</td>
+          <td>${escapeHtml(e.client_code||'—')}</td>
+          <td>${escapeHtml(e.rm||'—')}</td>
+          <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
+          <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
+          <td style="white-space:nowrap">${CU.role==='admin'?`
+            ${status!=='Approved'?`<button class="btn-icon" onclick="approveEqDematEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
+            ${status!=='Declined'?`<button class="btn-icon" onclick="declineEqDematEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
+            ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingEqDematEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
+            <button class="btn-icon" onclick="deleteEqDematEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function approveEqDematEntry(id){
+  if(CU.role!=='admin') return;
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Approved';
+  e.decline_reason = '';
+  setEqDematEntries(entries);
+  toast('Demat entry approved!','success');
+  renderEqDematTable();
+}
+
+function declineEqDematEntry(id){
+  if(CU.role!=='admin') return;
+  const reason = prompt('Decline reason (optional):','') || '';
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Declined';
+  e.decline_reason = reason.trim();
+  setEqDematEntries(entries);
+  toast('Demat entry declined','success');
+  renderEqDematTable();
+}
+
+function markPendingEqDematEntry(id){
+  if(CU.role!=='admin') return;
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Pending';
+  e.decline_reason = '';
+  setEqDematEntries(entries);
+  toast('Status reset to Pending','success');
+  renderEqDematTable();
+}
+
+function deleteEqDematEntry(id){
+  if(CU.role!=='admin') return;
+  if(!confirm('Ye Demat account entry delete karein?')) return;
+  const entries = getEqDematEntries().filter(e=>e.id!==id);
+  setEqDematEntries(entries);
+  toast('Entry deleted','success');
+  renderEqDematTable();
+}
+
+function exportEqDemat(){
+  const entries=getFilteredEqDemat();
+  if(entries.length===0){ toast('Export karne ke liye koi data nahi','error'); return; }
+  const rows=[['Date','Client Name','Client Code','RM','Remarks','Status']];
+  entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.remarks||'',e.status||'Pending']));
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='Demat_Account_Opening_'+today()+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════
 // FOLLOW-UP PAGES
 // ══════════════════════════════════════════
 function renderFollowup(group){
@@ -5005,7 +5315,7 @@ function eqNewBusinessReport(){
     monthAgg[month].rms[rm]++;
   });
 
-  // Flat rows: Date | Client Name | Client Code | RM | Type | Remarks
+  // Flat rows: Date | Client Name | Client Code | RM | Type | Remarks | Status
   const rows = filtered
     .slice()
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''))
@@ -5015,12 +5325,13 @@ function eqNewBusinessReport(){
       e.client_code||'—',
       e.rm||'—',
       e.type||'Open Demat Account',
-      e.remarks||'—'
+      e.remarks||'—',
+      e.status||'Pending'
     ]);
 
   showReport(
     `New Business — Demat Accounts (${filtered.length} entries)`,
-    ['Date','Client Name','Client Code','RM','Type','Remarks'],
+    ['Date','Client Name','Client Code','RM','Type','Remarks','Status'],
     rows
   );
 }
