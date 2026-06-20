@@ -115,7 +115,7 @@ tr:hover td{background:var(--surface2)}
 .form-row.single{grid-template-columns:1fr}
 .form-row.triple{grid-template-columns:1fr 1fr 1fr}
 .field-inline label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;font-weight:500}
-.field-inline input,.field-inline select,.field-inline textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);outline:none}
+.field-inline input,.field-inline select,.field-inline textarea{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);outline:none}
 .field-inline input:focus,.field-inline select:focus{border-color:var(--accent)}
 
 /* BUTTONS */
@@ -175,9 +175,10 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
 .compact-page .divider{margin:0.45rem 0}
 .compact-page .btn{padding:5px 12px;font-size:12px}
 .compact-page p{font-size:10.5px;line-height:1.35;margin-bottom:6px}
-.compact-page .compact-grid3{gap:6px;margin-bottom:6px}
-.compact-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
-@media (max-width:640px){.compact-grid3{grid-template-columns:1fr 1fr}}
+.compact-page .compact-grid3{gap:8px;margin-bottom:8px}
+.compact-grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px}
+.compact-grid3 .field-inline input,.compact-grid3 .field-inline select{width:100%;min-width:0}
+@media (max-width:520px){.compact-grid3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
