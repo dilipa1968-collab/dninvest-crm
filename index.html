@@ -1842,9 +1842,16 @@ async function doLogin(){
     try{ await DB.syncFromFirebase(); }catch(e){}
   }
   const users = DB.get('users') || DEFAULT_USERS;
-  // RM can login with PIN (4-digit) OR password; Admin uses password only
+  const td = today();
+  // RM can login with PIN (4-digit) OR password; Admin uses password only.
+  // Special case: if the account was auto-deactivated by the 10 AM late-login
+  // check (lateAbsentMarked === today), login is still allowed — this is what
+  // converts their attendance from "Absent" to "Late" and reactivates them.
+  // Any other active===false (manual Admin deactivation, or outside the
+  // scheduled working window) still blocks login as before.
   const user = users.find(x=>{
-    if(x.username!==u || x.active===false) return false;
+    if(x.username!==u) return false;
+    if(x.active===false && x.lateAbsentMarked!==td) return false;
     if(x.password===p) return true;
     if(x.role==='rm' && x.pin && x.pin===p) return true;
     return false;
@@ -1915,11 +1922,41 @@ async function recordHrAttendanceOnCrmLogin(user){
     const name = match || rawName;
     const td = today();
 
-    // Skip if already recorded today (read current doc first)
+    // Read current doc first
     const docRef = fdb.collection('hr_data').doc('attendance');
     const snap = await docRef.get();
     const existing = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
-    if(existing[name] && existing[name].some(r=>r.date===td)) return; // already marked today
+    const todayRec = existing[name] && existing[name].find(r=>r.date===td);
+
+    // If today was auto-marked "Absent" by the 10 AM late-login check, this is
+    // a delayed login — flip it to "Late" and reactivate the user immediately,
+    // instead of leaving them deactivated/absent for the rest of the day.
+    if(todayRec && todayRec.status==='Absent'){
+      const inDate = new Date();
+      const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
+      const record = {date:td, in:inTime, out:'', status:'Late'};
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+        if(!latest[name]) latest[name]=[];
+        const idx = latest[name].findIndex(r=>r.date===td);
+        if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+      });
+      // Reactivate the user account that the 10 AM check had deactivated
+      const usersList = DB.get('users') || [];
+      const uidx = usersList.findIndex(x=>x.id===user.id);
+      if(uidx>=0){
+        usersList[uidx].active = true;
+        usersList[uidx].manualOverride = false;
+        usersList[uidx].lateAbsentMarked = '';
+        DB.set('users', usersList);
+        CU.active = true; // keep current session's in-memory user object in sync
+      }
+      return;
+    }
+
+    if(todayRec) return; // already marked today with a normal status, leave it
 
     // Determine in-time (login time - 5 min)
     const inDate = new Date(Date.now() - 5*60*1000);
@@ -5681,6 +5718,88 @@ function runAutoSchedule(){
 
 // Auto-schedule every minute
 setInterval(runAutoSchedule, 60000);
+
+// ── 10 AM Late-Login Auto-Absent ──
+// On working days (same Mon-Sat window as the auto-schedule, no Sunday/holiday
+// handling needed since CRM is closed for RMs then anyway), if an RM has not
+// logged in by 10:00 AM IST, they are auto-deactivated AND marked "Absent" in
+// the HR Portal's attendance for the day. If they log in later that day, their
+// status flips to "Late" and they're reactivated immediately (see
+// recordHrAttendanceOnCrmLogin). Runs from whichever app (CRM or HR Portal) is
+// opened first — both share the same Firestore project.
+async function runLateAbsentCheck(){
+  try{
+    if(typeof fdb==='undefined') return;
+    const istHour = getISTHour();
+    const dow = getISTDayOfWeek();
+    if(dow===0) return; // Sunday — RM access is off anyway, skip
+    if(istHour < 10) return; // before 10 AM, nothing to do yet
+
+    const td = today();
+
+    // Check holiday calendar — skip entirely on a declared holiday
+    let isHoliday=false;
+    try{
+      const holDoc = await fdb.collection('hr_data').doc('holidays').get();
+      const holidays = (holDoc.exists && holDoc.data() && holDoc.data().data) ? holDoc.data().data : [];
+      if(holidays.some(h=>h.date===td)) isHoliday=true;
+    }catch(e){}
+    if(isHoliday) return;
+
+    const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+
+    const attDocRef = fdb.collection('hr_data').doc('attendance');
+    const attSnap = await attDocRef.get();
+    const attData = (attSnap.exists && attSnap.data() && attSnap.data().data) ? attSnap.data().data : {};
+
+    let usersChanged=false;
+    const usersList = DB.get('users') || [];
+
+    for(const u of usersList){
+      if(u.role==='admin') continue;
+      if(u.lateAbsentMarked===td) continue; // already handled today, don't repeat
+
+      const rawName = String(u.name || u.username || '').trim();
+      const hrName = HR_NAMES.find(n =>
+        n.toLowerCase() === rawName.toLowerCase() ||
+        n.toLowerCase() === rawName.split(' ')[0].toLowerCase() ||
+        n.toLowerCase() === String(u.username||'').toLowerCase()
+      ) || rawName;
+
+      const hasLoggedInToday = (attData[hrName]||[]).some(r=>r.date===td);
+      if(hasLoggedInToday) continue; // already logged in today, leave alone
+
+      // Not logged in by 10 AM — deactivate + mark Absent
+      const idx = usersList.findIndex(x=>x.id===u.id);
+      if(idx<0) continue;
+      usersList[idx].active = false;
+      usersList[idx].manualOverride = false; // this is an auto action, not a manual one
+      usersList[idx].lateAbsentMarked = td;
+      usersChanged = true;
+
+      try{
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(attDocRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+          if(!latest[hrName]) latest[hrName]=[];
+          const aidx = latest[hrName].findIndex(r=>r.date===td);
+          const record = {date:td, in:'', out:'', status:'Absent'};
+          if(aidx>=0) latest[hrName][aidx]=record; else latest[hrName].push(record);
+          tx.set(attDocRef, {data:latest, updated:new Date().toISOString()});
+        });
+      }catch(e){ console.log('Late-absent attendance write error:', hrName, e); }
+    }
+
+    if(usersChanged){
+      DB.set('users', usersList);
+      renderAdmin && renderAdmin();
+    }
+  }catch(e){
+    console.log('runLateAbsentCheck error:', e);
+  }
+}
+setInterval(runLateAbsentCheck, 60000);
+runLateAbsentCheck(); // also run once immediately on load
 
 // ══════════════════════════════════════════
 // ANNOUNCEMENT
