@@ -4837,7 +4837,12 @@ function toggleUser(id){
   toast((newActive ? '✅ Activated' : '🔴 Deactivated') + ' — Auto-schedule next boundary pe resume hoga', 'success');
 }
 
-// ── Auto Schedule (8:00 AM – 7:00 PM IST) ──
+// ── Auto Schedule ──
+// Mon-Fri: 8:00 AM – 7:00 PM IST (active window)
+// Saturday: 9:30 AM – 2:00 PM IST (shorter window, same as HR attendance rule)
+// Sunday: always inactive (no active window)
+// Holidays are NOT auto-handled here — Admin manually deactivates RMs on
+// declared holidays if needed (manual override below still applies).
 function getISTHour(){
   // IST = UTC+5:30
   const now = new Date();
@@ -4846,10 +4851,28 @@ function getISTHour(){
   return ist.getHours() + ist.getMinutes()/60;
 }
 
+function getISTDayOfWeek(){
+  // 0=Sunday .. 6=Saturday, computed in IST (not local browser time)
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset()*60000;
+  const ist = new Date(utc + 5.5*3600000);
+  return ist.getDay();
+}
+
+// Returns {start, end} active-window boundaries (in IST decimal hours) for
+// the given day-of-week. Sunday returns null (no active window at all).
+function getActiveWindowForDay(dow){
+  if(dow===0) return null;           // Sunday — always inactive
+  if(dow===6) return {start:9.5, end:14}; // Saturday — 9:30 AM to 2:00 PM
+  return {start:8, end:19};          // Mon-Fri — 8:00 AM to 7:00 PM
+}
+
 function runAutoSchedule(){
   const users = DB.get('users') || [];
   const istHour = getISTHour();
-  const shouldBeActive = istHour >= 8 && istHour < 19; // 8:00 AM to 7:00 PM IST
+  const dow = getISTDayOfWeek();
+  const win = getActiveWindowForDay(dow);
+  const shouldBeActive = win ? (istHour >= win.start && istHour < win.end) : false;
   let changed = false;
   users.forEach((u, idx) => {
     if(u.role === 'admin') return; // admins skip
@@ -4859,16 +4882,16 @@ function runAutoSchedule(){
       const utc = overrideTime.getTime() + overrideTime.getTimezoneOffset()*60000;
       const istO = new Date(utc + 5.5*3600000);
       const overrideHour = istO.getHours() + istO.getMinutes()/60;
-      // Next boundary from override time
-      let nextBoundary;
-      if(overrideHour < 8) nextBoundary = 8;
-      else if(overrideHour < 19) nextBoundary = 19;
-      else nextBoundary = 8; // next day 8 AM
-      // If current IST hour has crossed the next boundary, clear override
-      const crossedBoundary = (overrideHour < 8 && istHour >= 8) ||
-                               (overrideHour >= 8 && overrideHour < 19 && istHour >= 19) ||
-                               (overrideHour >= 19 && istHour >= 8 && istHour < 19 && 
-                                new Date().getDate() > overrideTime.getDate());
+      const overrideDow = istO.getDay();
+      const overrideWin = getActiveWindowForDay(overrideDow);
+      // Has the day changed since the override, or has the active window
+      // (start/end) for today been crossed since the override was set?
+      const dayChanged = new Date().getDate() !== overrideTime.getDate();
+      let crossedBoundary = dayChanged;
+      if(!dayChanged && overrideWin){
+        crossedBoundary = (overrideHour < overrideWin.start && istHour >= overrideWin.start) ||
+                           (overrideHour >= overrideWin.start && overrideHour < overrideWin.end && istHour >= overrideWin.end);
+      }
       if(crossedBoundary){
         users[idx].manualOverride = false;
         users[idx].active = shouldBeActive;
