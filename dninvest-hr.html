@@ -256,7 +256,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
 
       <div class="grid2">
         <div class="card">
-          <div class="card-title">Aaj ki attendance</div>
+          <div class="card-title">Today's Attendance</div>
           <div id="today-att-list"></div>
         </div>
         <div>
@@ -280,7 +280,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div id="my-att-summary"></div>
         </div>
         <div class="card">
-          <div class="card-title">Is mahine ka log</div>
+          <div class="card-title">This Month's Log</div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th></tr></thead>
@@ -298,7 +298,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
         </div>
         <div class="card admin-only" style="display:none">
-          <div class="card-title">Manual attendance mark karein</div>
+          <div class="card-title">Mark manual attendance</div>
           <div class="form-row">
             <div class="field-inline"><label>Employee</label>
               <select id="man-emp">
@@ -317,11 +317,11 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="form-row single">
             <div class="field-inline"><label>Date</label><input type="date" id="man-date" onchange="setManualTimesByDate()"></div>
           </div>
-          <button class="btn btn-primary" onclick="saveManualAtt()">Attendance save karein</button>
+          <button class="btn btn-primary" onclick="saveManualAtt()">Save Attendance</button>
         </div>
         <div class="card admin-only" style="display:none">
-          <div class="card-title">Bulk attendance mark karein (multiple dates)</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Ek employee, ek status, multiple dates ek saath. Sunday aur Exchange holidays list me dikhenge lekin auto-uncheck honge.</p>
+          <div class="card-title">Mark bulk attendance (multiple dates)</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">One employee, one status, multiple dates at once. Sundays and Exchange holidays will be shown in the list but auto-unchecked.</p>
           <div class="form-row">
             <div class="field-inline"><label>Employee</label>
               <select id="bulk-emp">
@@ -343,10 +343,10 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <div id="bulk-date-list" style="margin:10px 0;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;display:none"></div>
           <div id="bulk-date-actions" style="display:none;margin-bottom:10px">
-            <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="bulkToggleAll(true)">Sab select karein</button>
-            <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="bulkToggleAll(false)">Sab hatayein</button>
+            <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="bulkToggleAll(true)">Select All</button>
+            <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="bulkToggleAll(false)">Clear All</button>
           </div>
-          <button class="btn btn-primary" onclick="saveBulkAtt()">Selected dates ki attendance save karein</button>
+          <button class="btn btn-primary" onclick="saveBulkAtt()">Save Attendance for Selected Dates</button>
         </div>
       </div>
     </div>
@@ -356,20 +356,20 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       <div class="grid-flat">
         <div class="card">
           <div class="card-title">Holiday calendar</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Har Sunday automatically holiday hai. Iske alawa Stock Exchange (NSE/BSE) ki chuttiyan neeche list mein hain.</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Every Sunday is automatically a holiday. Stock Exchange (NSE/BSE) holidays are listed below in addition to that.</p>
           <div id="holiday-list"></div>
         </div>
         <div class="card admin-only" style="display:none">
-          <div class="card-title">Exchange holiday add karein</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">NSE/BSE jis din band rahega, woh date yahan add karein</p>
+          <div class="card-title">Add exchange holiday</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Add the date here for any day NSE/BSE will remain closed</p>
           <div class="form-row">
             <div class="field-inline"><label>Date</label><input type="date" id="hol-date"></div>
-            <div class="field-inline"><label>Naam (e.g. Diwali)</label><input type="text" id="hol-name" placeholder="Holiday ka naam"></div>
+            <div class="field-inline"><label>Name (e.g. Eid, Christmas)</label><input type="text" id="hol-name" placeholder="Holiday name"></div>
           </div>
-          <button class="btn btn-primary" style="width:100%" onclick="addHoliday()">Holiday add karein</button>
+          <button class="btn btn-primary" style="width:100%" onclick="addHoliday()">Add Holiday</button>
         </div>
         <div class="card">
-          <div class="card-title">Meri attendance — is mahine</div>
+          <div class="card-title">My Attendance — This Month</div>
           <div id="my-leave-summary"></div>
         </div>
       </div>
@@ -405,7 +405,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <hr class="divider">
           <div id="sal-result"></div>
-          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generate ho gaya! (Demo)')">Salary slip download</button>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generated! (Demo)')">Salary slip download</button>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
@@ -440,16 +440,16 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         </div>
         <div class="card admin-only" style="display:none">
           <div class="card-title">MF / SIP incentive rates</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Ek baar set karein, sab employees ke liye yahi rate use hoga</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Set once, this rate will be used for all employees</p>
           <div class="form-row">
             <div class="field-inline"><label>MF Sale incentive (%)</label><input type="number" step="0.1" id="mf-rate" placeholder="e.g. 0.5"></div>
             <div class="field-inline"><label>SIP incentive (%)</label><input type="number" step="0.1" id="sip-rate" placeholder="e.g. 0.5"></div>
           </div>
-          <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Rates save karein</button>
+          <button class="btn btn-primary" style="width:100%" onclick="saveRates()">Save Rates</button>
         </div>
         <div class="card admin-only" style="display:none">
           <div class="card-title">Monthly business figures (data entry)</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF and SIP figures come from here</p>
           <div class="compact-grid3">
             <div class="field-inline"><label>Month</label><input type="month" id="inc-month" onchange="loadIncEmp()"></div>
             <div class="field-inline"><label>Employee</label>
@@ -471,10 +471,10 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
             <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
             <div class="field-inline"><label>Other / Special (₹)</label><input type="number" id="inc-other" value="0" onchange="calcIncentive()"></div>
-            <div class="field-inline"><label>Remark</label><input type="text" id="inc-other-remark" placeholder="e.g. Diwali bonus, special target"></div>
+            <div class="field-inline"><label>Remark</label><input type="text" id="inc-other-remark" placeholder="e.g. Other Product, special target"></div>
           </div>
-          <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Business figures save karein</button>
-          <p style="font-size:11px;color:var(--text3);margin-top:8px">Salary change karne ke liye <a href="#" onclick="document.querySelector('.nav-tab[onclick*=employees]').click();return false" style="color:var(--accent)">Employees page</a> pe jaayein</p>
+          <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Save Business Figures</button>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">To change salary, go to the <a href="#" onclick="document.querySelector('.nav-tab[onclick*=employees]').click();return false" style="color:var(--accent)">Employees page</a></p>
           <hr class="divider">
           <div id="inc-result"></div>
         </div>
@@ -489,7 +489,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">Multi-month combined payment</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Jab ek saath kai mahine ka incentive pay karte ho (jaise May 1st week mein Jan+Feb+March ka), yahan se ek baar mein amount baant kar save karein. Payment pehle sabse purane mahine ke balance mein adjust hoga, phir uske baad wale mahine mein.</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">When you're paying incentive for multiple months together (e.g. Jan+Feb+March in the 1st week of May), split and save the amount in one go here. Payment will first adjust against the oldest month's balance, then the following months.</p>
           <div class="compact-grid3">
             <div class="field-inline"><label>Employee</label>
               <select id="mm-emp" onchange="renderMultiMonthSummary()">
@@ -509,9 +509,9 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <hr class="divider">
           <div id="mm-summary"></div>
-          <div class="field-inline" style="margin-top:10px"><label>Ab pay kar rahe hain (₹)</label><input type="number" id="mm-pay-amount" value="0" min="0" onchange="previewMultiMonthSplit()"></div>
+          <div class="field-inline" style="margin-top:10px"><label>Paying now (₹)</label><input type="number" id="mm-pay-amount" value="0" min="0" onchange="previewMultiMonthSplit()"></div>
           <div id="mm-split-preview" style="margin-top:8px"></div>
-          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="applyMultiMonthPayment()">Combined payment save karein</button>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="applyMultiMonthPayment()">Save Combined Payment</button>
         </div>
       </div>
     </div>
@@ -519,8 +519,8 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
     <!-- EMPLOYEES (admin only) -->
     <div id="page-employees" class="page">
       <div class="card" style="margin-bottom:1.25rem">
-        <div class="card-title">Access control — CRM aur HR Portal</div>
-        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Yahan se aap CRM ya HR Portal ko RM ke liye band/chalu kar sakte hain. Aapka (Admin) access kabhi band nahi hoga.</p>
+        <div class="card-title">Access control — CRM and HR Portal</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Here you can turn CRM or HR Portal access on/off for an RM. Your (Admin) access will never be turned off.</p>
         <div class="grid2" style="margin-bottom:0">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:var(--radius-sm)">
             <div>
@@ -549,7 +549,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         <button class="btn btn-primary" onclick="toggleAddForm()">+ Add employee</button>
       </div>
       <div id="add-emp-form" style="display:none" class="card">
-        <div class="card-title">New employee add karein</div>
+        <div class="card-title">Add new employee</div>
         <div class="form-row">
           <div class="field-inline"><label>Full name</label><input type="text" id="ne-name" placeholder="Priya Sharma"></div>
           <div class="field-inline"><label>Designation</label><input type="text" id="ne-role" placeholder="RM / Accountant"></div>
@@ -560,7 +560,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         </div>
         <div class="form-row">
           <div class="field-inline"><label>Basic salary (₹/month)</label><input type="number" id="ne-sal" placeholder="30000"></div>
-          <div class="field-inline"><label></label><p style="font-size:11px;color:var(--text3);margin-top:8px">Login username/PIN CRM mein add karein</p></div>
+          <div class="field-inline"><label></label><p style="font-size:11px;color:var(--text3);margin-top:8px">Add login username/PIN in CRM</p></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:4px">
           <button class="btn btn-primary" onclick="addEmployee()">Save</button>
@@ -599,22 +599,22 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             </table>
           </div>
           <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="downloadAttendanceSheet()">Excel download karein</button>
-            <button class="btn btn-danger" onclick="clearTodayAttendance()">Aaj ka attendance clear karein</button>
-            <button class="btn btn-danger" onclick="clearSelectedMonthAttendance()">Is mahine ka clear karein</button>
+            <button class="btn btn-primary" onclick="downloadAttendanceSheet()">Download Excel</button>
+            <button class="btn btn-danger" onclick="clearTodayAttendance()">Clear Today's Attendance</button>
+            <button class="btn btn-danger" onclick="clearSelectedMonthAttendance()">Clear This Month's Data</button>
           </div>
-          <p style="font-size:11px;color:var(--text3);margin-top:8px">"Aaj ka attendance clear karein" sirf <b id="att-clear-today-label"></b> ka data sabhi RMs ke liye hata dega. Is ke baad jo RM login karega uska attendance fresh auto-record hoga — purani dates is se affect nahi hongi.</p>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">"Clear Today's Attendance" will remove only <b id="att-clear-today-label"></b> data for all RMs. After this, any RM who logs in will get a fresh auto-recorded attendance — older dates won't be affected.</p>
 
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-            <div class="card-title" style="font-size:13px;color:var(--red)">Purana attendance data clear karein</div>
-            <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Date range select karke purani attendance history hata sakte hain — ye permanent hai, wapas nahi aayega.</p>
+            <div class="card-title" style="font-size:13px;color:var(--red)">Clear old attendance data</div>
+            <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Select a date range to remove old attendance history — this is permanent and cannot be undone.</p>
             <div class="form-row">
               <div class="field-inline"><label>From date</label><input type="date" id="att-clear-from"></div>
               <div class="field-inline"><label>To date</label><input type="date" id="att-clear-to"></div>
             </div>
             <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
-              <button class="btn btn-danger" onclick="clearDateRangeAttendance()">Is range ka data clear karein</button>
-              <button class="btn btn-danger" onclick="clearAllAttendance()">Saara attendance history clear karein</button>
+              <button class="btn btn-danger" onclick="clearDateRangeAttendance()">Clear Data for This Range</button>
+              <button class="btn btn-danger" onclick="clearAllAttendance()">Clear All Attendance History</button>
             </div>
           </div>
         </div>
@@ -623,7 +623,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="form-row single">
             <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
           </div>
-          <button class="btn btn-primary" onclick="alert('Salary report download ho raha hai... (Demo)')">Download Excel</button>
+          <button class="btn btn-primary" onclick="alert('Salary report downloading... (Demo)')">Download Excel</button>
         </div>
       </div>
     </div>
@@ -797,14 +797,14 @@ function getISTHour(){
 function officeWindowStatus(crmUser){
   const access=getAccessControl();
   if(access.hrEnabled===false){
-    return {open:false, reason:'Admin ne HR Portal abhi ke liye band kar diya hai'};
+    return {open:false, reason:'Admin has temporarily turned off HR Portal access'};
   }
   // If Admin has manually Activated/Deactivated this RM in CRM's Admin panel,
   // that override takes priority over the 8AM-7PM auto-schedule — exactly
   // like it already does inside the CRM itself.
   if(crmUser && crmUser.manualOverride){
     if(crmUser.active===false){
-      return {open:false, reason:'Admin ne aapko manually deactivate kiya hai'};
+      return {open:false, reason:'Admin has manually deactivated you'};
     }
     return {open:true};
   }
@@ -934,8 +934,8 @@ async function doLogin(){
   const username = document.getElementById('login-name').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value.trim();
   const errBox=document.getElementById('att-notice');
-  if(!username){alert('Username daalein');return}
-  if(!pass){alert('Password ya PIN daalein');return}
+  if(!username){alert('Please enter a username');return}
+  if(!pass){alert('Please enter a password or PIN');return}
 
   // Fetch CRM's users list from Firestore (collection: crm_data, doc: users) —
   // same credentials as DNInvest CRM, no separate HR login needed.
@@ -948,7 +948,7 @@ async function doLogin(){
   }catch(e){ console.log('CRM users fetch error:',e); }
 
   if(crmUsers.length===0){
-    alert('CRM se connect nahi ho paya. Internet check karein ya thodi der baad try karein.');
+    alert('Could not connect to CRM. Please check your internet or try again shortly.');
     return;
   }
 
@@ -959,7 +959,7 @@ async function doLogin(){
     return false;
   });
 
-  if(!user){ alert('Galat username ya password/PIN'); return; }
+  if(!user){ alert('Incorrect username or password/PIN'); return; }
 
   // Admin role in CRM => Admin in HR portal too — always allowed, no time restriction
   if(user.role==='admin'){
@@ -973,7 +973,7 @@ async function doLogin(){
   await fetchAccessControlOnce();
   const win=officeWindowStatus(user);
   if(!win.open){
-    alert('🔒 Office band hai\n\n'+win.reason+'\n\nKripya office time mein login karein.');
+    alert('🔒 Office is closed\n\n'+win.reason+'\n\nPlease login during office hours.');
     return;
   }
 
@@ -991,10 +991,10 @@ async function doLogin(){
     const holidayName=getHolidayName(td);
     if(holidayName){
       await saveAttRecord(name, {date:td,in:inTime,out:'',status:'Holiday'});
-      if(errBox){errBox.style.display='block';errBox.textContent='🎉 Aaj holiday hai ('+holidayName+'), attendance "Holiday" mark hui';}
+      if(errBox){errBox.style.display='block';errBox.textContent='🎉 Today is a holiday ('+holidayName+'), attendance marked as "Holiday"';}
     } else {
       await saveAttRecord(name, {date:td,in:inTime,out:'',status:'Present'});
-      if(errBox){errBox.style.display='block';errBox.textContent='✓ Aaj ki attendance automatically record ho gayi — in time: '+inTime;}
+      if(errBox){errBox.style.display='block';errBox.textContent='✓ Today\'s attendance auto-recorded — in time: '+inTime;}
     }
   }
   startApp();
@@ -1104,7 +1104,7 @@ async function updateOfficeStatusBanner(){
     banner.style.display='block';
     banner.style.background='var(--red-bg)';
     banner.style.color='var(--red-text)';
-    banner.innerHTML='🔒 <b>Office band hai</b><br>'+win.reason+'<br><span style="font-size:11px;opacity:0.8">Admin login hamesha allowed hai</span>';
+    banner.innerHTML='🔒 <b>Office is closed</b><br>'+win.reason+'<br><span style="font-size:11px;opacity:0.8">Admin login is always allowed</span>';
   }
 }
 updateOfficeStatusBanner();
@@ -1174,9 +1174,9 @@ function renderDashboard(){
   const myAtt=att[currentUser]&&att[currentUser].find(r=>r.date===td);
   const as=document.getElementById('dash-att-status');
   if(as){
-    if(todayHoliday) as.innerHTML='🎉 Aaj holiday hai — '+todayHoliday;
-    else if(myAtt) as.innerHTML='✓ Aaj ki attendance recorded — In: '+myAtt.in;
-    else as.innerHTML='⚠ Aaj attendance record nahi hua';
+    if(todayHoliday) as.innerHTML='🎉 Today is a holiday — '+todayHoliday;
+    else if(myAtt) as.innerHTML='✓ Today\'s attendance recorded — In: '+myAtt.in;
+    else as.innerHTML='⚠ Today\'s attendance not recorded yet';
   }
 
   // Today's status / next holiday
@@ -1186,12 +1186,12 @@ function renderDashboard(){
     const next=holidays[0];
     let html='';
     if(todayHoliday){
-      html+=`<div class="alert alert-amber" style="margin-bottom:8px">🎉 Aaj (${td}) holiday hai: <strong>${todayHoliday}</strong></div>`;
+      html+=`<div class="alert alert-amber" style="margin-bottom:8px">🎉 Today (${td}) is a holiday: <strong>${todayHoliday}</strong></div>`;
     }
     if(next){
-      html+=`<p style="font-size:13px">Agli holiday: <strong>${next.name}</strong> — ${next.date}</p>`;
+      html+=`<p style="font-size:13px">Next holiday: <strong>${next.name}</strong> — ${next.date}</p>`;
     } else if(!todayHoliday){
-      html+=`<p style="color:var(--text2);font-size:13px">Koi upcoming exchange holiday list mein nahi hai</p>`;
+      html+=`<p style="color:var(--text2);font-size:13px">No upcoming exchange holiday in the list</p>`;
     }
     pl.innerHTML=html;
   }
@@ -1220,7 +1220,7 @@ function renderAttendancePage(){
   // Log
   const al=document.getElementById('my-att-log');
   if(al){
-    if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">Koi record nahi</td></tr>'}
+    if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records</td></tr>'}
     else al.innerHTML=myRecs.slice(0,20).map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
       const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
@@ -1390,9 +1390,9 @@ async function clearSelectedMonthAttendance(){
   const monthSel=document.getElementById('att-rpt-month');
   const ym=monthSel ? (monthSel.value || attMonthOptions()[0]) : today().slice(0,7);
   const label=attMonthLabel(ym);
-  if(!confirm(label+' ka poora attendance data SABHI RMs ke liye clear ho jayega.\n\nYe wapas nahi aa sakta. Confirm karein?')) return;
+  if(!confirm('All attendance data for '+label+' will be cleared for ALL RMs.\n\nThis cannot be undone. Confirm?')) return;
   const removed=await clearAttendanceWhere(r=>r.date.startsWith(ym));
-  alert(removed ? (label+' ka attendance clear ho gaya.') : (label+' mein koi record mila hi nahi.'));
+  alert(removed ? ('Attendance for '+label+' has been cleared.') : ('No records were found for '+label+'.'));
 }
 
 // Clears attendance between two dates (inclusive), across all RMs.
@@ -1400,20 +1400,20 @@ async function clearDateRangeAttendance(){
   if(!isAdmin) return;
   const from=document.getElementById('att-clear-from').value;
   const to=document.getElementById('att-clear-to').value;
-  if(!from || !to){ alert('Pehle From date aur To date dono select karein.'); return; }
-  if(from>to){ alert('From date, To date se pehle honi chahiye.'); return; }
-  if(!confirm(from+' se '+to+' tak ka attendance data SABHI RMs ke liye clear ho jayega.\n\nYe wapas nahi aa sakta. Confirm karein?')) return;
+  if(!from || !to){ alert('Please select both From date and To date.'); return; }
+  if(from>to){ alert('From date must be before To date.'); return; }
+  if(!confirm('Attendance data from '+from+' to '+to+' will be cleared for ALL RMs.\n\nThis cannot be undone. Confirm?')) return;
   const removed=await clearAttendanceWhere(r=>r.date>=from && r.date<=to);
-  alert(removed ? ('Is range ('+from+' se '+to+') ka attendance clear ho gaya.') : 'Is range mein koi record mila hi nahi.');
+  alert(removed ? ('Attendance for this range ('+from+' to '+to+') has been cleared.') : 'No records were found in this range.');
 }
 
 // Nuclear option: wipes the ENTIRE attendance history for every RM.
 async function clearAllAttendance(){
   if(!isAdmin) return;
-  if(!confirm('⚠ SAARA attendance history — sabhi RMs ka, sabhi dates ka — permanently clear ho jayega.\n\nYe action wapas nahi ho sakta. Pakka clear karna hai?')) return;
-  if(!confirm('Final confirmation: poora attendance data delete karein?')) return;
+  if(!confirm('⚠ The ENTIRE attendance history — for all RMs, all dates — will be permanently cleared.\n\nThis action cannot be undone. Are you sure you want to clear it?')) return;
+  if(!confirm('Final confirmation: delete the entire attendance data?')) return;
   const removed=await clearAttendanceWhere(()=>true);
-  alert(removed ? 'Saara attendance history clear ho gaya.' : 'Pehle se hi koi attendance record nahi tha.');
+  alert(removed ? 'All attendance history has been cleared.' : 'There was no attendance record to begin with.');
 }
 
 // Removes TODAY's attendance record for every employee (all RMs), keeping all
@@ -1423,9 +1423,9 @@ async function clearAllAttendance(){
 async function clearTodayAttendance(){
   if(!isAdmin) return;
   const td=today();
-  if(!confirm('Aaj ('+td+') ka attendance data SABHI RMs ke liye clear ho jayega.\n\nPurani dates ka data safe rahega. Aage RM jab login karenge to unka attendance fresh auto-record ho jayega.\n\nConfirm karein?')) return;
+  if(!confirm('Today\'s ('+td+') attendance data will be cleared for ALL RMs.\n\nOlder dates\' data will remain safe. When an RM logs in next, their attendance will be freshly auto-recorded.\n\nConfirm?')) return;
   const removed=await clearAttendanceWhere(r=>r.date===td);
-  alert(removed ? 'Aaj ka attendance clear ho gaya. RM dobara login karenge to fresh mark hoga.' : 'Aaj ka koi attendance record mila hi nahi — pehle se clear hai.');
+  alert(removed ? 'Today\'s attendance has been cleared. It will be freshly marked when the RM logs in again.' : 'No attendance record found for today — it\'s already clear.');
 }
 
 // When admin picks a date in the manual attendance form, auto-fill the default
@@ -1453,7 +1453,7 @@ async function saveManualAtt(){
   const rec={date,in:inT,out:outT,status};
   await saveAttRecord(emp, rec);
   renderDashboard();renderAttendancePage();
-  alert(`${emp} ki ${date} ki attendance save ho gayi!`);
+  alert(`Attendance for ${emp} on ${date} has been saved!`);
 }
 
 // ─── BULK ATTENDANCE (multiple dates, one employee, one status) ──────────────
@@ -1467,7 +1467,7 @@ function renderBulkDateList(){
   const listEl=document.getElementById('bulk-date-list');
   const actEl=document.getElementById('bulk-date-actions');
   if(!fromStr || !toStr){ listEl.style.display='none'; actEl.style.display='none'; listEl.innerHTML=''; return; }
-  if(toStr<fromStr){ alert('To date, From date se pehle nahi ho sakti'); listEl.style.display='none'; actEl.style.display='none'; return; }
+  if(toStr<fromStr){ alert('To date cannot be before From date'); listEl.style.display='none'; actEl.style.display='none'; return; }
   const holidaySet=new Set(getHolidays().map(h=>h.date));
   const holidayNameMap={}; getHolidays().forEach(h=>holidayNameMap[h.date]=h.name);
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1505,13 +1505,13 @@ async function saveBulkAtt(){
   const inT=document.getElementById('bulk-in').value;
   const outT=document.getElementById('bulk-out').value;
   const dates=Array.from(document.querySelectorAll('.bulk-date-chk:checked')).map(cb=>cb.value);
-  if(!dates.length){ alert('Kam se kam ek date select karein'); return; }
-  if(!confirm(`${emp} ki ${dates.length} date(s) ki attendance "${status}" mark ho jayegi. Confirm karein?`)) return;
+  if(!dates.length){ alert('Please select at least one date'); return; }
+  if(!confirm(`Attendance for ${emp} on ${dates.length} date(s) will be marked "${status}". Confirm?`)) return;
   for(const d of dates){
     await saveAttRecord(emp, {date:d, in:inT, out:outT, status});
   }
   renderDashboard(); renderAttendancePage();
-  alert(`${emp} ki ${dates.length} date(s) ki attendance save ho gayi!`);
+  alert(`Attendance for ${emp} on ${dates.length} date(s) has been saved!`);
 }
 
 // ─── LEAVE ───────────────────────────────────────────────────────────────────
@@ -1542,7 +1542,7 @@ function renderLeavePage(){
     }
     html+='</table>';
     if(!upcoming.length && !past.length){
-      html+='<p style="font-size:12px;color:var(--text3);margin-top:6px">Koi exchange holiday abhi add nahi hui</p>';
+      html+='<p style="font-size:12px;color:var(--text3);margin-top:6px">No exchange holiday added yet</p>';
     }
     hl.innerHTML=html;
   }
@@ -1564,8 +1564,8 @@ function renderLeavePage(){
     mls.innerHTML=`
       <table style="width:100%;font-size:13px">
         <tr><td style="color:var(--text2);padding:5px 0">Present days</td><td style="text-align:right">${present}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">Sundays is mahine</td><td style="text-align:right">${sundaysInMonth}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">Exchange holidays is mahine</td><td style="text-align:right">${holidaysInMonth}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Sundays this month</td><td style="text-align:right">${sundaysInMonth}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Exchange holidays this month</td><td style="text-align:right">${holidaysInMonth}</td></tr>
       </table>`;
   }
 }
@@ -1583,16 +1583,16 @@ function countSundaysInMonth(yyyyMm){
 async function addHoliday(){
   const date=document.getElementById('hol-date').value;
   const name=document.getElementById('hol-name').value.trim();
-  if(!date||!name){alert('Date aur naam dono daalein');return}
-  if(isSunday(date)){alert('Yeh date pehle se Sunday hai, alag se add karne ki zaroorat nahi');return}
+  if(!date||!name){alert('Please enter both date and name');return}
+  if(isSunday(date)){alert('This date is already a Sunday, no need to add it separately');return}
   const holidays=getHolidays();
-  if(holidays.find(h=>h.date===date)){alert('Yeh date pehle se list mein hai');return}
+  if(holidays.find(h=>h.date===date)){alert('This date is already in the list');return}
   holidays.push({date,name});
   await saveHolidays(holidays);
   document.getElementById('hol-date').value='';
   document.getElementById('hol-name').value='';
   renderLeavePage();renderDashboard();
-  alert('Holiday add ho gayi: '+name+' ('+date+')');
+  alert('Holiday added: '+name+' ('+date+')');
 }
 
 async function removeHoliday(date){
@@ -1649,7 +1649,7 @@ function renderSalaryPage(){
         <tr><td style="color:var(--text2);padding:6px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(paid)}</td></tr>
         <tr><td style="padding:6px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td></tr>
       </table>
-      <p style="font-size:11px;color:var(--text3);margin-top:8px">Is mahine ka estimate — final admin se confirm hoga</p>`;
+      <p style="font-size:11px;color:var(--text3);margin-top:8px">This month's estimate — final figure to be confirmed by admin</p>`;
   }
 
   if(isAdmin){
@@ -1874,7 +1874,7 @@ function renderMultiMonthSummary(){
   if(!sel||!from||!to||!out) return;
   const months=monthsInRange(from.value, to.value);
   if(months.length===0){
-    out.innerHTML='<p style="font-size:12px;color:var(--text3)">From aur To month select karein</p>';
+    out.innerHTML='<p style="font-size:12px;color:var(--text3)">Select From and To month</p>';
     return;
   }
   const name=sel.value;
@@ -1918,13 +1918,13 @@ function previewMultiMonthSplit(){
   const {allocation, leftover}=computeMultiMonthSplit(name, months, payAmount);
   const mLabel=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
   out.innerHTML=`
-    <p style="font-size:11px;color:var(--text3);margin-bottom:4px">Ye amount is tarah baatega:</p>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:4px">This amount will be split as follows:</p>
     <table style="font-size:12.5px;width:100%">
       <tbody>
         ${allocation.map(a=>`<tr><td>${mLabel(a.month)}</td><td style="text-align:right;color:${a.allocated>0?'var(--green)':'var(--text3)'}">${a.allocated>0?'+ '+fmt(a.allocated):'—'}</td><td style="text-align:right;color:var(--text3);font-size:11px">naya balance: ${fmt(a.newBalance)}</td></tr>`).join('')}
       </tbody>
     </table>
-    ${leftover>0?`<p style="font-size:11.5px;color:var(--accent);margin-top:6px">Extra ${fmt(leftover)} bach raha hai (sabhi mahino ka balance clear ho chuka). Ye allocate nahi hoga.</p>`:''}`;
+    ${leftover>0?`<p style="font-size:11.5px;color:var(--accent);margin-top:6px">Extra ${fmt(leftover)} remaining (all months' balance cleared). This will not be allocated.</p>`:''}`;
 }
 
 async function applyMultiMonthPayment(){
@@ -1933,10 +1933,10 @@ async function applyMultiMonthPayment(){
   const to=document.getElementById('mm-to');
   const payEl=document.getElementById('mm-pay-amount');
   const months=monthsInRange(from.value, to.value);
-  if(months.length===0){ alert('Pehle From aur To month select karein'); return; }
+  if(months.length===0){ alert('Please select From and To month first'); return; }
   const name=sel.value;
   const payAmount=parseInt(payEl.value)||0;
-  if(payAmount<=0){ alert('Payment amount 0 se zyada honi chahiye'); return; }
+  if(payAmount<=0){ alert('Payment amount must be greater than 0'); return; }
   const {allocation}=computeMultiMonthSplit(name, months, payAmount);
   for(const a of allocation){
     if(a.allocated>0){
@@ -1944,7 +1944,7 @@ async function applyMultiMonthPayment(){
     }
   }
   const mLabel=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
-  alert(name+' ke liye '+fmt(payAmount)+' ('+mLabel(months[0])+' se '+mLabel(months[months.length-1])+') save ho gaya!');
+  alert('Saved '+fmt(payAmount)+' for '+name+' ('+mLabel(months[0])+' to '+mLabel(months[months.length-1])+')!');
   renderMultiMonthSummary();
   renderIncentivePage();
 }
@@ -1954,7 +1954,7 @@ async function saveRates(){
   const sipRate=parseFloat(document.getElementById('sip-rate').value)||0;
   await saveIncRates({mfRate,sipRate});
   renderIncentivePage();
-  alert('Rates save ho gaye! MF: '+mfRate+'%, SIP: '+sipRate+'%');
+  alert('Rates saved! MF: '+mfRate+'%, SIP: '+sipRate+'%');
 }
 
 function loadIncEmp(){
@@ -1993,7 +1993,7 @@ async function saveMfSipData(){
   calcIncentive();
   renderIncentivePage();
   const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-  alert(name+' ke '+mLabel+' ke business figures save ho gaye!');
+  alert(name+'\'s business figures for '+mLabel+' have been saved!');
 }
 
 function calcIncentive(){
@@ -2068,21 +2068,21 @@ async function renderAccessControl(){
 
   const crmLabel=document.getElementById('crm-status-label');
   const hrLabel=document.getElementById('hr-status-label');
-  if(crmLabel){ crmLabel.textContent = crmOn ? 'RM ke liye chalu hai' : 'RM ke liye band hai'; crmLabel.style.color = crmOn ? 'var(--green)' : 'var(--red)'; }
-  if(hrLabel){ hrLabel.textContent = hrOn ? 'RM ke liye chalu hai' : 'RM ke liye band hai'; hrLabel.style.color = hrOn ? 'var(--green)' : 'var(--red)'; }
+  if(crmLabel){ crmLabel.textContent = crmOn ? 'Enabled for RM' : 'Disabled for RM'; crmLabel.style.color = crmOn ? 'var(--green)' : 'var(--red)'; }
+  if(hrLabel){ hrLabel.textContent = hrOn ? 'Enabled for RM' : 'Disabled for RM'; hrLabel.style.color = hrOn ? 'var(--green)' : 'var(--red)'; }
 }
 
 async function toggleCrmAccess(checked){
   await setAccessControl({crmEnabled:checked});
   renderAccessControl();
-  alert('CRM ab RM ke liye '+(checked?'chalu':'band')+' kar diya gaya hai.\n\nAapka (Admin) access hamesha chalu rahega.');
+  alert('CRM has been '+(checked?'enabled':'disabled')+' for this RM.\n\nYour (Admin) access will always remain enabled.');
 }
 
 async function toggleHrAccess(checked){
   await setAccessControl({hrEnabled:checked});
   renderAccessControl();
   updateOfficeStatusBanner();
-  alert('HR Portal ab RM ke liye '+(checked?'chalu':'band')+' kar diya gaya hai.\n\nAapka (Admin) access hamesha chalu rahega.');
+  alert('HR Portal has been '+(checked?'enabled':'disabled')+' for this RM.\n\nYour (Admin) access will always remain enabled.');
 }
 
 async function saveEmpSalary(name){
@@ -2091,7 +2091,7 @@ async function saveEmpSalary(name){
   renderEmployees();
   renderSalaryPage();
   renderIncentivePage();
-  alert(name+' ki salary set ho gayi: '+fmt(parseInt(val)||0)+'\n\nYeh sab RM ke device par turant update ho jayegi.');
+  alert(name+'\'s salary has been set to: '+fmt(parseInt(val)||0)+'\n\nThis will update instantly on the RM\'s device.');
 }
 
 function toggleAddForm(){
@@ -2100,10 +2100,10 @@ function toggleAddForm(){
 }
 function addEmployee(){
   const name=document.getElementById('ne-name').value.trim();
-  if(!name){alert('Naam daalen');return}
+  if(!name){alert('Please enter a name');return}
   EMPLOYEES.push({name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000});
   toggleAddForm();renderEmployees();
-  alert(name+' add ho gaya!\n\nLogin ke liye CRM mein bhi naya user banayein, taaki yahan login ho sake.');
+  alert(name+' added!\n\nAlso create a new user in CRM for login, so they can log in here too.');
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
