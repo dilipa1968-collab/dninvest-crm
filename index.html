@@ -1604,6 +1604,17 @@ function v(x){ return (x!=null&&x!=='')?x:'—'; }
 document.getElementById('lpwd').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('lusr').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('lpwd').focus(); });
 
+// Detects if the current device is a mobile/handheld device using a
+// combination of User-Agent sniffing AND screen width. Both signals are
+// checked together so that e.g. a desktop browser window resized small
+// is not wrongly blocked, and a mobile browser spoofing UA is still
+// caught by the screen-size check (and vice versa).
+function isMobileDevice(){
+  const uaMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+  const smallScreen = Math.min(window.innerWidth, window.innerHeight) < 768;
+  return uaMobile && smallScreen;
+}
+
 async function doLogin(){
   const u = document.getElementById('lusr').value.trim().toLowerCase();
   const p = document.getElementById('lpwd').value;
@@ -1625,6 +1636,12 @@ async function doLogin(){
       const blocked = await isCrmBlockedForRm();
       if(blocked){
         document.getElementById('lerr').textContent='🔒 CRM abhi Admin ne band kar rakha hai. Kripya baad mein try karein.';
+        document.getElementById('lerr').style.display='block';
+        return;
+      }
+      // RM can only login from desktop — mobile devices are blocked.
+      if(isMobileDevice()){
+        document.getElementById('lerr').textContent='💻 CRM sirf Desktop/Laptop se login hoga. Mobile se login allowed nahi hai.';
         document.getElementById('lerr').style.display='block';
         return;
       }
@@ -1810,6 +1827,12 @@ function tryAutoLogin(){
       const users = DB.get('users') || DEFAULT_USERS;
       const user = users.find(x=>x.username===username && x.password===password && x.active!==false);
       if(user){
+        // Don't auto-login RMs on mobile — force them back to the login
+        // screen so the desktop-only restriction in doLogin() applies.
+        if(user.role!=='admin' && isMobileDevice()){
+          sessionStorage.removeItem('dninvest_session');
+          return;
+        }
         CU = user;
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').style.display='block';
