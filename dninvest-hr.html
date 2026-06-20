@@ -542,8 +542,22 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="downloadAttendanceSheet()">Excel download karein</button>
             <button class="btn btn-danger" onclick="clearTodayAttendance()">Aaj ka attendance clear karein</button>
+            <button class="btn btn-danger" onclick="clearSelectedMonthAttendance()">Is mahine ka clear karein</button>
           </div>
           <p style="font-size:11px;color:var(--text3);margin-top:8px">"Aaj ka attendance clear karein" sirf <b id="att-clear-today-label"></b> ka data sabhi RMs ke liye hata dega. Is ke baad jo RM login karega uska attendance fresh auto-record hoga — purani dates is se affect nahi hongi.</p>
+
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div class="card-title" style="font-size:13px;color:var(--red)">Purana attendance data clear karein</div>
+            <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Date range select karke purani attendance history hata sakte hain — ye permanent hai, wapas nahi aayega.</p>
+            <div class="form-row">
+              <div class="field-inline"><label>From date</label><input type="date" id="att-clear-from"></div>
+              <div class="field-inline"><label>To date</label><input type="date" id="att-clear-to"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+              <button class="btn btn-danger" onclick="clearDateRangeAttendance()">Is range ka data clear karein</button>
+              <button class="btn btn-danger" onclick="clearAllAttendance()">Saara attendance history clear karein</button>
+            </div>
+          </div>
         </div>
         <div class="card">
           <div class="card-title">Salary report</div>
@@ -1242,6 +1256,64 @@ function downloadAttendanceSheet(){
   URL.revokeObjectURL(url);
 }
 
+// Common helper: removes any attendance record matching `predicate(record)`
+// across ALL employees, syncs to Firestore + localStorage, then refreshes the
+// UI. Returns true if anything was actually removed.
+async function clearAttendanceWhere(predicate){
+  const att=getAtt();
+  let changed=false;
+  EMPLOYEES.forEach(e=>{
+    const recs=att[e.name];
+    if(!recs) return;
+    const kept=recs.filter(r=>!predicate(r));
+    if(kept.length!==recs.length){ att[e.name]=kept; changed=true; }
+  });
+  if(!changed) return false;
+
+  DB.setLocal('attendance', att);
+  try{
+    if(typeof fdb!=='undefined'){
+      await fdb.collection('hr_data').doc('attendance').set({data:att, updated:new Date().toISOString()});
+    }
+  }catch(e){ console.log('clearAttendanceWhere sync error:', e); }
+
+  renderAttendanceSheet();
+  renderAttendancePage();
+  return true;
+}
+
+// Clears attendance for the month currently selected in the Reports grid.
+async function clearSelectedMonthAttendance(){
+  if(!isAdmin) return;
+  const monthSel=document.getElementById('att-rpt-month');
+  const ym=monthSel ? (monthSel.value || attMonthOptions()[0]) : today().slice(0,7);
+  const label=attMonthLabel(ym);
+  if(!confirm(label+' ka poora attendance data SABHI RMs ke liye clear ho jayega.\n\nYe wapas nahi aa sakta. Confirm karein?')) return;
+  const removed=await clearAttendanceWhere(r=>r.date.startsWith(ym));
+  alert(removed ? (label+' ka attendance clear ho gaya.') : (label+' mein koi record mila hi nahi.'));
+}
+
+// Clears attendance between two dates (inclusive), across all RMs.
+async function clearDateRangeAttendance(){
+  if(!isAdmin) return;
+  const from=document.getElementById('att-clear-from').value;
+  const to=document.getElementById('att-clear-to').value;
+  if(!from || !to){ alert('Pehle From date aur To date dono select karein.'); return; }
+  if(from>to){ alert('From date, To date se pehle honi chahiye.'); return; }
+  if(!confirm(from+' se '+to+' tak ka attendance data SABHI RMs ke liye clear ho jayega.\n\nYe wapas nahi aa sakta. Confirm karein?')) return;
+  const removed=await clearAttendanceWhere(r=>r.date>=from && r.date<=to);
+  alert(removed ? ('Is range ('+from+' se '+to+') ka attendance clear ho gaya.') : 'Is range mein koi record mila hi nahi.');
+}
+
+// Nuclear option: wipes the ENTIRE attendance history for every RM.
+async function clearAllAttendance(){
+  if(!isAdmin) return;
+  if(!confirm('⚠ SAARA attendance history — sabhi RMs ka, sabhi dates ka — permanently clear ho jayega.\n\nYe action wapas nahi ho sakta. Pakka clear karna hai?')) return;
+  if(!confirm('Final confirmation: poora attendance data delete karein?')) return;
+  const removed=await clearAttendanceWhere(()=>true);
+  alert(removed ? 'Saara attendance history clear ho gaya.' : 'Pehle se hi koi attendance record nahi tha.');
+}
+
 // Removes TODAY's attendance record for every employee (all RMs), keeping all
 // past history intact. After this, the next time each RM logs in (CRM or HR
 // Portal), the existing "already marked today?" check will find nothing for
@@ -1250,28 +1322,8 @@ async function clearTodayAttendance(){
   if(!isAdmin) return;
   const td=today();
   if(!confirm('Aaj ('+td+') ka attendance data SABHI RMs ke liye clear ho jayega.\n\nPurani dates ka data safe rahega. Aage RM jab login karenge to unka attendance fresh auto-record ho jayega.\n\nConfirm karein?')) return;
-
-  const att=getAtt();
-  let changed=false;
-  EMPLOYEES.forEach(e=>{
-    const recs=att[e.name];
-    if(recs && recs.some(r=>r.date===td)){
-      att[e.name]=recs.filter(r=>r.date!==td);
-      changed=true;
-    }
-  });
-  if(!changed){ alert('Aaj ka koi attendance record mila hi nahi — pehle se clear hai.'); return; }
-
-  DB.setLocal('attendance', att);
-  try{
-    if(typeof fdb!=='undefined'){
-      await fdb.collection('hr_data').doc('attendance').set({data:att, updated:new Date().toISOString()});
-    }
-  }catch(e){ console.log('clearTodayAttendance sync error:', e); }
-
-  alert('Aaj ka attendance clear ho gaya. RM dobara login karenge to fresh mark hoga.');
-  renderAttendanceSheet();
-  renderAttendancePage();
+  const removed=await clearAttendanceWhere(r=>r.date===td);
+  alert(removed ? 'Aaj ka attendance clear ho gaya. RM dobara login karenge to fresh mark hoga.' : 'Aaj ka koi attendance record mila hi nahi — pehle se clear hai.');
 }
 
 // When admin picks a date in the manual attendance form, auto-fill the default
