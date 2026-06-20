@@ -901,6 +901,25 @@ function attTime5(){
   const n=new Date(Date.now()-5*60*1000);
   return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
 }
+
+// Returns badge class for a "Present" record based on login time vs cutoffs.
+// Mon-Fri: green 8:45-8:54, blue 8:55-8:59, yellow (amber) >= 9:00. Before 8:45 also green.
+// Saturday: green before 10:00, blue 10:00-10:14, yellow (amber) >= 10:15
+// Status text stays "Present" — only the badge color reflects punctuality.
+function presentBadgeClass(rec){
+  if(!rec || rec.status!=='Present' || !rec.in) return 'badge-green';
+  const [h,m]=rec.in.split(':').map(Number);
+  if(isNaN(h)||isNaN(m)) return 'badge-green';
+  const mins=h*60+m;
+  const day=rec.date ? new Date(rec.date+'T00:00:00').getDay() : null; // 0=Sun..6=Sat
+  let blueCutoff, amberCutoff;
+  if(day===6){ blueCutoff=10*60; amberCutoff=10*60+15; }       // Saturday: 10:00 / 10:15
+  else { blueCutoff=8*60+55; amberCutoff=9*60; }                // Mon-Fri: 8:55 / 9:00
+  if(mins>=amberCutoff) return 'badge-amber';
+  if(mins>=blueCutoff) return 'badge-blue';
+  return 'badge-green';
+}
+
 function daysBetween(f,t){
   const ms=new Date(t)-new Date(f);
   return Math.max(1,Math.round(ms/86400000)+1);
@@ -1145,7 +1164,7 @@ function renderDashboard(){
       const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
       let badge='',inT='—';
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
-      else if(rec&&rec.status==='Present'){badge='<span class="badge badge-green">Present</span>';inT=rec.in}
+      else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
       else{badge='<span class="badge badge-red">Absent</span>'}
       tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
     });
@@ -1204,7 +1223,7 @@ function renderAttendancePage(){
     if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">Koi record nahi</td></tr>'}
     else al.innerHTML=myRecs.slice(0,20).map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
-      const badge=r.status==='Present'?'badge-green':r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
+      const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
       return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td></tr>`;
     }).join('');
   }
@@ -1298,7 +1317,7 @@ function renderAttendanceSheet(){
       const r=byDate[dateStr];
       if(r){
         const short=ATT_STATUS_SHORT[r.status]||r.status[0];
-        const badge=ATT_STATUS_BADGE[r.status]||'badge-gray';
+        const badge=r.status==='Present'?presentBadgeClass(r):(ATT_STATUS_BADGE[r.status]||'badge-gray');
         row+=`<td style="text-align:center" title="${r.status}${r.in?' — In: '+r.in:''}${r.out?', Out: '+r.out:''}"><span class="badge ${badge}" style="padding:1px 6px">${short}</span></td>`;
       } else {
         row+='<td style="text-align:center;color:var(--text3)">·</td>';
