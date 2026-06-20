@@ -470,6 +470,8 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="0"></div>
             <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
             <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
+            <div class="field-inline"><label>Other / Special (₹)</label><input type="number" id="inc-other" value="0" onchange="calcIncentive()"></div>
+            <div class="field-inline"><label>Remark</label><input type="text" id="inc-other-remark" placeholder="e.g. Diwali bonus, special target"></div>
           </div>
           <button class="btn btn-primary" style="width:100%" onclick="saveMfSipData()">Business figures save karein</button>
           <p style="font-size:11px;color:var(--text3);margin-top:8px">Salary change karne ke liye <a href="#" onclick="document.querySelector('.nav-tab[onclick*=employees]').click();return false" style="color:var(--accent)">Employees page</a> pe jaayein</p>
@@ -480,7 +482,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -1685,14 +1687,16 @@ function totalIncentive(name, salary, month){
   const demat = mfsip.demat!==undefined ? mfsip.demat : 0;
   const mf = mfsip.mf||0;
   const sip = mfsip.sip||0;
+  const other = mfsip.other||0;
+  const otherRemark = mfsip.otherRemark||'';
 
   const br=brokerageIncentive(salary,brok);
   const dematInc = demat*DEMAT_RATE;
   const mfInc = mf*(rates.mfRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
-  const total = br.total + dematInc + mfInc + sipInc;
+  const total = br.total + dematInc + mfInc + sipInc + other;
 
-  return {brok, demat, mf, sip, br, dematInc, mfInc, sipInc, total};
+  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, total};
 }
 
 function viewIncMonth(){
@@ -1732,6 +1736,7 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">Demat opening (${t.demat} × ₹600)</td><td style="text-align:right">${fmt(t.dematInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
@@ -1760,6 +1765,7 @@ function renderIncentivePage(){
           <td>${tt.demat}</td>
           <td>${fmt(tt.mf)}</td>
           <td>${fmt(tt.sip)}</td>
+          <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other)}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
           <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
@@ -1807,6 +1813,8 @@ function loadIncEmp(){
   document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:0;
   document.getElementById('inc-mf').value = mfsip.mf||0;
   document.getElementById('inc-sip').value = mfsip.sip||0;
+  document.getElementById('inc-other').value = mfsip.other||0;
+  document.getElementById('inc-other-remark').value = mfsip.otherRemark||'';
   calcIncentive();
 }
 
@@ -1818,9 +1826,11 @@ async function saveMfSipData(){
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
   const sip=parseInt(document.getElementById('inc-sip').value)||0;
+  const other=parseInt(document.getElementById('inc-other').value)||0;
+  const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
   const all=getMfSipByMonth();
   if(!all[month]) all[month]={};
-  all[month][name]={brok,demat,mf,sip};
+  all[month][name]={brok,demat,mf,sip,other,otherRemark};
   await saveMfSipByMonth(all);
   calcIncentive();
   renderIncentivePage();
@@ -1837,13 +1847,15 @@ function calcIncentive(){
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
   const sip=parseInt(document.getElementById('inc-sip').value)||0;
+  const other=parseInt(document.getElementById('inc-other').value)||0;
+  const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
   const rates=getIncRates();
 
   const br=brokerageIncentive(salary,brok);
   const dematInc=demat*DEMAT_RATE;
   const mfInc=mf*(rates.mfRate||0)/100;
   const sipInc=sip*(rates.sipRate||0)/100;
-  const total=br.total+dematInc+mfInc+sipInc;
+  const total=br.total+dematInc+mfInc+sipInc+other;
 
   const el=document.getElementById('inc-result');
   if(el) el.innerHTML=`
@@ -1854,6 +1866,7 @@ function calcIncentive(){
       <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ₹600)</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">MF incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">SIP incentive (${rates.sipRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(sipInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Other / Special${otherRemark?' ('+otherRemark+')':''}</td><td style="text-align:right;color:var(--green)">+ ${fmt(other)}</td></tr>
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(total)}</td></tr>
     </table>`;
 }
