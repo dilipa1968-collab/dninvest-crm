@@ -310,11 +310,11 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             </div>
           </div>
           <div class="form-row">
-            <div class="field-inline"><label>In time</label><input type="time" id="man-in" value="09:00"></div>
+            <div class="field-inline"><label>In time</label><input type="time" id="man-in" value="08:45"></div>
             <div class="field-inline"><label>Out time</label><input type="time" id="man-out" value="18:00"></div>
           </div>
           <div class="form-row single">
-            <div class="field-inline"><label>Date</label><input type="date" id="man-date"></div>
+            <div class="field-inline"><label>Date</label><input type="date" id="man-date" onchange="setManualTimesByDate()"></div>
           </div>
           <button class="btn btn-primary" onclick="saveManualAtt()">Attendance save karein</button>
         </div>
@@ -356,7 +356,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Salary calculator</div>
           <div class="compact-grid3">
             <div class="field-inline"><label>Employee</label>
-              <select id="sal-emp" onchange="calcSalary()">
+              <select id="sal-emp" onchange="document.getElementById('sal-absent').dataset.touched='';calcSalary()">
                 <option value="Puja">Puja</option>
                 <option value="Rohit">Rohit</option>
                 <option value="Raju">Raju</option>
@@ -368,8 +368,8 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
                 <option value="Anjali">Anjali</option>
               </select>
             </div>
-            <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
-            <div class="field-inline"><label>Absent days</label><input type="number" id="sal-absent" value="0" min="0" max="30" onchange="calcSalary()"></div>
+            <div class="field-inline"><label>Month</label><input type="month" id="sal-month" onchange="document.getElementById('sal-absent').dataset.touched='';calcSalary()"></div>
+            <div class="field-inline"><label>Absent days</label><input type="number" id="sal-absent" value="0" min="0" max="30" oninput="this.dataset.touched='1'" onchange="calcSalary()"></div>
             <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
           </div>
           <hr class="divider">
@@ -419,6 +419,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Monthly business figures (data entry)</div>
           <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Brokerage, demat, MF aur SIP figures yahan se aati hain</p>
           <div class="compact-grid3">
+            <div class="field-inline"><label>Month</label><input type="month" id="inc-month" onchange="loadIncEmp()"></div>
             <div class="field-inline"><label>Employee</label>
               <select id="inc-emp" onchange="loadIncEmp()">
                 <option value="Riya">Riya</option>
@@ -605,7 +606,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','pins','mfsip','inc_rates'];
+    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -737,6 +738,22 @@ async function setEmpSalary(name,val){
 }
 function getMfSip(){ return DB.get('mfsip', {}) || {}; }
 async function saveMfSip(d){ await DB.set('mfsip', d); }
+
+// Month-aware business figures. Data is stored as:
+//   mfsip_by_month = { "2026-04": { Riya: {brok,demat,mf,sip}, ... }, "2026-05": {...} }
+// The selected month comes from the #inc-month picker (defaults to current month).
+function getMfSipByMonth(){ return DB.get('mfsip_by_month', {}) || {}; }
+async function saveMfSipByMonth(d){ await DB.set('mfsip_by_month', d); }
+function currentIncMonth(){
+  const el=document.getElementById('inc-month');
+  if(el && el.value) return el.value;
+  return today().slice(0,7); // YYYY-MM
+}
+function getMfSipForMonth(month){
+  const all=getMfSipByMonth();
+  return all[month] || {};
+}
+
 function getIncRates(){ return DB.get('inc_rates', {mfRate:0, sipRate:0}) || {mfRate:0, sipRate:0}; }
 async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
@@ -869,7 +886,12 @@ function startApp(){
 
   // set today's date on manual form
   const md=document.getElementById('man-date');
-  if(md) md.value=today();
+  if(md){ md.value=today(); setManualTimesByDate(); }
+
+  // Default month pickers (Salary & Incentive) to current month
+  const curMonth=today().slice(0,7);
+  const incM=document.getElementById('inc-month'); if(incM && !incM.value) incM.value=curMonth;
+  const salM=document.getElementById('sal-month'); if(salM && !salM.value) salM.value=curMonth;
 
   startClock();
   renderDashboard();
@@ -1096,6 +1118,21 @@ function calcHrs(inT,outT){
   return Math.floor(mins/60)+'h '+( mins%60)+'m';
 }
 
+// When admin picks a date in the manual attendance form, auto-fill the default
+// in/out times: Mon-Fri => 8:45 AM – 6:00 PM, Saturday => 9:30 AM – 2:00 PM.
+function setManualTimesByDate(){
+  const dateStr=document.getElementById('man-date').value;
+  if(!dateStr) return;
+  const day=new Date(dateStr+'T00:00:00').getDay(); // 0=Sun .. 6=Sat
+  const inEl=document.getElementById('man-in');
+  const outEl=document.getElementById('man-out');
+  if(day===6){ // Saturday
+    inEl.value='09:30'; outEl.value='14:00';
+  } else {
+    inEl.value='08:45'; outEl.value='18:00';
+  }
+}
+
 async function saveManualAtt(){
   const emp=document.getElementById('man-emp').value;
   const status=document.getElementById('man-status').value;
@@ -1249,6 +1286,19 @@ function calcSalary(){
   if(!sel) return;
   const name=sel.value||'Puja';
   const b=getEmpSalary(name);
+
+  // If a month is selected, auto-suggest absent days from that month's attendance
+  // (admin can still override the number manually).
+  const salMonthEl=document.getElementById('sal-month');
+  const absentEl=document.getElementById('sal-absent');
+  if(salMonthEl && salMonthEl.value && absentEl && !absentEl.dataset.touched){
+    const m=salMonthEl.value;
+    const att=getAtt();
+    const recs=(att[name]||[]).filter(r=>r.date.startsWith(m));
+    const autoAbsent=recs.filter(r=>r.status==='Absent').length;
+    absentEl.value=autoAbsent;
+  }
+
   const absentDays=parseInt(document.getElementById('sal-absent').value)||0;
   const bonus=parseInt(document.getElementById('sal-bonus').value)||0;
   const perday=b/30;
@@ -1267,11 +1317,14 @@ function calcSalary(){
 }
 
 // ─── INCENTIVE ───────────────────────────────────────────────────────────────
-function totalIncentive(name, salary){
-  const mfsip=getMfSip()[name]||{};
+function totalIncentive(name, salary, month){
+  // Prefer month-specific data; fall back to legacy single-bucket data if present.
+  const monthData = month ? getMfSipForMonth(month) : {};
+  const legacy = getMfSip()[name] || {};
+  const mfsip = (monthData[name] !== undefined) ? monthData[name] : legacy;
   const rates=getIncRates();
-  const brok = mfsip.brok!==undefined ? mfsip.brok : (BROKERAGE_MAR2026[name]||0);
-  const demat = mfsip.demat!==undefined ? mfsip.demat : (DEMAT_MAR2026[name]||0);
+  const brok = mfsip.brok!==undefined ? mfsip.brok : 0;
+  const demat = mfsip.demat!==undefined ? mfsip.demat : 0;
   const mf = mfsip.mf||0;
   const sip = mfsip.sip||0;
 
@@ -1286,6 +1339,7 @@ function totalIncentive(name, salary){
 
 function renderIncentivePage(){
   const rates=getIncRates();
+  const selMonth=currentIncMonth();
 
   // Update formula card with current rates
   const fmfEl=document.getElementById('formula-mf-rate');
@@ -1295,7 +1349,7 @@ function renderIncentivePage(){
 
   // My incentive card — salary always pulled from central getEmpSalary (set on Employees page)
   const mySalary=getEmpSalary(currentUser);
-  const t=totalIncentive(currentUser,mySalary);
+  const t=totalIncentive(currentUser,mySalary,selMonth);
   const mic=document.getElementById('my-incentive-card');
   if(mic){
     mic.innerHTML=`
@@ -1318,7 +1372,7 @@ function renderIncentivePage(){
     if(tit){
       tit.innerHTML=EMPLOYEES.map(e=>{
         const sal=getEmpSalary(e.name);
-        const tt=totalIncentive(e.name,sal);
+        const tt=totalIncentive(e.name,sal,selMonth);
         return `<tr>
           <td>${e.name}</td>
           <td>${fmt(sal)}</td>
@@ -1351,12 +1405,14 @@ function loadIncEmp(){
   const sel=document.getElementById('inc-emp');
   if(!sel) return;
   const name=sel.value;
+  const month=currentIncMonth();
   const sal=getEmpSalary(name);
-  const mfsip=getMfSip()[name]||{};
+  const monthData=getMfSipForMonth(month);
+  const mfsip=monthData[name]||{};
   const dispEl=document.getElementById('inc-salary-display');
   if(dispEl) dispEl.value=fmt(sal);
-  document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:(BROKERAGE_MAR2026[name]||0);
-  document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:(DEMAT_MAR2026[name]||0);
+  document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:0;
+  document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:0;
   document.getElementById('inc-mf').value = mfsip.mf||0;
   document.getElementById('inc-sip').value = mfsip.sip||0;
   calcIncentive();
@@ -1365,16 +1421,19 @@ function loadIncEmp(){
 async function saveMfSipData(){
   const sel=document.getElementById('inc-emp');
   const name=sel.value;
+  const month=currentIncMonth();
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
   const sip=parseInt(document.getElementById('inc-sip').value)||0;
-  const mfsip=getMfSip();
-  mfsip[name]={brok,demat,mf,sip};
-  await saveMfSip(mfsip);
+  const all=getMfSipByMonth();
+  if(!all[month]) all[month]={};
+  all[month][name]={brok,demat,mf,sip};
+  await saveMfSipByMonth(all);
   calcIncentive();
   renderIncentivePage();
-  alert(name+' ke business figures save ho gaye!');
+  const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  alert(name+' ke '+mLabel+' ke business figures save ho gaye!');
 }
 
 function calcIncentive(){
