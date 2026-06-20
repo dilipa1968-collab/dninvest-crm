@@ -487,9 +487,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">👥</span> Clients
         <span class="nav-badge" id="nb-eq">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('eq-demat')" id="nav-eq-demat">
-        <span class="icon">💼</span> Demat A/c Opening
-      </div>
       <div class="nav-item" onclick="showPage('eq-followup')" id="nav-eq-followup">
         <span class="icon">📞</span> Follow-ups
         <span class="nav-badge red" id="nb-eqf">0</span>
@@ -515,9 +512,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('mf-sip')" id="nav-mf-sip">
         <span class="icon">🔄</span> SIP Tracker
         <span class="nav-badge" id="nb-sip">0</span>
-      </div>
-      <div class="nav-item" onclick="showPage('mf-txns')" id="nav-mf-txns">
-        <span class="icon">💼</span> MF Transactions
       </div>
       <div class="nav-item" onclick="showPage('mf-nocall')" id="nav-mf-nocall">
         <span class="icon">📵</span> No-Call Alerts
@@ -568,6 +562,20 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
           <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
+          <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,#185FA5 0%,#1D9E75 100%);color:#fff" onclick="showPage('mf-txns')">
+            <div style="text-align:center">
+              <div style="font-size:2rem;margin-bottom:8px">💼</div>
+              <h3 style="color:#fff;margin:0">MF Transactions</h3>
+              <p style="font-size:.78rem;color:#eafff5;margin-top:4px">Lumpsum · SIP · Switch · Redemption</p>
+            </div>
+          </div>
+          <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,#7D3C98 0%,#B7950B 100%);color:#fff" onclick="showPage('eq-demat')">
+            <div style="text-align:center">
+              <div style="font-size:2rem;margin-bottom:8px">📂</div>
+              <h3 style="color:#fff;margin:0">Demat A/c Opening</h3>
+              <p style="font-size:.78rem;color:#fdf3e0;margin-top:4px">Equity — New Account Entries</p>
+            </div>
+          </div>
           <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 100%);color:#fff" onclick="openHrPortal()">
             <div style="text-align:center">
               <div style="font-size:2rem;margin-bottom:8px">👥</div>
