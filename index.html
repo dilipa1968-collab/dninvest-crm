@@ -616,6 +616,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('equity')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openEqImportModal()" id="eqImportBtn">📥 Import Excel</button>
+            <button class="btn btn-outline" onclick="openEqRmUpdateModal()" id="eqRmUpdateBtn" style="display:none">⇅ Bulk RM Update</button>
             <button class="btn btn-primary" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
@@ -1401,6 +1402,36 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
   </div>
 </div>
 
+<!-- Bulk RM Update Modal (Equity) -->
+<div class="modal-overlay" id="eqRmUpdateModal" onclick="if(event.target===this)closeModal('eqRmUpdateModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>⇅ Equity — Bulk RM Update</h3>
+      <button class="modal-close" onclick="closeModal('eqRmUpdateModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+        Excel upload karo jisme sirf <b>Client Code</b> aur <b>New RM</b> ho. Match <b>Client Code</b> se hoga (exact) — sirf <b>RM field update</b> hoga, baaki kuch (Asset Value, Status, Remarks etc.) touch nahi hoga.
+      </p>
+      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
+        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>New RM</b> (Name column optional, ignore hota hai)
+      </p>
+      <div style="margin-bottom:12px">
+        <a href="#" onclick="downloadEqRmUpdateTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
+      </div>
+      <div class="import-zone" id="eq-rm-zone" onclick="document.getElementById('eq-rm-file').click()">
+        📊 Excel file yahan drag karo ya click karo
+        <input type="file" id="eq-rm-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqRmUpdateFile(this)">
+      </div>
+      <div id="eq-rm-preview" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('eqRmUpdateModal')">Cancel</button>
+      <button class="btn btn-teal" id="eqRmUpdateBtnGo" onclick="doEqRmUpdate()" disabled>Update RM</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -2001,6 +2032,8 @@ function initApp(){
   // Bulk Excel import is admin-only
   const eqImportBtn=document.getElementById('eqImportBtn');
   if(eqImportBtn) eqImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqRmUpdateBtn=document.getElementById('eqRmUpdateBtn');
+  if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
   if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
@@ -6022,6 +6055,129 @@ async function doEqImport(){
   let msg = `✅ Import done! ${updated} updated, ${added} new added`;
   if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
+  renderEqTable(); refreshDash(); updateBadges();
+}
+
+// ══ EQUITY BULK RM UPDATE (Admin only) ══
+let eqRmUpdateData = null;
+
+function openEqRmUpdateModal(){
+  if(CU.role!=='admin') return;
+  eqRmUpdateData = null;
+  document.getElementById('eq-rm-preview').innerHTML='';
+  document.getElementById('eqRmUpdateBtnGo').disabled=true;
+  document.getElementById('eq-rm-file').value='';
+  document.getElementById('eqRmUpdateModal').classList.add('open');
+}
+
+function downloadEqRmUpdateTemplate(){
+  const wsData = [
+    ['Client Code','Client Name (reference only)','New RM'],
+    ['EQ12345','Example: Ramesh Kumar','Komal'],
+    ['EQ67890','Example: Sunita Devi','Bharat']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:18},{wch:32},{wch:18}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'RM Update');
+  XLSX.writeFile(wb, 'Equity_RM_Update_Template.xlsx');
+}
+
+function handleEqRmUpdateFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    let hdrIdx=-1, colMap={};
+    const wanted = {
+      code: ['code','clientcode','clientid','ucccode','ucc'],
+      rm: ['newrm','rm','relationshipmanager','dealer','dealername','employeename']
+    };
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const row = rows[i];
+      const map = {};
+      row.forEach((cell,ci)=>{
+        const h = normHdr(cell);
+        for(const [field, variants] of Object.entries(wanted)){
+          if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+        }
+      });
+      if(map.code!==undefined && map.rm!==undefined){
+        hdrIdx=i; colMap=map; break;
+      }
+    }
+    if(hdrIdx===-1){
+      toast('Header row nahi mil paya. Excel me Client Code aur New RM columns hone chahiye.','error');
+      return;
+    }
+    const data = rows.slice(hdrIdx+1)
+      .filter(r=>r.some(c=>c!==''))
+      .map(r=>({
+        code: String(r[colMap.code]||'').trim(),
+        rm: String(r[colMap.rm]||'').trim()
+      }))
+      .filter(r=>r.code && r.rm);
+
+    if(!data.length){
+      toast('Koi valid row nahi mili (Client Code aur New RM dono zaroori hain).','error');
+      return;
+    }
+
+    // Validate RM names against active RM list
+    const validRms = new Set((DB.get('users')||DEFAULT_USERS).filter(u=>u.role!=='admin').map(u=>u.name));
+    const invalidRows = data.filter(r=>!validRms.has(r.rm));
+
+    eqRmUpdateData = data;
+    let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${data.length} rows found</div>`;
+    if(invalidRows.length){
+      const names = [...new Set(invalidRows.map(r=>r.rm))].join(', ');
+      html += `<div style="background:#fdecea;color:var(--red);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
+       ⚠️ ${invalidRows.length} row(s) me RM naam CRM ki list se match nahi kar raha: <b>${names}</b>. In rows ko skip kiya jayega — RM naam exact match hona chahiye (e.g. Komal, Bharat).</div>`;
+    }
+    document.getElementById('eq-rm-preview').innerHTML = html;
+    document.getElementById('eqRmUpdateBtnGo').disabled = data.length===0;
+  });
+}
+
+async function doEqRmUpdate(){
+  if(CU.role!=='admin') return;
+  if(!eqRmUpdateData || !eqRmUpdateData.length) return;
+  const existing = DB.get('eq_clients')||[];
+  const byCode = {};
+  existing.forEach(c=>{ if(c.code) byCode[String(c.code).trim().toUpperCase()] = c; });
+  const validRms = new Set((DB.get('users')||DEFAULT_USERS).filter(u=>u.role!=='admin').map(u=>u.name));
+
+  let updated=0, notFound=0, invalidRm=0;
+  const touched = [];
+  const actLogs = DB.get('activity_logs')||[];
+
+  eqRmUpdateData.forEach(row=>{
+    if(!validRms.has(row.rm)){ invalidRm++; return; }
+    const ex = byCode[row.code.trim().toUpperCase()];
+    if(!ex){ notFound++; return; }
+    if(ex.rm===row.rm) return; // no change needed
+    const oldRm = ex.rm||'—';
+    ex.rm = row.rm;
+    ex.updated = today();
+    touched.push(ex);
+    updated++;
+    actLogs.unshift({
+      id: uid(), type: 'bulk_rm_update', seg:'equity',
+      client_id: ex.id, client_name: ex.name, rm: row.rm,
+      by: CU.name, date: new Date().toISOString(),
+      changes: [{field:'rm', old:oldRm, new:row.rm}]
+    });
+  });
+
+  if(touched.length) await DB.setClientsBulk('eq_clients', touched);
+  if(updated) DB.set('activity_logs', actLogs.slice(0,2000));
+
+  closeModal('eqRmUpdateModal');
+  let msg = `✅ RM Update done! ${updated} client(s) updated`;
+  if(notFound) msg += `, ${notFound} Client Code not found`;
+  if(invalidRm) msg += `, ${invalidRm} invalid RM name`;
+  toast(msg, updated>0?'success':'error');
   renderEqTable(); refreshDash(); updateBadges();
 }
 
