@@ -4181,12 +4181,53 @@ function saveBusinessEntry(){
     rm,
     type, amount, date, remarks,
     created_by: CU.name,
-    created: today()
+    created: today(),
+    status: CU.role==='admin' ? 'Approved' : 'Pending',
+    decline_reason: ''
   });
   const eqEntries2 = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
   DB.set('mf_business', {entries, eq_entries: eqEntries2});
   closeModal('businessModal');
   toast('Business entry saved!','success');
+}
+
+// ── Approve / Decline (Admin only) ──
+function bizStatusBadge(status){
+  const s = status || 'Pending';
+  const map = {
+    Approved: {bg:'#1D9E7522', col:'#1D9E75', label:'✅ Approved'},
+    Declined: {bg:'#C0392B22', col:'#C0392B', label:'❌ Declined'},
+    Pending:  {bg:'#D3940022', col:'#B7950B', label:'⏳ Pending'}
+  };
+  const m = map[s] || map.Pending;
+  return `<span class="badge" style="background:${m.bg};color:${m.col};font-weight:600">${m.label}</span>`;
+}
+
+function approveBusinessEntry(id){
+  if(CU.role!=='admin') return;
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Approved';
+  e.decline_reason = '';
+  setMfBizEntries(entries);
+  toast('Business approved!','success');
+  if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
+  renderMfTxnTable();
+}
+
+function declineBusinessEntry(id){
+  if(CU.role!=='admin') return;
+  const reason = prompt('Decline reason (optional):','') || '';
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Declined';
+  e.decline_reason = reason.trim();
+  setMfBizEntries(entries);
+  toast('Business declined','success');
+  if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
+  renderMfTxnTable();
 }
 
 // ══════════════════════════════════════════
@@ -4290,7 +4331,9 @@ function saveMfTxnEntry(){
     rm: mfTxnSelectedClient.rm,
     type, amount, date, remarks,
     created_by: CU.name,
-    created: today()
+    created: today(),
+    status: CU.role==='admin' ? 'Approved' : 'Pending',
+    decline_reason: ''
   });
   setMfBizEntries(entries);
   toast(`${type} entry saved — ${mfTxnSelectedClient.name}`,'success');
@@ -4345,10 +4388,11 @@ function renderMfTxnTable(){
   }
 
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>RM</th><th>Type</th><th style="text-align:right">Amount (₹)</th><th>Remarks</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Client</th><th>RM</th><th>Type</th><th style="text-align:right">Amount (₹)</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
+        const status = e.status||'Pending';
         return `<tr>
           <td>${e.date||'—'}</td>
           <td>${escapeHtml(e.client_name||'—')}</td>
@@ -4356,7 +4400,11 @@ function renderMfTxnTable(){
           <td><span class="badge" style="background:${color}22;color:${color}">${escapeHtml(e.type||'—')}</span></td>
           <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
-          <td>${CU.role==='admin'?`<button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
+          <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
+          <td style="white-space:nowrap">${CU.role==='admin'?`
+            ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
+            ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
+            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -4864,7 +4912,7 @@ function newBusinessMonthlyReport(){
   document.getElementById('reportModalTitle').textContent='New Business (Month-wise)';
   let h=`<p style="color:var(--gray);font-size:.8rem;margin-bottom:12px">${entries.length} records</p>`;
   const showActions = true;
-  const tblHeaders = showActions ? [...headers,'Actions'] : headers;
+  const tblHeaders = showActions ? [...headers,'Status','Actions'] : [...headers,'Status'];
   h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${tblHeaders.map(hd=>`<th>${hd}</th>`).join('')}</tr></thead><tbody>`;
   if(!sorted.length){
     h+=`<tr><td colspan="${tblHeaders.length}" style="text-align:center;padding:24px;color:#bbb">No business entries yet</td></tr>`;
@@ -4877,9 +4925,13 @@ function newBusinessMonthlyReport(){
     const [y,m]=ym.split('-');
     const monthLabel = m ? MN[parseInt(m)]+'-'+y : '';
     const cells = [monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||''];
+    const status = e.status||'Pending';
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
+    h+=`<td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>`;
     if(showActions){
-      h+=`<td>
+      h+=`<td style="white-space:nowrap">
+        ${CU.role==='admin'&&status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
+        ${CU.role==='admin'&&status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
         <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="deleteBusinessEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>
       </td>`;
@@ -4892,7 +4944,7 @@ function newBusinessMonthlyReport(){
 }
 
 function editBusinessEntry(id){
-  const entries = DB.get('mf_business')||[];
+  const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
   currentBusinessTarget = {id: e.client_id, name: e.client_name};
