@@ -1111,6 +1111,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="page-hdr">
           <div class="page-title">Users & Settings</div>
           <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="fixRmCasing()" title="Merges duplicate RM entries caused by inconsistent name casing (e.g. 'riya' vs 'Riya')">🔧 Fix RM Name Casing</button>
             <button class="btn btn-primary" onclick="openAddUser()">+ Add User</button>
           </div>
         </div>
@@ -1770,6 +1771,20 @@ const DEFAULT_USERS = [
   {id:'u10',username:'megha',password:'Megha@123',name:'Megha',role:'staff',segments:['mf'],eq_dealers:[],mf_dealers:['MEGHA','MEGHA '],active:true},
   {id:'u11',username:'anjali',password:'Anjali@123',name:'Anjali',role:'staff',segments:['mf'],eq_dealers:[],mf_dealers:['ANJALI','ANJALI '],active:true},
 ];
+
+// Normalizes an RM name string to its canonical casing as registered in the users list
+// (e.g. "riya", "RIYA", "  riya  " -> "Riya"), so the same RM is never split into
+// multiple buckets on dashboards/reports due to inconsistent casing. If the name
+// doesn't match any registered user, falls back to simple Title Case so at least
+// "riya kumari" and "RIYA KUMARI" still merge together.
+function normRm(rmStr){
+  const raw = (rmStr||'').trim();
+  if(!raw) return raw;
+  const users = DB.get('users') || DEFAULT_USERS;
+  const match = users.find(u=>(u.name||'').trim().toLowerCase()===raw.toLowerCase());
+  if(match) return match.name.trim();
+  return raw.toLowerCase().replace(/\b\w/g, ch=>ch.toUpperCase());
+}
 
 // ══════════════════════════════════════════
 // STATE
@@ -3059,7 +3074,7 @@ function editLead(id){
 
 async function saveLead(){
   const name=(document.getElementById('l_name')||{value:''}).value.trim();
-  const rm=(document.getElementById('l_rm')||{value:''}).value.trim();
+  const rm=normRm((document.getElementById('l_rm')||{value:''}).value.trim());
   if(!name){ toast('Lead name is required','error'); return; }
 
   const gv2=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
@@ -3726,7 +3741,7 @@ async function addAttendee(sourceId,type){
 async function addGuestAttendee(){
   const name=document.getElementById('guest_name').value.trim();
   const mobile=document.getElementById('guest_mobile').value.trim();
-  const rm=document.getElementById('guest_rm').value;
+  const rm=normRm(document.getElementById('guest_rm').value);
   if(!name){ toast('Please enter the guest name','error'); return; }
 
   const seminars=DB.get('seminars')||[];
@@ -3897,7 +3912,7 @@ function clientForm(seg, c){
 async function saveClient(){
   const seg = document.getElementById('clientSaveBtn').dataset.seg;
   const name = (document.getElementById('f_name')||{value:''}).value.trim();
-  const rm = (document.getElementById('f_rm')||{value:''}).value.trim();
+  const rm = normRm((document.getElementById('f_rm')||{value:''}).value.trim());
   if(!name){ toast('Client name is required','error'); return; }
   if(!rm){ toast('Please select RM','error'); return; }
 
@@ -5555,6 +5570,41 @@ function deleteUser(id){
   toast(u.name+' has been deleted','success');
 }
 
+async function fixRmCasing(){
+  if(CU.role!=='admin'){ toast('Only Admin can do this','error'); return; }
+  if(!confirm('This will scan all Equity & MF clients and leads, and fix any RM names that are stored with inconsistent capitalization (e.g. "riya" -> "Riya"), merging them into one entry on dashboards & reports.\n\nThis only changes how names are capitalized — no client data is deleted. Continue?')) return;
+
+  let changedCount=0;
+
+  for(const key of ['eq_clients','mf_clients','leads']){
+    const list = DB.get(key)||[];
+    let anyChange=false;
+    list.forEach(c=>{
+      if(c.rm){
+        const fixed=normRm(c.rm);
+        if(fixed!==c.rm){ c.rm=fixed; anyChange=true; changedCount++; }
+      }
+    });
+    if(anyChange) await DB.set(key, list);
+  }
+
+  // Seminars: attendee rm field too
+  const seminars = DB.get('seminars')||[];
+  let seminarChanged=false;
+  seminars.forEach(s=>{
+    (s.attendees||[]).forEach(a=>{
+      if(a.rm){
+        const fixed=normRm(a.rm);
+        if(fixed!==a.rm){ a.rm=fixed; seminarChanged=true; changedCount++; }
+      }
+    });
+  });
+  if(seminarChanged) await DB.set('seminars', seminars);
+
+  toast(changedCount>0 ? `✅ Fixed casing on ${changedCount} record(s)! Refreshing...` : '✅ All RM names were already consistent — nothing to fix.', 'success');
+  if(changedCount>0) setTimeout(()=>{ refreshDash(); }, 800);
+}
+
 // ── Auto Schedule ──
 // Mon-Fri: 8:00 AM – 7:00 PM IST (active window)
 // Saturday: 9:30 AM – 2:00 PM IST (shorter window, same as HR attendance rule)
@@ -6732,7 +6782,7 @@ function handleEqFile(input){
         code: colMap.code!==undefined ? String(r[colMap.code]||'').trim() : '',
         mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').trim() : '',
         name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
-        rm: colMap.rm!==undefined ? String(r[colMap.rm]||'').trim() : '',
+        rm: colMap.rm!==undefined ? normRm(String(r[colMap.rm]||'').trim()) : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
         last_trade_date: colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : ''
       }))
@@ -6855,7 +6905,7 @@ function handleEqRmUpdateFile(input){
       .filter(r=>r.some(c=>c!==''))
       .map(r=>({
         code: String(r[colMap.code]||'').trim(),
-        rm: String(r[colMap.rm]||'').trim()
+        rm: normRm(String(r[colMap.rm]||'').trim())
       }))
       .filter(r=>r.code && r.rm);
 
