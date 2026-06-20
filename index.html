@@ -294,6 +294,14 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .dash-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
 .dash-card h3{font-size:.75rem;color:var(--gray);font-weight:800;text-transform:uppercase;
   letter-spacing:.5px;margin-bottom:14px;}
+.dash-card.collapsible h3{display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;margin-bottom:0;user-select:none;}
+.dash-card.collapsible .dc-chevron{font-size:.7rem;color:var(--gray);transition:transform .2s;margin-left:8px;}
+.dash-card.collapsible.open .dc-chevron{transform:rotate(90deg);}
+.dash-card.collapsible .dc-count{background:var(--border);color:var(--navy);font-size:.68rem;
+  font-weight:700;border-radius:10px;padding:1px 8px;margin-left:auto;margin-right:8px;}
+.dash-card.collapsible .dc-body{display:none;margin-top:14px;}
+.dash-card.collapsible.open .dc-body{display:block;}
 .bar-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f0f2f8;}
 .bar-row:last-child{border:none;}
 .bar-name{font-size:.8rem;font-weight:600;color:var(--navy);min-width:100px;max-width:120px;
@@ -556,12 +564,30 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
         <div class="stats-row" id="dashStats"></div>
         <div class="dash-grid">
-          <div class="dash-card" id="rmEqCard"><h3>Equity RM — Client Count</h3><div id="rmEqChart"></div></div>
-          <div class="dash-card" id="rmMfCard"><h3>MF RM — AUM Summary</h3><div id="rmMfChart"></div></div>
-          <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
-          <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
-          <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
-          <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
+          <div class="dash-card collapsible" id="rmEqCard">
+            <h3 onclick="toggleDashCard('rmEqCard')">Equity RM — Client Count <span class="dc-count" id="rmEqCount"></span><span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="rmEqChart"></div></div>
+          </div>
+          <div class="dash-card collapsible" id="rmMfCard">
+            <h3 onclick="toggleDashCard('rmMfCard')">MF RM — AUM Summary <span class="dc-count" id="rmMfCount"></span><span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="rmMfChart"></div></div>
+          </div>
+          <div class="dash-card collapsible" id="noTradeCard">
+            <h3 onclick="toggleDashCard('noTradeCard')">⚠️ No-Trade Alerts <span class="dc-count" id="noTradeCount"></span><span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="noTradeAlert"></div></div>
+          </div>
+          <div class="dash-card collapsible" id="noCallEqCard">
+            <h3 onclick="toggleDashCard('noCallEqCard')">📵 No-Call Alerts (Equity, 60+ days) <span class="dc-count" id="noCallEqCount"></span><span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="noCallEqAlert"></div></div>
+          </div>
+          <div class="dash-card collapsible" id="noCallMfCard">
+            <h3 onclick="toggleDashCard('noCallMfCard')">📵 No-Call Alerts (MF, 60+ days) <span class="dc-count" id="noCallMfCount"></span><span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="noCallMfAlert"></div></div>
+          </div>
+          <div class="dash-card collapsible" id="todayFollowupCard">
+            <h3 onclick="toggleDashCard('todayFollowupCard')">📞 Today's Follow-ups <span class="dc-count" id="todayFollowupCount"></span><span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="todayFollowup"></div></div>
+          </div>
           <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,#185FA5 0%,#1D9E75 100%);color:#fff" onclick="showPage('mf-txns')">
             <div style="text-align:center">
               <div style="font-size:2rem;margin-bottom:8px">💼</div>
@@ -2326,6 +2352,10 @@ function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebarOverlay').classList.toggle('open');
 }
+function toggleDashCard(id){
+  const el=document.getElementById(id);
+  if(el) el.classList.toggle('open');
+}
 function closeSidebar(){
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
@@ -2424,6 +2454,7 @@ function refreshDash(){
       ? rs.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx*100).toFixed(0)}%"></div></div><span class="bar-num">${v}</span></div>`).join('')
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No equity clients yet</p>';
     document.getElementById('rmEqCard').style.display=hasEq?'':'none';
+    const rmEqCountEl=document.getElementById('rmEqCount'); if(rmEqCountEl) rmEqCountEl.textContent=rs.length+' RMs';
   }
 
   // MF RM AUM chart
@@ -2436,6 +2467,7 @@ function refreshDash(){
       ? rs2.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx2*100).toFixed(0)}%;background:var(--teal)"></div></div><span class="bar-num">₹${fmtNum(v)}</span></div>`).join('')
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No MF clients yet</p>';
     document.getElementById('rmMfCard').style.display=hasMf?'':'none';
+    const rmMfCountEl=document.getElementById('rmMfCount'); if(rmMfCountEl) rmMfCountEl.textContent=rs2.length+' RMs';
   }
 
   // No-trade alerts
@@ -2448,6 +2480,7 @@ function refreshDash(){
         return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${c.days} days</span></div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
+  const noTradeCountEl=document.getElementById('noTradeCount'); if(noTradeCountEl) noTradeCountEl.textContent=alerts.length;
 
   // No-call alerts (Equity)
   const noCallEq = activeEq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
@@ -2461,6 +2494,7 @@ function refreshDash(){
         return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${label}</span></div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
+  const noCallEqCountEl=document.getElementById('noCallEqCount'); if(noCallEqCountEl) noCallEqCountEl.textContent=noCallEq.length;
 
   // No-call alerts (MF)
   const noCallMf = mf.map(c=>({...c,days:daysDiff(c.last_call_date)}))
@@ -2474,6 +2508,7 @@ function refreshDash(){
         return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${label}</span></div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
+  const noCallMfCountEl=document.getElementById('noCallMfCount'); if(noCallMfCountEl) noCallMfCountEl.textContent=noCallMf.length;
 
   // Today's follow-ups
   const allClients=[
@@ -2488,6 +2523,7 @@ function refreshDash(){
           <span style="font-size:.75rem;color:var(--gray)">${c.rm}</span>
         </div>`).join('')
     : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No follow-ups scheduled for today</p>';
+  const todayFollowupCountEl=document.getElementById('todayFollowupCount'); if(todayFollowupCountEl) todayFollowupCountEl.textContent=allClients.length;
 
   updateBadges();
 }
