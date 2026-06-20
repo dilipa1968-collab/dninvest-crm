@@ -494,7 +494,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th>Demat</th><th>MF</th><th>SIP</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>SIP</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -1871,10 +1871,12 @@ function renderIncentivePage(){
       <table style="font-size:13px;width:100%">
         <tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Brokerage incentive</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Total brokerage</td><td style="text-align:right">${fmt(t.brok)}</td></tr>
-        <tr><td style="color:var(--text2);padding:4px 0">Excess over 3× Salary</td><td style="text-align:right">${fmt(t.br.excess)}</td></tr>
-        <tr><td style="color:var(--text2);padding:4px 0">Brokerage incentive</td><td style="text-align:right">${fmt(t.br.total)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}× Salary</td><td style="text-align:right">${fmt(t.br.excess)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right">${fmt(t.br.base5)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}× Salary)</td><td style="text-align:right">${fmt(t.br.extra2)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0;font-weight:600">Brokerage incentive total</td><td style="text-align:right;font-weight:600">${fmt(t.br.total)}</td></tr>
         <tr><td colspan="2" style="padding:6px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Other incentives</td></tr>
-        <tr><td style="color:var(--text2);padding:4px 0">Demat opening (${t.demat} × ₹600)</td><td style="text-align:right">${fmt(t.dematInc)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Demat opening (${t.demat} × ${fmt(getDematRate())})</td><td style="text-align:right">${fmt(t.dematInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
@@ -1903,6 +1905,8 @@ function renderIncentivePage(){
           <td>${e.name}</td>
           <td>${fmt(sal)}</td>
           <td>${fmt(tt.brok)}</td>
+          <td>${fmt(tt.br.base5)}</td>
+          <td>${fmt(tt.br.extra2)}</td>
           <td>${tt.demat}</td>
           <td>${fmt(tt.mf)}</td>
           <td>${fmt(tt.sip)}</td>
@@ -2121,10 +2125,12 @@ function calcIncentive(){
   const el=document.getElementById('inc-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%">
-      <tr><td style="color:var(--text2);padding:4px 0">3× Salary / 10× Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
-      <tr><td style="color:var(--text2);padding:4px 0">Excess over 3×</td><td style="text-align:right">${fmt(br.excess)}</td></tr>
-      <tr><td style="color:var(--text2);padding:4px 0">Brokerage incentive</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.total)}</td></tr>
-      <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ₹600)</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">${rates.lowMult||3}× Salary / ${rates.highMult||10}× Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}×</td><td style="text-align:right">${fmt(br.excess)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.base5)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.extra2)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0;font-weight:600">Brokerage incentive total</td><td style="text-align:right;font-weight:600;color:var(--green)">${fmt(br.total)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ${fmt(getDematRate())})</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">MF incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">SIP incentive (${rates.sipRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(sipInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Other / Special${otherRemark?' ('+otherRemark+')':''}</td><td style="text-align:right;color:var(--green)">+ ${fmt(other)}</td></tr>
