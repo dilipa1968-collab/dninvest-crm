@@ -1426,6 +1426,15 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <button class="modal-close" onclick="closeModal('businessModal')">×</button>
     </div>
     <div class="modal-body">
+      <div class="form-row" id="biz_client_wrap" style="display:none">
+        <div class="form-field" style="min-width:240px;position:relative">
+          <label>Client *</label>
+          <input type="text" id="biz_client_search" placeholder="🔍 Search by Name / PAN / mobile..." autocomplete="off" oninput="searchBizClient()" onfocus="searchBizClient()">
+          <div id="biz_client_results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+        </div>
+        <div class="form-field"><label>Selected Client</label><input type="text" id="biz_client_selected" placeholder="No client selected" readonly style="background:#f7f7f7"></div>
+        <div class="form-field"><label>RM</label><input type="text" id="biz_client_rm" readonly style="background:#f7f7f7"></div>
+      </div>
       <div class="form-row">
         <div class="form-field"><label>Type *</label>
           <select id="biz_type">
@@ -1834,7 +1843,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -2248,7 +2257,7 @@ function initApp(){
       });
 
       // Real-time listeners for small array collections (users, call_logs, mf_business)
-      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive'].forEach(key=>{
+      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
@@ -4466,6 +4475,7 @@ function openBusinessModal(clientId, clientName){
   currentBusinessTarget = {id: clientId, name: clientName};
   editingBusinessId = null;
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
+  const clientWrap=document.getElementById('biz_client_wrap'); if(clientWrap) clientWrap.style.display='none';
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
@@ -4493,6 +4503,14 @@ function saveBusinessEntry(){
     const idx = entries.findIndex(e=>e.id===editingBusinessId);
     if(idx>=0){
       if(CU.role!=='admin' && entries[idx].created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
+      // Admin can also reassign the Client (and the RM that comes with it)
+      if(CU.role==='admin'){
+        if(!currentBusinessTarget.id){ toast('Please select a client','error'); return; }
+        entries[idx].client_id = currentBusinessTarget.id;
+        entries[idx].client_name = currentBusinessTarget.name;
+        const rmVal = document.getElementById('biz_client_rm')?.value || '';
+        entries[idx].rm = (rmVal==='—') ? '' : rmVal;
+      }
       entries[idx].type = type;
       entries[idx].amount = amount;
       entries[idx].fund_name = fundName;
@@ -4501,10 +4519,12 @@ function saveBusinessEntry(){
     }
     const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
     DB.set('mf_business', {entries, eq_entries: eqEntries});
+    learnFundName(fundName);
     closeModal('businessModal');
     toast('Business entry updated!','success');
     editingBusinessId = null;
     if(document.getElementById('reportModal').classList.contains('open')) newBusinessMonthlyReport();
+    renderMfTxnTable();
     return;
   }
 
@@ -4527,6 +4547,7 @@ function saveBusinessEntry(){
   });
   const eqEntries2 = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
   DB.set('mf_business', {entries, eq_entries: eqEntries2});
+  learnFundName(fundName);
   closeModal('businessModal');
   toast('Business entry saved!','success');
 }
@@ -4585,6 +4606,23 @@ function addCrossRemark(id){
   e.cross_remark_at = today();
   setMfBizEntries(entries);
   toast('Remark saved','success');
+  renderMfTxnTable();
+  if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
+}
+
+// Admin-only: clear/reverse a cross-check remark in one click, without having
+// to open the prompt and manually delete the text.
+function clearCrossRemark(id){
+  if(CU.role!=='admin') return;
+  if(!confirm('Clear this cross-check remark?')) return;
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.cross_remark = '';
+  e.cross_remark_by = '';
+  e.cross_remark_at = '';
+  setMfBizEntries(entries);
+  toast('Remark cleared','success');
   renderMfTxnTable();
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
 }
@@ -4795,6 +4833,24 @@ const FUND_NAME_LIST = [
   "HDFC Overnight Fund - Regular Plan - Growth","SBI Overnight Fund - Regular Plan - Growth",
 ];
 
+// Fund names typed manually (because they weren't in the built-in list) get
+// remembered here so the NEXT person who needs the same fund finds it as a
+// suggestion instead of having to type it out again. Synced via Firestore
+// like the other small collections, so it's shared across all RMs live.
+function getLearnedFundNames(){
+  return DB.get('learned_fund_names') || [];
+}
+
+async function learnFundName(name){
+  if(!name) return;
+  const trimmed = name.trim();
+  if(!trimmed) return;
+  const existing = getLearnedFundNames();
+  const knownLower = new Set([...FUND_NAME_LIST, ...existing].map(n=>n.toLowerCase()));
+  if(knownLower.has(trimmed.toLowerCase())) return; // already known — nothing new to learn
+  await DB.set('learned_fund_names', [...existing, trimmed]);
+}
+
 function searchFundName(inputId, resultsId){
   const input=document.getElementById(inputId);
   const out=document.getElementById(resultsId);
@@ -4802,10 +4858,21 @@ function searchFundName(inputId, resultsId){
   const q=input.value.trim().toLowerCase();
   if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
 
-  const matches=FUND_NAME_LIST.filter(n=>n.toLowerCase().includes(q)).slice(0,15);
+  // Built-in list + anything learned from earlier manual entries, deduped
+  const combined = [...FUND_NAME_LIST, ...getLearnedFundNames()];
+  const seen=new Set();
+  const allFunds=[];
+  for(const n of combined){
+    const key=n.toLowerCase();
+    if(seen.has(key)) continue;
+    seen.add(key);
+    allFunds.push(n);
+  }
+
+  const matches=allFunds.filter(n=>n.toLowerCase().includes(q)).slice(0,15);
 
   if(matches.length===0){
-    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No match in the built-in list — you can type the fund name manually</div>';
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No match found — type it and it\'ll be remembered for next time</div>';
     out.style.display='block';
     return;
   }
@@ -4830,6 +4897,51 @@ document.addEventListener('click', e=>{
     const out=document.getElementById(resultsId);
     if(wrap && out && !wrap.contains(e.target) && !out.contains(e.target)) out.style.display='none';
   });
+});
+
+// Admin-only client reassignment inside the Edit Business modal — lets Admin
+// fix a transaction that got attributed to the wrong client (and therefore
+// the wrong RM) without having to delete and re-enter it.
+function searchBizClient(){
+  const q=(document.getElementById('biz_client_search').value||'').trim().toLowerCase();
+  const out=document.getElementById('biz_client_results');
+  if(!out) return;
+  if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
+  const clients=getMfTxnSearchClients();
+  const matches=clients.filter(c=>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.pan||'').toLowerCase().includes(q) ||
+    (c.mobile||'').toLowerCase().includes(q)
+  ).slice(0,30);
+  if(matches.length===0){
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found</div>';
+    out.style.display='block';
+    return;
+  }
+  out.innerHTML=matches.map(c=>`
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectBizClient('${c.id}')">
+      <div style="font-weight:600;font-size:.88rem">${escapeHtml(c.name||'')}</div>
+      <div style="font-size:.75rem;color:var(--gray)">${escapeHtml(c.pan||'—')} · ${escapeHtml(c.mobile||'—')} · RM: ${escapeHtml(c.rm||'—')}</div>
+    </div>`).join('');
+  out.style.display='block';
+}
+
+function selectBizClient(clientId){
+  const clients=getMfTxnSearchClients();
+  const c=clients.find(x=>x.id===clientId);
+  if(!c) return;
+  currentBusinessTarget = {id:c.id, name:c.name};
+  const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=c.name;
+  const cRm=document.getElementById('biz_client_rm'); if(cRm) cRm.value=c.rm||'—';
+  const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
+  const out=document.getElementById('biz_client_results');
+  if(out){ out.style.display='none'; out.innerHTML=''; }
+}
+
+document.addEventListener('click', e=>{
+  const wrap=document.getElementById('biz_client_search');
+  const out=document.getElementById('biz_client_results');
+  if(wrap && out && !wrap.contains(e.target) && !out.contains(e.target)) out.style.display='none';
 });
 
 
@@ -4916,6 +5028,7 @@ function saveMfTxnEntry(){
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
   setMfBizEntries(entries);
+  learnFundName(fundName);
   toast(`${type} entry saved — ${mfTxnSelectedClient.name}`,'success');
 
   // Reset form for next entry but keep date/type for fast repeated entry
@@ -4977,7 +5090,7 @@ function renderMfTxnTable(){
         const status = e.status||'Pending';
         const canRemark = canAddCrossRemark(e);
         const remarkCell = e.cross_remark
-          ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}`
+          ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
           : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
         return `<tr>
           <td>${e.date||'—'}</td>
@@ -4993,6 +5106,7 @@ function renderMfTxnTable(){
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
+            <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit (all fields)">✏️</button>
             <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
         </tr>`;
       }).join('')}
@@ -5783,7 +5897,7 @@ function renderBizReportTable(){
     const status = e.status||'Pending';
     const canRemark = canAddCrossRemark(e);
     const remarkCell = e.cross_remark
-      ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}`
+      ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
       : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
     const canEdit = CU.role==='admin' || e.created_by===CU.name;
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
@@ -5810,6 +5924,14 @@ function editBusinessEntry(id){
   currentBusinessTarget = {id: e.client_id, name: e.client_name};
   editingBusinessId = id;
   document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
+
+  const clientWrap=document.getElementById('biz_client_wrap');
+  if(clientWrap) clientWrap.style.display = CU.role==='admin' ? '' : 'none';
+  const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=e.client_name||'';
+  const cRm=document.getElementById('biz_client_rm'); if(cRm) cRm.value=e.rm||'—';
+  const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
+  const cResults=document.getElementById('biz_client_results'); if(cResults){ cResults.style.display='none'; cResults.innerHTML=''; }
+
   document.getElementById('biz_type').value = e.type;
   document.getElementById('biz_amount').value = e.amount;
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value = e.fund_name||'';
