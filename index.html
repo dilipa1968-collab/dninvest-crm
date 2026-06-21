@@ -4521,7 +4521,7 @@ function saveBusinessEntry(){
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
-    status: (CU.role==='admin' || CU.role==='mf_desk') ? 'Approved' : 'Pending',
+    status: (CU.role==='admin' || hasMfDeskAccess(CU)) ? 'Approved' : 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
@@ -4543,21 +4543,34 @@ function bizStatusBadge(status){
   return `<span class="badge" style="background:${m.bg};color:${m.col};font-weight:600">${m.label}</span>`;
 }
 
+// A user has MF Desk capability either as their sole/primary role ('mf_desk'
+// — back-office, no client base of their own), or as an RM who's ALSO been
+// granted MF Desk access (mf_desk_access flag) so they can help backfill
+// transactions across all RMs while still being a normal RM otherwise.
+function hasMfDeskAccess(user){
+  if(!user) return false;
+  return user.role==='mf_desk' || (user.role==='rm' && user.mf_desk_access===true);
+}
+
 // ── Cross-check remarks ──
 // A light two-way check between the RM and MF Desk on the same entry, without
-// either side needing approve/decline authority (that's Admin-only):
-//  - If an RM logged the entry, MF Desk can leave a remark on it (e.g. flag
-//    that it looks like a duplicate of someone else's business).
-//  - If MF Desk logged the entry, the RM that client actually belongs to can
-//    leave a remark on it (e.g. confirm/dispute it).
+// either side needing approve/decline authority (that's Admin-only). Based on
+// whether the entry was self-logged by its own RM or logged by someone else
+// on that RM's behalf — this works correctly whether the "someone else" is a
+// pure MF Desk user or an RM who also has MF Desk access:
+//  - Self-logged (rm === created_by) → any other MF-Desk-capable user can
+//    leave a remark (e.g. flag that it looks like a duplicate).
+//  - Logged by someone else on this RM's behalf → the actual owning RM can
+//    leave a remark (e.g. confirm/dispute it).
 // Admin can always remark on anything.
 function canAddCrossRemark(e){
   if(!CU) return false;
   if(CU.role==='admin') return true;
-  if(e.created_by_role==='mf_desk'){
-    return CU.role!=='mf_desk' && (e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+  const selfEntered = (e.rm||'').trim().toLowerCase() === (e.created_by||'').trim().toLowerCase();
+  if(selfEntered){
+    return hasMfDeskAccess(CU) && CU.name!==e.created_by;
   }
-  return CU.role==='mf_desk';
+  return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
 }
 
 function addCrossRemark(id){
@@ -4658,7 +4671,7 @@ function renderMfTxnPage(){
   // Populate RM filter dropdown (admin / MF Desk sees all MF RMs, RM sees just themself)
   const rmFilter=document.getElementById('mftxn-rm-filter');
   if(rmFilter){
-    const isFullAccess = CU.role==='admin' || CU.role==='mf_desk';
+    const isFullAccess = CU.role==='admin' || hasMfDeskAccess(CU);
     const mfRMs = isFullAccess ? getSegRMs('mf') : [CU.name];
     rmFilter.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
     if(!isFullAccess){ rmFilter.value=CU.name; rmFilter.disabled=true; }
@@ -4820,12 +4833,12 @@ document.addEventListener('click', e=>{
 });
 
 
-// MF Desk (role 'mf_desk') needs to search/select ANY client across all RMs
-// when logging a transaction on their behalf — unlike the shared
-// getMyMfClients() which stays RM-scoped everywhere else in the app, this is
-// scoped specifically to the MF Transactions entry form.
+// MF Desk (pure role, or an RM granted MF Desk access) needs to search/select
+// ANY client across all RMs when logging a transaction on their behalf —
+// unlike the shared getMyMfClients() which stays RM-scoped everywhere else
+// in the app, this is scoped specifically to the MF Transactions entry form.
 function getMfTxnSearchClients(){
-  if(CU.role==='admin' || CU.role==='mf_desk') return DB.get('mf_clients')||[];
+  if(CU.role==='admin' || hasMfDeskAccess(CU)) return DB.get('mf_clients')||[];
   return getMyMfClients();
 }
 
@@ -4898,7 +4911,7 @@ function saveMfTxnEntry(){
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
-    status: (CU.role==='admin' || CU.role==='mf_desk') ? 'Approved' : 'Pending',
+    status: (CU.role==='admin' || hasMfDeskAccess(CU)) ? 'Approved' : 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
@@ -4920,8 +4933,8 @@ function saveMfTxnEntry(){
 function getFilteredMfTxns(){
   let entries=getMfBizEntries();
   // RM scoping — only plain RMs are restricted to their own entries.
-  // Admin and MF Desk (back-office, scoped role) see everyone's.
-  if(CU.role!=='admin' && CU.role!=='mf_desk'){
+  // Admin and anyone with MF Desk access (pure role or RM+MF Desk) see everyone's.
+  if(CU.role!=='admin' && !hasMfDeskAccess(CU)){
     entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
   }
   const q=(document.getElementById('mftxn-search')?.value||'').trim().toLowerCase();
@@ -5717,8 +5730,8 @@ function bizReportRowCells(e){
 function newBusinessMonthlyReport(){
   const biz = DB.get('mf_business');
   let entries = Array.isArray(biz) ? biz : (biz?.entries || []);
-  // Staff sees only their own entries. Admin and MF Desk see everyone's.
-  if(CU.role!=='admin' && CU.role!=='mf_desk'){
+  // Staff sees only their own entries. Admin and anyone with MF Desk access see everyone's.
+  if(CU.role!=='admin' && !hasMfDeskAccess(CU)){
     const myNames = (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
     entries = entries.filter(e=>myNames.includes((e.rm||'').trim().toUpperCase()) || e.created_by===CU.name);
   }
@@ -5898,7 +5911,7 @@ function renderAdmin(){
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
         <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
-        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':'RM'}</div>
+        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
@@ -5943,7 +5956,7 @@ function userForm(u){
       <div class="form-field"><label>Password *</label><input id="uf_pwd" type="password" placeholder="${u?'Leave blank to keep current':'Enter password'}"></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Role</label><select id="uf_role" onchange="togglePinField(this)">
+      <div class="form-field"><label>Role</label><select id="uf_role" onchange="onUserRoleChange(this)">
         <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
         <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
         <option ${u?.role==='mf_desk'?'selected':''} value="mf_desk">MF Desk (MF Transactions only)</option>
@@ -5952,6 +5965,12 @@ function userForm(u){
         <label>4-Digit PIN (RM only)</label>
         <input id="uf_pin" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" value="" placeholder="${u?'Leave blank to keep current':'Enter 4-digit PIN'}">
       </div>
+    </div>
+    <div class="form-field" id="uf_mfdesk_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
+        <input type="checkbox" id="uf_mfdesk_access" ${u?.mf_desk_access?'checked':''}>
+        Also give MF Desk access (can view/enter MF Transactions for any RM, in addition to their own)
+      </label>
     </div>
     <div class="form-field"><label>Segments Access</label>
       <div style="display:flex;gap:12px;margin-top:6px">
@@ -5971,6 +5990,7 @@ function saveUser(){
   const pwd=document.getElementById('uf_pwd').value;
   const role=document.getElementById('uf_role').value;
   const pinVal=document.getElementById('uf_pin')?.value||'';
+  const mfDeskAccess = role==='rm' && !!document.getElementById('uf_mfdesk_access')?.checked;
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
     toast('PIN must be 4 digits (0-9)','error'); return;
   }
@@ -5987,7 +6007,7 @@ function saveUser(){
     if(idx>=0){
       const mob=document.getElementById('uf_mobile').value.trim();
       const eml=document.getElementById('uf_email').value.trim();
-      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml};
+      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess};
       if(pwd) users[idx].password=pwd;
       if(role==='rm' && pinVal) users[idx].pin=pinVal;
     }
@@ -5996,7 +6016,7 @@ function saveUser(){
     if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
     const mob2=document.getElementById('uf_mobile').value.trim();
     const eml2=document.getElementById('uf_email').value.trim();
-    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true};
+    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess};
     if(role==='rm' && pinVal) newUser.pin=pinVal;
     users.push(newUser);
   }
@@ -7009,10 +7029,11 @@ function saveChangeCred(){
 }
 
 
-function togglePinField(sel){
-  const wrap = document.getElementById('uf_pin_wrap');
-  if(!wrap) return;
-  wrap.style.display = sel.value==='rm' ? '' : 'none';
+function onUserRoleChange(sel){
+  const pinWrap = document.getElementById('uf_pin_wrap');
+  if(pinWrap) pinWrap.style.display = sel.value==='rm' ? '' : 'none';
+  const mfDeskWrap = document.getElementById('uf_mfdesk_wrap');
+  if(mfDeskWrap) mfDeskWrap.style.display = sel.value==='rm' ? '' : 'none';
 }
 
 
