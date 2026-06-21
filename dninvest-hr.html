@@ -251,7 +251,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         <div class="metric"><div class="m-lbl">Present today</div><div class="m-val" style="color:var(--green)" id="d-present">—</div></div>
         <div class="metric"><div class="m-lbl">Absent</div><div class="m-val" style="color:var(--red)" id="d-absent">—</div></div>
         <div class="metric"><div class="m-lbl">Holiday</div><div class="m-val" style="color:var(--amber)" id="d-leave">—</div></div>
-        <div class="metric"><div class="m-lbl">This month payroll</div><div class="m-val" style="font-size:16px" id="d-payroll">₹0</div></div>
+        <div class="metric admin-only" style="display:none"><div class="m-lbl">Pending advances</div><div class="m-val" style="font-size:16px;color:var(--red)" id="d-pending-adv">₹0</div></div>
       </div>
 
       <div class="grid2">
@@ -264,10 +264,22 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <div class="card-title">Holiday status</div>
             <div id="pending-leaves"></div>
           </div>
-          <div class="card admin-only" style="display:none">
-            <div class="card-title">This month at a glance</div>
-            <div id="month-summary"></div>
-          </div>
+        </div>
+      </div>
+
+      <div class="card-title admin-only" style="display:none;margin-top:0.5rem">This month — financial snapshot</div>
+      <div class="grid2 admin-only" style="display:none">
+        <div class="card">
+          <div class="card-title">Payroll breakdown <span id="dash-payroll-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
+          <div id="dash-payroll-snapshot"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Pending advances</div>
+          <div id="dash-advance-summary"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">ESI summary</div>
+          <div id="dash-esi-summary"></div>
         </div>
       </div>
     </div>
@@ -1540,15 +1552,12 @@ function renderDashboard(){
   const da=document.getElementById('d-absent'); if(da) da.textContent=absent;
   const dl=document.getElementById('d-leave'); if(dl) dl.textContent=onleave;
 
-  // Real payroll: sum of each employee's net salary this month (Salary - absent deduction)
-  const dpay=document.getElementById('d-payroll');
-  if(dpay){
-    let totalPayroll=0;
-    const month=td.slice(0,7);
-    EMPLOYEES.forEach(e=>{
-      totalPayroll += calcMonthlySalary(e.name,month).net;
-    });
-    dpay.textContent=fmt(totalPayroll);
+  // Quick top-row metric: total pending advance across the team (admin-only)
+  const dpa=document.getElementById('d-pending-adv');
+  if(dpa){
+    let totalPending=0;
+    EMPLOYEES.forEach(e=>{ totalPending += getPendingAdvanceTotal(e.name); });
+    dpa.textContent=fmt(totalPending);
   }
 
   // Today att list
@@ -1589,6 +1598,90 @@ function renderDashboard(){
       html+=`<p style="color:var(--text2);font-size:13px">No upcoming exchange holiday in the list</p>`;
     }
     pl.innerHTML=html;
+  }
+
+  renderDashboardFinancials();
+}
+
+// Admin-only financial snapshot for the dashboard: payroll breakdown, pending
+// advances list, and ESI summary — all computed for the current month.
+function renderDashboardFinancials(){
+  if(!isAdmin) return;
+  const month=today().slice(0,7);
+  const payments=getPaymentsForMonth(month);
+
+  let grossPayroll=0, totalAbsentDed=0, totalESI=0, totalESIEmployer=0,
+      totalExtra=0, totalAdvThisMonth=0, netPayroll=0, totalPaid=0, esiCoveredCount=0;
+  const advanceList=[];
+
+  EMPLOYEES.forEach(e=>{
+    const r=calcMonthlySalary(e.name, month);
+    grossPayroll += r.salary;
+    totalAbsentDed += r.deduction;
+    totalESI += r.esi.employeeContribution;
+    totalESIEmployer += r.esi.employerContribution;
+    if(r.esi.applicable) esiCoveredCount++;
+    totalExtra += r.extra.amount;
+    const advThisMonth=getAdvanceAdjustedForMonth(e.name, month);
+    totalAdvThisMonth += advThisMonth;
+    netPayroll += Math.max(0, r.net-advThisMonth);
+    totalPaid += (payments[e.name] && payments[e.name].salaryPaid) || 0;
+    const pending=getPendingAdvanceTotal(e.name);
+    if(pending>0) advanceList.push({name:e.name, pending});
+  });
+  advanceList.sort((a,b)=>b.pending-a.pending);
+  const totalPendingAdvance=advanceList.reduce((s,a)=>s+a.pending,0);
+
+  const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const mLblEl=document.getElementById('dash-payroll-month-label');
+  if(mLblEl) mLblEl.textContent='— '+mLabel;
+
+  const snap=document.getElementById('dash-payroll-snapshot');
+  if(snap){
+    const balance=Math.max(0, netPayroll-totalPaid);
+    snap.innerHTML=`
+      <table style="font-size:13px;width:100%">
+        <tr><td style="color:var(--text2);padding:5px 0">Gross payroll (Basic, ${EMPLOYEES.length} employees)</td><td style="text-align:right">${fmt(grossPayroll)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Absent deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(totalAbsentDed)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">ESI (employee share)</td><td style="text-align:right;color:var(--red)">− ${fmt(totalESI)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Extra deductions</td><td style="text-align:right;color:var(--red)">− ${fmt(totalExtra)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(totalAdvThisMonth)}</td></tr>
+        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payroll (this month)</td><td style="text-align:right;font-weight:700;color:var(--green)">${fmt(netPayroll)}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Paid so far</td><td style="text-align:right;color:var(--green)">${fmt(totalPaid)}</td></tr>
+        <tr><td style="padding:5px 0;font-weight:600">Balance pending</td><td style="text-align:right;font-weight:700;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td></tr>
+      </table>`;
+  }
+
+  const advBox=document.getElementById('dash-advance-summary');
+  if(advBox){
+    if(advanceList.length===0){
+      advBox.innerHTML=`<p style="font-size:12.5px;color:var(--text3)">Koi pending advance nahi hai — sab clear hai.</p>`;
+    }else{
+      advBox.innerHTML=`
+        <p style="font-size:13px;margin-bottom:10px">Total pending: <strong style="color:var(--red)">${fmt(totalPendingAdvance)}</strong> (${advanceList.length} employee${advanceList.length>1?'s':''})</p>
+        <div>${advanceList.slice(0,6).map(a=>`
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <span>${a.name}</span><span style="color:var(--red);font-weight:600">${fmt(a.pending)}</span>
+          </div>`).join('')}
+        </div>
+        ${advanceList.length>6?`<p style="font-size:11px;color:var(--text3);margin-top:6px">+${advanceList.length-6} more — Salary page mein puri list dekhein</p>`:''}`;
+    }
+  }
+
+  const esiBox=document.getElementById('dash-esi-summary');
+  if(esiBox){
+    const s=getEsiSettings();
+    if(!s.enabled){
+      esiBox.innerHTML=`<p style="font-size:12.5px;color:var(--text3)">ESI fillhal disabled hai — Salary page se enable karein.</p>`;
+    }else{
+      esiBox.innerHTML=`
+        <table style="font-size:13px;width:100%">
+          <tr><td style="color:var(--text2);padding:5px 0">Employees covered</td><td style="text-align:right;font-weight:600">${esiCoveredCount} / ${EMPLOYEES.length}</td></tr>
+          <tr><td style="color:var(--text2);padding:5px 0">Employee share (@ ${s.employeeRate}%)</td><td style="text-align:right;color:var(--red)">${fmt(totalESI)}</td></tr>
+          <tr><td style="color:var(--text2);padding:5px 0">Employer share (@ ${s.employerRate}%)</td><td style="text-align:right;color:var(--text2)">${fmt(totalESIEmployer)}</td></tr>
+          <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total ESI (company cost)</td><td style="text-align:right;font-weight:700">${fmt(totalESI+totalESIEmployer)}</td></tr>
+        </table>`;
+    }
   }
 }
 
