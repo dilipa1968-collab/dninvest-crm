@@ -405,6 +405,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <hr class="divider">
           <div id="sal-advance-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
+          <div id="sal-esi-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
           <div id="sal-result"></div>
           <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generated! (Demo)')">Salary slip download</button>
         </div>
@@ -412,7 +413,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance kata</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance kata</th><th>ESI</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-salary-table"></tbody>
             </table>
           </div>
@@ -457,6 +458,30 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <table>
               <thead><tr><th>Date</th><th>Amount diya</th><th>Note</th><th>Pending balance</th><th>Status</th><th></th></tr></thead>
               <tbody id="adv-history-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card admin-only" style="display:none;grid-column:1/-1">
+          <div class="card-title">ESI (Employee State Insurance) settings</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Jis employee ki Basic salary wage ceiling se kam-ya-barabar ho, uska ESI auto-deduct hoga (Employee share). Employer share sirf company cost record ke liye dikhega, employee ki salary se nahi katega.</p>
+          <div class="compact-grid3">
+            <div class="field-inline"><label>ESI enabled?</label>
+              <select id="esi-enabled">
+                <option value="1">Haan</option>
+                <option value="0">Nahi</option>
+              </select>
+            </div>
+            <div class="field-inline"><label>Wage ceiling (₹/month)</label><input type="number" id="esi-ceiling" placeholder="e.g. 21000" oninput="this.dataset.touched='1'"></div>
+            <div class="field-inline"><label>Employee rate (%)</label><input type="number" step="0.01" id="esi-emp-rate" placeholder="e.g. 0.75" oninput="this.dataset.touched='1'"></div>
+            <div class="field-inline"><label>Employer rate (%)</label><input type="number" step="0.01" id="esi-empr-rate" placeholder="e.g. 3.25" oninput="this.dataset.touched='1'"></div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="saveEsiSettingsFromUI()">Save ESI settings</button>
+          <hr class="divider">
+          <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">Per-employee override (zaroorat par hi use karein)</p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Employee</th><th>Basic salary</th><th>Status</th><th>Override</th></tr></thead>
+              <tbody id="esi-override-table"></tbody>
             </table>
           </div>
         </div>
@@ -755,7 +780,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month'];
+    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -1067,6 +1092,41 @@ async function reverseAdvanceForMonth(name, month){
   await saveAdvances(all);
 }
 
+// ─── ESI (Employee State Insurance) ─────────────────────────────────────────
+// Statutory rule (current, as configurable below): employees with gross monthly
+// wage ≤ wage ceiling are covered. Employee contributes employeeRate% (default
+// 0.75%), employer contributes employerRate% (default 3.25%) — employer's share
+// is a company cost only, it never reduces the employee's net pay.
+function getEsiSettings(){
+  return DB.get('esi_settings', {enabled:true, ceiling:21000, employeeRate:0.75, employerRate:3.25})
+    || {enabled:true, ceiling:21000, employeeRate:0.75, employerRate:3.25};
+}
+async function saveEsiSettings(d){ await DB.set('esi_settings', d); }
+
+// Per-employee override: 'auto' (default, decided by ceiling) | 'include' | 'exclude'
+function getEsiOverrides(){ return DB.get('esi_overrides', {}) || {}; }
+async function setEsiOverride(name, mode){ await DB.setMerged('esi_overrides', {[name]: mode}); }
+function getEsiOverride(name){ return (getEsiOverrides()[name]) || 'auto'; }
+
+// grossWage = the wage figure used to (a) check ceiling eligibility and (b) compute
+// the contribution amount. We use the employee's configured basic salary for the
+// ceiling check (matches how wages are declared to ESIC), and the actual earned
+// wage for that month (basic − absent deduction) for the contribution amount.
+function calcESI(name, basicSalary, earnedWage){
+  const s=getEsiSettings();
+  if(!s.enabled) return {applicable:false, employeeContribution:0, employerContribution:0, settings:s};
+  const override=getEsiOverride(name);
+  let applicable;
+  if(override==='include') applicable=true;
+  else if(override==='exclude') applicable=false;
+  else applicable = basicSalary <= s.ceiling;
+  if(!applicable) return {applicable:false, employeeContribution:0, employerContribution:0, settings:s};
+  const wage=Math.max(0, earnedWage!=null?earnedWage:basicSalary);
+  const employeeContribution=Math.round(wage*(s.employeeRate/100));
+  const employerContribution=Math.round(wage*(s.employerRate/100));
+  return {applicable:true, employeeContribution, employerContribution, settings:s};
+}
+
 // Brokerage incentive formula (fully Admin-configurable from Incentive page):
 // Brokerage < lowMult x Salary                 => Incentive = 0
 // lowMult x Salary <= Brokerage < highMult x Salary => Excess(over lowMult x) * tier1Rate%
@@ -1278,6 +1338,9 @@ function startApp(){
   calcSalary();
   renderAdvanceBox();
   renderAdvanceHistory();
+  loadEsiSettingsIntoUI();
+  renderEsiBox();
+  if(isAdmin) renderEsiOverrideTable();
 
   // Real-time sync: whenever Admin (or anyone, on any device) changes data in
   // Firestore, this fires and we re-render the relevant pages immediately —
@@ -1288,7 +1351,8 @@ function startApp(){
     renderLeavePage();
     renderSalaryPage();
     renderIncentivePage();
-    if(isAdmin){ renderEmployees(); renderAdvanceBox(); renderAdvanceHistory(); }
+    renderEsiBox();
+    if(isAdmin){ renderEmployees(); renderAdvanceBox(); renderAdvanceHistory(); loadEsiSettingsIntoUI(); renderEsiOverrideTable(); }
   });
 }
 
@@ -1925,8 +1989,10 @@ function calcMonthlySalary(name, monthPrefix){
   const absentDays=recs.filter(r=>r.status==='Absent').length;
   const perDay=sal/30;
   const deduction=perDay*absentDays;
-  const net=Math.max(0,sal-deduction);
-  return {salary:sal, perDay, presentDays, absentDays, deduction, net};
+  const earnedWage=Math.max(0,sal-deduction);
+  const esi=calcESI(name, sal, earnedWage);
+  const net=Math.max(0, earnedWage-esi.employeeContribution);
+  return {salary:sal, perDay, presentDays, absentDays, deduction, esi, net};
 }
 
 function viewSalMonth(){
@@ -1959,6 +2025,7 @@ function renderSalaryPage(){
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent × per-day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
+        ${r.esi.applicable?`<tr><td style="color:var(--text2);padding:6px 0">ESI (Employee share @ ${r.esi.settings.employeeRate}%)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.esi.employeeContribution)}</td></tr>`:''}
         ${advDeducted>0?`<tr><td style="color:var(--text2);padding:6px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(netAfterAdv)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(paid)}</td></tr>
@@ -1990,6 +2057,7 @@ function renderSalaryPage(){
           <td>${r.absentDays}</td>
           <td style="color:var(--red)">− ${fmt(r.deduction)}</td>
           <td style="color:${advDeducted>0?'var(--red)':'var(--text3)'}">${advDeducted>0?'− '+fmt(advDeducted):'—'}</td>
+          <td style="color:${r.esi.applicable?'var(--red)':'var(--text3)'}">${r.esi.applicable?'− '+fmt(r.esi.employeeContribution):'—'}</td>
           <td style="font-weight:600;color:var(--green)">${fmt(netAfterAdv)}</td>
           <td><input type="number" id="sal-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
@@ -2016,6 +2084,7 @@ async function markSalaryPaid(name){
 // figures, since advance deduction depends on which employee/month is selected.
 function onSalEmpOrMonthChange(){
   renderAdvanceBox();
+  renderEsiBox();
   calcSalary();
 }
 
@@ -2101,7 +2170,9 @@ function calcSalary(){
   const deduction=perday*absentDays;
   const month=salMonthEl&&salMonthEl.value?salMonthEl.value:'';
   const advDeducted=month?getAdvanceAdjustedForMonth(name,month):0;
-  const net=Math.max(0,b-deduction)+bonus-advDeducted;
+  const earnedWage=Math.max(0,b-deduction);
+  const esi=calcESI(name, b, earnedWage);
+  const net=earnedWage-esi.employeeContribution+bonus-advDeducted;
   const el=document.getElementById('sal-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
@@ -2109,10 +2180,93 @@ function calcSalary(){
       <tr><td style="color:var(--text2);padding:5px 0">Per day (Salary÷30)</td><td style="text-align:right">${fmt(perday)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(deduction)}</td></tr>
+      ${esi.applicable?`<tr><td style="color:var(--text2);padding:5px 0">ESI (Employee @ ${esi.settings.employeeRate}%)</td><td style="text-align:right;color:var(--red)">− ${fmt(esi.employeeContribution)}</td></tr>`:''}
       <tr><td style="color:var(--text2);padding:5px 0">Bonus</td><td style="text-align:right;color:var(--green)">+ ${fmt(bonus)}</td></tr>
       ${advDeducted>0?`<tr><td style="color:var(--text2);padding:5px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(Math.max(0,net))}</td></tr>
+      ${esi.applicable?`<tr><td colspan="2" style="padding-top:6px;font-size:10.5px;color:var(--text3)">Employer ESI share (company cost, salary se nahi katega): ${fmt(esi.employerContribution)}</td></tr>`:''}
     </table>`;
+}
+
+// ─── ESI UI ──────────────────────────────────────────────────────────────────
+// Compact info box shown next to the salary calculator: tells admin whether the
+// selected employee is ESI-covered this month and what gets deducted.
+function renderEsiBox(){
+  const box=document.getElementById('sal-esi-box');
+  if(!box) return;
+  const sel=document.getElementById('sal-emp');
+  const name=sel?sel.value||'Puja':'Puja';
+  const s=getEsiSettings();
+  if(!s.enabled){
+    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">ESI fillhal disabled hai. ESI settings card se enable karein.</p>`;
+    return;
+  }
+  const b=getEmpSalary(name);
+  const esi=calcESI(name, b, b);
+  const override=getEsiOverride(name);
+  box.innerHTML=`
+    <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:4px">ESI status — ${name}</p>
+    <p style="font-size:11.5px;color:${esi.applicable?'var(--red)':'var(--text3)'}">
+      ${esi.applicable?`Covered — ${esi.settings.employeeRate}% employee share is month se net se katega.`:`Covered nahi (Basic ${fmt(b)} ceiling ${fmt(s.ceiling)} se zyada hai).`}
+      ${override!=='auto'?` <span style="color:var(--text3)">(manual override: ${override==='include'?'always include':'always exclude'})</span>`:''}
+    </p>`;
+}
+
+async function saveEsiSettingsFromUI(){
+  const enabled=document.getElementById('esi-enabled').value==='1';
+  const ceiling=parseInt(document.getElementById('esi-ceiling').value)||21000;
+  const employeeRate=parseFloat(document.getElementById('esi-emp-rate').value)||0.75;
+  const employerRate=parseFloat(document.getElementById('esi-empr-rate').value)||3.25;
+  await saveEsiSettings({enabled, ceiling, employeeRate, employerRate});
+  renderEsiBox();
+  calcSalary();
+  renderSalaryPage();
+  renderEsiOverrideTable();
+  alert('ESI settings save ho gayi.');
+}
+
+function loadEsiSettingsIntoUI(){
+  const s=getEsiSettings();
+  const enEl=document.getElementById('esi-enabled');
+  const ceilEl=document.getElementById('esi-ceiling');
+  const erEl=document.getElementById('esi-emp-rate');
+  const errEl=document.getElementById('esi-empr-rate');
+  if(enEl) enEl.value=s.enabled?'1':'0';
+  if(ceilEl && !ceilEl.dataset.touched) ceilEl.value=s.ceiling;
+  if(erEl && !erEl.dataset.touched) erEl.value=s.employeeRate;
+  if(errEl && !errEl.dataset.touched) errEl.value=s.employerRate;
+}
+
+async function setEsiOverrideFromUI(name, mode){
+  await setEsiOverride(name, mode);
+  renderEsiOverrideTable();
+  renderEsiBox();
+  calcSalary();
+  renderSalaryPage();
+}
+
+function renderEsiOverrideTable(){
+  const tbl=document.getElementById('esi-override-table');
+  if(!tbl) return;
+  const s=getEsiSettings();
+  tbl.innerHTML=EMPLOYEES.map(e=>{
+    const sal=getEmpSalary(e.name);
+    const esi=calcESI(e.name, sal, sal);
+    const override=getEsiOverride(e.name);
+    const safeName=e.name.replace(/'/g,"\\'");
+    return `<tr>
+      <td>${e.name}</td>
+      <td>${fmt(sal)}</td>
+      <td style="color:${esi.applicable?'var(--red)':'var(--text3)'}">${esi.applicable?'Covered':'Not covered'}</td>
+      <td>
+        <select onchange="setEsiOverrideFromUI('${safeName}', this.value)" style="font-size:12px">
+          <option value="auto" ${override==='auto'?'selected':''}>Auto (Basic vs ceiling)</option>
+          <option value="include" ${override==='include'?'selected':''}>Always include</option>
+          <option value="exclude" ${override==='exclude'?'selected':''}>Always exclude</option>
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 // ─── ADVANCE MANAGEMENT UI ───────────────────────────────────────────────────
@@ -2602,7 +2756,7 @@ function showPage(id,btn){
   // refresh on visit
   if(id==='attendance') renderAttendancePage();
   if(id==='leave') renderLeavePage();
-  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); }
+  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); loadEsiSettingsIntoUI(); if(isAdmin) renderEsiOverrideTable(); }
   if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
