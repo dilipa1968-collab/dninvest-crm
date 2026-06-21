@@ -406,6 +406,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <hr class="divider">
           <div id="sal-advance-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
           <div id="sal-esi-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
+          <div id="sal-extra-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
           <div id="sal-result"></div>
           <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generated! (Demo)')">Salary slip download</button>
         </div>
@@ -413,7 +414,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance kata</th><th>ESI</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance kata</th><th>ESI</th><th>Extra</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-salary-table"></tbody>
             </table>
           </div>
@@ -780,7 +781,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides'];
+    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','extra_deductions'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -1127,6 +1128,23 @@ function calcESI(name, basicSalary, earnedWage){
   return {applicable:true, employeeContribution, employerContribution, settings:s};
 }
 
+// ─── EXTRA DEDUCTION (manual, ad-hoc) ───────────────────────────────────────
+// For anything not auto-calculated — half day, late fine, damage, etc.
+// One simple amount + reason per employee per month, fully admin-controlled.
+// Shape: { "EmployeeName": { "YYYY-MM": {amount, note} } }
+function getExtraDeductions(){ return DB.get('extra_deductions', {}) || {}; }
+async function saveExtraDeductions(d){ await DB.set('extra_deductions', d); }
+function getExtraDeductionForMonth(name, month){
+  const all=getExtraDeductions();
+  return (all[name] && all[name][month]) || {amount:0, note:''};
+}
+async function setExtraDeductionForMonth(name, month, amount, note){
+  const all=getExtraDeductions();
+  if(!all[name]) all[name]={};
+  all[name][month]={amount: Math.max(0, Number(amount)||0), note: note||''};
+  await saveExtraDeductions(all);
+}
+
 // Brokerage incentive formula (fully Admin-configurable from Incentive page):
 // Brokerage < lowMult x Salary                 => Incentive = 0
 // lowMult x Salary <= Brokerage < highMult x Salary => Excess(over lowMult x) * tier1Rate%
@@ -1340,6 +1358,7 @@ function startApp(){
   renderAdvanceHistory();
   loadEsiSettingsIntoUI();
   renderEsiBox();
+  renderExtraDeductionBox();
   if(isAdmin) renderEsiOverrideTable();
 
   // Real-time sync: whenever Admin (or anyone, on any device) changes data in
@@ -1352,6 +1371,7 @@ function startApp(){
     renderSalaryPage();
     renderIncentivePage();
     renderEsiBox();
+    renderExtraDeductionBox();
     if(isAdmin){ renderEmployees(); renderAdvanceBox(); renderAdvanceHistory(); loadEsiSettingsIntoUI(); renderEsiOverrideTable(); }
   });
 }
@@ -1987,12 +2007,14 @@ function calcMonthlySalary(name, monthPrefix){
   const recs=(att[name]||[]).filter(r=>!monthPrefix || r.date.startsWith(monthPrefix));
   const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
   const absentDays=recs.filter(r=>r.status==='Absent').length;
+  const halfDays=recs.filter(r=>r.status==='Half day').length;
   const perDay=sal/30;
   const deduction=perDay*absentDays;
   const earnedWage=Math.max(0,sal-deduction);
   const esi=calcESI(name, sal, earnedWage);
-  const net=Math.max(0, earnedWage-esi.employeeContribution);
-  return {salary:sal, perDay, presentDays, absentDays, deduction, esi, net};
+  const extra=monthPrefix?getExtraDeductionForMonth(name, monthPrefix):{amount:0, note:''};
+  const net=Math.max(0, earnedWage-esi.employeeContribution-extra.amount);
+  return {salary:sal, perDay, presentDays, absentDays, halfDays, deduction, esi, extra, net};
 }
 
 function viewSalMonth(){
@@ -2024,8 +2046,10 @@ function renderSalaryPage(){
         <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷30)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
+        ${r.halfDays>0?`<tr><td style="color:var(--text2);padding:6px 0">Half days</td><td style="text-align:right;color:var(--amber,#b58a00)">${r.halfDays}</td></tr>`:''}
         <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent × per-day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
         ${r.esi.applicable?`<tr><td style="color:var(--text2);padding:6px 0">ESI (Employee share @ ${r.esi.settings.employeeRate}%)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.esi.employeeContribution)}</td></tr>`:''}
+        ${r.extra.amount>0?`<tr><td style="color:var(--text2);padding:6px 0">Extra deduction${r.extra.note?' ('+r.extra.note.replace(/</g,'&lt;')+')':''}</td><td style="text-align:right;color:var(--red)">− ${fmt(r.extra.amount)}</td></tr>`:''}
         ${advDeducted>0?`<tr><td style="color:var(--text2);padding:6px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(netAfterAdv)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(paid)}</td></tr>
@@ -2058,6 +2082,7 @@ function renderSalaryPage(){
           <td style="color:var(--red)">− ${fmt(r.deduction)}</td>
           <td style="color:${advDeducted>0?'var(--red)':'var(--text3)'}">${advDeducted>0?'− '+fmt(advDeducted):'—'}</td>
           <td style="color:${r.esi.applicable?'var(--red)':'var(--text3)'}">${r.esi.applicable?'− '+fmt(r.esi.employeeContribution):'—'}</td>
+          <td style="color:${r.extra.amount>0?'var(--red)':'var(--text3)'}" title="${r.extra.note?r.extra.note.replace(/"/g,'&quot;'):''}">${r.extra.amount>0?'− '+fmt(r.extra.amount):'—'}</td>
           <td style="font-weight:600;color:var(--green)">${fmt(netAfterAdv)}</td>
           <td><input type="number" id="sal-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
@@ -2085,6 +2110,7 @@ async function markSalaryPaid(name){
 function onSalEmpOrMonthChange(){
   renderAdvanceBox();
   renderEsiBox();
+  renderExtraDeductionBox();
   calcSalary();
 }
 
@@ -2172,7 +2198,8 @@ function calcSalary(){
   const advDeducted=month?getAdvanceAdjustedForMonth(name,month):0;
   const earnedWage=Math.max(0,b-deduction);
   const esi=calcESI(name, b, earnedWage);
-  const net=earnedWage-esi.employeeContribution+bonus-advDeducted;
+  const extra=month?getExtraDeductionForMonth(name,month):{amount:0,note:''};
+  const net=earnedWage-esi.employeeContribution+bonus-advDeducted-extra.amount;
   const el=document.getElementById('sal-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
@@ -2181,6 +2208,7 @@ function calcSalary(){
       <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(deduction)}</td></tr>
       ${esi.applicable?`<tr><td style="color:var(--text2);padding:5px 0">ESI (Employee @ ${esi.settings.employeeRate}%)</td><td style="text-align:right;color:var(--red)">− ${fmt(esi.employeeContribution)}</td></tr>`:''}
+      ${extra.amount>0?`<tr><td style="color:var(--text2);padding:5px 0">Extra deduction${extra.note?' ('+extra.note.replace(/</g,'&lt;')+')':''}</td><td style="text-align:right;color:var(--red)">− ${fmt(extra.amount)}</td></tr>`:''}
       <tr><td style="color:var(--text2);padding:5px 0">Bonus</td><td style="text-align:right;color:var(--green)">+ ${fmt(bonus)}</td></tr>
       ${advDeducted>0?`<tr><td style="color:var(--text2);padding:5px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(Math.max(0,net))}</td></tr>
@@ -2210,6 +2238,58 @@ function renderEsiBox(){
       ${esi.applicable?`Covered — ${esi.settings.employeeRate}% employee share is month se net se katega.`:`Covered nahi (Basic ${fmt(b)} ceiling ${fmt(s.ceiling)} se zyada hai).`}
       ${override!=='auto'?` <span style="color:var(--text3)">(manual override: ${override==='include'?'always include':'always exclude'})</span>`:''}
     </p>`;
+}
+
+// ─── EXTRA DEDUCTION UI ──────────────────────────────────────────────────────
+// Fully manual line — half day, late fine, damage, ya kuch bhi. Admin types in
+// whatever amount + an optional reason, per employee per month. If that month
+// has Half day attendance records marked, a small heads-up is shown (no
+// auto-deduction — admin decides the amount).
+function renderExtraDeductionBox(){
+  const box=document.getElementById('sal-extra-box');
+  if(!box) return;
+  const sel=document.getElementById('sal-emp');
+  const monthEl=document.getElementById('sal-month');
+  const name=sel?sel.value||'Puja':'Puja';
+  const month=monthEl&&monthEl.value?monthEl.value:'';
+
+  if(!month){
+    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">Extra deduction ke liye pehle Month select karein.</p>`;
+    return;
+  }
+
+  const att=getAtt();
+  const halfDays=(att[name]||[]).filter(r=>r.date.startsWith(month) && r.status==='Half day').length;
+  const existing=getExtraDeductionForMonth(name, month);
+
+  box.innerHTML=`
+    <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:6px">Extra deduction — ${name}</p>
+    ${halfDays>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">Is month ${halfDays} Half day record(s) hain — agar inka deduction lagana hai to amount yahan manually add kar dein.</p>`:''}
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field-inline" style="margin-bottom:0;max-width:140px"><label>Amount (₹)</label>
+        <input type="number" id="extra-ded-amount" min="0" value="${existing.amount||''}" placeholder="0">
+      </div>
+      <div class="field-inline" style="margin-bottom:0;flex:1;min-width:160px"><label>Reason (optional)</label>
+        <input type="text" id="extra-ded-note" value="${existing.note?existing.note.replace(/"/g,'&quot;'):''}" placeholder="e.g. Half day on 12th">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="applyExtraDeduction()">Save</button>
+    </div>`;
+}
+
+async function applyExtraDeduction(){
+  const sel=document.getElementById('sal-emp');
+  const monthEl=document.getElementById('sal-month');
+  const name=sel?sel.value||'Puja':'Puja';
+  const month=monthEl&&monthEl.value?monthEl.value:'';
+  if(!month){ alert('Pehle Month select karein.'); return; }
+  const amtEl=document.getElementById('extra-ded-amount');
+  const noteEl=document.getElementById('extra-ded-note');
+  const amount=amtEl?parseInt(amtEl.value)||0:0;
+  const note=noteEl?noteEl.value:'';
+  await setExtraDeductionForMonth(name, month, amount, note);
+  renderExtraDeductionBox();
+  calcSalary();
+  renderSalaryPage();
 }
 
 async function saveEsiSettingsFromUI(){
@@ -2756,7 +2836,7 @@ function showPage(id,btn){
   // refresh on visit
   if(id==='attendance') renderAttendancePage();
   if(id==='leave') renderLeavePage();
-  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); loadEsiSettingsIntoUI(); if(isAdmin) renderEsiOverrideTable(); }
+  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin) renderEsiOverrideTable(); }
   if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
