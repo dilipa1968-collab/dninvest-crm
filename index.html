@@ -916,6 +916,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <label>Amount (₹) *</label>
               <input type="number" id="mftxn-amount" placeholder="e.g. 25000">
             </div>
+            <div class="form-field" style="min-width:200px">
+              <label>Fund Name *</label>
+              <input type="text" id="mftxn-fund" placeholder="e.g. HDFC Flexi Cap Fund">
+            </div>
             <div class="form-field" style="min-width:160px">
               <label>Date *</label>
               <input type="date" id="mftxn-date">
@@ -932,7 +936,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
 
         <div class="filters">
-          <input type="text" placeholder="🔍 Search client / RM..." oninput="renderMfTxnTable()" id="mftxn-search">
+          <input type="text" placeholder="🔍 Search client / RM / fund..." oninput="renderMfTxnTable()" id="mftxn-search">
           <select onchange="renderMfTxnTable()" id="mftxn-rm-filter"><option value="">All RMs</option></select>
           <select onchange="renderMfTxnTable()" id="mftxn-type-filter">
             <option value="">All Types</option>
@@ -1428,6 +1432,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="SIP">New SIP</option>
             <option value="SIP Stop">SIP Stop</option>
             <option value="Switch">Switch</option>
+            <option value="STP">STP</option>
             <option value="Redemption">Redemption</option>
             <option value="SWP">SWP</option>
             <option value="Resumption">Resumption</option>
@@ -1436,7 +1441,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
       </div>
       <div class="form-row">
+        <div class="form-field"><label>Fund Name *</label><input id="biz_fund" placeholder="e.g. HDFC Flexi Cap Fund"></div>
         <div class="form-field"><label>Date *</label><input id="biz_date" type="date"></div>
+      </div>
+      <div class="form-row">
         <div class="form-field"><label>Remarks</label><input id="biz_remarks" placeholder="Optional notes"></div>
       </div>
     </div>
@@ -4456,6 +4464,7 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
+  const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
   document.getElementById('biz_date').value = today();
   document.getElementById('biz_remarks').value = '';
   document.getElementById('businessModal').classList.add('open');
@@ -4465,10 +4474,12 @@ function saveBusinessEntry(){
   if(!currentBusinessTarget) return;
   const type = document.getElementById('biz_type').value;
   const amount = parseFloat(document.getElementById('biz_amount').value);
+  const fundName = (document.getElementById('biz_fund')?.value||'').trim();
   const date = document.getElementById('biz_date').value;
   const remarks = document.getElementById('biz_remarks').value.trim();
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
+  if(!fundName){ toast('Please enter the fund name','error'); return; }
   if(!date){ toast('Please enter the date','error'); return; }
 
   const biz = DB.get('mf_business');
@@ -4477,8 +4488,10 @@ function saveBusinessEntry(){
   if(editingBusinessId){
     const idx = entries.findIndex(e=>e.id===editingBusinessId);
     if(idx>=0){
+      if(CU.role!=='admin' && entries[idx].created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
       entries[idx].type = type;
       entries[idx].amount = amount;
+      entries[idx].fund_name = fundName;
       entries[idx].date = date;
       entries[idx].remarks = remarks;
     }
@@ -4500,11 +4513,13 @@ function saveBusinessEntry(){
     client_id: currentBusinessTarget.id,
     client_name: currentBusinessTarget.name,
     rm,
-    type, amount, date, remarks,
+    type, amount, fund_name: fundName, date, remarks,
     created_by: CU.name,
+    created_by_role: CU.role,
     created: today(),
-    status: CU.role==='admin' ? 'Approved' : 'Pending',
-    decline_reason: ''
+    status: (CU.role==='admin' || CU.role==='mf_desk') ? 'Approved' : 'Pending',
+    decline_reason: '',
+    cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
   const eqEntries2 = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
   DB.set('mf_business', {entries, eq_entries: eqEntries2});
@@ -4524,8 +4539,41 @@ function bizStatusBadge(status){
   return `<span class="badge" style="background:${m.bg};color:${m.col};font-weight:600">${m.label}</span>`;
 }
 
+// ── Cross-check remarks ──
+// A light two-way check between the RM and MF Desk on the same entry, without
+// either side needing approve/decline authority (that's Admin-only):
+//  - If an RM logged the entry, MF Desk can leave a remark on it (e.g. flag
+//    that it looks like a duplicate of someone else's business).
+//  - If MF Desk logged the entry, the RM that client actually belongs to can
+//    leave a remark on it (e.g. confirm/dispute it).
+// Admin can always remark on anything.
+function canAddCrossRemark(e){
+  if(!CU) return false;
+  if(CU.role==='admin') return true;
+  if(e.created_by_role==='mf_desk'){
+    return CU.role!=='mf_desk' && (e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+  }
+  return CU.role==='mf_desk';
+}
+
+function addCrossRemark(id){
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  if(!canAddCrossRemark(e)){ toast('You are not allowed to remark on this entry','error'); return; }
+  const remark = prompt('Your remark on this entry (e.g. checking if this business belongs to someone else):', e.cross_remark||'');
+  if(remark===null) return;
+  e.cross_remark = remark.trim();
+  e.cross_remark_by = CU.name;
+  e.cross_remark_at = today();
+  setMfBizEntries(entries);
+  toast('Remark saved','success');
+  renderMfTxnTable();
+  if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
+}
+
 function approveBusinessEntry(id){
-  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
+  if(CU.role!=='admin') return;
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
@@ -4538,7 +4586,7 @@ function approveBusinessEntry(id){
 }
 
 function declineBusinessEntry(id){
-  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
+  if(CU.role!=='admin') return;
   const reason = prompt('Decline reason (optional):','') || '';
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
@@ -4552,7 +4600,7 @@ function declineBusinessEntry(id){
 }
 
 function markPendingBusinessEntry(id){
-  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
+  if(CU.role!=='admin') return;
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
@@ -4600,6 +4648,7 @@ function renderMfTxnPage(){
   const rmEl=document.getElementById('mftxn-client-rm'); if(rmEl) rmEl.value='';
   const srch=document.getElementById('mftxn-client-search'); if(srch) srch.value='';
   const res=document.getElementById('mftxn-client-results'); if(res){ res.style.display='none'; res.innerHTML=''; }
+  const fundEl=document.getElementById('mftxn-fund'); if(fundEl) fundEl.value='';
   const dateEl=document.getElementById('mftxn-date'); if(dateEl && !dateEl.value) dateEl.value=today();
 
   // Populate RM filter dropdown (admin / MF Desk sees all MF RMs, RM sees just themself)
@@ -4674,10 +4723,12 @@ function saveMfTxnEntry(){
   if(!mfTxnSelectedClient){ toast('Please select a client first','error'); return; }
   const type=document.getElementById('mftxn-type').value;
   const amount=parseFloat(document.getElementById('mftxn-amount').value);
+  const fundName=document.getElementById('mftxn-fund').value.trim();
   const date=document.getElementById('mftxn-date').value;
   const remarks=document.getElementById('mftxn-remarks').value.trim();
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
+  if(!fundName){ toast('Please enter the fund name','error'); return; }
   if(!date){ toast('Please enter the date','error'); return; }
 
   const entries=getMfBizEntries();
@@ -4686,11 +4737,13 @@ function saveMfTxnEntry(){
     client_id: mfTxnSelectedClient.id,
     client_name: mfTxnSelectedClient.name,
     rm: mfTxnSelectedClient.rm,
-    type, amount, date, remarks,
+    type, amount, fund_name: fundName, date, remarks,
     created_by: CU.name,
+    created_by_role: CU.role,
     created: today(),
     status: (CU.role==='admin' || CU.role==='mf_desk') ? 'Approved' : 'Pending',
-    decline_reason: ''
+    decline_reason: '',
+    cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
   setMfBizEntries(entries);
   toast(`${type} entry saved — ${mfTxnSelectedClient.name}`,'success');
@@ -4701,6 +4754,7 @@ function saveMfTxnEntry(){
   document.getElementById('mftxn-client-rm').value='';
   document.getElementById('mftxn-client-search').value='';
   document.getElementById('mftxn-amount').value='';
+  document.getElementById('mftxn-fund').value='';
   document.getElementById('mftxn-remarks').value='';
 
   renderMfTxnTable();
@@ -4719,7 +4773,7 @@ function getFilteredMfTxns(){
   const fromD=document.getElementById('mftxn-from-date')?.value||'';
   const toD=document.getElementById('mftxn-to-date')?.value||'';
 
-  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q));
+  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.fund_name||'').toLowerCase().includes(q));
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
   if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
@@ -4746,20 +4800,26 @@ function renderMfTxnTable(){
   }
 
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>RM</th><th>Type</th><th style="text-align:right">Amount (₹)</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Client</th><th>RM</th><th>Type</th><th>Fund Name</th><th style="text-align:right">Amount (₹)</th><th>Remarks</th><th>Cross-Check</th><th>Status</th><th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
         const status = e.status||'Pending';
+        const canRemark = canAddCrossRemark(e);
+        const remarkCell = e.cross_remark
+          ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}`
+          : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
         return `<tr>
           <td>${e.date||'—'}</td>
           <td>${escapeHtml(e.client_name||'—')}</td>
           <td>${escapeHtml(e.rm||'—')}</td>
           <td><span class="badge" style="background:${color}22;color:${color}">${escapeHtml(e.type||'—')}</span></td>
+          <td style="font-size:.82rem">${escapeHtml(e.fund_name||'—')}</td>
           <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
+          <td style="min-width:140px">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
-          <td style="white-space:nowrap">${(CU.role==='admin'||CU.role==='mf_desk')?`
+          <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
@@ -4771,7 +4831,7 @@ function renderMfTxnTable(){
 }
 
 function deleteMfTxnEntry(id){
-  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
+  if(CU.role!=='admin') return;
   if(!confirm('Delete this transaction entry?')) return;
   const entries=getMfBizEntries().filter(e=>e.id!==id);
   setMfBizEntries(entries);
@@ -4782,8 +4842,8 @@ function deleteMfTxnEntry(id){
 function exportMfTxns(){
   const entries=getFilteredMfTxns();
   if(entries.length===0){ toast('No data to export','error'); return; }
-  const rows=[['Date','Client Name','RM','Type','Amount','Remarks']];
-  entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.rm||'',e.type||'',e.amount||0,e.remarks||'']));
+  const rows=[['Date','Client Name','RM','Type','Fund Name','Amount','Remarks','Status','Cross-Check Remark']];
+  entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,e.remarks||'',e.status||'Pending',e.cross_remark||'']));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
@@ -5481,82 +5541,115 @@ function fuPendingMf(){
   showReport('Follow-up Pending — MF',['RM','Name','Mobile','Last Call','Next Call','Status','Remarks'],rows);
 }
 
+let _bizReportEntries = [];
+let _bizReportSort = {col:null, dir:1};
+
+const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Resumption','Remarks'];
+const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, Resumption:7};
+
+function bizReportRowCells(e){
+  const amts = new Array(8).fill('');
+  const idx = BIZ_REPORT_TYPECOL[e.type];
+  if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
+  const ym = (e.date||'').slice(0,7);
+  const [y,m]=ym.split('-');
+  const monthLabel = m ? MN[parseInt(m)]+'-'+y : '';
+  return [monthLabel, e.rm||'—', e.client_name||'—', e.fund_name||'—', fmtDate(e.date)||'—', ...amts, e.remarks||'—'];
+}
+
 function newBusinessMonthlyReport(){
   const biz = DB.get('mf_business');
   let entries = Array.isArray(biz) ? biz : (biz?.entries || []);
-  // Staff sees only their own entries
-  if(CU.role!=='admin'){
+  // Staff sees only their own entries. Admin and MF Desk see everyone's.
+  if(CU.role!=='admin' && CU.role!=='mf_desk'){
     const myNames = (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
     entries = entries.filter(e=>myNames.includes((e.rm||'').trim().toUpperCase()) || e.created_by===CU.name);
   }
-  const headers = ['Month','RM','Client','Date','Lumpsum','SIP','SIP Stop','Switch','Resumption','Remarks'];
-  const typeCol = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, Resumption:4};
-
-  // Sort entries by date desc for both table and CSV
-  const sorted = entries.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-
-  // Build CSV rows (no actions column)
-  const csvRows = sorted.map(e=>{
-    const amts = ['','','','',''];
-    const idx = typeCol[e.type];
-    if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
-    const ym = (e.date||'').slice(0,7);
-    const [y,m]=ym.split('-');
-    const monthLabel = m ? MN[parseInt(m)]+'-'+y : '';
-    return [monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||''];
-  });
-  currentReportData = {headers, rows: csvRows};
-
+  _bizReportEntries = entries;
+  _bizReportSort = {col:null, dir:1};
   document.getElementById('reportModalTitle').textContent='New Business (Month-wise)';
+  document.getElementById('reportModal').classList.add('open');
+  renderBizReportTable();
+}
+
+function sortBizReportCol(colIndex){
+  if(_bizReportSort.col===colIndex) _bizReportSort.dir = -_bizReportSort.dir;
+  else { _bizReportSort.col=colIndex; _bizReportSort.dir=1; }
+  renderBizReportTable();
+}
+
+function renderBizReportTable(){
+  let entries = _bizReportEntries.slice();
+  entries.sort((a,b)=>(b.date||'').localeCompare(a.date||'')); // default: most recent first
+
+  if(_bizReportSort.col!=null){
+    const col=_bizReportSort.col, dir=_bizReportSort.dir;
+    entries.sort((a,b)=>{
+      const ca=bizReportRowCells(a)[col], cb=bizReportRowCells(b)[col];
+      const na=parseFloat((ca||'').toString().replace(/[^0-9.\-]/g,''));
+      const nb=parseFloat((cb||'').toString().replace(/[^0-9.\-]/g,''));
+      if(!isNaN(na) && !isNaN(nb) && /[0-9]/.test(ca||'') && /[0-9]/.test(cb||'')) return dir*(na-nb);
+      return dir*(ca||'').toString().toLowerCase().localeCompare((cb||'').toString().toLowerCase(), undefined, {numeric:true});
+    });
+  }
+
+  // CSV export uses the same sorted entries (no action buttons in export)
+  currentReportData = { headers: BIZ_REPORT_HEADERS, rows: entries.map(e=>bizReportRowCells(e)) };
+
   let h=`<p style="color:var(--gray);font-size:.8rem;margin-bottom:12px">${entries.length} records</p>`;
-  const showActions = true;
-  const tblHeaders = showActions ? [...headers,'Status','Actions'] : [...headers,'Status'];
-  h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${tblHeaders.map(hd=>`<th>${hd}</th>`).join('')}</tr></thead><tbody>`;
-  if(!sorted.length){
+  const tblHeaders=[...BIZ_REPORT_HEADERS,'Cross-Check','Status','Actions'];
+  h+=`<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>${tblHeaders.map((hd,i)=>{
+    if(i>=BIZ_REPORT_HEADERS.length) return `<th>${hd}</th>`;
+    const arrow = _bizReportSort.col===i ? (_bizReportSort.dir===1?' ▲':' ▼') : '';
+    return `<th onclick="sortBizReportCol(${i})" style="cursor:pointer" title="Click to sort">${hd}${arrow}</th>`;
+  }).join('')}</tr></thead><tbody>`;
+
+  if(!entries.length){
     h+=`<tr><td colspan="${tblHeaders.length}" style="text-align:center;padding:24px;color:#bbb">No business entries yet</td></tr>`;
   }
-  sorted.forEach((e,i)=>{
-    const amts = ['','','','',''];
-    const idx = typeCol[e.type];
-    if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
-    const ym = (e.date||'').slice(0,7);
-    const [y,m]=ym.split('-');
-    const monthLabel = m ? MN[parseInt(m)]+'-'+y : '';
-    const cells = [monthLabel, e.rm||'—', e.client_name, fmtDate(e.date), ...amts, e.remarks||''];
+
+  entries.forEach(e=>{
+    const cells = bizReportRowCells(e);
     const status = e.status||'Pending';
+    const canRemark = canAddCrossRemark(e);
+    const remarkCell = e.cross_remark
+      ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}`
+      : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
+    const canEdit = CU.role==='admin' || e.created_by===CU.name;
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
+    h+=`<td style="min-width:140px">${remarkCell}</td>`;
     h+=`<td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>`;
-    if(showActions){
-      h+=`<td style="white-space:nowrap">
-        ${CU.role==='admin'&&status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
-        ${CU.role==='admin'&&status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
-        ${CU.role==='admin'&&status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
-        <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit">✏️</button>
-        <button class="btn-icon" onclick="deleteBusinessEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>
-      </td>`;
-    }
+    h+=`<td style="white-space:nowrap">
+      ${CU.role==='admin'&&status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
+      ${CU.role==='admin'&&status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
+      ${CU.role==='admin'&&status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
+      ${canEdit?`<button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit">✏️</button>`:''}
+      ${CU.role==='admin'?`<button class="btn-icon" onclick="deleteBusinessEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
+    </td>`;
     h+='</tr>';
   });
   h+='</tbody></table></div></div>';
   document.getElementById('reportModalBody').innerHTML=h;
-  document.getElementById('reportModal').classList.add('open');
 }
 
 function editBusinessEntry(id){
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
+  if(CU.role!=='admin' && e.created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
   currentBusinessTarget = {id: e.client_id, name: e.client_name};
   editingBusinessId = id;
   document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
   document.getElementById('biz_type').value = e.type;
   document.getElementById('biz_amount').value = e.amount;
+  const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value = e.fund_name||'';
   document.getElementById('biz_date').value = e.date;
   document.getElementById('biz_remarks').value = e.remarks||'';
   document.getElementById('businessModal').classList.add('open');
 }
 
 function deleteBusinessEntry(id){
+  if(CU.role!=='admin') return;
   if(!confirm('Delete this business entry? This cannot be undone.')) return;
   const biz = DB.get('mf_business');
   const entries = (Array.isArray(biz) ? biz : (biz?.entries||[])).filter(e=>e.id!==id);
