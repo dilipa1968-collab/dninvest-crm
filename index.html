@@ -4667,65 +4667,140 @@ function renderMfTxnPage(){
   renderMfTxnTable();
 }
 
-// ── Fund Name autocomplete (mfdata.in — free, CORS-enabled, 14,000+ AMFI
-// schemes, no key needed) ──
-// Since DN Investment is a distributor (ARN holder), only "Regular Plan"
-// schemes are relevant here — "Direct Plan" variants pay no distributor
-// commission, so they're filtered out of the suggestions entirely. The field
-// stays a normal text input underneath (not a hard dropdown-only control),
-// so an RM can still type a name manually if the API is slow/unreachable or
-// a fund genuinely isn't in the list — the suggestions are a guard-rail
-// against typos, not a hard lock.
-let _fundSearchTimer = null;
-let _fundSearchSeq = 0;
+// ── Fund Name autocomplete (built-in list, no internet dependency) ──
+// An earlier version of this pulled live suggestions from a third-party API,
+// but that external site proved unreliable (slow/unreachable for some users,
+// stuck on "Searching…"). Switched to a bundled list of common Regular Plan
+// schemes across the major AMCs instead — it's instant, works with zero
+// internet dependency, and never gets stuck. It only covers the commonly
+// transacted schemes (not all ~14,000 in India), so the field stays a normal
+// text input underneath — if a fund isn't in the list, just type it manually.
+const FUND_NAME_LIST = [
+  // HDFC
+  "HDFC Flexi Cap Fund - Regular Plan - Growth","HDFC Top 100 Fund - Regular Plan - Growth",
+  "HDFC Mid-Cap Opportunities Fund - Regular Plan - Growth","HDFC Small Cap Fund - Regular Plan - Growth",
+  "HDFC Balanced Advantage Fund - Regular Plan - Growth","HDFC Hybrid Equity Fund - Regular Plan - Growth",
+  "HDFC Tax Saver Fund - Regular Plan - Growth","HDFC Index Fund - Sensex Plan - Regular Plan - Growth",
+  "HDFC Index Fund - Nifty 50 Plan - Regular Plan - Growth","HDFC Liquid Fund - Regular Plan - Growth",
+  "HDFC Money Market Fund - Regular Plan - Growth","HDFC Capital Builder Value Fund - Regular Plan - Growth",
+  "HDFC Focused 30 Fund - Regular Plan - Growth","HDFC Multi Cap Fund - Regular Plan - Growth",
+  // SBI
+  "SBI Bluechip Fund - Regular Plan - Growth","SBI Small Cap Fund - Regular Plan - Growth",
+  "SBI Magnum Midcap Fund - Regular Plan - Growth","SBI Contra Fund - Regular Plan - Growth",
+  "SBI Equity Hybrid Fund - Regular Plan - Growth","SBI Long Term Equity Fund - Regular Plan - Growth",
+  "SBI Focused Equity Fund - Regular Plan - Growth","SBI Magnum Gilt Fund - Regular Plan - Growth",
+  "SBI Liquid Fund - Regular Plan - Growth","SBI Healthcare Opportunities Fund - Regular Plan - Growth",
+  "SBI Technology Opportunities Fund - Regular Plan - Growth","SBI Banking & Financial Services Fund - Regular Plan - Growth",
+  "SBI Nifty Index Fund - Regular Plan - Growth","SBI Multicap Fund - Regular Plan - Growth",
+  // ICICI Prudential
+  "ICICI Prudential Bluechip Fund - Regular Plan - Growth","ICICI Prudential Flexicap Fund - Regular Plan - Growth",
+  "ICICI Prudential Value Discovery Fund - Regular Plan - Growth","ICICI Prudential Equity & Debt Fund - Regular Plan - Growth",
+  "ICICI Prudential Balanced Advantage Fund - Regular Plan - Growth","ICICI Prudential Technology Fund - Regular Plan - Growth",
+  "ICICI Prudential Banking and Financial Services Fund - Regular Plan - Growth","ICICI Prudential Nifty 50 Index Fund - Regular Plan - Growth",
+  "ICICI Prudential Liquid Fund - Regular Plan - Growth","ICICI Prudential Multicap Fund - Regular Plan - Growth",
+  "ICICI Prudential Midcap Fund - Regular Plan - Growth","ICICI Prudential Dividend Yield Equity Fund - Regular Plan - Growth",
+  "ICICI Prudential All Seasons Bond Fund - Regular Plan - Growth",
+  // Axis
+  "Axis Bluechip Fund - Regular Plan - Growth","Axis Small Cap Fund - Regular Plan - Growth",
+  "Axis Midcap Fund - Regular Plan - Growth","Axis Long Term Equity Fund - Regular Plan - Growth",
+  "Axis Focused 25 Fund - Regular Plan - Growth","Axis Flexi Cap Fund - Regular Plan - Growth",
+  "Axis Liquid Fund - Regular Plan - Growth","Axis Balanced Advantage Fund - Regular Plan - Growth",
+  // Nippon India
+  "Nippon India Large Cap Fund - Regular Plan - Growth","Nippon India Small Cap Fund - Regular Plan - Growth",
+  "Nippon India Growth Fund - Regular Plan - Growth","Nippon India Multi Cap Fund - Regular Plan - Growth",
+  "Nippon India Pharma Fund - Regular Plan - Growth","Nippon India Liquid Fund - Regular Plan - Growth",
+  "Nippon India Focused Equity Fund - Regular Plan - Growth","Nippon India Index Fund - Nifty 50 Plan - Regular Plan - Growth",
+  // Kotak
+  "Kotak Flexicap Fund - Regular Plan - Growth","Kotak Emerging Equity Fund - Regular Plan - Growth",
+  "Kotak Bluechip Fund - Regular Plan - Growth","Kotak Small Cap Fund - Regular Plan - Growth",
+  "Kotak Balanced Advantage Fund - Regular Plan - Growth","Kotak Equity Hybrid Fund - Regular Plan - Growth",
+  "Kotak Tax Saver Fund - Regular Plan - Growth","Kotak Liquid Fund - Regular Plan - Growth",
+  // Mirae Asset
+  "Mirae Asset Large Cap Fund - Regular Plan - Growth","Mirae Asset Large & Midcap Fund - Regular Plan - Growth",
+  "Mirae Asset Emerging Bluechip Fund - Regular Plan - Growth","Mirae Asset Tax Saver Fund - Regular Plan - Growth",
+  "Mirae Asset Midcap Fund - Regular Plan - Growth",
+  // Parag Parikh
+  "Parag Parikh Flexi Cap Fund - Regular Plan - Growth","Parag Parikh Tax Saver Fund - Regular Plan - Growth",
+  "Parag Parikh Conservative Hybrid Fund - Regular Plan - Growth",
+  // Aditya Birla Sun Life
+  "Aditya Birla Sun Life Frontline Equity Fund - Regular Plan - Growth","Aditya Birla Sun Life Flexi Cap Fund - Regular Plan - Growth",
+  "Aditya Birla Sun Life Tax Relief 96 - Regular Plan - Growth","Aditya Birla Sun Life Equity Hybrid 95 Fund - Regular Plan - Growth",
+  "Aditya Birla Sun Life Mid Cap Fund - Regular Plan - Growth","Aditya Birla Sun Life Liquid Fund - Regular Plan - Growth",
+  // UTI
+  "UTI Flexi Cap Fund - Regular Plan - Growth","UTI Nifty 50 Index Fund - Regular Plan - Growth",
+  "UTI Value Opportunities Fund - Regular Plan - Growth","UTI Mid Cap Fund - Regular Plan - Growth",
+  "UTI Dividend Yield Fund - Regular Plan - Growth","UTI Liquid Cash Plan - Regular Plan - Growth",
+  // DSP
+  "DSP Flexi Cap Fund - Regular Plan - Growth","DSP Midcap Fund - Regular Plan - Growth",
+  "DSP Small Cap Fund - Regular Plan - Growth","DSP Tax Saver Fund - Regular Plan - Growth",
+  "DSP Equity & Bond Fund - Regular Plan - Growth","DSP Top 100 Equity Fund - Regular Plan - Growth",
+  // Quant
+  "Quant Active Fund - Regular Plan - Growth","Quant Small Cap Fund - Regular Plan - Growth",
+  "Quant Mid Cap Fund - Regular Plan - Growth","Quant Flexi Cap Fund - Regular Plan - Growth",
+  "Quant ELSS Tax Saver Fund - Regular Plan - Growth","Quant Infrastructure Fund - Regular Plan - Growth",
+  // Tata
+  "Tata Flexi Cap Fund - Regular Plan - Growth","Tata Large Cap Fund - Regular Plan - Growth",
+  "Tata Mid Cap Growth Fund - Regular Plan - Growth","Tata Small Cap Fund - Regular Plan - Growth",
+  "Tata Digital India Fund - Regular Plan - Growth",
+  // Canara Robeco
+  "Canara Robeco Bluechip Equity Fund - Regular Plan - Growth","Canara Robeco Flexi Cap Fund - Regular Plan - Growth",
+  "Canara Robeco Emerging Equities Fund - Regular Plan - Growth","Canara Robeco Equity Tax Saver Fund - Regular Plan - Growth",
+  "Canara Robeco Equity Hybrid Fund - Regular Plan - Growth",
+  // Franklin Templeton
+  "Franklin India Flexi Cap Fund - Regular Plan - Growth","Franklin India Prima Fund - Regular Plan - Growth",
+  "Franklin India Equity Income Fund - Regular Plan - Growth","Templeton India Value Fund - Regular Plan - Growth",
+  // Motilal Oswal
+  "Motilal Oswal Midcap Fund - Regular Plan - Growth","Motilal Oswal Flexi Cap Fund - Regular Plan - Growth",
+  "Motilal Oswal Nifty 500 Fund - Regular Plan - Growth",
+  // Edelweiss
+  "Edelweiss Balanced Advantage Fund - Regular Plan - Growth","Edelweiss Flexi Cap Fund - Regular Plan - Growth",
+  "Edelweiss Mid Cap Fund - Regular Plan - Growth",
+  // PGIM
+  "PGIM India Flexi Cap Fund - Regular Plan - Growth","PGIM India Midcap Opportunities Fund - Regular Plan - Growth",
+  // Invesco
+  "Invesco India Contra Fund - Regular Plan - Growth","Invesco India Midcap Fund - Regular Plan - Growth",
+  "Invesco India Large Cap Fund - Regular Plan - Growth",
+  // Bandhan (formerly IDFC)
+  "Bandhan Flexi Cap Fund - Regular Plan - Growth","Bandhan Large Cap Fund - Regular Plan - Growth",
+  "Bandhan Sterling Value Fund - Regular Plan - Growth",
+  // Mahindra Manulife
+  "Mahindra Manulife Multi Cap Fund - Regular Plan - Growth","Mahindra Manulife Mid Cap Fund - Regular Plan - Growth",
+  // JM Financial
+  "JM Flexicap Fund - Regular Plan - Growth","JM Value Fund - Regular Plan - Growth",
+  // WhiteOak Capital
+  "WhiteOak Capital Flexi Cap Fund - Regular Plan - Growth","WhiteOak Capital Mid Cap Fund - Regular Plan - Growth",
+  // Sundaram
+  "Sundaram Large and Mid Cap Fund - Regular Plan - Growth","Sundaram Mid Cap Fund - Regular Plan - Growth",
+  // Baroda BNP Paribas
+  "Baroda BNP Paribas Large Cap Fund - Regular Plan - Growth","Baroda BNP Paribas Flexi Cap Fund - Regular Plan - Growth",
+  // 360 ONE / IIFL
+  "360 ONE Flexicap Fund - Regular Plan - Growth",
+  // LIC
+  "LIC MF Large & Mid Cap Fund - Regular Plan - Growth","LIC MF Flexi Cap Fund - Regular Plan - Growth",
+  // Liquid/Debt generic (other AMCs commonly used for parking funds)
+  "Axis Overnight Fund - Regular Plan - Growth","ICICI Prudential Overnight Fund - Regular Plan - Growth",
+  "HDFC Overnight Fund - Regular Plan - Growth","SBI Overnight Fund - Regular Plan - Growth",
+];
 
 function searchFundName(inputId, resultsId){
   const input=document.getElementById(inputId);
   const out=document.getElementById(resultsId);
   if(!input||!out) return;
-  const q=input.value.trim();
-  if(q.length<3){ out.style.display='none'; out.innerHTML=''; return; }
+  const q=input.value.trim().toLowerCase();
+  if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
 
-  clearTimeout(_fundSearchTimer);
-  _fundSearchTimer=setTimeout(async ()=>{
-    const seq = ++_fundSearchSeq;
-    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Searching…</div>';
+  const matches=FUND_NAME_LIST.filter(n=>n.toLowerCase().includes(q)).slice(0,15);
+
+  if(matches.length===0){
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No match in the built-in list — you can type the fund name manually</div>';
     out.style.display='block';
-    try{
-      const resp=await fetch('https://mfdata.in/api/v1/search?q='+encodeURIComponent(q));
-      const json=await resp.json();
-      if(seq!==_fundSearchSeq) return; // a newer keystroke superseded this search
-      const all = (json && json.data) || [];
-      // Regular Plan only — exclude Direct Plan variants (no distributor commission on those)
-      const regularOnly = all.filter(s=>{
-        const n=(s.scheme_name||s.name||'').toLowerCase();
-        return !n.includes('direct');
-      });
-      const seen=new Set();
-      const matches=[];
-      for(const s of regularOnly){
-        const name=s.scheme_name||s.name||'';
-        if(!name || seen.has(name)) continue;
-        seen.add(name);
-        matches.push(name);
-        if(matches.length>=15) break;
-      }
-      if(matches.length===0){
-        out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No Regular Plan match found — you can type the name manually</div>';
-        out.style.display='block';
-        return;
-      }
-      out.innerHTML=matches.map(name=>`
-        <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
-          ${escapeHtml(name)}
-        </div>`).join('');
-      out.style.display='block';
-    }catch(e){
-      if(seq!==_fundSearchSeq) return;
-      out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Couldn\'t reach fund search — you can type the name manually</div>';
-      out.style.display='block';
-    }
-  }, 400);
+    return;
+  }
+  out.innerHTML=matches.map(name=>`
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
+      ${escapeHtml(name)}
+    </div>`).join('');
+  out.style.display='block';
 }
 
 function selectFundName(inputId, resultsId, name){
