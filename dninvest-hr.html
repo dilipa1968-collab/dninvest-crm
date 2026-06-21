@@ -288,7 +288,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
     <div id="page-attendance" class="page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">Meri attendance — June 2026</div>
+          <div class="card-title">My Attendance — June 2026</div>
           <div id="my-att-summary"></div>
         </div>
         <div class="card">
@@ -391,7 +391,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
     <div id="page-salary" class="page compact-page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">Meri Salary</div>
+          <div class="card-title">My Salary</div>
           <div class="field-inline" style="margin-bottom:8px"><label>Month dekhein</label><input type="month" id="view-sal-month" onchange="renderSalaryPage()"></div>
           <div id="my-salary-card"></div>
         </div>
@@ -469,7 +469,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Date</th><th>Amount diya</th><th>Note</th><th>Pending balance</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Amount given</th><th>Note</th><th>Pending balance</th><th>Status</th><th></th></tr></thead>
               <tbody id="adv-history-table"></tbody>
             </table>
           </div>
@@ -506,7 +506,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
     <div id="page-incentive" class="page compact-page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">Meri Incentive</div>
+          <div class="card-title">My Incentive</div>
           <div class="field-inline" style="margin-bottom:8px"><label>Month dekhein</label><input type="month" id="view-inc-month" onchange="renderIncentivePage()"></div>
           <div id="my-incentive-card"></div>
         </div>
@@ -960,7 +960,7 @@ function officeWindowStatus(crmUser){
   }
   const istHour=getISTHour();
   if(istHour<8 || istHour>=19){
-    return {open:false, reason:'Office time: 8:00 AM – 7:00 PM (roz)'};
+    return {open:false, reason:'Office time: 8:00 AM – 7:00 PM (daily)'};
   }
   return {open:true};
 }
@@ -2013,7 +2013,7 @@ function renderLeavePage(){
     const upcoming=holidays.filter(h=>h.date>=td);
     const past=holidays.filter(h=>h.date<td);
     let html='<table style="width:100%;font-size:13px">';
-    html+='<tr><td colspan="3" style="padding:4px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Har Sunday</td></tr>';
+    html+='<tr><td colspan="3" style="padding:4px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Every Sunday</td></tr>';
     html+='<tr><td colspan="3" style="padding:4px 0;color:var(--text2)">Weekly off — automatically applies</td></tr>';
     if(upcoming.length){
       html+='<tr><td colspan="3" style="padding:8px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Upcoming exchange holidays</td></tr>';
@@ -2147,7 +2147,7 @@ function renderSalaryPage(){
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(netAfterAdv)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(paid)}</td></tr>
         <tr><td style="padding:6px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td></tr>
-        ${pendingAdv>0?`<tr><td colspan="2" style="padding-top:8px;font-size:11px;color:var(--text3)">Aapka pending advance balance: <span style="color:var(--red);font-weight:600">${fmt(pendingAdv)}</span></td></tr>`:''}
+        ${pendingAdv>0?`<tr><td colspan="2" style="padding-top:8px;font-size:11px;color:var(--text3)">Your pending advance balance: <span style="color:var(--red);font-weight:600">${fmt(pendingAdv)}</span></td></tr>`:''}
       </table>
       <p style="font-size:11px;color:var(--text3);margin-top:8px">This month's estimate — final figure to be confirmed by admin</p>`;
   }
@@ -2712,7 +2712,7 @@ function previewMultiMonthSplit(){
     <p style="font-size:11px;color:var(--text3);margin-bottom:4px">This amount will be split as follows:</p>
     <table style="font-size:12.5px;width:100%">
       <tbody>
-        ${allocation.map(a=>`<tr><td>${mLabel(a.month)}</td><td style="text-align:right;color:${a.allocated>0?'var(--green)':'var(--text3)'}">${a.allocated>0?'+ '+fmt(a.allocated):'—'}</td><td style="text-align:right;color:var(--text3);font-size:11px">naya balance: ${fmt(a.newBalance)}</td></tr>`).join('')}
+        ${allocation.map(a=>`<tr><td>${mLabel(a.month)}</td><td style="text-align:right;color:${a.allocated>0?'var(--green)':'var(--text3)'}">${a.allocated>0?'+ '+fmt(a.allocated):'—'}</td><td style="text-align:right;color:var(--text3);font-size:11px">new balance: ${fmt(a.newBalance)}</td></tr>`).join('')}
       </tbody>
     </table>
     ${leftover>0?`<p style="font-size:11.5px;color:var(--accent);margin-top:6px">Extra ${fmt(leftover)} remaining (all months' balance cleared). This will not be allocated.</p>`:''}`;
