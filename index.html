@@ -916,9 +916,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <label>Amount (₹) *</label>
               <input type="number" id="mftxn-amount" placeholder="e.g. 25000">
             </div>
-            <div class="form-field" style="min-width:200px">
+            <div class="form-field" style="min-width:200px;position:relative">
               <label>Fund Name *</label>
-              <input type="text" id="mftxn-fund" placeholder="e.g. HDFC Flexi Cap Fund">
+              <input type="text" id="mftxn-fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('mftxn-fund','mftxn-fund-results')" onfocus="searchFundName('mftxn-fund','mftxn-fund-results')">
+              <div id="mftxn-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Date *</label>
@@ -1441,7 +1442,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label>Fund Name *</label><input id="biz_fund" placeholder="e.g. HDFC Flexi Cap Fund"></div>
+        <div class="form-field" style="position:relative"><label>Fund Name *</label>
+          <input id="biz_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_fund','biz-fund-results')" onfocus="searchFundName('biz_fund','biz-fund-results')">
+          <div id="biz-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+        </div>
         <div class="form-field"><label>Date *</label><input id="biz_date" type="date"></div>
       </div>
       <div class="form-row">
@@ -4662,6 +4666,84 @@ function renderMfTxnPage(){
 
   renderMfTxnTable();
 }
+
+// ── Fund Name autocomplete (mfdata.in — free, CORS-enabled, 14,000+ AMFI
+// schemes, no key needed) ──
+// Since DN Investment is a distributor (ARN holder), only "Regular Plan"
+// schemes are relevant here — "Direct Plan" variants pay no distributor
+// commission, so they're filtered out of the suggestions entirely. The field
+// stays a normal text input underneath (not a hard dropdown-only control),
+// so an RM can still type a name manually if the API is slow/unreachable or
+// a fund genuinely isn't in the list — the suggestions are a guard-rail
+// against typos, not a hard lock.
+let _fundSearchTimer = null;
+let _fundSearchSeq = 0;
+
+function searchFundName(inputId, resultsId){
+  const input=document.getElementById(inputId);
+  const out=document.getElementById(resultsId);
+  if(!input||!out) return;
+  const q=input.value.trim();
+  if(q.length<3){ out.style.display='none'; out.innerHTML=''; return; }
+
+  clearTimeout(_fundSearchTimer);
+  _fundSearchTimer=setTimeout(async ()=>{
+    const seq = ++_fundSearchSeq;
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Searching…</div>';
+    out.style.display='block';
+    try{
+      const resp=await fetch('https://mfdata.in/api/v1/search?q='+encodeURIComponent(q));
+      const json=await resp.json();
+      if(seq!==_fundSearchSeq) return; // a newer keystroke superseded this search
+      const all = (json && json.data) || [];
+      // Regular Plan only — exclude Direct Plan variants (no distributor commission on those)
+      const regularOnly = all.filter(s=>{
+        const n=(s.scheme_name||s.name||'').toLowerCase();
+        return !n.includes('direct');
+      });
+      const seen=new Set();
+      const matches=[];
+      for(const s of regularOnly){
+        const name=s.scheme_name||s.name||'';
+        if(!name || seen.has(name)) continue;
+        seen.add(name);
+        matches.push(name);
+        if(matches.length>=15) break;
+      }
+      if(matches.length===0){
+        out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No Regular Plan match found — you can type the name manually</div>';
+        out.style.display='block';
+        return;
+      }
+      out.innerHTML=matches.map(name=>`
+        <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
+          ${escapeHtml(name)}
+        </div>`).join('');
+      out.style.display='block';
+    }catch(e){
+      if(seq!==_fundSearchSeq) return;
+      out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">Couldn\'t reach fund search — you can type the name manually</div>';
+      out.style.display='block';
+    }
+  }, 400);
+}
+
+function selectFundName(inputId, resultsId, name){
+  const input=document.getElementById(inputId);
+  if(input) input.value=name;
+  const out=document.getElementById(resultsId);
+  if(out){ out.style.display='none'; out.innerHTML=''; }
+}
+
+// Close fund-search dropdowns when clicking elsewhere
+document.addEventListener('click', e=>{
+  [['mftxn-fund','mftxn-fund-results'], ['biz_fund','biz-fund-results']].forEach(([inputId,resultsId])=>{
+    const wrap=document.getElementById(inputId);
+    const out=document.getElementById(resultsId);
+    if(wrap && out && !wrap.contains(e.target) && !out.contains(e.target)) out.style.display='none';
+  });
+});
+
 
 // MF Desk (role 'mf_desk') needs to search/select ANY client across all RMs
 // when logging a transaction on their behalf — unlike the shared
