@@ -433,7 +433,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">Advance management</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Yahan se kisi bhi employee ko advance de sakte hain. Salary calculator mein ye automatically pending dikhega, jise aap full ya partial deduct kar sakte hain.</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Give an advance to any employee here. It will automatically show as pending in the Salary calculator, where you can deduct it fully or partially.</p>
           <div class="compact-grid3" style="margin-bottom:0">
             <div class="field-inline"><label>Employee</label>
               <select id="adv-emp">
@@ -452,9 +452,9 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <div class="field-inline"><label>Date</label><input type="date" id="adv-date"></div>
             <div class="field-inline"><label>Note (optional)</label><input type="text" id="adv-note" placeholder="e.g. Personal advance"></div>
           </div>
-          <button class="btn btn-primary" style="margin-top:8px" onclick="submitAdvance()">+ Advance add karein</button>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="submitAdvance()">+ Add advance</button>
           <hr class="divider">
-          <div class="field-inline" style="margin-bottom:8px;max-width:280px"><label>Employee ka advance history dekhein</label>
+          <div class="field-inline" style="margin-bottom:8px;max-width:280px"><label>View employee's advance history</label>
             <select id="adv-history-emp" onchange="renderAdvanceHistory()">
               <option value="Puja">Puja</option>
               <option value="Rohit">Rohit</option>
@@ -476,7 +476,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">ESI (Employee State Insurance) settings</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Jis employee ki Basic salary wage ceiling se kam-ya-barabar ho, uska ESI auto-deduct hoga (Employee share). Employer share sirf company cost record ke liye dikhega, employee ki salary se nahi katega.</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Any employee whose Basic salary is at or below the wage ceiling will have ESI auto-deducted (Employee share). The Employer share is shown only for company cost records — it is never deducted from the employee's salary.</p>
           <div class="compact-grid3">
             <div class="field-inline"><label>ESI enabled?</label>
               <select id="esi-enabled">
@@ -490,7 +490,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
           <button class="btn btn-primary" style="margin-top:8px" onclick="saveEsiSettingsFromUI()">Save ESI settings</button>
           <hr class="divider">
-          <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">Per-employee override (zaroorat par hi use karein)</p>
+          <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">Per-employee override (use only when needed)</p>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th>Basic salary</th><th>Status</th><th>Override</th></tr></thead>
@@ -1655,7 +1655,7 @@ function renderDashboardFinancials(){
   const advBox=document.getElementById('dash-advance-summary');
   if(advBox){
     if(advanceList.length===0){
-      advBox.innerHTML=`<p style="font-size:12.5px;color:var(--text3)">Koi pending advance nahi hai — sab clear hai.</p>`;
+      advBox.innerHTML=`<p style="font-size:12.5px;color:var(--text3)">No pending advances — everything's clear.</p>`;
     }else{
       advBox.innerHTML=`
         <p style="font-size:13px;margin-bottom:10px">Total pending: <strong style="color:var(--red)">${fmt(totalPendingAdvance)}</strong> (${advanceList.length} employee${advanceList.length>1?'s':''})</p>
@@ -1664,7 +1664,7 @@ function renderDashboardFinancials(){
             <span>${a.name}</span><span style="color:var(--red);font-weight:600">${fmt(a.pending)}</span>
           </div>`).join('')}
         </div>
-        ${advanceList.length>6?`<p style="font-size:11px;color:var(--text3);margin-top:6px">+${advanceList.length-6} more — Salary page mein puri list dekhein</p>`:''}`;
+        ${advanceList.length>6?`<p style="font-size:11px;color:var(--text3);margin-top:6px">+${advanceList.length-6} more — see the full list on the Salary page</p>`:''}`;
     }
   }
 
@@ -1672,7 +1672,7 @@ function renderDashboardFinancials(){
   if(esiBox){
     const s=getEsiSettings();
     if(!s.enabled){
-      esiBox.innerHTML=`<p style="font-size:12.5px;color:var(--text3)">ESI fillhal disabled hai — Salary page se enable karein.</p>`;
+      esiBox.innerHTML=`<p style="font-size:12.5px;color:var(--text3)">ESI is currently disabled — enable it from the Salary page.</p>`;
     }else{
       esiBox.innerHTML=`
         <table style="font-size:13px;width:100%">
@@ -2223,20 +2223,20 @@ function renderAdvanceBox(){
   // (that amount is already reflected in 'alreadyAdjusted' below, not double counted).
 
   if(pending<=0 && alreadyAdjusted<=0){
-    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">${name} ka koi pending advance nahi hai.</p>`;
+    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">${name} has no pending advance.</p>`;
     return;
   }
 
   box.innerHTML=`
     <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">Advance deduction — ${name}</p>
-    ${alreadyAdjusted>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">Is month ke liye pehle se <b style="color:var(--red)">${fmt(alreadyAdjusted)}</b> adjust ho chuka hai. Naya amount enter karke "Apply" karne par pehla wala revert hoke naya apply hoga.</p>`:''}
+    ${alreadyAdjusted>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px"><b style="color:var(--red)">${fmt(alreadyAdjusted)}</b> has already been adjusted for this month. Entering a new amount and clicking "Apply" will revert the old one and apply the new one.</p>`:''}
     <p style="font-size:12px;margin-bottom:8px">Total pending advance: <b style="color:var(--red)">${fmt(pending+alreadyAdjusted)}</b></p>
     <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-      <div class="field-inline" style="margin-bottom:0;max-width:160px"><label>Is mahine kitna katna hai (₹)</label>
+      <div class="field-inline" style="margin-bottom:0;max-width:160px"><label>Amount to deduct this month (₹)</label>
         <input type="number" id="adv-deduct-amount" min="0" max="${pending+alreadyAdjusted}" value="${alreadyAdjusted>0?alreadyAdjusted:''}" placeholder="0">
       </div>
       <button class="btn btn-sm" onclick="setAdvDeductAmount(${pending+alreadyAdjusted})">Full deduct</button>
-      <button class="btn btn-sm" onclick="setAdvDeductAmount(0)">Kuch mat kaato</button>
+      <button class="btn btn-sm" onclick="setAdvDeductAmount(0)">Don't deduct</button>
       <button class="btn btn-primary btn-sm" onclick="applyAdvanceDeduction()">Apply</button>
     </div>`;
 }
@@ -2251,7 +2251,7 @@ async function applyAdvanceDeduction(){
   const monthEl=document.getElementById('sal-month');
   const name=sel?sel.value||'Puja':'Puja';
   const month=monthEl&&monthEl.value?monthEl.value:'';
-  if(!month){ alert('Pehle Month select karein.'); return; }
+  if(!month){ alert('Please select a Month first.'); return; }
   const amtEl=document.getElementById('adv-deduct-amount');
   const amount=amtEl?parseInt(amtEl.value)||0:0;
 
@@ -2305,7 +2305,7 @@ function calcSalary(){
       <tr><td style="color:var(--text2);padding:5px 0">Bonus</td><td style="text-align:right;color:var(--green)">+ ${fmt(bonus)}</td></tr>
       ${advDeducted>0?`<tr><td style="color:var(--text2);padding:5px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(Math.max(0,net))}</td></tr>
-      ${esi.applicable?`<tr><td colspan="2" style="padding-top:6px;font-size:10.5px;color:var(--text3)">Employer ESI share (company cost, salary se nahi katega): ${fmt(esi.employerContribution)}</td></tr>`:''}
+      ${esi.applicable?`<tr><td colspan="2" style="padding-top:6px;font-size:10.5px;color:var(--text3)">Employer ESI share (company cost, not deducted from salary): ${fmt(esi.employerContribution)}</td></tr>`:''}
     </table>`;
 }
 
@@ -2319,7 +2319,7 @@ function renderEsiBox(){
   const name=sel?sel.value||'Puja':'Puja';
   const s=getEsiSettings();
   if(!s.enabled){
-    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">ESI fillhal disabled hai. ESI settings card se enable karein.</p>`;
+    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">ESI is currently disabled. Enable it from the ESI settings card.</p>`;
     return;
   }
   const b=getEmpSalary(name);
@@ -2328,13 +2328,13 @@ function renderEsiBox(){
   box.innerHTML=`
     <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:4px">ESI status — ${name}</p>
     <p style="font-size:11.5px;color:${esi.applicable?'var(--red)':'var(--text3)'}">
-      ${esi.applicable?`Covered — ${esi.settings.employeeRate}% employee share is month se net se katega.`:`Covered nahi (Basic ${fmt(b)} ceiling ${fmt(s.ceiling)} se zyada hai).`}
+      ${esi.applicable?`Covered — ${esi.settings.employeeRate}% employee share will be deducted from net pay this month.`:`Not covered (Basic ${fmt(b)} is above the ceiling ${fmt(s.ceiling)}).`}
       ${override!=='auto'?` <span style="color:var(--text3)">(manual override: ${override==='include'?'always include':'always exclude'})</span>`:''}
     </p>`;
 }
 
 // ─── EXTRA DEDUCTION UI ──────────────────────────────────────────────────────
-// Fully manual line — half day, late fine, damage, ya kuch bhi. Admin types in
+// Fully manual line — half day, late fine, damage, or anything else. Admin types in
 // whatever amount + an optional reason, per employee per month. If that month
 // has Half day attendance records marked, a small heads-up is shown (no
 // auto-deduction — admin decides the amount).
@@ -2347,7 +2347,7 @@ function renderExtraDeductionBox(){
   const month=monthEl&&monthEl.value?monthEl.value:'';
 
   if(!month){
-    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">Extra deduction ke liye pehle Month select karein.</p>`;
+    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">Select a Month first to add an extra deduction.</p>`;
     return;
   }
 
@@ -2357,7 +2357,7 @@ function renderExtraDeductionBox(){
 
   box.innerHTML=`
     <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:6px">Extra deduction — ${name}</p>
-    ${halfDays>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">Is month ${halfDays} Half day record(s) hain — agar inka deduction lagana hai to amount yahan manually add kar dein.</p>`:''}
+    ${halfDays>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">${halfDays} Half day record(s) found this month — if you want to deduct for them, add the amount here manually.</p>`:''}
     <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
       <div class="field-inline" style="margin-bottom:0;max-width:140px"><label>Amount (₹)</label>
         <input type="number" id="extra-ded-amount" min="0" value="${existing.amount||''}" placeholder="0">
@@ -2374,7 +2374,7 @@ async function applyExtraDeduction(){
   const monthEl=document.getElementById('sal-month');
   const name=sel?sel.value||'Puja':'Puja';
   const month=monthEl&&monthEl.value?monthEl.value:'';
-  if(!month){ alert('Pehle Month select karein.'); return; }
+  if(!month){ alert('Please select a Month first.'); return; }
   const amtEl=document.getElementById('extra-ded-amount');
   const noteEl=document.getElementById('extra-ded-note');
   const amount=amtEl?parseInt(amtEl.value)||0:0;
@@ -2395,7 +2395,7 @@ async function saveEsiSettingsFromUI(){
   calcSalary();
   renderSalaryPage();
   renderEsiOverrideTable();
-  alert('ESI settings save ho gayi.');
+  alert('ESI settings saved.');
 }
 
 function loadEsiSettingsIntoUI(){
@@ -2450,8 +2450,8 @@ async function submitAdvance(){
   const noteEl=document.getElementById('adv-note');
   const name=sel?sel.value:'';
   const amount=amtEl?parseInt(amtEl.value)||0:0;
-  if(!name){ alert('Employee select karein.'); return; }
-  if(amount<=0){ alert('Sahi amount enter karein.'); return; }
+  if(!name){ alert('Please select an employee.'); return; }
+  if(amount<=0){ alert('Please enter a valid amount.'); return; }
   await addAdvance(name, amount, dateEl?dateEl.value:'', noteEl?noteEl.value:'');
   if(amtEl) amtEl.value='';
   if(noteEl) noteEl.value='';
@@ -2460,7 +2460,7 @@ async function submitAdvance(){
   renderAdvanceHistory();
   renderAdvanceBox();
   renderSalaryPage();
-  alert(name+' ko '+fmt(amount)+' advance add ho gaya.');
+  alert('Advance of '+fmt(amount)+' added for '+name+'.');
 }
 
 function renderAdvanceHistory(){
@@ -2470,7 +2470,7 @@ function renderAdvanceHistory(){
   const name=sel?sel.value||'Puja':'Puja';
   const list=getEmpAdvances(name).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   if(list.length===0){
-    tbl.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">Koi advance record nahi hai</td></tr>';
+    tbl.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">No advance records found</td></tr>';
     return;
   }
   tbl.innerHTML=list.map(a=>{
@@ -2487,7 +2487,7 @@ function renderAdvanceHistory(){
 }
 
 async function confirmDeleteAdvance(name, id){
-  if(!confirm('Ye advance record delete karein?\n\nAgar ye kisi salary month se already adjust ho chuka hai, to wo adjustment history bhi is record ke saath delete ho jayegi.')) return;
+  if(!confirm('Delete this advance record?\n\nIf it has already been adjusted against a salary month, that adjustment history will also be deleted along with this record.')) return;
   await deleteAdvance(name, id);
   renderAdvanceHistory();
   renderAdvanceBox();
@@ -2678,7 +2678,7 @@ function renderMultiMonthSummary(){
       <tbody>
         ${rows.map(r=>`<tr><td>${mLabel(r.month)}</td><td style="text-align:right">${fmt(r.total)}</td><td style="text-align:right;color:var(--green)">${fmt(r.paid)}</td><td style="text-align:right;color:${r.balance>0?'var(--red)':'var(--green)'}">${fmt(r.balance)}</td></tr>`).join('')}
       </tbody>
-      <tfoot><tr style="border-top:1px solid var(--border)"><td style="padding-top:6px;font-weight:600">Total balance (${months.length} mahine)</td><td></td><td></td><td style="text-align:right;padding-top:6px;font-weight:700;font-size:15px;color:var(--red)">${fmt(totalBalance)}</td></tr></tfoot>
+      <tfoot><tr style="border-top:1px solid var(--border)"><td style="padding-top:6px;font-weight:600">Total balance (${months.length} months)</td><td></td><td></td><td style="text-align:right;padding-top:6px;font-weight:700;font-size:15px;color:var(--red)">${fmt(totalBalance)}</td></tr></tfoot>
     </table>`;
   previewMultiMonthSplit();
 }
