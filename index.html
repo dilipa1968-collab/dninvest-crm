@@ -244,6 +244,34 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 
 /* ── ANNOUNCEMENT ── */
 .ann-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px;margin-bottom:18px;}
+
+/* MEETING AGENDA */
+.ma-board{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:18px;}
+@media(max-width:800px){.ma-board{grid-template-columns:1fr;}}
+.ma-col{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:14px;min-height:120px;}
+.ma-col-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border);}
+.ma-col-title{font-size:.95rem;font-weight:800;}
+.ma-col-count{background:var(--bg);color:var(--gray);font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:10px;}
+.ma-col.idea .ma-col-title{color:var(--orange);}
+.ma-col.problem .ma-col-title{color:var(--red);}
+.ma-col.target .ma-col-title{color:var(--green);}
+.ma-item{background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:10px;border-left:3px solid var(--border);}
+.ma-col.idea .ma-item{border-left-color:var(--orange);}
+.ma-col.problem .ma-item{border-left-color:var(--red);}
+.ma-col.target .ma-item{border-left-color:var(--green);}
+.ma-item-text{font-size:.85rem;color:var(--navy);line-height:1.45;word-break:break-word;}
+.ma-item-meta{display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:.7rem;color:var(--gray);}
+.ma-item-del{cursor:pointer;color:var(--gray);font-size:.78rem;}
+.ma-item-del:hover{color:var(--red);}
+.ma-empty{color:var(--gray);font-size:.8rem;text-align:center;padding:20px 0;}
+.ma-history-entry{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+.ma-history-hdr{display:flex;align-items:center;justify-content:space-between;font-size:.78rem;color:var(--gray);margin-bottom:8px;cursor:pointer;}
+.ma-history-body{display:none;}
+.ma-history-body.open{display:block;}
+.ma-history-tag{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:8px;margin-right:6px;}
+.ma-history-tag.idea{background:var(--orange2);color:var(--orange);}
+.ma-history-tag.problem{background:var(--red2);color:var(--red);}
+.ma-history-tag.target{background:var(--green2);color:var(--green);}
 .ann-card h3{font-size:.95rem;font-weight:800;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
 .ann-imgwrap{margin-top:10px;position:relative;display:inline-block;}
 .ann-imgwrap img{max-width:240px;max-height:160px;border-radius:9px;border:1.5px solid var(--border);display:block;}
@@ -489,6 +517,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">🎤</span> Seminars
         <span class="nav-badge" id="nb-seminars">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('meeting-agenda')" id="nav-meeting-agenda">
+        <span class="icon">🗓️</span> Meeting Agenda
+      </div>
 
       <div class="sidebar-section" id="eq-nav-section">Equity</div>
       <div class="nav-item" onclick="showPage('eq-clients')" id="nav-eq-clients">
@@ -580,8 +611,21 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <div style="text-align:center">
               <div style="font-size:2rem;margin-bottom:8px">💼</div>
               <h3 style="color:#fff;margin:0">MF Transactions</h3>
-              <p style="font-size:.78rem;color:#eafff5;margin-top:4px">Lumpsum · SIP · Switch · Redemption</p>
+              <p style="font-size:.78rem;color:#eafff5;margin-top:4px">Lumpsum · SIP · Switch · STP · Redemption</p>
             </div>
+          </div>
+          <div class="dash-card" id="mfReminderCard" style="display:none">
+            <h3>📋 Don't Forget</h3>
+            <p style="font-size:.82rem;color:var(--gray);margin-bottom:10px">Redemptions and SIP Stops are easy to forget to log — add them here as soon as they happen.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-outline" onclick="quickMfTxn('Redemption')">➖ Log Redemption</button>
+              <button class="btn btn-outline" onclick="quickMfTxn('SIP Stop')">⏸️ Log SIP Stop</button>
+            </div>
+            <p style="font-size:.74rem;color:var(--gray);margin-top:10px" id="mfReminderLastEntry"></p>
+          </div>
+          <div class="dash-card collapsible admin-only" id="mfAuditCard" style="display:none">
+            <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="mfAuditTable"></div></div>
           </div>
           <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,#7D3C98 0%,#B7950B 100%);color:#fff" onclick="showPage('eq-demat')">
             <div style="text-align:center">
@@ -599,6 +643,43 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           </div>
         </div>
       </div>
+
+      <!-- ── MEETING AGENDA ── -->
+      <div class="page" id="page-meeting-agenda">
+        <div class="page-hdr">
+          <div class="page-title">🗓️ Office Meeting Agenda</div>
+          <div class="hdr-actions admin-only" id="ma-admin-actions" style="display:none">
+            <button class="btn btn-danger" onclick="clearMeetingAgenda()">🗑️ Clear for New Meeting</button>
+          </div>
+        </div>
+
+        <div class="ann-card">
+          <h3>➕ Add to Agenda</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Type</label>
+              <select id="ma-type">
+                <option value="idea">💡 Idea</option>
+                <option value="problem">⚠️ Problem</option>
+                <option value="target">🎯 Target</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-field" style="margin-top:4px">
+            <label>Your point</label>
+            <textarea id="ma-text" placeholder="Type your idea, problem, or target here..."></textarea>
+          </div>
+          <button class="btn btn-gold" style="margin-top:10px" onclick="submitAgendaItem()">➕ Add to Agenda</button>
+        </div>
+
+        <div class="ma-board" id="ma-board"></div>
+
+        <div class="ann-card admin-only" id="ma-history-card" style="display:none;margin-top:18px">
+          <h3>📜 Past Meetings</h3>
+          <div id="ma-history-list"></div>
+        </div>
+      </div>
+
 
       <!-- ── LEADS ── -->
       <div class="page" id="page-leads">
@@ -822,6 +903,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
                 <option value="SIP">New SIP</option>
                 <option value="SIP Stop">SIP Stop</option>
                 <option value="Switch">Switch</option>
+                <option value="STP">STP</option>
                 <option value="Redemption">Redemption</option>
                 <option value="SWP">SWP</option>
                 <option value="Resumption">Resumption</option>
@@ -855,6 +937,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="SIP">New SIP</option>
             <option value="SIP Stop">SIP Stop</option>
             <option value="Switch">Switch</option>
+            <option value="STP">STP</option>
             <option value="Redemption">Redemption</option>
             <option value="SWP">SWP</option>
             <option value="Resumption">Resumption</option>
@@ -1736,7 +1819,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -2150,7 +2233,7 @@ function initApp(){
       });
 
       // Real-time listeners for small array collections (users, call_logs, mf_business)
-      ['call_logs','users','mf_business'].forEach(key=>{
+      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
@@ -2173,6 +2256,7 @@ function initApp(){
                   else if(pg==='dashboard') refreshDash();
                 }
               }
+              if((key==='meeting_agenda'||key==='meeting_agenda_archive') && getCurrentPageId()==='meeting-agenda') renderMeetingAgenda();
               refreshDash(); updateBadges();
             }
           }
@@ -2369,6 +2453,7 @@ function showPage(id){
   else if(id==='mf-clients') renderMfTable();
   else if(id==='leads') renderLeadsTable();
   else if(id==='seminars') renderSeminarsTable();
+  else if(id==='meeting-agenda') renderMeetingAgenda();
   else if(id==='eq-followup'){ renderFollowup('eqf'); }
   else if(id==='mf-followup'){ renderFollowup('mff'); }
   else if(id==='eq-notrade') renderNoTrade();
@@ -2560,6 +2645,67 @@ function refreshDash(){
           <span style="font-size:.75rem;color:var(--gray)">${c.rm}</span>
         </div>`).join('')
     : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No follow-ups scheduled for today</p>';
+
+  // Redemption / SIP Stop reminder (RM side) — these are the two transaction
+  // types people most often forget to log since they're "negative" events.
+  // Shows each RM how long it's been since their own last entry of each type.
+  const reminderCard = document.getElementById('mfReminderCard');
+  if(reminderCard && hasMf && CU.role!=='admin'){
+    reminderCard.style.display='';
+    const myEntries = getMfBizEntries().filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
+    const lastOf = type=>{
+      const list = myEntries.filter(e=>e.type===type).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      return list[0]?.date || null;
+    };
+    const lastRed = lastOf('Redemption');
+    const lastStop = lastOf('SIP Stop');
+    const dRed = daysDiff(lastRed), dStop = daysDiff(lastStop);
+    const partRed = lastRed ? `Redemption: ${dRed} day${dRed===1?'':'s'} ago` : 'Redemption: never logged';
+    const partStop = lastStop ? `SIP Stop: ${dStop} day${dStop===1?'':'s'} ago` : 'SIP Stop: never logged';
+    document.getElementById('mfReminderLastEntry').textContent = `Your last entry — ${partRed} · ${partStop}`;
+  } else if(reminderCard){
+    reminderCard.style.display='none';
+  }
+
+  // Redemption / SIP Stop audit (Admin side) — last entry date per MF RM,
+  // sorted with the most overdue (or never-logged) RM at the top, so Admin
+  // can see at a glance who needs a follow-up nudge.
+  const auditCard = document.getElementById('mfAuditCard');
+  if(auditCard && CU.role==='admin'){
+    auditCard.style.display='';
+    const entries = getMfBizEntries();
+    const mfRMs = getSegRMs('mf');
+    const rows = mfRMs.map(rm=>{
+      const mine = entries.filter(e=>(e.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+      const lastOf = type=>{
+        const list = mine.filter(e=>e.type===type).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+        return list[0]?.date || null;
+      };
+      const lastRed = lastOf('Redemption'), lastStop = lastOf('SIP Stop');
+      const dRed = daysDiff(lastRed), dStop = daysDiff(lastStop);
+      const worst = Math.max(dRed===null?9999:dRed, dStop===null?9999:dStop);
+      return {rm, lastRed, lastStop, dRed, dStop, worst};
+    }).sort((a,b)=>b.worst-a.worst);
+
+    const colorOf = d => d===null||d>=60 ? '#f3e8ff' : d>=30 ? '#fef3c7' : d>=15 ? '#fee2e2' : '#dcfce7';
+    const textColorOf = d => d===null||d>=60 ? '#6d28d9' : d>=30 ? '#92400e' : d>=15 ? '#991b1b' : '#166534';
+    const label = d => d===null ? 'Never' : d+'d ago';
+    const badge = d => `<span style="display:inline-block;min-width:72px;text-align:center;padding:3px 8px;border-radius:8px;font-size:.74rem;font-weight:700;background:${colorOf(d)};color:${textColorOf(d)}">${label(d)}</span>`;
+
+    document.getElementById('mfAuditTable').innerHTML = rows.length
+      ? `<div class="bar-row" style="font-size:.72rem;color:var(--gray);font-weight:700;padding-bottom:6px">
+           <span class="bar-name">RM</span><span style="width:90px;text-align:center">Redemption</span><span style="width:90px;text-align:center">SIP Stop</span>
+         </div>` +
+        rows.map(r=>`
+          <div class="bar-row">
+            <span class="bar-name">${r.rm}</span>
+            <span style="width:90px;display:flex;justify-content:center">${badge(r.dRed)}</span>
+            <span style="width:90px;display:flex;justify-content:center">${badge(r.dStop)}</span>
+          </div>`).join('')
+      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No MF RMs found</p>';
+  } else if(auditCard){
+    auditCard.style.display='none';
+  }
 
   updateBadges();
 }
@@ -4411,6 +4557,19 @@ function setMfBizEntries(entries){
   DB.set('mf_business', {entries, eq_entries: eqEntries});
 }
 
+// Jumps straight to the MF Transactions page with the Type pre-selected and
+// focus on client search — used by the Dashboard "Don't Forget" reminder card
+// so logging a Redemption / SIP Stop takes one click instead of three.
+function quickMfTxn(type){
+  showPage('mf-txns');
+  setTimeout(()=>{
+    const sel=document.getElementById('mftxn-type');
+    if(sel) sel.value=type;
+    const search=document.getElementById('mftxn-client-search');
+    if(search) search.focus();
+  }, 50);
+}
+
 function renderMfTxnPage(){
   mfTxnSelectedClient = null;
   const sel=document.getElementById('mftxn-client-selected'); if(sel) sel.value='';
@@ -4536,7 +4695,7 @@ function getFilteredMfTxns(){
 
 const MFTXN_TYPE_COLOR = {
   Lumpsum:'#1D9E75', SIP:'#185FA5', 'SIP Stop':'#C0392B', Switch:'#B7950B',
-  Redemption:'#C0392B', SWP:'#D35400', Resumption:'#7D3C98'
+  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', Resumption:'#7D3C98'
 };
 
 function renderMfTxnTable(){
@@ -5952,6 +6111,126 @@ function clearAnnouncement(){
   DB.set('announcement', null);
   toast('Announcement cleared','success');
   renderAnnouncementAdmin();
+}
+
+// ══════════════════════════════════════════
+// MEETING AGENDA — shared board where every RM and Admin can drop in an
+// Idea / Problem / Target ahead of the office meeting. 'meeting_agenda' holds
+// the current/active items (merge-on-write, like client records, so two RMs
+// adding at the same moment don't clobber each other). When Admin clears the
+// board for a new meeting, the current items are archived as one dated cycle
+// into 'meeting_agenda_archive' instead of being deleted outright.
+// ══════════════════════════════════════════
+const MA_TYPES = {
+  idea:    {label:'Idea',    icon:'💡'},
+  problem: {label:'Problem', icon:'⚠️'},
+  target:  {label:'Target',  icon:'🎯'}
+};
+
+function submitAgendaItem(){
+  const type = document.getElementById('ma-type').value;
+  const textEl = document.getElementById('ma-text');
+  const text = (textEl.value||'').trim();
+  if(!text){ toast('Please type your point first','error'); return; }
+  const item = {
+    id: uid(),
+    type,
+    text,
+    author: CU.name,
+    createdAt: new Date().toISOString()
+  };
+  DB.setClient('meeting_agenda', item);
+  textEl.value = '';
+  toast('Added to agenda','success');
+  renderMeetingAgenda();
+}
+
+async function deleteAgendaItem(id){
+  if(!confirm('Remove this item from the agenda?')) return;
+  await DB.deleteClient('meeting_agenda', id);
+  renderMeetingAgenda();
+}
+
+async function clearMeetingAgenda(){
+  const items = DB.get('meeting_agenda') || [];
+  if(items.length === 0){ toast('Agenda is already empty','error'); return; }
+  if(!confirm(`Clear all ${items.length} item(s) for a new meeting?\n\nThey will be saved under Past Meetings, not deleted.`)) return;
+  const archive = DB.get('meeting_agenda_archive') || [];
+  archive.unshift({
+    id: uid(),
+    clearedAt: new Date().toISOString(),
+    clearedBy: CU.name,
+    items
+  });
+  await DB.set('meeting_agenda_archive', archive);
+  await DB.set('meeting_agenda', []);
+  toast('Agenda cleared for the next meeting','success');
+  renderMeetingAgenda();
+}
+
+function toggleMaHistory(id){
+  const el = document.getElementById('ma-hist-'+id);
+  if(el) el.classList.toggle('open');
+}
+
+function renderMeetingAgenda(){
+  const board = document.getElementById('ma-board');
+  if(!board) return;
+  const items = DB.get('meeting_agenda') || [];
+
+  const adminActions = document.getElementById('ma-admin-actions');
+  if(adminActions) adminActions.style.display = CU.role==='admin' ? 'flex' : 'none';
+  const historyCard = document.getElementById('ma-history-card');
+  if(historyCard) historyCard.style.display = CU.role==='admin' ? '' : 'none';
+
+  board.innerHTML = Object.keys(MA_TYPES).map(type=>{
+    const meta = MA_TYPES[type];
+    const list = items.filter(i=>i.type===type).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    const body = list.length
+      ? list.map(i=>`
+        <div class="ma-item">
+          <div class="ma-item-text">${escapeHtml(i.text)}</div>
+          <div class="ma-item-meta">
+            <span>👤 ${escapeHtml(i.author)} · ${fmtDate(i.createdAt)}</span>
+            ${(CU.role==='admin' || i.author===CU.name) ? `<span class="ma-item-del" onclick="deleteAgendaItem('${i.id}')">🗑️ Remove</span>` : ''}
+          </div>
+        </div>`).join('')
+      : `<div class="ma-empty">No ${meta.label.toLowerCase()}s yet</div>`;
+    return `
+      <div class="ma-col ${type}">
+        <div class="ma-col-hdr">
+          <span class="ma-col-title">${meta.icon} ${meta.label}s</span>
+          <span class="ma-col-count">${list.length}</span>
+        </div>
+        ${body}
+      </div>`;
+  }).join('');
+
+  if(CU.role==='admin'){
+    const histList = document.getElementById('ma-history-list');
+    if(histList){
+      const archive = DB.get('meeting_agenda_archive') || [];
+      if(archive.length===0){
+        histList.innerHTML = `<div class="ma-empty">No past meetings cleared yet</div>`;
+      } else {
+        histList.innerHTML = archive.map(cycle=>`
+          <div class="ma-history-entry">
+            <div class="ma-history-hdr" onclick="toggleMaHistory('${cycle.id}')">
+              <span>🗓️ Cleared ${fmtDate(cycle.clearedAt)} by ${escapeHtml(cycle.clearedBy)} — ${cycle.items.length} item(s)</span>
+              <span>▾</span>
+            </div>
+            <div class="ma-history-body" id="ma-hist-${cycle.id}">
+              ${cycle.items.map(i=>`
+                <div class="ma-item" style="margin-bottom:8px">
+                  <span class="ma-history-tag ${i.type}">${MA_TYPES[i.type].icon} ${MA_TYPES[i.type].label}</span>
+                  <span class="ma-item-text" style="display:inline">${escapeHtml(i.text)}</span>
+                  <div class="ma-item-meta"><span>👤 ${escapeHtml(i.author)} · ${fmtDate(i.createdAt)}</span></div>
+                </div>`).join('')}
+            </div>
+          </div>`).join('');
+      }
+    }
+  }
 }
 
 // Show popup if there's an unseen announcement for the current user
