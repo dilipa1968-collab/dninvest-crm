@@ -556,6 +556,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-mfnc">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('mf-txns')" id="nav-mf-txns">
+        <span class="icon">💼</span> MF Transactions
+      </div>
 
       <div class="sidebar-section">Reports</div>
       <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
@@ -2318,7 +2321,7 @@ function initApp(){
     if(el) el.style.display=hasEq?'flex':'none';
   });
   if(eqSec) eqSec.style.display=hasEq?'':'none';
-  ['mf-clients','mf-followup','mf-sip','mf-nocall'].forEach(id=>{
+  ['mf-clients','mf-followup','mf-sip','mf-nocall','mf-txns'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.style.display=hasMf?'flex':'none';
   });
@@ -2328,6 +2331,20 @@ function initApp(){
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
   const annNav=document.getElementById('nav-announcements');
   if(annNav) annNav.style.display=CU.role==='admin'?'flex':'none';
+
+  // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
+  // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
+  // but get no other access — everything else in the sidebar stays hidden.
+  if(CU.role==='mf_desk'){
+    ['nav-dashboard','nav-leads','nav-seminars','nav-meeting-agenda',
+     'nav-mf-clients','nav-mf-followup','nav-mf-sip','nav-mf-nocall',
+     'nav-reports','nav-activity-log'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.display='none';
+    });
+    const mfTxnNav=document.getElementById('nav-mf-txns');
+    if(mfTxnNav) mfTxnNav.style.display='flex';
+  }
 
   // Messages nav — only for RMs (not admin)
   const msgNav = document.getElementById('nav-msg-admin');
@@ -2354,6 +2371,10 @@ function initApp(){
   populateRmDropdowns();
   refreshDash();
   updateBadges();
+
+  // MF Desk lands directly on MF Transactions — Dashboard isn't relevant to
+  // this scoped role and its nav item is hidden, so don't leave them on it.
+  if(CU.role==='mf_desk') showPage('mf-txns');
 }
 
 function getTempAccessDealers(seg){
@@ -2404,7 +2425,10 @@ function getAllRMs(){
   return (DB.get('users')||[]).filter(u=>u.active!==false).map(u=>u.name);
 }
 function getSegRMs(seg){
-  return (DB.get('users')||[]).filter(u=>u.active!==false&&(u.segments||[]).includes(seg)).map(u=>u.name);
+  // Excludes 'mf_desk' — that's a back-office role, not an actual RM clients
+  // get assigned to, so it must never show up in RM-assignment dropdowns
+  // (Lead RM, Attendee RM, client RM, etc.) anywhere in the app.
+  return (DB.get('users')||[]).filter(u=>u.active!==false && u.role!=='mf_desk' && (u.segments||[]).includes(seg)).map(u=>u.name);
 }
 
 function populateRmDropdowns(){
@@ -4501,7 +4525,7 @@ function bizStatusBadge(status){
 }
 
 function approveBusinessEntry(id){
-  if(CU.role!=='admin') return;
+  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
@@ -4514,7 +4538,7 @@ function approveBusinessEntry(id){
 }
 
 function declineBusinessEntry(id){
-  if(CU.role!=='admin') return;
+  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
   const reason = prompt('Decline reason (optional):','') || '';
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
@@ -4528,7 +4552,7 @@ function declineBusinessEntry(id){
 }
 
 function markPendingBusinessEntry(id){
-  if(CU.role!=='admin') return;
+  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
@@ -4578,15 +4602,25 @@ function renderMfTxnPage(){
   const res=document.getElementById('mftxn-client-results'); if(res){ res.style.display='none'; res.innerHTML=''; }
   const dateEl=document.getElementById('mftxn-date'); if(dateEl && !dateEl.value) dateEl.value=today();
 
-  // Populate RM filter dropdown (admin sees all MF RMs, RM sees just themself)
+  // Populate RM filter dropdown (admin / MF Desk sees all MF RMs, RM sees just themself)
   const rmFilter=document.getElementById('mftxn-rm-filter');
   if(rmFilter){
-    const mfRMs = CU.role==='admin' ? getSegRMs('mf') : [CU.name];
+    const isFullAccess = CU.role==='admin' || CU.role==='mf_desk';
+    const mfRMs = isFullAccess ? getSegRMs('mf') : [CU.name];
     rmFilter.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
-    if(CU.role!=='admin'){ rmFilter.value=CU.name; rmFilter.disabled=true; }
+    if(!isFullAccess){ rmFilter.value=CU.name; rmFilter.disabled=true; }
   }
 
   renderMfTxnTable();
+}
+
+// MF Desk (role 'mf_desk') needs to search/select ANY client across all RMs
+// when logging a transaction on their behalf — unlike the shared
+// getMyMfClients() which stays RM-scoped everywhere else in the app, this is
+// scoped specifically to the MF Transactions entry form.
+function getMfTxnSearchClients(){
+  if(CU.role==='admin' || CU.role==='mf_desk') return DB.get('mf_clients')||[];
+  return getMyMfClients();
 }
 
 function searchMfTxnClient(){
@@ -4595,7 +4629,7 @@ function searchMfTxnClient(){
   if(!out) return;
   if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
 
-  const clients=getMyMfClients();
+  const clients=getMfTxnSearchClients();
   const matches=clients.filter(c=>
     (c.name||'').toLowerCase().includes(q) ||
     (c.pan||'').toLowerCase().includes(q) ||
@@ -4616,7 +4650,7 @@ function searchMfTxnClient(){
 }
 
 function selectMfTxnClient(clientId){
-  const clients=getMyMfClients();
+  const clients=getMfTxnSearchClients();
   const c=clients.find(x=>x.id===clientId);
   if(!c) return;
   mfTxnSelectedClient = {id:c.id, name:c.name, rm:c.rm||''};
@@ -4655,7 +4689,7 @@ function saveMfTxnEntry(){
     type, amount, date, remarks,
     created_by: CU.name,
     created: today(),
-    status: CU.role==='admin' ? 'Approved' : 'Pending',
+    status: (CU.role==='admin' || CU.role==='mf_desk') ? 'Approved' : 'Pending',
     decline_reason: ''
   });
   setMfBizEntries(entries);
@@ -4674,8 +4708,9 @@ function saveMfTxnEntry(){
 
 function getFilteredMfTxns(){
   let entries=getMfBizEntries();
-  // RM scoping — non-admin only sees their own entries
-  if(CU.role!=='admin'){
+  // RM scoping — only plain RMs are restricted to their own entries.
+  // Admin and MF Desk (back-office, scoped role) see everyone's.
+  if(CU.role!=='admin' && CU.role!=='mf_desk'){
     entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
   }
   const q=(document.getElementById('mftxn-search')?.value||'').trim().toLowerCase();
@@ -4724,7 +4759,7 @@ function renderMfTxnTable(){
           <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
-          <td style="white-space:nowrap">${CU.role==='admin'?`
+          <td style="white-space:nowrap">${(CU.role==='admin'||CU.role==='mf_desk')?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
@@ -4736,7 +4771,7 @@ function renderMfTxnTable(){
 }
 
 function deleteMfTxnEntry(id){
-  if(CU.role!=='admin') return;
+  if(CU.role!=='admin' && CU.role!=='mf_desk') return;
   if(!confirm('Delete this transaction entry?')) return;
   const entries=getMfBizEntries().filter(e=>e.id!==id);
   setMfBizEntries(entries);
@@ -5613,7 +5648,7 @@ function renderAdmin(){
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
         <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
-        <div class="user-role">@${u.username} · ${u.role}</div>
+        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':'RM'}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
@@ -5661,6 +5696,7 @@ function userForm(u){
       <div class="form-field"><label>Role</label><select id="uf_role" onchange="togglePinField(this)">
         <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
         <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
+        <option ${u?.role==='mf_desk'?'selected':''} value="mf_desk">MF Desk (MF Transactions only)</option>
       </select></div>
       <div class="form-field" id="uf_pin_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
         <label>4-Digit PIN (RM only)</label>
