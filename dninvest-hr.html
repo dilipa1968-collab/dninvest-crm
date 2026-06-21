@@ -387,7 +387,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Salary calculator</div>
           <div class="compact-grid3">
             <div class="field-inline"><label>Employee</label>
-              <select id="sal-emp" onchange="document.getElementById('sal-absent').dataset.touched='';calcSalary()">
+              <select id="sal-emp" onchange="document.getElementById('sal-absent').dataset.touched='';onSalEmpOrMonthChange()">
                 <option value="Puja">Puja</option>
                 <option value="Rohit">Rohit</option>
                 <option value="Raju">Raju</option>
@@ -399,11 +399,12 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
                 <option value="Anjali">Anjali</option>
               </select>
             </div>
-            <div class="field-inline"><label>Month</label><input type="month" id="sal-month" onchange="document.getElementById('sal-absent').dataset.touched='';calcSalary()"></div>
+            <div class="field-inline"><label>Month</label><input type="month" id="sal-month" onchange="document.getElementById('sal-absent').dataset.touched='';onSalEmpOrMonthChange()"></div>
             <div class="field-inline"><label>Absent days</label><input type="number" id="sal-absent" value="0" min="0" max="30" oninput="this.dataset.touched='1'" onchange="calcSalary()"></div>
             <div class="field-inline"><label>Bonus (₹)</label><input type="number" id="sal-bonus" value="0" onchange="calcSalary()"></div>
           </div>
           <hr class="divider">
+          <div id="sal-advance-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
           <div id="sal-result"></div>
           <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generated! (Demo)')">Salary slip download</button>
         </div>
@@ -411,13 +412,57 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance kata</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-salary-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card admin-only" style="display:none;grid-column:1/-1">
+          <div class="card-title">Advance management</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Yahan se kisi bhi employee ko advance de sakte hain. Salary calculator mein ye automatically pending dikhega, jise aap full ya partial deduct kar sakte hain.</p>
+          <div class="compact-grid3" style="margin-bottom:0">
+            <div class="field-inline"><label>Employee</label>
+              <select id="adv-emp">
+                <option value="Puja">Puja</option>
+                <option value="Rohit">Rohit</option>
+                <option value="Raju">Raju</option>
+                <option value="Komal">Komal</option>
+                <option value="Riya">Riya</option>
+                <option value="Bharat">Bharat</option>
+                <option value="Khokhan">Khokhan</option>
+                <option value="Megha">Megha</option>
+                <option value="Anjali">Anjali</option>
+              </select>
+            </div>
+            <div class="field-inline"><label>Amount (₹)</label><input type="number" id="adv-amount" min="0" placeholder="e.g. 5000"></div>
+            <div class="field-inline"><label>Date</label><input type="date" id="adv-date"></div>
+            <div class="field-inline"><label>Note (optional)</label><input type="text" id="adv-note" placeholder="e.g. Personal advance"></div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="submitAdvance()">+ Advance add karein</button>
+          <hr class="divider">
+          <div class="field-inline" style="margin-bottom:8px;max-width:280px"><label>Employee ka advance history dekhein</label>
+            <select id="adv-history-emp" onchange="renderAdvanceHistory()">
+              <option value="Puja">Puja</option>
+              <option value="Rohit">Rohit</option>
+              <option value="Raju">Raju</option>
+              <option value="Komal">Komal</option>
+              <option value="Riya">Riya</option>
+              <option value="Bharat">Bharat</option>
+              <option value="Khokhan">Khokhan</option>
+              <option value="Megha">Megha</option>
+              <option value="Anjali">Anjali</option>
+            </select>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Amount diya</th><th>Note</th><th>Pending balance</th><th>Status</th><th></th></tr></thead>
+              <tbody id="adv-history-table"></tbody>
             </table>
           </div>
         </div>
       </div>
     </div>
+
 
     <!-- INCENTIVE -->
     <div id="page-incentive" class="page compact-page">
@@ -710,7 +755,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes'];
+    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -936,6 +981,92 @@ function getIncRates(){
 }
 async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
+// ─── ADVANCES ────────────────────────────────────────────────────────────────
+// Shape: { "EmployeeName": [ {id, amount, balance, date, note, adjustments:[{month, amount, date}], closed} ] }
+// 'amount' = original advance given. 'balance' = remaining unadjusted amount.
+// 'adjustments' = history of how much was deducted, in which salary month.
+function getAdvances(){ return DB.get('advances', {}) || {}; }
+async function saveAdvances(d){ await DB.set('advances', d); }
+
+function getEmpAdvances(name){ return (getAdvances()[name]||[]).slice(); }
+
+function getPendingAdvanceTotal(name){
+  return getEmpAdvances(name).reduce((s,a)=>s+(a.balance||0),0);
+}
+
+async function addAdvance(name, amount, date, note){
+  const all=getAdvances();
+  if(!all[name]) all[name]=[];
+  all[name].push({
+    id: 'adv_'+Date.now()+'_'+Math.floor(Math.random()*1000),
+    amount: Math.max(0, Number(amount)||0),
+    balance: Math.max(0, Number(amount)||0),
+    date: date || today(),
+    note: note || '',
+    adjustments: [],
+    closed: false
+  });
+  await saveAdvances(all);
+}
+
+async function deleteAdvance(name, id){
+  const all=getAdvances();
+  if(!all[name]) return;
+  all[name]=all[name].filter(a=>a.id!==id);
+  await saveAdvances(all);
+}
+
+// Deducts `amount` against an employee's oldest-first pending advances, tagged to `month`.
+// Returns the amount actually deducted (capped by total pending balance).
+async function adjustAdvanceForMonth(name, month, amount){
+  const all=getAdvances();
+  const list=all[name]||[];
+  let remaining=Math.max(0, Number(amount)||0);
+  let deducted=0;
+  for(const a of list){
+    if(remaining<=0) break;
+    const bal=a.balance||0;
+    if(bal<=0) continue;
+    const take=Math.min(bal, remaining);
+    a.balance=Math.round((bal-take)*100)/100;
+    a.adjustments=a.adjustments||[];
+    a.adjustments.push({month, amount:take, date:today()});
+    if(a.balance<=0){ a.balance=0; a.closed=true; }
+    remaining-=take;
+    deducted+=take;
+  }
+  all[name]=list;
+  await saveAdvances(all);
+  return deducted;
+}
+
+// Total already adjusted against a given salary month (so re-saving doesn't double count,
+// and so the UI can show what was deducted for that month specifically).
+function getAdvanceAdjustedForMonth(name, month){
+  const list=getEmpAdvances(name);
+  let total=0;
+  list.forEach(a=>(a.adjustments||[]).forEach(adj=>{ if(adj.month===month) total+=adj.amount; }));
+  return total;
+}
+
+// Reverses any adjustments previously tagged to `month` for this employee (restores balances),
+// used when admin recalculates/re-saves a month's advance deduction.
+async function reverseAdvanceForMonth(name, month){
+  const all=getAdvances();
+  const list=all[name]||[];
+  list.forEach(a=>{
+    if(!a.adjustments) return;
+    const keep=[];
+    a.adjustments.forEach(adj=>{
+      if(adj.month===month){ a.balance=Math.round(((a.balance||0)+adj.amount)*100)/100; a.closed=false; }
+      else keep.push(adj);
+    });
+    a.adjustments=keep;
+  });
+  all[name]=list;
+  await saveAdvances(all);
+}
+
 // Brokerage incentive formula (fully Admin-configurable from Incentive page):
 // Brokerage < lowMult x Salary                 => Incentive = 0
 // lowMult x Salary <= Brokerage < highMult x Salary => Excess(over lowMult x) * tier1Rate%
@@ -1135,6 +1266,7 @@ function startApp(){
     mmFrom.value=d.toISOString().slice(0,7);
   }
   const mmTo=document.getElementById('mm-to'); if(mmTo && !mmTo.value) mmTo.value=curMonth;
+  const advDateEl=document.getElementById('adv-date'); if(advDateEl && !advDateEl.value) advDateEl.value=today();
 
   startClock();
   renderDashboard();
@@ -1144,6 +1276,8 @@ function startApp(){
   renderIncentivePage();
   if(isAdmin) renderEmployees();
   calcSalary();
+  renderAdvanceBox();
+  renderAdvanceHistory();
 
   // Real-time sync: whenever Admin (or anyone, on any device) changes data in
   // Firestore, this fires and we re-render the relevant pages immediately —
@@ -1154,7 +1288,7 @@ function startApp(){
     renderLeavePage();
     renderSalaryPage();
     renderIncentivePage();
-    if(isAdmin) renderEmployees();
+    if(isAdmin){ renderEmployees(); renderAdvanceBox(); renderAdvanceHistory(); }
   });
 }
 
@@ -1812,7 +1946,10 @@ function renderSalaryPage(){
     const r=calcMonthlySalary(currentUser,month);
     const pay=getPaymentsForMonth(month)[currentUser]||{};
     const paid=pay.salaryPaid||0;
-    const balance=Math.max(0, r.net-paid);
+    const advDeducted=getAdvanceAdjustedForMonth(currentUser, month);
+    const netAfterAdv=Math.max(0, r.net-advDeducted);
+    const balance=Math.max(0, netAfterAdv-paid);
+    const pendingAdv=getPendingAdvanceTotal(currentUser);
     const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
     msc.innerHTML=`
       <p style="font-size:11px;color:var(--text3);margin-bottom:6px">${mLabel}</p>
@@ -1822,9 +1959,11 @@ function renderSalaryPage(){
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent × per-day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
-        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(r.net)}</td></tr>
+        ${advDeducted>0?`<tr><td style="color:var(--text2);padding:6px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
+        <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(netAfterAdv)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(paid)}</td></tr>
         <tr><td style="padding:6px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td></tr>
+        ${pendingAdv>0?`<tr><td colspan="2" style="padding-top:8px;font-size:11px;color:var(--text3)">Aapka pending advance balance: <span style="color:var(--red);font-weight:600">${fmt(pendingAdv)}</span></td></tr>`:''}
       </table>
       <p style="font-size:11px;color:var(--text3);margin-top:8px">This month's estimate — final figure to be confirmed by admin</p>`;
   }
@@ -1840,15 +1979,18 @@ function renderSalaryPage(){
       const payments=getPaymentsForMonth(month);
       tst.innerHTML=EMPLOYEES.map(e=>{
         const r=calcMonthlySalary(e.name,month);
+        const advDeducted=getAdvanceAdjustedForMonth(e.name, month);
+        const netAfterAdv=Math.max(0, r.net-advDeducted);
         const paid=(payments[e.name]&&payments[e.name].salaryPaid)||0;
-        const balance=Math.max(0, r.net-paid);
+        const balance=Math.max(0, netAfterAdv-paid);
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
         return `<tr>
           <td>${e.name}</td>
           <td>${fmt(r.salary)}</td>
           <td>${r.absentDays}</td>
           <td style="color:var(--red)">− ${fmt(r.deduction)}</td>
-          <td style="font-weight:600;color:var(--green)">${fmt(r.net)}</td>
+          <td style="color:${advDeducted>0?'var(--red)':'var(--text3)'}">${advDeducted>0?'− '+fmt(advDeducted):'—'}</td>
+          <td style="font-weight:600;color:var(--green)">${fmt(netAfterAdv)}</td>
           <td><input type="number" id="sal-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
           <td><button class="btn btn-sm" onclick="markSalaryPaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
@@ -1856,6 +1998,7 @@ function renderSalaryPage(){
       }).join('');
     }
     calcSalary();
+    renderAdvanceHistory();
   }
 }
 
@@ -1865,6 +2008,72 @@ async function markSalaryPaid(name){
   const input=document.getElementById('sal-paid-'+safeId);
   const amount=input?parseInt(input.value)||0:0;
   await setPaidAmount(name, month, 'salaryPaid', amount);
+  renderSalaryPage();
+}
+
+// Called when employee or month changes in the Salary calculator dropdowns —
+// refreshes both the advance box (pending balance for that employee) and the
+// figures, since advance deduction depends on which employee/month is selected.
+function onSalEmpOrMonthChange(){
+  renderAdvanceBox();
+  calcSalary();
+}
+
+// Shows the employee's pending advance balance + lets admin pick how much of it
+// to deduct this month: Full / Partial (custom amount) / None.
+function renderAdvanceBox(){
+  const box=document.getElementById('sal-advance-box');
+  if(!box) return;
+  const sel=document.getElementById('sal-emp');
+  const monthEl=document.getElementById('sal-month');
+  const name=sel?sel.value||'Puja':'Puja';
+  const month=monthEl&&monthEl.value?monthEl.value:'';
+
+  const pending=getPendingAdvanceTotal(name);
+  const alreadyAdjusted=month?getAdvanceAdjustedForMonth(name,month):0;
+  // Pending shown here EXCLUDES what's already been adjusted for this month
+  // (that amount is already reflected in 'alreadyAdjusted' below, not double counted).
+
+  if(pending<=0 && alreadyAdjusted<=0){
+    box.innerHTML=`<p style="font-size:11.5px;color:var(--text3)">${name} ka koi pending advance nahi hai.</p>`;
+    return;
+  }
+
+  box.innerHTML=`
+    <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">Advance deduction — ${name}</p>
+    ${alreadyAdjusted>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">Is month ke liye pehle se <b style="color:var(--red)">${fmt(alreadyAdjusted)}</b> adjust ho chuka hai. Naya amount enter karke "Apply" karne par pehla wala revert hoke naya apply hoga.</p>`:''}
+    <p style="font-size:12px;margin-bottom:8px">Total pending advance: <b style="color:var(--red)">${fmt(pending+alreadyAdjusted)}</b></p>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field-inline" style="margin-bottom:0;max-width:160px"><label>Is mahine kitna katna hai (₹)</label>
+        <input type="number" id="adv-deduct-amount" min="0" max="${pending+alreadyAdjusted}" value="${alreadyAdjusted>0?alreadyAdjusted:''}" placeholder="0">
+      </div>
+      <button class="btn btn-sm" onclick="setAdvDeductAmount(${pending+alreadyAdjusted})">Full deduct</button>
+      <button class="btn btn-sm" onclick="setAdvDeductAmount(0)">Kuch mat kaato</button>
+      <button class="btn btn-primary btn-sm" onclick="applyAdvanceDeduction()">Apply</button>
+    </div>`;
+}
+
+function setAdvDeductAmount(v){
+  const el=document.getElementById('adv-deduct-amount');
+  if(el) el.value=v;
+}
+
+async function applyAdvanceDeduction(){
+  const sel=document.getElementById('sal-emp');
+  const monthEl=document.getElementById('sal-month');
+  const name=sel?sel.value||'Puja':'Puja';
+  const month=monthEl&&monthEl.value?monthEl.value:'';
+  if(!month){ alert('Pehle Month select karein.'); return; }
+  const amtEl=document.getElementById('adv-deduct-amount');
+  const amount=amtEl?parseInt(amtEl.value)||0:0;
+
+  // Reverse whatever was previously tagged to this month, then re-apply fresh —
+  // keeps it idempotent so re-clicking Apply never double-deducts.
+  await reverseAdvanceForMonth(name, month);
+  if(amount>0) await adjustAdvanceForMonth(name, month, amount);
+
+  renderAdvanceBox();
+  calcSalary();
   renderSalaryPage();
 }
 
@@ -1890,7 +2099,9 @@ function calcSalary(){
   const bonus=parseInt(document.getElementById('sal-bonus').value)||0;
   const perday=b/30;
   const deduction=perday*absentDays;
-  const net=Math.max(0,b-deduction)+bonus;
+  const month=salMonthEl&&salMonthEl.value?salMonthEl.value:'';
+  const advDeducted=month?getAdvanceAdjustedForMonth(name,month):0;
+  const net=Math.max(0,b-deduction)+bonus-advDeducted;
   const el=document.getElementById('sal-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
@@ -1899,8 +2110,61 @@ function calcSalary(){
       <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(deduction)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Bonus</td><td style="text-align:right;color:var(--green)">+ ${fmt(bonus)}</td></tr>
-      <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(net)}</td></tr>
+      ${advDeducted>0?`<tr><td style="color:var(--text2);padding:5px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
+      <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Net payable</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(Math.max(0,net))}</td></tr>
     </table>`;
+}
+
+// ─── ADVANCE MANAGEMENT UI ───────────────────────────────────────────────────
+async function submitAdvance(){
+  const sel=document.getElementById('adv-emp');
+  const amtEl=document.getElementById('adv-amount');
+  const dateEl=document.getElementById('adv-date');
+  const noteEl=document.getElementById('adv-note');
+  const name=sel?sel.value:'';
+  const amount=amtEl?parseInt(amtEl.value)||0:0;
+  if(!name){ alert('Employee select karein.'); return; }
+  if(amount<=0){ alert('Sahi amount enter karein.'); return; }
+  await addAdvance(name, amount, dateEl?dateEl.value:'', noteEl?noteEl.value:'');
+  if(amtEl) amtEl.value='';
+  if(noteEl) noteEl.value='';
+  const histSel=document.getElementById('adv-history-emp');
+  if(histSel) histSel.value=name;
+  renderAdvanceHistory();
+  renderAdvanceBox();
+  renderSalaryPage();
+  alert(name+' ko '+fmt(amount)+' advance add ho gaya.');
+}
+
+function renderAdvanceHistory(){
+  const tbl=document.getElementById('adv-history-table');
+  if(!tbl) return;
+  const sel=document.getElementById('adv-history-emp');
+  const name=sel?sel.value||'Puja':'Puja';
+  const list=getEmpAdvances(name).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(list.length===0){
+    tbl.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">Koi advance record nahi hai</td></tr>';
+    return;
+  }
+  tbl.innerHTML=list.map(a=>{
+    const dLabel=a.date?new Date(a.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    return `<tr>
+      <td>${dLabel}</td>
+      <td>${fmt(a.amount)}</td>
+      <td style="color:var(--text2)">${a.note?a.note.replace(/</g,'&lt;'):'—'}</td>
+      <td style="font-weight:600;color:${a.balance>0?'var(--red)':'var(--green)'}">${fmt(a.balance)}</td>
+      <td>${a.closed?'<span style="color:var(--green)">Cleared</span>':'<span style="color:var(--red)">Pending</span>'}</td>
+      <td><button class="btn btn-sm" onclick="confirmDeleteAdvance('${name.replace(/'/g,"\\'")}','${a.id}')">Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function confirmDeleteAdvance(name, id){
+  if(!confirm('Ye advance record delete karein?\n\nAgar ye kisi salary month se already adjust ho chuka hai, to wo adjustment history bhi is record ke saath delete ho jayegi.')) return;
+  await deleteAdvance(name, id);
+  renderAdvanceHistory();
+  renderAdvanceBox();
+  renderSalaryPage();
 }
 
 // ─── INCENTIVE ───────────────────────────────────────────────────────────────
@@ -2338,7 +2602,7 @@ function showPage(id,btn){
   // refresh on visit
   if(id==='attendance') renderAttendancePage();
   if(id==='leave') renderLeavePage();
-  if(id==='salary') renderSalaryPage();
+  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); }
   if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
