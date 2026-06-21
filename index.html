@@ -1433,7 +1433,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div id="biz_client_results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
         </div>
         <div class="form-field"><label>Selected Client</label><input type="text" id="biz_client_selected" placeholder="No client selected" readonly style="background:#f7f7f7"></div>
-        <div class="form-field"><label>RM</label><input type="text" id="biz_client_rm" readonly style="background:#f7f7f7"></div>
+        <div class="form-field"><label>RM for this entry only</label><select id="biz_client_rm"></select></div>
+      </div>
+      <div class="form-row" id="biz_rm_note_wrap" style="display:none;margin-top:-8px;margin-bottom:14px">
+        <p style="font-size:.74rem;color:var(--gray)">ℹ️ Changing RM here only re-attributes this one transaction. The client's actual RM in their profile stays unchanged.</p>
       </div>
       <div class="form-row">
         <div class="form-field"><label>Type *</label>
@@ -4476,6 +4479,7 @@ function openBusinessModal(clientId, clientName){
   editingBusinessId = null;
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
   const clientWrap=document.getElementById('biz_client_wrap'); if(clientWrap) clientWrap.style.display='none';
+  const rmNoteWrap=document.getElementById('biz_rm_note_wrap'); if(rmNoteWrap) rmNoteWrap.style.display='none';
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
@@ -4503,13 +4507,14 @@ function saveBusinessEntry(){
     const idx = entries.findIndex(e=>e.id===editingBusinessId);
     if(idx>=0){
       if(CU.role!=='admin' && entries[idx].created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
-      // Admin can also reassign the Client (and the RM that comes with it)
+      // Admin can reassign the Client and/or re-attribute the RM — but only
+      // for this one transaction entry. Neither touches the client's actual
+      // RM assignment in mf_clients; that mapping stays exactly as it was.
       if(CU.role==='admin'){
         if(!currentBusinessTarget.id){ toast('Please select a client','error'); return; }
         entries[idx].client_id = currentBusinessTarget.id;
         entries[idx].client_name = currentBusinessTarget.name;
-        const rmVal = document.getElementById('biz_client_rm')?.value || '';
-        entries[idx].rm = (rmVal==='—') ? '' : rmVal;
+        entries[idx].rm = document.getElementById('biz_client_rm')?.value || '';
       }
       entries[idx].type = type;
       entries[idx].amount = amount;
@@ -4926,13 +4931,29 @@ function searchBizClient(){
   out.style.display='block';
 }
 
+// Populates the RM dropdown in the Edit Business modal — this RM choice only
+// applies to the one transaction entry being edited; it never touches the
+// client's actual RM assignment in their profile. Defaults to the given RM
+// (the client's real RM, or the entry's currently-stored RM) but stays fully
+// editable so Admin can re-attribute just this entry to a different RM.
+function populateBizRmDropdown(selectedRm){
+  const sel = document.getElementById('biz_client_rm');
+  if(!sel) return;
+  const rms = getSegRMs('mf');
+  let opts = rms.map(r=>`<option value="${escapeHtml(r)}" ${r===selectedRm?'selected':''}>${escapeHtml(r)}</option>`).join('');
+  if(selectedRm && !rms.includes(selectedRm)){
+    opts += `<option value="${escapeHtml(selectedRm)}" selected>${escapeHtml(selectedRm)} (inactive/unlisted)</option>`;
+  }
+  sel.innerHTML = opts;
+}
+
 function selectBizClient(clientId){
   const clients=getMfTxnSearchClients();
   const c=clients.find(x=>x.id===clientId);
   if(!c) return;
   currentBusinessTarget = {id:c.id, name:c.name};
   const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=c.name;
-  const cRm=document.getElementById('biz_client_rm'); if(cRm) cRm.value=c.rm||'—';
+  populateBizRmDropdown(c.rm||'');
   const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
   const out=document.getElementById('biz_client_results');
   if(out){ out.style.display='none'; out.innerHTML=''; }
@@ -5927,8 +5948,10 @@ function editBusinessEntry(id){
 
   const clientWrap=document.getElementById('biz_client_wrap');
   if(clientWrap) clientWrap.style.display = CU.role==='admin' ? '' : 'none';
+  const rmNoteWrap=document.getElementById('biz_rm_note_wrap');
+  if(rmNoteWrap) rmNoteWrap.style.display = CU.role==='admin' ? '' : 'none';
   const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=e.client_name||'';
-  const cRm=document.getElementById('biz_client_rm'); if(cRm) cRm.value=e.rm||'—';
+  populateBizRmDropdown(e.rm||'');
   const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
   const cResults=document.getElementById('biz_client_results'); if(cResults){ cResults.style.display='none'; cResults.innerHTML=''; }
 
