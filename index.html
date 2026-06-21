@@ -6260,7 +6260,7 @@ function showAdminMsgNotif(msg){
   const body = document.getElementById('announcementPopupBody');
   const popup = document.getElementById('announcementPopup');
   body.innerHTML = `<div style="text-align:left">
-    <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">✉️ <b>${escapeHtml(msg.rmName)}</b> ne message bheja:</div>
+    <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">✉️ <b>${escapeHtml(msg.rmName)}</b> sent a message:</div>
     <div class="msg-bubble recv" style="max-width:100%;background:var(--navy);color:#fff">${escapeHtml(msg.text).replace(/\n/g,'<br>')}</div>
     <div style="font-size:.72rem;color:var(--gray);margin-top:8px;text-align:right">${fmtDate(msg.date)}</div>
   </div>`;
@@ -6339,7 +6339,7 @@ function openTempAccessModal(userId){
   // Show current access
   if(existing.length){
     const names = existing.map(id=>(users.find(u=>u.id===id)||{}).name||id).join(', ');
-    document.getElementById('ta-current').innerHTML = `✅ Current temp access: <b>${names}</b> (aaj expire)`;
+    document.getElementById('ta-current').innerHTML = `✅ Current temp access: <b>${names}</b> (expires today)`;
   } else {
     document.getElementById('ta-current').textContent = '';
   }
@@ -7641,7 +7641,7 @@ function brkCompute(){
   const kwList=(kwEl?kwEl.value:'').split(',').map(k=>brkNorm(k.trim())).filter(Boolean);
   const isNewBiz = t=>{ const tt=brkNorm(t); return tt && kwList.some(k=>tt.includes(k)); };
 
-  // RM filter - staff sirf apna data dekhega
+  // RM filter - staff will only see their own data
   const isAdmin = CU && CU.role==='admin';
   const myMfDealers = CU ? (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase()) : [];
   const myEqDealers = CU ? (CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase()) : [];
