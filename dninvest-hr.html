@@ -2859,82 +2859,120 @@ function parseBrokerageFile(inputEl){
   const file = inputEl.files[0];
   if(!file){ return; }
 
-  // Pre-fill threshold fields from saved rates so admin can see / override
+  // Pre-fill threshold fields from saved rates
   const rates = getIncRates();
-  const minEl  = document.getElementById('bro-client-min');
-  const thrEl  = document.getElementById('bro-client-threshold');
-  const bonEl  = document.getElementById('bro-client-bonus');
-  if(minEl  && !minEl.value)  minEl.value  = rates.broClientMin     || 50;
-  if(thrEl  && !thrEl.value)  thrEl.value  = rates.broClientThreshold|| 100;
-  if(bonEl  && !bonEl.value)  bonEl.value  = rates.broClientBonus    || 700;
+  const minEl = document.getElementById('bro-client-min');
+  const thrEl = document.getElementById('bro-client-threshold');
+  const bonEl = document.getElementById('bro-client-bonus');
+  if(minEl && !minEl.value) minEl.value = rates.broClientMin     || 50;
+  if(thrEl && !thrEl.value) thrEl.value = rates.broClientThreshold|| 100;
+  if(bonEl && !bonEl.value) bonEl.value = rates.broClientBonus    || 700;
 
   const resEl = document.getElementById('bro-upload-result');
-  if(resEl) resEl.innerHTML = '<p style="color:var(--text3);font-size:12px">Reading file…</p>';
+  if(resEl) resEl.innerHTML = '<p style="color:var(--text3);font-size:12px">⏳ Reading file…</p>';
 
   const reader = new FileReader();
-  reader.onload = function(e){
+  reader.onload = function(ev){
     try{
-      // SheetJS must be available (imported via CDN in this file's <head>/<body>)
       if(typeof XLSX === 'undefined'){
-        if(resEl) resEl.innerHTML='<p style="color:var(--red)">SheetJS library not loaded. Please reload the page.</p>';
+        document.getElementById('bro-upload-result').innerHTML = '<p style="color:var(--red)">SheetJS library not loaded. Reload the page and try again.</p>';
         return;
       }
-      const data = new Uint8Array(e.target.result);
+
+      const data = new Uint8Array(ev.target.result);
       const wb   = XLSX.read(data, {type:'array'});
       const sh   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sh, {defval:''});
 
-      // Detect column names flexibly (case-insensitive, trim spaces)
-      if(!rows.length){ resEl.innerHTML='<p style="color:var(--red)">File is empty or unreadable.</p>'; return; }
-      const sample = rows[0];
-      const keys   = Object.keys(sample);
-      const colKey = (hint) => keys.find(k => k.trim().toLowerCase().includes(hint.toLowerCase())) || null;
-      const colBro = colKey('brok') || colKey('brokerage');
-      const colRm  = colKey('rm')   || colKey('dealer') || colKey('adviser');
-
-      if(!colBro || !colRm){
-        resEl.innerHTML='<p style="color:var(--red)">Could not find "Brokerage" and/or "RM" columns. Columns found: '+keys.join(', ')+'</p>';
+      // Use header:1 to get raw rows as arrays first so we can detect headers ourselves
+      const rawRows = XLSX.utils.sheet_to_json(sh, {header:1, defval:''});
+      if(!rawRows.length){
+        document.getElementById('bro-upload-result').innerHTML = '<p style="color:var(--red)">File is empty or unreadable.</p>';
         return;
       }
 
-      // Aggregate per RM
-      const minClients   = parseFloat(document.getElementById('bro-client-min').value)       || 50;
-      const threshold    = parseFloat(document.getElementById('bro-client-threshold').value)  || 100;
-      const bonus        = parseFloat(document.getElementById('bro-client-bonus').value)      || 700;
+      // Find the header row (first row that has at least 3 non-empty cells)
+      let headerRowIdx = 0;
+      for(let i=0; i<Math.min(5, rawRows.length); i++){
+        if(rawRows[i].filter(c=>String(c).trim()).length >= 3){ headerRowIdx = i; break; }
+      }
+      const headerRow = rawRows[headerRowIdx].map(c => String(c).trim());
 
-      const rmMap = {}; // rmName => {totalClients, eligibleClients, totalBrokerage}
-      rows.forEach(r => {
-        const rm  = String(r[colRm] || '').trim().toUpperCase();
-        const bro = parseFloat(r[colBro]) || 0;
-        if(!rm) return;
+      // Flexible column detection (case-insensitive, partial match)
+      const findCol = (...hints) => {
+        for(const hint of hints){
+          const idx = headerRow.findIndex(h => h.toLowerCase().includes(hint.toLowerCase()));
+          if(idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      const idxBro = findCol('brok', 'brokerage');
+      const idxRm  = findCol('rm', 'dealer', 'adviser', 'agent');
+
+      if(idxBro < 0 || idxRm < 0){
+        document.getElementById('bro-upload-result').innerHTML =
+          '<p style="color:var(--red)">Could not find required columns.<br>Headers found: <b>' +
+          headerRow.join(' | ') + '</b><br>Need: a Brokerage column and an RM/Dealer column.</p>';
+        return;
+      }
+
+      // Parse data rows (skip header row)
+      const minClients = parseFloat(document.getElementById('bro-client-min').value)      || 50;
+      const threshold  = parseFloat(document.getElementById('bro-client-threshold').value) || 100;
+      const bonus      = parseFloat(document.getElementById('bro-client-bonus').value)     || 700;
+
+      const rmMap = {};
+      let dataRows = 0;
+      for(let i = headerRowIdx + 1; i < rawRows.length; i++){
+        const row = rawRows[i];
+        const rm  = String(row[idxRm]  || '').trim().toUpperCase();
+        const bro = parseFloat(row[idxBro]) || 0;
+        if(!rm) continue;
+        dataRows++;
         if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0};
         rmMap[rm].totalClients++;
         rmMap[rm].totalBrokerage += bro;
         if(bro >= threshold) rmMap[rm].eligibleClients++;
-      });
+      }
 
-      // Match to employee names (case-insensitive prefix match)
+      if(!dataRows){
+        document.getElementById('bro-upload-result').innerHTML =
+          '<p style="color:var(--red)">No data rows found after the header row.</p>';
+        return;
+      }
+
+      // Match RM names from file to HR employee names
       const employees = EMPLOYEES.filter(emp => emp && !emp.deleted);
-      const empNames  = employees.map(e => e.name.trim().toUpperCase());
-
       const results = [];
       Object.entries(rmMap).forEach(([rmUpper, stats]) => {
-        // Find matching employee
-        const empName = employees.find(e => e.name.trim().toUpperCase() === rmUpper)?.name
-                     || employees.find(e => rmUpper.startsWith(e.name.trim().toUpperCase()))?.name
-                     || employees.find(e => e.name.trim().toUpperCase().startsWith(rmUpper))?.name
-                     || null;
+        const empName =
+          employees.find(e => e.name.trim().toUpperCase() === rmUpper)?.name ||
+          employees.find(e => rmUpper.startsWith(e.name.trim().toUpperCase()))?.name ||
+          employees.find(e => e.name.trim().toUpperCase().startsWith(rmUpper))?.name ||
+          null;
         const eligible = stats.eligibleClients >= minClients;
-        results.push({rm: rmUpper, empName, totalClients: stats.totalClients, eligibleClients: stats.eligibleClients, totalBrokerage: stats.totalBrokerage, eligible, bonus: eligible ? bonus : 0});
+        results.push({
+          rm: rmUpper, empName,
+          totalClients: stats.totalClients,
+          eligibleClients: stats.eligibleClients,
+          totalBrokerage: stats.totalBrokerage,
+          eligible,
+          bonus: eligible ? bonus : 0
+        });
       });
 
       _broParseResult = {results, minClients, threshold, bonus};
       renderBroUploadResult(results, minClients, threshold, bonus);
 
     } catch(err){
-      console.error(err);
-      if(resEl) resEl.innerHTML='<p style="color:var(--red)">Error reading file: '+escapeHtml(err.message)+'</p>';
+      console.error('Brokerage parse error:', err);
+      document.getElementById('bro-upload-result').innerHTML =
+        '<p style="color:var(--red)">Error reading file: ' + escapeHtml(String(err.message||err)) + '</p>';
     }
+  };
+  reader.onerror = function(){
+    document.getElementById('bro-upload-result').innerHTML =
+      '<p style="color:var(--red)">Could not read the file. Try again.</p>';
   };
   reader.readAsArrayBuffer(file);
 }
