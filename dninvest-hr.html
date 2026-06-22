@@ -295,7 +295,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">This Month's Log</div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th></tr></thead>
+              <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th><th>Key</th></tr></thead>
               <tbody id="my-att-log"></tbody>
             </table>
           </div>
@@ -1717,6 +1717,12 @@ function renderAttendancePage(){
   const late=myRecs.filter(r=>r.status==='Late').length;
   const total=26; // working days this month
   const pct=Math.round((present/total)*100);
+
+  // Present me Normal/Late/Warning count (based on presentBadgeClass)
+  const normalDays=myRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
+  const blueDays=myRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
+  const warnDays=myRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
+
   const ms=document.getElementById('my-att-summary');
   if(ms) ms.innerHTML=`
     <div class="grid4" style="margin-bottom:0">
@@ -1725,16 +1731,28 @@ function renderAttendancePage(){
       <div class="metric"><div class="m-lbl">Working days</div><div class="m-val">${total}</div></div>
       <div class="metric"><div class="m-lbl">Attendance %</div><div class="m-val" style="color:${pct>=85?'var(--green)':'var(--amber)'}">${pct}%</div></div>
     </div>
-    <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>`;
+    <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px">
+      <span><span class="badge badge-green" style="font-size:11px">Normal</span> <strong>${normalDays}d</strong></span>
+      <span><span class="badge badge-blue" style="font-size:11px">Late</span> <strong>${blueDays}d</strong></span>
+      <span><span class="badge badge-amber" style="font-size:11px">Warning</span> <strong>${warnDays}d</strong></span>
+    </div>`;
 
   // Log
   const al=document.getElementById('my-att-log');
   if(al){
-    if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records</td></tr>'}
+    if(myRecs.length===0){al.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2)">No records</td></tr>'}
     else al.innerHTML=myRecs.slice(0,20).map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
       const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
-      return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td></tr>`;
+      // Key label for Present rows only
+      let keyCell='<td>—</td>';
+      if(r.status==='Present'){
+        const bc=presentBadgeClass(r);
+        const keyLabel=bc==='badge-green'?'Normal':bc==='badge-blue'?'Late':'Warning';
+        keyCell=`<td><span class="badge ${bc}" style="font-size:10px">${keyLabel}</span></td>`;
+      }
+      return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td>${keyCell}</tr>`;
     }).join('');
   }
 
