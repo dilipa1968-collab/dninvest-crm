@@ -1585,7 +1585,22 @@ function renderDashboard(){
       } else {
         badge='<span class="badge badge-red">Absent</span>';
       }
-      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
+      // Month-wise counts for admin
+      let summaryHtml = '';
+      if(isAdmin){
+        const curMonth = td.slice(0,7); // YYYY-MM
+        const allRecs = att[e.name]||[];
+        const monthRecs = allRecs.filter(r=>r.date&&r.date.startsWith(curMonth));
+        const norm = monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
+        const sl   = monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
+        const vl   = monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
+        summaryHtml = `<div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap">
+          <span style="color:var(--green-text);font-weight:600">N:${norm}</span>
+          <span style="color:var(--blue-text);font-weight:600">SL:${sl}</span>
+          <span style="color:var(--amber-text);font-weight:600">VL:${vl}</span>
+        </div>`;
+      }
+      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div>${summaryHtml}</div></div>${badge}</div>`;
     });
     if(isAdmin){
       tal.innerHTML+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2)">
