@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1332,18 +1332,28 @@ async function doLogin(){
   const name=empMatch?empMatch.name:user.name;
   currentUser=name;isAdmin=false;
 
-  // Auto-record attendance: login time - 5 min (skip "Present" status on holidays)
-  const att=getAtt();
+  // Auto-record attendance — read FRESH from Firestore first so we never
+  // overwrite a time that was already recorded by the CRM login today.
   const td=today();
-  const already=(att[name]||[]).find(r=>r.date===td);
+  let attFresh = getAtt(); // start with cache
+  if(typeof fdb !== 'undefined'){
+    try{
+      const snap = await fdb.collection('hr_data').doc('attendance').get();
+      if(snap.exists && snap.data() && snap.data().data){
+        attFresh = snap.data().data;
+        DB.set('attendance', attFresh); // sync cache
+      }
+    }catch(e){ /* fallback to cache */ }
+  }
+  const already=(attFresh[name]||[]).find(r=>r.date===td);
   if(already && already.status==='Absent'){
-    // This is a delayed login after the 10 AM auto-absent mark — flip to
-    // "Late" and reactivate the user back in the CRM's users list.
+    // Delayed login after 10 AM auto-absent mark — flip to Late
     const nowTime=String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0');
     await saveAttRecord(name, {date:td,in:nowTime,out:'',status:'Late'});
     await reactivateCrmUser(user.id);
     if(errBox){errBox.style.display='block';errBox.textContent='⏰ Marked "Late" — in time: '+nowTime;}
   } else if(!already){
+    // No record at all — first login of the day
     const inTime=attTime5();
     const holidayName=getHolidayName(td);
     if(holidayName){
@@ -1353,6 +1363,9 @@ async function doLogin(){
       await saveAttRecord(name, {date:td,in:inTime,out:'',status:'Present'});
       if(errBox){errBox.style.display='block';errBox.textContent='✓ Today\'s attendance auto-recorded — in time: '+inTime;}
     }
+  } else {
+    // Already marked with a normal status (Present/Late/Holiday) — do nothing
+    if(errBox){errBox.style.display='none';}
   }
   startApp();
 }
