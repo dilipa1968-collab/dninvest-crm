@@ -1284,10 +1284,25 @@ async function doLogin(){
   const name=empMatch?empMatch.name:user.name;
   currentUser=name;isAdmin=false;
 
-  // Auto-record attendance: login time - 5 min (skip "Present" status on holidays)
-  const att=getAtt();
+  // Auto-record attendance: fetch FRESH from Firestore first (not stale localStorage)
+  // so that CRM-recorded attendance is never overwritten by HR Portal login.
   const td=today();
-  const already=(att[name]||[]).find(r=>r.date===td);
+  let freshAttForName=[];
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc=await fdb.collection('hr_data').doc('attendance').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        const freshAll=doc.data().data;
+        // Sync fresh data into localStorage so rest of app stays consistent
+        DB.setLocal('attendance', freshAll);
+        freshAttForName=freshAll[name]||[];
+      }
+    }
+  }catch(e){ console.log('Fresh att fetch error:',e); }
+  // Fallback to localStorage if Firestore fetch failed
+  if(!freshAttForName.length){ const att=getAtt(); freshAttForName=(att[name]||[]); }
+
+  const already=freshAttForName.find(r=>r.date===td);
   if(already && already.status==='Absent'){
     // This is a delayed login after the 10 AM auto-absent mark — flip to
     // "Late" and reactivate the user back in the CRM's users list.
@@ -1306,6 +1321,7 @@ async function doLogin(){
       if(errBox){errBox.style.display='block';errBox.textContent='✓ Today\'s attendance auto-recorded — in time: '+inTime;}
     }
   }
+  // already has Present/Late/Holiday — skip silently, CRM record is preserved
   startApp();
 }
 
