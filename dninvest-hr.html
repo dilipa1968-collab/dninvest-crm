@@ -304,7 +304,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team attendance — June 2026</div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Present</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
+              <thead><tr><th>Employee</th><th>Present</th><th>Normal</th><th>Sl.Late</th><th>V.Late</th><th>Status Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
               <tbody id="team-att-table"></tbody>
             </table>
           </div>
@@ -1590,8 +1590,8 @@ function renderDashboard(){
     if(isAdmin){
       tal.innerHTML+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2)">
         <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:3px;vertical-align:middle"></span>Normal</span>
-        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:3px;vertical-align:middle"></span>Late</span>
-        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-right:3px;vertical-align:middle"></span>Warning</span>
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:3px;vertical-align:middle"></span>Slightly Late</span>
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-right:3px;vertical-align:middle"></span>Very Late</span>
       </div>`;
     }
   }
@@ -1733,9 +1733,9 @@ function renderAttendancePage(){
     </div>
     <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px">
-      <span><span class="badge badge-green" style="font-size:11px">Normal</span> <strong>${normalDays}d</strong></span>
-      <span><span class="badge badge-blue" style="font-size:11px">Late</span> <strong>${blueDays}d</strong></span>
-      <span><span class="badge badge-amber" style="font-size:11px">Warning</span> <strong>${warnDays}d</strong></span>
+      <span><span class="badge badge-green" style="font-size:11px">Normal</span> <strong>${normalDays}</strong></span>
+      <span><span class="badge badge-blue" style="font-size:11px">Slightly Late</span> <strong>${blueDays}</strong></span>
+      <span><span class="badge badge-amber" style="font-size:11px">Very Late</span> <strong>${warnDays}</strong></span>
     </div>`;
 
   // Log
@@ -1749,7 +1749,7 @@ function renderAttendancePage(){
       let keyCell='<td>—</td>';
       if(r.status==='Present'){
         const bc=presentBadgeClass(r);
-        const keyLabel=bc==='badge-green'?'Normal':bc==='badge-blue'?'Late':'Warning';
+        const keyLabel=bc==='badge-green'?'Normal':bc==='badge-blue'?'Slightly Late':'Very Late';
         keyCell=`<td><span class="badge ${bc}" style="font-size:10px">${keyLabel}</span></td>`;
       }
       return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td>${keyCell}</tr>`;
@@ -1767,7 +1767,10 @@ function renderAttendancePage(){
       const ab=total-p-lt-lv;
       const pc=Math.round((p/total)*100);
       const bc=pc>=85?'badge-green':pc>=70?'badge-amber':'badge-red';
-      return `<tr><td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td><td>${p}</td><td>${lt}</td><td>${lv}</td><td>${Math.max(0,ab)}</td><td><span class="badge ${bc}">${pc}%</span></td></tr>`;
+      const norm=recs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
+      const sl=recs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
+      const vl=recs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
+      return `<tr><td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td><td>${p}</td><td>${norm}</td><td>${sl}</td><td>${vl}</td><td>${lt}</td><td>${lv}</td><td>${Math.max(0,ab)}</td><td><span class="badge ${bc}">${pc}%</span></td></tr>`;
     }).join('');
   }
 }
