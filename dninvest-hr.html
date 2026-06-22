@@ -2880,7 +2880,7 @@ function parseBrokerageFile(inputEl){
       }
 
       const data = new Uint8Array(ev.target.result);
-      const wb   = XLSX.read(data, {type:'array'});
+      const wb   = XLSX.read(data, {type:'array', cellDates:false, cellNF:false, cellStyles:false});
       const sh   = wb.Sheets[wb.SheetNames[0]];
 
       // Use header:1 to get raw rows as arrays first so we can detect headers ourselves
@@ -2978,31 +2978,59 @@ function parseBrokerageFile(inputEl){
 }
 
 function renderBroUploadResult(results, minClients, threshold, bonus){
-  const resEl = document.getElementById('bro-upload-result');
-  if(!resEl) return;
+  // Show results in a full-page overlay so renderIncentivePage() can never wipe it
+  let overlay = document.getElementById('bro-result-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'bro-result-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto';
+    document.body.appendChild(overlay);
+  }
 
-  let html = `<p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">
-    Rule: ≥${minClients} clients with brokerage ≥₹${threshold} → ₹${bonus} flat bonus
-  </p>
-  <div class="tbl-wrap"><table style="font-size:12.5px;width:100%">
-    <thead><tr><th>RM (in file)</th><th>Matched Employee</th><th>Total Clients</th><th>Eligible Clients<br><small>brokerage ≥₹${threshold}</small></th><th>Total Brokerage</th><th>Bonus</th></tr></thead>
-    <tbody>`;
+  let html = `<div style="background:var(--surface,#fff);border-radius:12px;padding:24px;width:min(900px,95vw);max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-weight:700;font-size:15px;color:var(--text1)">📊 Brokerage File — Parse Result</div>
+      <button onclick="document.getElementById('bro-result-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:0 4px">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
+      Rule: ≥<b>${minClients}</b> clients with brokerage ≥₹<b>${threshold}</b> → ₹<b>${bonus}</b> flat bonus
+    </p>
+    <div style="overflow-x:auto">
+    <table style="font-size:13px;width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--surface2,#f5f5f5)">
+        <th style="padding:8px 10px;text-align:left">RM (in file)</th>
+        <th style="padding:8px 10px;text-align:left">Matched Employee</th>
+        <th style="padding:8px 10px;text-align:right">Total Clients</th>
+        <th style="padding:8px 10px;text-align:right">Eligible<br><small style="font-weight:400">brokerage ≥₹${threshold}</small></th>
+        <th style="padding:8px 10px;text-align:right">Total Brokerage</th>
+        <th style="padding:8px 10px;text-align:right">Bonus</th>
+      </tr></thead>
+      <tbody>`;
 
   results.forEach(r => {
-    const statusColor = r.eligible ? 'var(--green)' : 'var(--text3)';
-    html += `<tr>
-      <td>${escapeHtml(r.rm)}</td>
-      <td style="font-weight:600;color:${r.empName ? 'var(--text1)' : 'var(--red)'}">${r.empName ? escapeHtml(r.empName) : '⚠ Not matched'}</td>
-      <td style="text-align:right">${r.totalClients}</td>
-      <td style="text-align:right;font-weight:600;color:${r.eligible?'var(--green)':'var(--text1)'}">${r.eligibleClients}</td>
-      <td style="text-align:right">₹${Math.round(r.totalBrokerage).toLocaleString('en-IN')}</td>
-      <td style="text-align:right;font-weight:700;color:${statusColor}">${r.eligible ? '₹'+r.bonus : '—'}</td>
+    html += `<tr style="border-bottom:1px solid var(--border,#eee)">
+      <td style="padding:8px 10px;font-weight:600">${escapeHtml(r.rm)}</td>
+      <td style="padding:8px 10px;color:${r.empName ? 'var(--text1)' : 'var(--red)'};font-weight:600">${r.empName ? escapeHtml(r.empName) : '⚠ Not matched'}</td>
+      <td style="padding:8px 10px;text-align:right">${r.totalClients}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:${r.eligible?'var(--green)':'var(--text1)'}">${r.eligibleClients}</td>
+      <td style="padding:8px 10px;text-align:right">₹${Math.round(r.totalBrokerage).toLocaleString('en-IN')}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:${r.eligible?'var(--green)':'var(--text3)'}">${r.eligible ? '₹'+r.bonus : '—'}</td>
     </tr>`;
   });
 
-  html += '</tbody></table></div>';
-  html += `<button class="btn btn-primary" style="margin-top:10px;width:100%" onclick="applyBroClientIncentive()">✅ Apply to Month's Incentive Data</button>`;
-  resEl.innerHTML = html;
+  html += `</tbody></table></div>
+    <button class="btn btn-primary" style="margin-top:16px;width:100%;padding:12px" onclick="applyBroClientIncentive()">✅ Apply to Selected Month's Incentive Data</button>
+  </div>`;
+
+  overlay.innerHTML = html;
+  // Also update the inline result div for quick status
+  const inlineDiv = document.getElementById('bro-upload-result');
+  if(inlineDiv){
+    const qualCount = results.filter(r=>r.eligible && r.empName).length;
+    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ File parsed — ${results.length} RMs found, ${qualCount} qualify for bonus. <a href="#" onclick="renderBroUploadResult(window._broParseResult.results,window._broParseResult.minClients,window._broParseResult.threshold,window._broParseResult.bonus);return false" style="color:var(--accent)">View results</a></p>`;
+  }
+  // Store on window so the "View results" link can re-open
+  window._broParseResult = _broParseResult;
 }
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
