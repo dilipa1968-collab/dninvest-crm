@@ -3061,6 +3061,18 @@ async function applyBroClientIncentive(){
     all[month][r.empName].broClientTotal    = r.totalClients;
   });
   await saveMfSipByMonth(all);
+
+  // Close the popup overlay
+  const overlay = document.getElementById('bro-result-overlay');
+  if(overlay) overlay.remove();
+
+  // Update inline status
+  const inlineDiv = document.getElementById('bro-upload-result');
+  if(inlineDiv){
+    const qualNames = matched.filter(r=>r.eligible).map(r=>r.empName+' ₹'+r.bonus).join(', ');
+    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ Applied for ${mLabel}${qualNames ? ' — Bonus: '+qualNames : ' — No one qualified'}</p>`;
+  }
+
   renderIncentivePage();
   alert('✅ Brokerage client bonus applied for '+mLabel+'!');
 }
