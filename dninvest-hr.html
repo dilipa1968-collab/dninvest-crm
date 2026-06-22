@@ -518,6 +518,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <tr><td style="color:var(--text2);padding:5px 0" id="formula-tier1-label">3× ≤ Brokerage &lt; 10× Salary</td><td style="text-align:right" id="formula-tier1-value">(Brokerage − 3×Salary) × 5%</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0" id="formula-tier2-label">Brokerage ≥ 10× Salary</td><td style="text-align:right" id="formula-tier2-value">(Brokerage − 3×Salary) × 7%</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">Demat account opening</td><td style="text-align:right" id="formula-demat-rate">₹600 / account</td></tr>
+            <tr><td style="color:var(--text2);padding:5px 0">Tier 2 eligibility</td><td style="text-align:right;font-size:11.5px" id="formula-tier2-min">Min 2 Demat + ₹2000 SIP + ₹10000 Lumpsum</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">MF Sale incentive</td><td style="text-align:right" id="formula-mf-rate">—</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">SIP incentive</td><td style="text-align:right" id="formula-sip-rate">—</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">Brokerage client count bonus</td><td style="text-align:right" id="formula-bro-client-rate">—</td></tr>
@@ -536,6 +537,14 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <div class="field-inline"><label>Tier 2 rate (%) — above upper</label><input type="number" step="0.1" id="tier2-rate" placeholder="e.g. 7"></div>
           </div>
           <p style="font-size:10.5px;color:var(--text3);margin:4px 0 10px">Formula: Brokerage below Lower×Salary → ₹0. Between Lower× and Upper×Salary → (Brokerage − Lower×Salary) × Tier 1%. At or above Upper×Salary → (Brokerage − Lower×Salary) × Tier 2% (Tier 2 is the total rate on the excess, not added on top of Tier 1).</p>
+
+          <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:14px 0 6px">Tier 2 eligibility minimums</p>
+          <p style="font-size:10.5px;color:var(--text3);margin:0 0 8px">RM must meet ALL three to unlock Tier 2 extra incentive.</p>
+          <div class="compact-grid3">
+            <div class="field-inline"><label>Min Demat accounts</label><input type="number" id="tier2-min-demat" placeholder="e.g. 2"></div>
+            <div class="field-inline"><label>Min SIP amount (₹)</label><input type="number" id="tier2-min-sip" placeholder="e.g. 2000"></div>
+            <div class="field-inline"><label>Min Lumpsum (₹)</label><input type="number" id="tier2-min-lumpsum" placeholder="e.g. 10000"></div>
+          </div>
 
           <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:14px 0 6px">MF / SIP incentive rates</p>
           <div class="form-row">
@@ -1038,8 +1047,8 @@ async function setPaidAmount(name, month, field, amount){
 }
 
 function getIncRates(){
-  return DB.get('inc_rates', {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700})
-    || {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700};
+  return DB.get('inc_rates', {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700, tier2MinDemat:2, tier2MinSip:2000, tier2MinLumpsum:10000})
+    || {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700, tier2MinDemat:2, tier2MinSip:2000, tier2MinLumpsum:10000};
 }
 async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
@@ -1186,8 +1195,10 @@ async function setExtraDeductionForMonth(name, month, amount, note){
 // lowMult x Salary <= Brokerage < highMult x Salary => Excess(over lowMult x) * tier1Rate%
 // Brokerage >= highMult x Salary                => Excess(over lowMult x) * tier2Rate%
 // (tier2Rate is the TOTAL rate on the excess at the top tier, not additive on top of tier1Rate)
-function brokerageIncentive(salary, brokerage){
+// tier2Eligible: false => extra2 is blocked (RM did not meet demat/SIP/lumpsum minimums)
+function brokerageIncentive(salary, brokerage, tier2Eligible){
   salary=Number(salary)||0; brokerage=Number(brokerage)||0;
+  if(tier2Eligible===undefined) tier2Eligible=true; // default: allow tier2
   const rates=getIncRates();
   const lowMult=Number(rates.lowMult)||0, highMult=Number(rates.highMult)||0;
   const tier1Rate=Number(rates.tier1Rate)||0, tier2Rate=Number(rates.tier2Rate)||0;
@@ -1198,10 +1209,20 @@ function brokerageIncentive(salary, brokerage){
     base5=excess*(tier1Rate/100);
   } else if(brokerage>=t10){
     base5=excess*(tier1Rate/100);
-    extra2=excess*((tier2Rate-tier1Rate)/100);
+    if(tier2Eligible) extra2=excess*((tier2Rate-tier1Rate)/100);
   }
   const inc=base5+extra2;
-  return {threshold3:t3, threshold10:t10, excess, base5, extra2, total:inc};
+  return {threshold3:t3, threshold10:t10, excess, base5, extra2, total:inc, tier2Eligible};
+}
+
+// Returns true if RM meets all Tier-2 minimum targets (demat, SIP, lumpsum).
+// Minimums are admin-configurable from the Incentive rates card.
+function checkTier2Eligible(demat, sip, lumpsum){
+  const rates=getIncRates();
+  const minDemat    = Number(rates.tier2MinDemat)    || 2;
+  const minSip      = Number(rates.tier2MinSip)      || 2000;
+  const minLumpsum  = Number(rates.tier2MinLumpsum)  || 10000;
+  return demat >= minDemat && sip >= minSip && lumpsum >= minLumpsum;
 }
 
 function fmt(n){return '₹'+Math.round(n).toLocaleString('en-IN')}
@@ -2535,13 +2556,13 @@ function totalIncentive(name, salary, month){
   const broClientEligible = mfsip.broClientEligible||false;
   const broClientCount = mfsip.broClientCount||0;
 
-  const br=brokerageIncentive(salary,brok);
+  const br=brokerageIncentive(salary,brok, checkTier2Eligible(demat,sip,mf));
   const dematInc = demat*getDematRate();
   const mfInc = mf*(rates.mfRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
   const total = br.total + dematInc + mfInc + sipInc + other + broClientInc;
 
-  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, broClientInc, broClientEligible, broClientCount, total};
+  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, broClientInc, broClientEligible, broClientCount, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -2571,6 +2592,8 @@ function renderIncentivePage(){
   if(ft2vEl) ft2vEl.textContent='(Brokerage − '+lowMult+'×Salary) × '+tier2+'%';
   const fdrEl=document.getElementById('formula-demat-rate');
   if(fdrEl) fdrEl.textContent='₹'+dematRate+' / account';
+  const ft2mEl=document.getElementById('formula-tier2-min');
+  if(ft2mEl) ft2mEl.textContent='Min '+(rates.tier2MinDemat||2)+' Demat + ₹'+(rates.tier2MinSip||2000)+' SIP + ₹'+(rates.tier2MinLumpsum||10000)+' Lumpsum';
   const fmfEl=document.getElementById('formula-mf-rate');
   if(fmfEl) fmfEl.textContent = rates.mfRate ? rates.mfRate+'% of MF sale' : 'Not set';
   const fsipEl=document.getElementById('formula-sip-rate');
@@ -2593,7 +2616,8 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">Total brokerage</td><td style="text-align:right">${fmt(t.brok)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}× Salary</td><td style="text-align:right">${fmt(t.br.excess)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right">${fmt(t.br.base5)}</td></tr>
-        <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}× Salary)</td><td style="text-align:right">${fmt(t.br.extra2)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)${t.br.tier2Eligible?'':'<span style="color:var(--red);margin-left:4px">🚫</span>'}</td><td style="text-align:right">${fmt(t.br.extra2)}</td></tr>
+        ${!t.br.tier2Eligible?`<tr><td colspan="2" style="font-size:11px;color:var(--red);padding:2px 0">Tier 2 blocked — min ${rates.tier2MinDemat||2} Demat, ₹${rates.tier2MinSip||2000} SIP, ₹${rates.tier2MinLumpsum||10000} Lumpsum required</td></tr>`:''}
         <tr><td style="color:var(--text2);padding:4px 0;font-weight:600">Brokerage incentive total</td><td style="text-align:right;font-weight:600">${fmt(t.br.total)}</td></tr>
         <tr><td colspan="2" style="padding:6px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Other incentives</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Demat opening (${t.demat} × ${fmt(getDematRate())})</td><td style="text-align:right">${fmt(t.dematInc)}</td></tr>
@@ -2652,6 +2676,9 @@ function renderIncentivePage(){
     const bcm=document.getElementById('br-client-min'); if(bcm && !bcm.value) bcm.value=rates.broClientMin||50;
     const bct=document.getElementById('br-client-threshold'); if(bct && !bct.value) bct.value=rates.broClientThreshold||100;
     const bcb=document.getElementById('br-client-bonus'); if(bcb && !bcb.value) bcb.value=rates.broClientBonus||700;
+    const t2d=document.getElementById('tier2-min-demat'); if(t2d && !t2d.value) t2d.value=rates.tier2MinDemat||2;
+    const t2s=document.getElementById('tier2-min-sip'); if(t2s && !t2s.value) t2s.value=rates.tier2MinSip||2000;
+    const t2l=document.getElementById('tier2-min-lumpsum'); if(t2l && !t2l.value) t2l.value=rates.tier2MinLumpsum||10000;
     loadIncEmp();
     renderMultiMonthSummary();
   }
@@ -2784,11 +2811,14 @@ async function saveRates(){
   const broClientMin=parseInt(document.getElementById('br-client-min').value)||50;
   const broClientThreshold=parseFloat(document.getElementById('br-client-threshold').value)||100;
   const broClientBonus=parseFloat(document.getElementById('br-client-bonus').value)||700;
+  const tier2MinDemat=parseInt(document.getElementById('tier2-min-demat').value)||2;
+  const tier2MinSip=parseInt(document.getElementById('tier2-min-sip').value)||2000;
+  const tier2MinLumpsum=parseInt(document.getElementById('tier2-min-lumpsum').value)||10000;
   if(highMult<lowMult){ alert('Upper multiplier must be greater than or equal to the lower multiplier'); return; }
   if(tier2Rate<tier1Rate){ alert('Tier 2 rate must be greater than or equal to Tier 1 rate'); return; }
-  await saveIncRates({mfRate,sipRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus});
+  await saveIncRates({mfRate,sipRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus,tier2MinDemat,tier2MinSip,tier2MinLumpsum});
   renderIncentivePage();
-  alert('Rates & formula saved!\n\nBrokerage: '+lowMult+'×–'+highMult+'× Salary @ '+tier1Rate+'%, '+highMult+'×+ @ '+tier2Rate+'%\nDemat: ₹'+dematRate+'/account · MF: '+mfRate+'% · SIP: '+sipRate+'%\nBro client bonus: ≥'+broClientMin+' clients (≥₹'+broClientThreshold+') → ₹'+broClientBonus);
+  alert('Rates & formula saved!\n\nTier 2 needs: ≥'+tier2MinDemat+' Demat + ₹'+tier2MinSip+' SIP + ₹'+tier2MinLumpsum+' Lumpsum\nBro client bonus: ≥'+broClientMin+' clients (≥₹'+broClientThreshold+') → ₹'+broClientBonus);
 }
 
 // ── Brokerage File Upload — Client-wise Incentive ───────────────────────────
@@ -2978,7 +3008,7 @@ async function saveMfSipData(){
   // Preserve broClientInc if already applied from file upload — manual form save should not erase it
   all[month][name]={brok,demat,mf,sip,other,otherRemark, broClientInc: prev.broClientInc||0, broClientEligible: prev.broClientEligible||false};
   await saveMfSipByMonth(all);
-  calcIncentive();
+  loadIncEmp();        // reload fields from saved data — keeps figures visible & editable
   renderIncentivePage();
   const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   alert(name+'\'s business figures for '+mLabel+' have been saved!');
@@ -2997,11 +3027,23 @@ function calcIncentive(){
   const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
   const rates=getIncRates();
 
-  const br=brokerageIncentive(salary,brok);
+  const br=brokerageIncentive(salary,brok, checkTier2Eligible(demat,sip,mf));
   const dematInc=demat*getDematRate();
   const mfInc=mf*(rates.mfRate||0)/100;
   const sipInc=sip*(rates.sipRate||0)/100;
   const total=br.total+dematInc+mfInc+sipInc+other;
+
+  const t2Elig = br.tier2Eligible;
+  const t2MinDemat    = Number(rates.tier2MinDemat)||2;
+  const t2MinSip      = Number(rates.tier2MinSip)||2000;
+  const t2MinLumpsum  = Number(rates.tier2MinLumpsum)||10000;
+  const t2BlockNote   = t2Elig ? '' :
+    `<tr><td colspan="2" style="font-size:11px;color:var(--red);padding:4px 0">
+      ⚠ Tier 2 blocked — minimum not met:
+      ${demat<t2MinDemat?`Demat ${demat}/${t2MinDemat} `:''}
+      ${sip<t2MinSip?`SIP ₹${sip}/₹${t2MinSip} `:''}
+      ${mf<t2MinLumpsum?`Lumpsum ₹${mf}/₹${t2MinLumpsum}`:''}
+    </td></tr>`;
 
   const el=document.getElementById('inc-result');
   if(el) el.innerHTML=`
@@ -3009,7 +3051,8 @@ function calcIncentive(){
       <tr><td style="color:var(--text2);padding:4px 0">${rates.lowMult||3}× Salary / ${rates.highMult||10}× Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}×</td><td style="text-align:right">${fmt(br.excess)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.base5)}</td></tr>
-      <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.extra2)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)${t2Elig?'':'<span style="color:var(--red);margin-left:4px">🚫</span>'}</td><td style="text-align:right;color:${t2Elig?'var(--green)':'var(--text3)'}">+ ${fmt(br.extra2)}</td></tr>
+      ${t2BlockNote}
       <tr><td style="color:var(--text2);padding:4px 0;font-weight:600">Brokerage incentive total</td><td style="text-align:right;font-weight:600;color:var(--green)">${fmt(br.total)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ${fmt(getDematRate())})</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">MF incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
