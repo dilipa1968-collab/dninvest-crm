@@ -1561,17 +1561,39 @@ function renderDashboard(){
   }
 
   // Today att list
+  // Admin: sabhi employees | RM: sirf khud ka row
   const tal=document.getElementById('today-att-list');
   if(tal){
     tal.innerHTML='';
-    EMPLOYEES.forEach(e=>{
+    const listToShow = isAdmin ? EMPLOYEES : EMPLOYEES.filter(e=>e.name===currentUser);
+    listToShow.forEach(e=>{
       const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
       let badge='',inT='—';
-      if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
-      else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
-      else{badge='<span class="badge badge-red">Absent</span>'}
+      if(todayHoliday){
+        badge='<span class="badge badge-amber">Holiday</span>';
+      } else if(rec&&rec.status==='Present'){
+        badge=`<span class="badge ${presentBadgeClass(rec)}">Present</span>`;
+        inT=rec.in;
+      } else if(rec&&rec.status==='Late'){
+        badge='<span class="badge badge-blue">Late</span>';
+        inT=rec.in;
+      } else if(rec&&rec.status==='Half day'){
+        badge='<span class="badge badge-blue">Half day</span>';
+        inT=rec.in||'—';
+      } else if(rec&&rec.status==='Holiday'){
+        badge='<span class="badge badge-amber">Holiday</span>';
+      } else {
+        badge='<span class="badge badge-red">Absent</span>';
+      }
       tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
     });
+    if(isAdmin){
+      tal.innerHTML+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2)">
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:3px;vertical-align:middle"></span>Normal</span>
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:3px;vertical-align:middle"></span>Late</span>
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-right:3px;vertical-align:middle"></span>Warning</span>
+      </div>`;
+    }
   }
 
   // My att status
