@@ -2914,7 +2914,7 @@ function parseBrokerageFile(inputEl){
       });
 
       // Match to employee names (case-insensitive prefix match)
-      const employees = getEmployees().filter(emp => emp && !emp.deleted);
+      const employees = EMPLOYEES.filter(emp => emp && !emp.deleted);
       const empNames  = employees.map(e => e.name.trim().toUpperCase());
 
       const results = [];
