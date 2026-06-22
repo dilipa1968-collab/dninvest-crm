@@ -3447,6 +3447,74 @@ function showPage(id,btn){
   if(id==='employees') renderEmployees();
   if(id==='reports') renderAttendanceSheet();
 }
+
+/* ── Generic click-to-sort for every data table (any <table> with a <thead>) ──
+   Click a header to sort; click again to flip ascending/descending. Auto-detects
+   numbers (₹/commas/%), dates (dd-mm-yyyy or yyyy-mm-dd) and text. Empty/action
+   columns aren't clickable and TOTAL / footer rows stay pinned at the bottom.
+   View-only convenience; a table re-render resets it. */
+(function(){
+  if(window.__genericSortInit) return; window.__genericSortInit=true;
+  const st=document.createElement('style');
+  st.textContent='table thead th{cursor:pointer;user-select:none}';
+  (document.head||document.documentElement).appendChild(st);
+
+  function parse(s){
+    const n=s.replace(/[₹,%]/g,'').replace(/\s/g,'');
+    if(n!=='' && /[0-9]/.test(n) && !isNaN(n)) return {t:'num', v:parseFloat(n)};
+    let m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+    if(m) return {t:'str', v:m[3]+m[2].padStart(2,'0')+m[1].padStart(2,'0')};
+    m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+    if(m) return {t:'str', v:m[1]+m[2].padStart(2,'0')+m[3].padStart(2,'0')};
+    return {t:'str', v:s.toLowerCase()};
+  }
+
+  document.addEventListener('click', function(e){
+    const th=e.target.closest('th'); if(!th) return;
+    if(!th.closest('thead')) return;
+    const table=th.closest('table'); if(!table) return;
+    if(th.hasAttribute('onclick')) return;
+    const ths=Array.from(th.parentElement.children);
+    const col=ths.indexOf(th); if(col<0) return;
+    if(!th.textContent.replace(/[▲▼⇅]/g,'').trim()) return;
+    const tbody=table.tBodies[0]; if(!tbody) return;
+
+    let dir='asc';
+    if(table.getAttribute('data-gs-col')===String(col))
+      dir=table.getAttribute('data-gs-dir')==='asc'?'desc':'asc';
+    table.setAttribute('data-gs-col',col);
+    table.setAttribute('data-gs-dir',dir);
+    const d=dir==='asc'?1:-1;
+
+    const pinned=[], list=[];
+    Array.from(tbody.rows).forEach(r=>{
+      const f=(r.cells[0]?r.cells[0].textContent:'').trim().toUpperCase();
+      if(r.classList.contains('no-sort')||f.startsWith('TOTAL')||f.startsWith('GRAND')) pinned.push(r);
+      else list.push(r);
+    });
+    list.sort((a,b)=>{
+      const pa=parse((a.cells[col]?a.cells[col].textContent:'').trim());
+      const pb=parse((b.cells[col]?b.cells[col].textContent:'').trim());
+      let c;
+      if(pa.t==='num'&&pb.t==='num') c=pa.v-pb.v;
+      else c=String(pa.v).localeCompare(String(pb.v),undefined,{numeric:true});
+      return c*d;
+    });
+    list.forEach(r=>tbody.appendChild(r));
+    pinned.forEach(r=>tbody.appendChild(r));
+
+    ths.forEach((h,i)=>{
+      const ex=h.querySelector('.gs-arrow'); if(ex) ex.remove();
+      if(h.hasAttribute('onclick')) return;
+      if(!h.textContent.replace(/[▲▼⇅]/g,'').trim()) return;
+      const sp=document.createElement('span');
+      sp.className='gs-arrow';
+      sp.style.cssText='color:#9aa;font-size:.7em;margin-left:3px';
+      sp.textContent = i===col ? (dir==='asc'?'▲':'▼') : '';
+      h.appendChild(sp);
+    });
+  });
+})();
 </script>
 </body>
 </html>
