@@ -3055,6 +3055,8 @@ async function applyBroClientIncentive(){
   if(!all[month]) all[month] = {};
   matched.forEach(r => {
     if(!all[month][r.empName]) all[month][r.empName] = {brok:0,demat:0,mf:0,sip:0,other:0,otherRemark:''};
+    // Save total brokerage from file — fills the Brokerage column in team incentive table
+    all[month][r.empName].brok           = Math.round(r.totalBrokerage);
     all[month][r.empName].broClientInc      = r.eligible ? r.bonus : 0;
     all[month][r.empName].broClientEligible = r.eligible;
     all[month][r.empName].broClientCount    = r.eligibleClients;
