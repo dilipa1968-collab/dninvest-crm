@@ -910,7 +910,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
                 <option value="STP">STP</option>
                 <option value="Redemption">Redemption</option>
                 <option value="SWP">SWP</option>
-                <option value="Resumption">Resumption</option>
+                <option value="Additional Buy">Additional Buy</option>
+                <option value="SIP Bounce Buy">SIP Bounce Buy</option>
+                <option value="SIP Pause">SIP Pause</option>
               </select>
             </div>
             <div class="form-field" style="min-width:160px">
@@ -949,7 +951,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="STP">STP</option>
             <option value="Redemption">Redemption</option>
             <option value="SWP">SWP</option>
-            <option value="Resumption">Resumption</option>
+            <option value="Additional Buy">Additional Buy</option>
+            <option value="SIP Bounce Buy">SIP Bounce Buy</option>
+            <option value="SIP Pause">SIP Pause</option>
           </select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
@@ -1449,7 +1453,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="STP">STP</option>
             <option value="Redemption">Redemption</option>
             <option value="SWP">SWP</option>
-            <option value="Resumption">Resumption</option>
+            <option value="Additional Buy">Additional Buy</option>
+            <option value="SIP Bounce Buy">SIP Bounce Buy</option>
+            <option value="SIP Pause">SIP Pause</option>
           </select>
         </div>
         <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
@@ -5089,7 +5095,7 @@ function getFilteredMfTxns(){
 
 const MFTXN_TYPE_COLOR = {
   Lumpsum:'#1D9E75', SIP:'#185FA5', 'SIP Stop':'#C0392B', Switch:'#B7950B',
-  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', Resumption:'#7D3C98'
+  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
 };
 
 function renderMfTxnTable(){
@@ -5850,8 +5856,8 @@ function fuPendingMf(){
 let _bizReportEntries = [];
 let _bizReportSort = {col:null, dir:1};
 
-const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Resumption','Remarks'];
-const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, Resumption:7};
+const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Additional Buy','SIP Bounce Buy','SIP Pause','Remarks'];
+const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, 'Additional Buy':7, 'SIP Bounce Buy':8, 'SIP Pause':9};
 
 function bizReportRowCells(e){
   const amts = new Array(8).fill('');
