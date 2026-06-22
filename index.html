@@ -5077,6 +5077,28 @@ function saveMfTxnEntry(){
   renderMfTxnTable();
 }
 
+// Column sorting for the MF Transactions table. Click a header to sort; click
+// again to flip the direction. Date & Amount default to descending, text columns
+// to ascending.
+let mfTxnSort = { key:'date', dir:'desc' };
+function setMfTxnSort(key){
+  if(mfTxnSort.key===key){ mfTxnSort.dir = mfTxnSort.dir==='asc' ? 'desc' : 'asc'; }
+  else { mfTxnSort.key=key; mfTxnSort.dir = (key==='date'||key==='amount') ? 'desc' : 'asc'; }
+  renderMfTxnTable();
+}
+function mfTxnSortValue(e, key){
+  switch(key){
+    case 'client': return (e.client_name||'').toLowerCase();
+    case 'rm':     return (e.rm||'').toLowerCase();
+    case 'type':   return (e.type||'').toLowerCase();
+    case 'fund':   return (e.fund_name||'').toLowerCase();
+    case 'amount': return Number(e.amount)||0;
+    case 'status': return (e.status||'Pending').toLowerCase();
+    case 'date':
+    default:       return (e.date||'');
+  }
+}
+
 function getFilteredMfTxns(){
   let entries=getMfBizEntries();
   // RM scoping — only plain RMs are restricted to their own entries.
@@ -5096,7 +5118,15 @@ function getFilteredMfTxns(){
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
 
-  return entries.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||'').localeCompare(a.created||''));
+  const sk=mfTxnSort.key, dir=(mfTxnSort.dir==='asc'?1:-1);
+  return entries.sort((a,b)=>{
+    const va=mfTxnSortValue(a,sk), vb=mfTxnSortValue(b,sk);
+    let c;
+    if(typeof va==='number' && typeof vb==='number') c=va-vb;
+    else c=String(va).localeCompare(String(vb));
+    if(c===0) c=(a.date||'').localeCompare(b.date||'')||(a.created||'').localeCompare(b.created||'');
+    return c*dir;
+  });
 }
 
 const MFTXN_TYPE_COLOR = {
@@ -5116,8 +5146,11 @@ function renderMfTxnTable(){
     return;
   }
 
+  const arrow=k=> mfTxnSort.key===k ? (mfTxnSort.dir==='asc'?' ▲':' ▼') : ' ⇅';
+  const sTh=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
+
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>RM</th><th>Type</th><th>Fund Name</th><th style="text-align:right">Amount (₹)</th><th>Remarks</th><th>Cross-Check</th><th>Status</th><th></th></tr></thead>
+    <thead><tr>${sTh('date','Date')}${sTh('client','Client')}${sTh('rm','RM')}${sTh('type','Type')}${sTh('fund','Fund Name')}${sTh('amount','Amount (₹)','text-align:right')}<th>Remarks</th><th>Cross-Check</th>${sTh('status','Status')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
