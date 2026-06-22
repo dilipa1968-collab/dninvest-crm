@@ -393,7 +393,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       <div class="grid-flat">
         <div class="card">
           <div class="card-title">My Salary</div>
-          <div class="field-inline" style="margin-bottom:8px"><label>Month dekhein</label><input type="month" id="view-sal-month" onchange="renderSalaryPage()"></div>
+          <div class="field-inline" style="margin-bottom:8px"><label>View month</label><input type="month" id="view-sal-month" onchange="renderSalaryPage()"></div>
           <div id="my-salary-card"></div>
         </div>
         <div class="card admin-only" style="display:none">
@@ -427,7 +427,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance kata</th><th>ESI</th><th>Extra</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Basic</th><th>Absent days</th><th>Deduction</th><th>Advance deducted</th><th>ESI</th><th>Extra</th><th>Net</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-salary-table"></tbody>
             </table>
           </div>
@@ -481,8 +481,8 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="compact-grid3">
             <div class="field-inline"><label>ESI enabled?</label>
               <select id="esi-enabled">
-                <option value="1">Haan</option>
-                <option value="0">Nahi</option>
+                <option value="1">Yes</option>
+                <option value="0">No</option>
               </select>
             </div>
             <div class="field-inline"><label>Wage ceiling (₹/month)</label><input type="number" id="esi-ceiling" placeholder="e.g. 21000" oninput="this.dataset.touched='1'"></div>
@@ -508,7 +508,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       <div class="grid-flat">
         <div class="card">
           <div class="card-title">My Incentive</div>
-          <div class="field-inline" style="margin-bottom:8px"><label>Month dekhein</label><input type="month" id="view-inc-month" onchange="renderIncentivePage()"></div>
+          <div class="field-inline" style="margin-bottom:8px"><label>View month</label><input type="month" id="view-inc-month" onchange="renderIncentivePage()"></div>
           <div id="my-incentive-card"></div>
         </div>
         <div class="card">
@@ -871,10 +871,32 @@ function applyEmployeeChanges(){
   const added=changes.added||[];
   const removed=changes.removed||[];
   const merged=EMPLOYEES_BASE.concat(added).filter(e=>removed.indexOf(e.name)===-1);
+  merged.sort((a,b)=>a.name.localeCompare(b.name));
   EMPLOYEES.length=0;
   merged.forEach(e=>EMPLOYEES.push(e));
 }
 applyEmployeeChanges();
+
+// Fills every RM dropdown from the (alphabetically sorted) EMPLOYEES list, so the
+// order is always alphabetical and the lists auto-update when employees are added/removed.
+function populateEmpDropdowns(){
+  const names=EMPLOYEES.map(e=>e.name); // EMPLOYEES is kept sorted by applyEmployeeChanges()
+  const opts=names.map(n=>'<option value="'+n+'">'+n+'</option>').join('');
+  ['man-emp','bulk-emp','sal-emp','adv-emp','adv-history-emp','inc-emp','mm-emp'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    const prev=sel.value;
+    sel.innerHTML=opts;
+    if(names.indexOf(prev)!==-1) sel.value=prev;
+  });
+  // Attendance report dropdown keeps an "All" option first.
+  const rpt=document.getElementById('att-rpt-emp');
+  if(rpt){
+    const prev=rpt.value;
+    rpt.innerHTML='<option value="">All</option>'+opts;
+    rpt.value=prev;
+  }
+}
 
 // Persist a newly added employee to Firestore so it survives refresh / syncs to all devices.
 async function persistAddEmployee(emp){
@@ -1438,6 +1460,7 @@ function startApp(){
   const advDateEl=document.getElementById('adv-date'); if(advDateEl && !advDateEl.value) advDateEl.value=today();
 
   startClock();
+  populateEmpDropdowns();
   renderDashboard();
   renderAttendancePage();
   renderLeavePage();
@@ -1456,6 +1479,7 @@ function startApp(){
   // Firestore, this fires and we re-render the relevant pages immediately —
   // no refresh needed, no demo/stale data.
   DB.startListeners(function(changedKey){
+    if(changedKey==='employee_changes') populateEmpDropdowns();
     renderDashboard();
     renderAttendancePage();
     renderLeavePage();
@@ -2016,7 +2040,7 @@ async function saveManualAtt(){
   const inT=document.getElementById('man-in').value;
   const outT=document.getElementById('man-out').value;
   const date=document.getElementById('man-date').value;
-  if(!date){alert('Date chunein');return}
+  if(!date){alert('Please select a date');return}
   const rec={date,in:inT,out:outT,status};
   await saveAttRecord(emp, rec);
   renderDashboard();renderAttendancePage();
@@ -3298,6 +3322,7 @@ function calcIncentive(){
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────
 function renderEmployees(){
   renderAccessControl();
+  populateEmpDropdowns();
   const et=document.getElementById('emp-table');
   if(!et) return;
   et.innerHTML=EMPLOYEES.map(e=>{
