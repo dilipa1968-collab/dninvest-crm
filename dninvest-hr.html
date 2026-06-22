@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -530,13 +530,13 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
 
           <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:10px 0 6px">Brokerage incentive formula</p>
           <div class="compact-grid3">
-            <div class="field-inline"><label>Lower multiplier (×Salary)</label><input type="number" step="0.1" id="br-low-mult" placeholder="e.g. 3"></div>
-            <div class="field-inline"><label>Upper multiplier (×Salary)</label><input type="number" step="0.1" id="br-high-mult" placeholder="e.g. 10"></div>
+            <div class="field-inline"><label>Lower multiplier (×Inc.Salary)</label><input type="number" step="0.1" id="br-low-mult" placeholder="e.g. 3"></div>
+            <div class="field-inline"><label>Upper multiplier (×Inc.Salary)</label><input type="number" step="0.1" id="br-high-mult" placeholder="e.g. 10"></div>
             <div class="field-inline"><label>Demat bonus (₹/account)</label><input type="number" id="demat-rate" placeholder="e.g. 600"></div>
             <div class="field-inline"><label>Tier 1 rate (%) — lower to upper</label><input type="number" step="0.1" id="tier1-rate" placeholder="e.g. 5"></div>
             <div class="field-inline"><label>Tier 2 rate (%) — above upper</label><input type="number" step="0.1" id="tier2-rate" placeholder="e.g. 7"></div>
           </div>
-          <p style="font-size:10.5px;color:var(--text3);margin:4px 0 10px">Formula: Brokerage below Lower×Salary → ₹0. Between Lower× and Upper×Salary → (Brokerage − Lower×Salary) × Tier 1%. At or above Upper×Salary → (Brokerage − Lower×Salary) × Tier 2% (Tier 2 is the total rate on the excess, not added on top of Tier 1).</p>
+          <p style="font-size:10.5px;color:var(--text3);margin:4px 0 10px">Inc.Salary = Basic Salary + Performance Incentive (set per RM on the Employees page). Formula: Brokerage below Lower×Inc.Salary → ₹0. Between Lower× and Upper×Inc.Salary → (Brokerage − Lower×Inc.Salary) × Tier 1%. At or above Upper×Inc.Salary → (Brokerage − Lower×Inc.Salary) × Tier 2% (Tier 2 is the total rate on the excess, not added on top of Tier 1).</p>
 
           <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:14px 0 6px">Tier 2 eligibility minimums</p>
           <p style="font-size:10.5px;color:var(--text3);margin:0 0 8px">RM must meet ALL three to unlock Tier 2 extra incentive.</p>
@@ -579,7 +579,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
                 <option value="Anjali">Anjali</option>
               </select>
             </div>
-            <div class="field-inline"><label>Salary</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
+            <div class="field-inline"><label>Incentive Salary (Salary + Perf. Inc.)</label><input type="text" id="inc-salary-display" readonly style="background:var(--surface2);color:var(--text2)"></div>
             <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="0"></div>
             <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="0"></div>
             <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
@@ -613,7 +613,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -691,8 +691,9 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         </div>
         <div class="form-row">
           <div class="field-inline"><label>Basic salary (₹/month)</label><input type="number" id="ne-sal" placeholder="30000"></div>
-          <div class="field-inline"><label></label><p style="font-size:11px;color:var(--text3);margin-top:8px">Add login username/PIN in CRM</p></div>
+          <div class="field-inline"><label>Performance Incentive (₹/month)</label><input type="number" id="ne-perf" placeholder="0"></div>
         </div>
+        <p style="font-size:11px;color:var(--text3);margin:0 0 4px">Add login username/PIN in CRM</p>
         <div style="display:flex;gap:8px;margin-top:4px">
           <button class="btn btn-primary" onclick="addEmployee()">Save</button>
           <button class="btn" onclick="toggleAddForm()">Cancel</button>
@@ -700,7 +701,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Login</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>Login</th><th>Status</th><th></th></tr></thead>
           <tbody id="emp-table"></tbody>
         </table>
       </div>
@@ -829,7 +830,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','extra_deductions'];
+    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','extra_deductions'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -1013,6 +1014,23 @@ function getEmpSalary(name){
 }
 async function setEmpSalary(name,val){
   await DB.setMerged('salaries', {[name]: parseInt(val)||0});
+}
+
+// ─── PERFORMANCE INCENTIVE ────────────────────────────────────────────────────
+// A fixed per-RM amount set by Admin (alongside salary on the Employees page).
+// It is NOT part of the salary payout — it only RAISES the base used for the
+// brokerage incentive formula. Salary + Performance Incentive = "Incentive Salary".
+function getPerfIncentives(){ return DB.get('perf_incentive', {}) || {}; }
+function getPerfIncentive(name){
+  const p=getPerfIncentives();
+  return p[name]!==undefined ? (parseInt(p[name])||0) : 0;
+}
+async function setPerfIncentive(name,val){
+  await DB.setMerged('perf_incentive', {[name]: parseInt(val)||0});
+}
+// Base used by the brokerage incentive formula everywhere = Salary + Perf. Incentive.
+function getIncentiveSalary(name){
+  return (Number(getEmpSalary(name))||0) + (Number(getPerfIncentive(name))||0);
 }
 function getMfSip(){ return DB.get('mfsip', {}) || {}; }
 async function saveMfSip(d){ await DB.set('mfsip', d); }
@@ -2574,7 +2592,7 @@ function totalIncentive(name, salary, month){
   const broClientTotal = mfsip.broClientTotal||0;
   const broClientRows  = mfsip.broClientRows||[];
 
-  const br=brokerageIncentive(salary,brok, checkTier2Eligible(demat,sip,mf));
+  const br=brokerageIncentive(getIncentiveSalary(name),brok, checkTier2Eligible(demat,sip,mf));
   const dematInc = demat*getDematRate();
   const mfInc = mf*(rates.mfRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
@@ -2599,15 +2617,15 @@ function renderIncentivePage(){
   const lowMult=rates.lowMult||3, highMult=rates.highMult||10;
   const tier1=rates.tier1Rate||5, tier2=rates.tier2Rate||7, dematRate=rates.dematRate||0;
   const flowEl=document.getElementById('formula-low-label');
-  if(flowEl) flowEl.textContent='Brokerage < '+lowMult+'× Salary';
+  if(flowEl) flowEl.textContent='Brokerage < '+lowMult+'× Inc.Salary';
   const ft1lEl=document.getElementById('formula-tier1-label');
-  if(ft1lEl) ft1lEl.textContent=lowMult+'× ≤ Brokerage < '+highMult+'× Salary';
+  if(ft1lEl) ft1lEl.textContent=lowMult+'× ≤ Brokerage < '+highMult+'× Inc.Salary';
   const ft1vEl=document.getElementById('formula-tier1-value');
-  if(ft1vEl) ft1vEl.textContent='(Brokerage − '+lowMult+'×Salary) × '+tier1+'%';
+  if(ft1vEl) ft1vEl.textContent='(Brokerage − '+lowMult+'×Inc.Salary) × '+tier1+'%';
   const ft2lEl=document.getElementById('formula-tier2-label');
-  if(ft2lEl) ft2lEl.textContent='Brokerage ≥ '+highMult+'× Salary';
+  if(ft2lEl) ft2lEl.textContent='Brokerage ≥ '+highMult+'× Inc.Salary';
   const ft2vEl=document.getElementById('formula-tier2-value');
-  if(ft2vEl) ft2vEl.textContent='(Brokerage − '+lowMult+'×Salary) × '+tier2+'%';
+  if(ft2vEl) ft2vEl.textContent='(Brokerage − '+lowMult+'×Inc.Salary) × '+tier2+'%';
   const fdrEl=document.getElementById('formula-demat-rate');
   if(fdrEl) fdrEl.textContent='₹'+dematRate+' / account';
   const ft2mEl=document.getElementById('formula-tier2-min');
@@ -2621,6 +2639,7 @@ function renderIncentivePage(){
 
   // My incentive card — salary always pulled from central getEmpSalary (set on Employees page)
   const mySalary=getEmpSalary(currentUser);
+  const myPerf=getPerfIncentive(currentUser);
   const t=totalIncentive(currentUser,mySalary,selMonth);
   const myPay=getPaymentsForMonth(selMonth)[currentUser]||{};
   const myIncPaid=myPay.incPaid||0;
@@ -2628,11 +2647,11 @@ function renderIncentivePage(){
   const mic=document.getElementById('my-incentive-card');
   if(mic){
     mic.innerHTML=`
-      <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Salary: ${fmt(mySalary)}</p>
+      <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Salary: ${fmt(mySalary)}${myPerf>0?' + Perf. Inc.: '+fmt(myPerf):''} &nbsp;→&nbsp; <b style="color:var(--text2)">Incentive Salary: ${fmt(mySalary+myPerf)}</b></p>
       <table style="font-size:13px;width:100%">
         <tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Brokerage incentive</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Total brokerage</td><td style="text-align:right">${fmt(t.brok)}</td></tr>
-        <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}× Salary</td><td style="text-align:right">${fmt(t.br.excess)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}× Inc.Salary</td><td style="text-align:right">${fmt(t.br.excess)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right">${fmt(t.br.base5)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)${t.br.tier2Eligible?'':'<span style="color:var(--red);margin-left:4px">🚫</span>'}</td><td style="text-align:right">${fmt(t.br.extra2)}</td></tr>
         ${!t.br.tier2Eligible?`<tr><td colspan="2" style="font-size:11px;color:var(--red);padding:2px 0">Tier 2 blocked — min ${rates.tier2MinDemat||2} Demat, ₹${rates.tier2MinSip||2000} SIP, ₹${rates.tier2MinLumpsum||10000} Lumpsum required</td></tr>`:''}
@@ -2661,13 +2680,14 @@ function renderIncentivePage(){
       const payments=getPaymentsForMonth(selMonth);
       tit.innerHTML=EMPLOYEES.map(e=>{
         const sal=getEmpSalary(e.name);
+        const perf=getPerfIncentive(e.name);
         const tt=totalIncentive(e.name,sal,selMonth);
         const paid=(payments[e.name]&&payments[e.name].incPaid)||0;
         const balance=Math.max(0, tt.total-paid);
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
-          <td>${fmt(sal)}</td>
+          <td title="Salary ${fmt(sal)}${perf>0?' + Perf. Inc. '+fmt(perf):''}">${fmt(sal+perf)}${perf>0?'<br><small style="font-weight:400;color:var(--text3)">('+fmt(sal)+'+'+fmt(perf)+')</small>':''}</td>
           <td>${fmt(tt.brok)}</td>
           <td>${fmt(tt.br.base5)}</td>
           <td>${fmt(tt.br.extra2)}</td>
@@ -3169,10 +3189,11 @@ function loadIncEmp(){
   const name=sel.value;
   const month=currentIncMonth();
   const sal=getEmpSalary(name);
+  const perf=getPerfIncentive(name);
   const monthData=getMfSipForMonth(month);
   const mfsip=monthData[name]||{};
   const dispEl=document.getElementById('inc-salary-display');
-  if(dispEl) dispEl.value=fmt(sal);
+  if(dispEl) dispEl.value=fmt(sal+perf)+(perf>0?'  ('+fmt(sal)+' + '+fmt(perf)+' perf.)':'');
   document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:0;
   document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:0;
   document.getElementById('inc-mf').value = mfsip.mf||0;
@@ -3208,7 +3229,7 @@ function calcIncentive(){
   const sel=document.getElementById('inc-emp');
   if(!sel) return;
   const name=sel.value;
-  const salary=getEmpSalary(name);
+  const salary=getIncentiveSalary(name);
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
@@ -3238,7 +3259,7 @@ function calcIncentive(){
   const el=document.getElementById('inc-result');
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%">
-      <tr><td style="color:var(--text2);padding:4px 0">${rates.lowMult||3}× Salary / ${rates.highMult||10}× Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">${rates.lowMult||3}× Inc.Salary / ${rates.highMult||10}× Inc.Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}×</td><td style="text-align:right">${fmt(br.excess)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.base5)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)${t2Elig?'':'<span style="color:var(--red);margin-left:4px">🚫</span>'}</td><td style="text-align:right;color:${t2Elig?'var(--green)':'var(--text3)'}">+ ${fmt(br.extra2)}</td></tr>
@@ -3259,6 +3280,7 @@ function renderEmployees(){
   if(!et) return;
   et.innerHTML=EMPLOYEES.map(e=>{
     const sal=getEmpSalary(e.name);
+    const perf=getPerfIncentive(e.name);
     return `
     <tr>
       <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
@@ -3270,11 +3292,18 @@ function renderEmployees(){
           <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')">Set</button>
         </div>
       </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span>₹</span>
+          <input type="number" value="${perf}" id="emp-perf-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px" title="Performance Incentive — added to salary to form the Incentive Salary base">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpPerfInc('${e.name}')">Set</button>
+        </div>
+      </td>
       <td><span style="font-size:11px;color:var(--text3)">CRM credentials</span></td>
       <td><span class="badge badge-green">Active</span></td>
       <td>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}')))">View</button>
+          <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}'))+'\\nPerf. Inc.: '+fmt(getPerfIncentive('${e.name}'))+'\\nIncentive Salary: '+fmt(getIncentiveSalary('${e.name}')))">View</button>
           <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.name}')">Delete</button>
         </div>
       </td>
@@ -3322,6 +3351,17 @@ async function saveEmpSalary(name){
   alert(name+'\'s salary has been set to: '+fmt(parseInt(val)||0)+'\n\nThis will update instantly on the RM\'s device.');
 }
 
+async function saveEmpPerfInc(name){
+  const val=document.getElementById('emp-perf-'+name).value;
+  await setPerfIncentive(name,val);
+  renderEmployees();
+  renderIncentivePage();
+  const sal=getEmpSalary(name);
+  alert(name+'\'s Performance Incentive set to: '+fmt(parseInt(val)||0)+
+        '\n\nIncentive Salary (Salary + Perf. Inc.) is now '+fmt(sal+(parseInt(val)||0))+
+        '.\nAll brokerage incentive tiers will now be calculated on this base.');
+}
+
 function toggleAddForm(){
   const f=document.getElementById('add-emp-form');
   f.style.display=f.style.display==='none'?'block':'none';
@@ -3332,6 +3372,8 @@ async function addEmployee(){
   if(EMPLOYEES.find(e=>e.name.toLowerCase()===name.toLowerCase())){alert('An employee with this name already exists');return}
   const emp={name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000};
   await persistAddEmployee(emp);
+  const perfVal=parseInt(document.getElementById('ne-perf').value)||0;
+  if(perfVal>0) await setPerfIncentive(name, perfVal);
   toggleAddForm();renderEmployees();
   alert(name+' added!\n\nAlso create a new user in CRM for login, so they can log in here too.');
 }
