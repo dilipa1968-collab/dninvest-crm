@@ -4553,9 +4553,7 @@ function saveBusinessEntry(){
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
-    status: (CU.role==='admin' || hasMfDeskAccess(CU))
-      ? 'Approved'
-      : (['SIP','Lumpsum'].includes(type) ? 'Pending' : 'Approved'),
+    status: 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
@@ -5053,9 +5051,7 @@ function saveMfTxnEntry(){
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
-    status: (CU.role==='admin' || hasMfDeskAccess(CU))
-      ? 'Approved'
-      : (['SIP','Lumpsum'].includes(type) ? 'Pending' : 'Approved'),
+    status: 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
