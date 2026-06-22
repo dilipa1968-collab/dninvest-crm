@@ -598,6 +598,9 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="compact-grid3" style="margin-bottom:10px">
             <div class="field-inline"><label>Month</label><input type="month" id="bro-upload-month"></div>
             <div class="field-inline"><label>Upload XLS / XLSX</label><input type="file" id="bro-file-input" accept=".xls,.xlsx" onchange="parseBrokerageFile(this)"></div>
+            <div class="field-inline" style="align-self:flex-end">
+              <button class="btn btn-sm" onclick="downloadBrokerageTemplate()" style="width:100%">⬇ Download Template</button>
+            </div>
           </div>
           <div class="compact-grid3" style="margin-bottom:8px">
             <div class="field-inline"><label>Min clients (≥ threshold)</label><input type="number" id="bro-client-min" value="" placeholder="e.g. 50"></div>
@@ -2822,6 +2825,29 @@ async function saveRates(){
 }
 
 // ── Brokerage File Upload — Client-wise Incentive ───────────────────────────
+// Downloads a blank XLS template with exactly the 4 required columns.
+// Uses SheetJS (already loaded via CDN). Admins fill this and re-upload it.
+function downloadBrokerageTemplate(){
+  if(typeof XLSX === 'undefined'){
+    alert('SheetJS library not loaded. Please reload the page and try again.');
+    return;
+  }
+  const headers = ['Client Code', 'Client Name', 'Brokerage', 'Rm'];
+  const sampleRows = [
+    [1001234, 'RAMESH KUMAR', 1500.00, 'RAJU'],
+    [1005678, 'SUNITA DEVI',   250.50, 'PUJA'],
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const wsData = [headers, ...sampleRows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [{wch:14}, {wch:30}, {wch:12}, {wch:14}];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'BrokerageData');
+  XLSX.writeFile(wb, 'DN_Brokerage_Template.xlsx');
+}
 // Reads an XLS/XLSX with columns: Client Code, Client Name, Brokerage, RM.
 // Uses SheetJS (already a global — loaded from CDN in the body script block or
 // bundled into the page). Falls back gracefully if SheetJS isn't present.
