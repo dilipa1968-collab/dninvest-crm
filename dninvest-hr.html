@@ -7,7 +7,6 @@
 <!-- Firebase SDK (same project as DNInvest CRM) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
@@ -296,7 +295,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">This Month's Log</div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th></tr></thead>
+              <thead><tr><th>Date</th><th>In time</th><th>Out time</th><th>Hrs</th><th>Status</th><th>Key</th></tr></thead>
               <tbody id="my-att-log"></tbody>
             </table>
           </div>
@@ -305,7 +304,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team attendance — June 2026</div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Present</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
+              <thead><tr><th>Employee</th><th>Present</th><th>Normal</th><th>Sl.Late</th><th>V.Late</th><th>Status Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
               <tbody id="team-att-table"></tbody>
             </table>
           </div>
@@ -520,7 +519,6 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <tr><td style="color:var(--text2);padding:5px 0">Demat account opening</td><td style="text-align:right" id="formula-demat-rate">₹600 / account</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">MF Sale incentive</td><td style="text-align:right" id="formula-mf-rate">—</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">SIP incentive</td><td style="text-align:right" id="formula-sip-rate">—</td></tr>
-            <tr><td style="color:var(--text2);padding:5px 0">Brokerage client count bonus</td><td style="text-align:right" id="formula-bro-client-rate">—</td></tr>
           </table>
         </div>
         <div class="card admin-only" style="display:none">
@@ -541,14 +539,6 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="form-row">
             <div class="field-inline"><label>MF Sale incentive (%)</label><input type="number" step="0.1" id="mf-rate" placeholder="e.g. 0.5"></div>
             <div class="field-inline"><label>SIP incentive (%)</label><input type="number" step="0.1" id="sip-rate" placeholder="e.g. 0.5"></div>
-          </div>
-
-          <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:14px 0 6px">Brokerage client count bonus (from file upload)</p>
-          <p style="font-size:10.5px;color:var(--text3);margin:0 0 8px">RM gets flat bonus if number of clients who gave brokerage ≥ Per-client threshold is ≥ Min clients.</p>
-          <div class="compact-grid3">
-            <div class="field-inline"><label>Min clients (≥ threshold)</label><input type="number" id="br-client-min" placeholder="e.g. 50"></div>
-            <div class="field-inline"><label>Per-client threshold (₹)</label><input type="number" id="br-client-threshold" placeholder="e.g. 100"></div>
-            <div class="field-inline"><label>Flat bonus if qualified (₹)</label><input type="number" id="br-client-bonus" placeholder="e.g. 700"></div>
           </div>
           <button class="btn btn-primary" style="width:100%;margin-top:6px" onclick="saveRates()">Save Rates</button>
         </div>
@@ -584,24 +574,10 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div id="inc-result"></div>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
-          <div class="card-title">Brokerage File Upload — Client-wise Incentive</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Upload the monthly brokerage XLS/XLSX (columns: Client Code, Client Name, Brokerage, RM). The system will auto-calculate how many clients per RM gave brokerage ≥ threshold. If ≥ minimum client count, flat bonus is credited.</p>
-          <div class="compact-grid3" style="margin-bottom:10px">
-            <div class="field-inline"><label>Month</label><input type="month" id="bro-upload-month"></div>
-            <div class="field-inline"><label>Upload XLS / XLSX</label><input type="file" id="bro-file-input" accept=".xls,.xlsx" onchange="parseBrokerageFile(this)"></div>
-          </div>
-          <div class="compact-grid3" style="margin-bottom:8px">
-            <div class="field-inline"><label>Min clients (≥ threshold)</label><input type="number" id="bro-client-min" value="" placeholder="e.g. 50"></div>
-            <div class="field-inline"><label>Per-client threshold (₹)</label><input type="number" id="bro-client-threshold" value="" placeholder="e.g. 100"></div>
-            <div class="field-inline"><label>Flat bonus if qualified (₹)</label><input type="number" id="bro-client-bonus" value="" placeholder="e.g. 700"></div>
-          </div>
-          <div id="bro-upload-result" style="margin-top:8px"></div>
-        </div>
-        <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th>Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>SIP</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -1038,8 +1014,8 @@ async function setPaidAmount(name, month, field, amount){
 }
 
 function getIncRates(){
-  return DB.get('inc_rates', {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700})
-    || {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700};
+  return DB.get('inc_rates', {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600})
+    || {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600};
 }
 async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
@@ -1308,10 +1284,25 @@ async function doLogin(){
   const name=empMatch?empMatch.name:user.name;
   currentUser=name;isAdmin=false;
 
-  // Auto-record attendance: login time - 5 min (skip "Present" status on holidays)
-  const att=getAtt();
+  // Auto-record attendance: fetch FRESH from Firestore first (not stale localStorage)
+  // so that CRM-recorded attendance is never overwritten by HR Portal login.
   const td=today();
-  const already=(att[name]||[]).find(r=>r.date===td);
+  let freshAttForName=[];
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc=await fdb.collection('hr_data').doc('attendance').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        const freshAll=doc.data().data;
+        // Sync fresh data into localStorage so rest of app stays consistent
+        DB.setLocal('attendance', freshAll);
+        freshAttForName=freshAll[name]||[];
+      }
+    }
+  }catch(e){ console.log('Fresh att fetch error:',e); }
+  // Fallback to localStorage if Firestore fetch failed
+  if(!freshAttForName.length){ const att=getAtt(); freshAttForName=(att[name]||[]); }
+
+  const already=freshAttForName.find(r=>r.date===td);
   if(already && already.status==='Absent'){
     // This is a delayed login after the 10 AM auto-absent mark — flip to
     // "Late" and reactivate the user back in the CRM's users list.
@@ -1330,6 +1321,7 @@ async function doLogin(){
       if(errBox){errBox.style.display='block';errBox.textContent='✓ Today\'s attendance auto-recorded — in time: '+inTime;}
     }
   }
+  // already has Present/Late/Holiday — skip silently, CRM record is preserved
   startApp();
 }
 
@@ -1585,17 +1577,54 @@ function renderDashboard(){
   }
 
   // Today att list
+  // Admin: sabhi employees | RM: sirf khud ka row
   const tal=document.getElementById('today-att-list');
   if(tal){
     tal.innerHTML='';
-    EMPLOYEES.forEach(e=>{
+    const listToShow = isAdmin ? EMPLOYEES : EMPLOYEES.filter(e=>e.name===currentUser);
+    listToShow.forEach(e=>{
       const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
       let badge='',inT='—';
-      if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
-      else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
-      else{badge='<span class="badge badge-red">Absent</span>'}
-      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
+      if(todayHoliday){
+        badge='<span class="badge badge-amber">Holiday</span>';
+      } else if(rec&&rec.status==='Present'){
+        badge=`<span class="badge ${presentBadgeClass(rec)}">Present</span>`;
+        inT=rec.in;
+      } else if(rec&&rec.status==='Late'){
+        badge='<span class="badge badge-blue">Late</span>';
+        inT=rec.in;
+      } else if(rec&&rec.status==='Half day'){
+        badge='<span class="badge badge-blue">Half day</span>';
+        inT=rec.in||'—';
+      } else if(rec&&rec.status==='Holiday'){
+        badge='<span class="badge badge-amber">Holiday</span>';
+      } else {
+        badge='<span class="badge badge-red">Absent</span>';
+      }
+      // Month-wise counts for admin
+      let summaryHtml = '';
+      if(isAdmin){
+        const curMonth = td.slice(0,7); // YYYY-MM
+        const allRecs = att[e.name]||[];
+        const monthRecs = allRecs.filter(r=>r.date&&r.date.startsWith(curMonth));
+        const norm = monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
+        const sl   = monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
+        const vl   = monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
+        summaryHtml = `<div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap">
+          <span style="color:var(--green-text);font-weight:600">N:${norm}</span>
+          <span style="color:var(--blue-text);font-weight:600">SL:${sl}</span>
+          <span style="color:var(--amber-text);font-weight:600">VL:${vl}</span>
+        </div>`;
+      }
+      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div>${summaryHtml}</div></div>${badge}</div>`;
     });
+    if(isAdmin){
+      tal.innerHTML+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2)">
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:3px;vertical-align:middle"></span>Normal</span>
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:3px;vertical-align:middle"></span>Slightly Late</span>
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-right:3px;vertical-align:middle"></span>Very Late</span>
+      </div>`;
+    }
   }
 
   // My att status
@@ -1719,6 +1748,12 @@ function renderAttendancePage(){
   const late=myRecs.filter(r=>r.status==='Late').length;
   const total=26; // working days this month
   const pct=Math.round((present/total)*100);
+
+  // Present me Normal/Late/Warning count (based on presentBadgeClass)
+  const normalDays=myRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
+  const blueDays=myRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
+  const warnDays=myRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
+
   const ms=document.getElementById('my-att-summary');
   if(ms) ms.innerHTML=`
     <div class="grid4" style="margin-bottom:0">
@@ -1727,16 +1762,28 @@ function renderAttendancePage(){
       <div class="metric"><div class="m-lbl">Working days</div><div class="m-val">${total}</div></div>
       <div class="metric"><div class="m-lbl">Attendance %</div><div class="m-val" style="color:${pct>=85?'var(--green)':'var(--amber)'}">${pct}%</div></div>
     </div>
-    <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>`;
+    <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px">
+      <span><span class="badge badge-green" style="font-size:11px">Normal</span> <strong>${normalDays}</strong></span>
+      <span><span class="badge badge-blue" style="font-size:11px">Slightly Late</span> <strong>${blueDays}</strong></span>
+      <span><span class="badge badge-amber" style="font-size:11px">Very Late</span> <strong>${warnDays}</strong></span>
+    </div>`;
 
   // Log
   const al=document.getElementById('my-att-log');
   if(al){
-    if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records</td></tr>'}
+    if(myRecs.length===0){al.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2)">No records</td></tr>'}
     else al.innerHTML=myRecs.slice(0,20).map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
       const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
-      return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td></tr>`;
+      // Key label for Present rows only
+      let keyCell='<td>—</td>';
+      if(r.status==='Present'){
+        const bc=presentBadgeClass(r);
+        const keyLabel=bc==='badge-green'?'Normal':bc==='badge-blue'?'Slightly Late':'Very Late';
+        keyCell=`<td><span class="badge ${bc}" style="font-size:10px">${keyLabel}</span></td>`;
+      }
+      return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td>${keyCell}</tr>`;
     }).join('');
   }
 
@@ -1751,7 +1798,10 @@ function renderAttendancePage(){
       const ab=total-p-lt-lv;
       const pc=Math.round((p/total)*100);
       const bc=pc>=85?'badge-green':pc>=70?'badge-amber':'badge-red';
-      return `<tr><td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td><td>${p}</td><td>${lt}</td><td>${lv}</td><td>${Math.max(0,ab)}</td><td><span class="badge ${bc}">${pc}%</span></td></tr>`;
+      const norm=recs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
+      const sl=recs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
+      const vl=recs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
+      return `<tr><td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td><td>${p}</td><td>${norm}</td><td>${sl}</td><td>${vl}</td><td>${lt}</td><td>${lv}</td><td>${Math.max(0,ab)}</td><td><span class="badge ${bc}">${pc}%</span></td></tr>`;
     }).join('');
   }
 }
@@ -2531,17 +2581,14 @@ function totalIncentive(name, salary, month){
   const sip = mfsip.sip||0;
   const other = mfsip.other||0;
   const otherRemark = mfsip.otherRemark||'';
-  const broClientInc = mfsip.broClientInc||0;          // flat bonus from file upload
-  const broClientEligible = mfsip.broClientEligible||false;
-  const broClientCount = mfsip.broClientCount||0;
 
   const br=brokerageIncentive(salary,brok);
   const dematInc = demat*getDematRate();
   const mfInc = mf*(rates.mfRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
-  const total = br.total + dematInc + mfInc + sipInc + other + broClientInc;
+  const total = br.total + dematInc + mfInc + sipInc + other;
 
-  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, broClientInc, broClientEligible, broClientCount, total};
+  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, total};
 }
 
 function viewIncMonth(){
@@ -2575,8 +2622,6 @@ function renderIncentivePage(){
   if(fmfEl) fmfEl.textContent = rates.mfRate ? rates.mfRate+'% of MF sale' : 'Not set';
   const fsipEl=document.getElementById('formula-sip-rate');
   if(fsipEl) fsipEl.textContent = rates.sipRate ? rates.sipRate+'% of SIP amount' : 'Not set';
-  const fbrcEl=document.getElementById('formula-bro-client-rate');
-  if(fbrcEl) fbrcEl.textContent = '≥'+(rates.broClientMin||50)+' clients (≥₹'+(rates.broClientThreshold||100)+') → ₹'+(rates.broClientBonus||700)+' flat';
 
   // My incentive card — salary always pulled from central getEmpSalary (set on Employees page)
   const mySalary=getEmpSalary(currentUser);
@@ -2600,7 +2645,6 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
-        ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
@@ -2631,7 +2675,6 @@ function renderIncentivePage(){
           <td>${tt.demat}</td>
           <td>${fmt(tt.mf)}</td>
           <td>${fmt(tt.sip)}</td>
-          <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other)}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
           <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
@@ -2649,9 +2692,7 @@ function renderIncentivePage(){
     const dmr=document.getElementById('demat-rate'); if(dmr && !dmr.value) dmr.value=rates.dematRate||'';
     const t1r=document.getElementById('tier1-rate'); if(t1r && !t1r.value) t1r.value=rates.tier1Rate||'';
     const t2r=document.getElementById('tier2-rate'); if(t2r && !t2r.value) t2r.value=rates.tier2Rate||'';
-    const bcm=document.getElementById('br-client-min'); if(bcm && !bcm.value) bcm.value=rates.broClientMin||50;
-    const bct=document.getElementById('br-client-threshold'); if(bct && !bct.value) bct.value=rates.broClientThreshold||100;
-    const bcb=document.getElementById('br-client-bonus'); if(bcb && !bcb.value) bcb.value=rates.broClientBonus||700;
+
     loadIncEmp();
     renderMultiMonthSummary();
   }
@@ -2781,167 +2822,14 @@ async function saveRates(){
   const dematRate=parseFloat(document.getElementById('demat-rate').value)||0;
   const tier1Rate=parseFloat(document.getElementById('tier1-rate').value)||0;
   const tier2Rate=parseFloat(document.getElementById('tier2-rate').value)||0;
-  const broClientMin=parseInt(document.getElementById('br-client-min').value)||50;
-  const broClientThreshold=parseFloat(document.getElementById('br-client-threshold').value)||100;
-  const broClientBonus=parseFloat(document.getElementById('br-client-bonus').value)||700;
   if(highMult<lowMult){ alert('Upper multiplier must be greater than or equal to the lower multiplier'); return; }
   if(tier2Rate<tier1Rate){ alert('Tier 2 rate must be greater than or equal to Tier 1 rate'); return; }
-  await saveIncRates({mfRate,sipRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus});
+  await saveIncRates({mfRate,sipRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate});
   renderIncentivePage();
-  alert('Rates & formula saved!\n\nBrokerage: '+lowMult+'×–'+highMult+'× Salary @ '+tier1Rate+'%, '+highMult+'×+ @ '+tier2Rate+'%\nDemat: ₹'+dematRate+'/account · MF: '+mfRate+'% · SIP: '+sipRate+'%\nBro client bonus: ≥'+broClientMin+' clients (≥₹'+broClientThreshold+') → ₹'+broClientBonus);
+  alert('Rates & formula saved!\n\nBrokerage: '+lowMult+'×–'+highMult+'× Salary @ '+tier1Rate+'%, '+highMult+'×+ @ '+tier2Rate+'%\nDemat: ₹'+dematRate+'/account · MF: '+mfRate+'% · SIP: '+sipRate+'%');
 }
 
-// ── Brokerage File Upload — Client-wise Incentive ───────────────────────────
-// Reads an XLS/XLSX with columns: Client Code, Client Name, Brokerage, RM.
-// Uses SheetJS (already a global — loaded from CDN in the body script block or
-// bundled into the page). Falls back gracefully if SheetJS isn't present.
-// Rule (configurable from rates): if ≥ broClientMin clients of an RM gave
-// brokerage ≥ broClientThreshold, that RM earns broClientBonus flat this month.
-let _broParseResult = null; // holds last parsed result for apply step
-
-function parseBrokerageFile(inputEl){
-  const file = inputEl.files[0];
-  if(!file){ return; }
-
-  // Pre-fill threshold fields from saved rates so admin can see / override
-  const rates = getIncRates();
-  const minEl  = document.getElementById('bro-client-min');
-  const thrEl  = document.getElementById('bro-client-threshold');
-  const bonEl  = document.getElementById('bro-client-bonus');
-  if(minEl  && !minEl.value)  minEl.value  = rates.broClientMin     || 50;
-  if(thrEl  && !thrEl.value)  thrEl.value  = rates.broClientThreshold|| 100;
-  if(bonEl  && !bonEl.value)  bonEl.value  = rates.broClientBonus    || 700;
-
-  const resEl = document.getElementById('bro-upload-result');
-  if(resEl) resEl.innerHTML = '<p style="color:var(--text3);font-size:12px">Reading file…</p>';
-
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      // SheetJS must be available (imported via CDN in this file's <head>/<body>)
-      if(typeof XLSX === 'undefined'){
-        if(resEl) resEl.innerHTML='<p style="color:var(--red)">SheetJS library not loaded. Please reload the page.</p>';
-        return;
-      }
-      const data = new Uint8Array(e.target.result);
-      const wb   = XLSX.read(data, {type:'array'});
-      const sh   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sh, {defval:''});
-
-      // Detect column names flexibly (case-insensitive, trim spaces)
-      if(!rows.length){ resEl.innerHTML='<p style="color:var(--red)">File is empty or unreadable.</p>'; return; }
-      const sample = rows[0];
-      const keys   = Object.keys(sample);
-      const colKey = (hint) => keys.find(k => k.trim().toLowerCase().includes(hint.toLowerCase())) || null;
-      const colBro = colKey('brok') || colKey('brokerage');
-      const colRm  = colKey('rm')   || colKey('dealer') || colKey('adviser');
-
-      if(!colBro || !colRm){
-        resEl.innerHTML='<p style="color:var(--red)">Could not find "Brokerage" and/or "RM" columns. Columns found: '+keys.join(', ')+'</p>';
-        return;
-      }
-
-      // Aggregate per RM
-      const minClients   = parseFloat(document.getElementById('bro-client-min').value)       || 50;
-      const threshold    = parseFloat(document.getElementById('bro-client-threshold').value)  || 100;
-      const bonus        = parseFloat(document.getElementById('bro-client-bonus').value)      || 700;
-
-      const rmMap = {}; // rmName => {totalClients, eligibleClients, totalBrokerage}
-      rows.forEach(r => {
-        const rm  = String(r[colRm] || '').trim().toUpperCase();
-        const bro = parseFloat(r[colBro]) || 0;
-        if(!rm) return;
-        if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0};
-        rmMap[rm].totalClients++;
-        rmMap[rm].totalBrokerage += bro;
-        if(bro >= threshold) rmMap[rm].eligibleClients++;
-      });
-
-      // Match to employee names (case-insensitive prefix match)
-      const employees = getEmployees().filter(emp => emp && !emp.deleted);
-      const empNames  = employees.map(e => e.name.trim().toUpperCase());
-
-      const results = [];
-      Object.entries(rmMap).forEach(([rmUpper, stats]) => {
-        // Find matching employee
-        const empName = employees.find(e => e.name.trim().toUpperCase() === rmUpper)?.name
-                     || employees.find(e => rmUpper.startsWith(e.name.trim().toUpperCase()))?.name
-                     || employees.find(e => e.name.trim().toUpperCase().startsWith(rmUpper))?.name
-                     || null;
-        const eligible = stats.eligibleClients >= minClients;
-        results.push({rm: rmUpper, empName, totalClients: stats.totalClients, eligibleClients: stats.eligibleClients, totalBrokerage: stats.totalBrokerage, eligible, bonus: eligible ? bonus : 0});
-      });
-
-      _broParseResult = {results, minClients, threshold, bonus};
-      renderBroUploadResult(results, minClients, threshold, bonus);
-
-    } catch(err){
-      console.error(err);
-      if(resEl) resEl.innerHTML='<p style="color:var(--red)">Error reading file: '+escapeHtml(err.message)+'</p>';
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function renderBroUploadResult(results, minClients, threshold, bonus){
-  const resEl = document.getElementById('bro-upload-result');
-  if(!resEl) return;
-
-  let html = `<p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px">
-    Rule: ≥${minClients} clients with brokerage ≥₹${threshold} → ₹${bonus} flat bonus
-  </p>
-  <div class="tbl-wrap"><table style="font-size:12.5px;width:100%">
-    <thead><tr><th>RM (in file)</th><th>Matched Employee</th><th>Total Clients</th><th>Eligible Clients<br><small>brokerage ≥₹${threshold}</small></th><th>Total Brokerage</th><th>Bonus</th></tr></thead>
-    <tbody>`;
-
-  results.forEach(r => {
-    const statusColor = r.eligible ? 'var(--green)' : 'var(--text3)';
-    html += `<tr>
-      <td>${escapeHtml(r.rm)}</td>
-      <td style="font-weight:600;color:${r.empName ? 'var(--text1)' : 'var(--red)'}">${r.empName ? escapeHtml(r.empName) : '⚠ Not matched'}</td>
-      <td style="text-align:right">${r.totalClients}</td>
-      <td style="text-align:right;font-weight:600;color:${r.eligible?'var(--green)':'var(--text1)'}">${r.eligibleClients}</td>
-      <td style="text-align:right">₹${Math.round(r.totalBrokerage).toLocaleString('en-IN')}</td>
-      <td style="text-align:right;font-weight:700;color:${statusColor}">${r.eligible ? '₹'+r.bonus : '—'}</td>
-    </tr>`;
-  });
-
-  html += '</tbody></table></div>';
-  html += `<button class="btn btn-primary" style="margin-top:10px;width:100%" onclick="applyBroClientIncentive()">✅ Apply to Month's Incentive Data</button>`;
-  resEl.innerHTML = html;
-}
-
-function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-async function applyBroClientIncentive(){
-  if(!_broParseResult){ alert('No file parsed yet.'); return; }
-  const monthEl = document.getElementById('bro-upload-month');
-  const month   = monthEl ? monthEl.value : '';
-  if(!month){ alert('Please select a month first.'); return; }
-
-  const {results} = _broParseResult;
-  const matched   = results.filter(r => r.empName);
-  const unmatched = results.filter(r => !r.empName);
-  if(!matched.length){ alert('No RM names could be matched to employees. Check the file.'); return; }
-
-  const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-  const summary = matched.map(r => `${r.empName}: ${r.eligible ? '₹'+r.bonus+' bonus ('+r.eligibleClients+' clients)' : 'No bonus ('+r.eligibleClients+'/'+_broParseResult.minClients+' clients)'}`).join('\n');
-  const unmSummary = unmatched.length ? '\n\nUnmatched RMs (skipped): '+unmatched.map(r=>r.rm).join(', ') : '';
-  if(!confirm('Apply brokerage client bonus for '+mLabel+'?\n\n'+summary+unmSummary)) return;
-
-  const all = getMfSipByMonth();
-  if(!all[month]) all[month] = {};
-  matched.forEach(r => {
-    if(!all[month][r.empName]) all[month][r.empName] = {brok:0,demat:0,mf:0,sip:0,other:0,otherRemark:''};
-    all[month][r.empName].broClientInc      = r.eligible ? r.bonus : 0;
-    all[month][r.empName].broClientEligible = r.eligible;
-    all[month][r.empName].broClientCount    = r.eligibleClients;
-    all[month][r.empName].broClientTotal    = r.totalClients;
-  });
-  await saveMfSipByMonth(all);
-  renderIncentivePage();
-  alert('✅ Brokerage client bonus applied for '+mLabel+'!');
-}
+function loadIncEmp(){
   const sel=document.getElementById('inc-emp');
   if(!sel) return;
   const name=sel.value;
@@ -2972,9 +2860,7 @@ async function saveMfSipData(){
   const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
   const all=getMfSipByMonth();
   if(!all[month]) all[month]={};
-  const prev=all[month][name]||{};
-  // Preserve broClientInc if already applied from file upload — manual form save should not erase it
-  all[month][name]={brok,demat,mf,sip,other,otherRemark, broClientInc: prev.broClientInc||0, broClientEligible: prev.broClientEligible||false};
+  all[month][name]={brok,demat,mf,sip,other,otherRemark};
   await saveMfSipByMonth(all);
   calcIncentive();
   renderIncentivePage();
