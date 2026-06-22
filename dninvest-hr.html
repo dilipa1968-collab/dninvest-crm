@@ -2558,6 +2558,8 @@ function totalIncentive(name, salary, month){
   const broClientInc = mfsip.broClientInc||0;          // flat bonus from file upload
   const broClientEligible = mfsip.broClientEligible||false;
   const broClientCount = mfsip.broClientCount||0;
+  const broClientTotal = mfsip.broClientTotal||0;
+  const broClientRows  = mfsip.broClientRows||[];
 
   const br=brokerageIncentive(salary,brok, checkTier2Eligible(demat,sip,mf));
   const dematInc = demat*getDematRate();
@@ -2565,7 +2567,7 @@ function totalIncentive(name, salary, month){
   const sipInc = sip*(rates.sipRate||0)/100;
   const total = br.total + dematInc + mfInc + sipInc + other + broClientInc;
 
-  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, broClientInc, broClientEligible, broClientCount, total, tier2Eligible: br.tier2Eligible};
+  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -2628,6 +2630,31 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
+        ${t.broClientRows&&t.broClientRows.length>0?`
+        <tr><td colspan="2" style="padding:6px 0 2px">
+          <details>
+            <summary style="cursor:pointer;font-size:11.5px;font-weight:600;color:var(--accent);list-style:none">
+              📋 Client-wise brokerage detail (${t.broClientTotal} clients, ${t.broClientCount} eligible)
+            </summary>
+            <div style="margin-top:8px;max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+            <table style="font-size:11.5px;width:100%;border-collapse:collapse">
+              <thead><tr style="background:var(--surface2)">
+                <th style="padding:5px 8px;text-align:left">Client Code</th>
+                <th style="padding:5px 8px;text-align:left">Client Name</th>
+                <th style="padding:5px 8px;text-align:right">Brokerage</th>
+                <th style="padding:5px 8px;text-align:center">Status</th>
+              </tr></thead>
+              <tbody>
+              ${t.broClientRows.map(c=>`<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:4px 8px;color:var(--text3)">${escapeHtml(String(c.code))}</td>
+                <td style="padding:4px 8px">${escapeHtml(c.name)}</td>
+                <td style="padding:4px 8px;text-align:right">₹${Number(c.bro).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                <td style="padding:4px 8px;text-align:center">${c.eligible?'<span style="color:var(--green);font-weight:600">✓</span>':'<span style="color:var(--text3)">—</span>'}</td>
+              </tr>`).join('')}
+              </tbody>
+            </table></div>
+          </details>
+        </td></tr>`:''}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
@@ -2650,7 +2677,7 @@ function renderIncentivePage(){
         const balance=Math.max(0, tt.total-paid);
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
         return `<tr>
-          <td>${e.name}</td>
+          <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
           <td>${fmt(sal)}</td>
           <td>${fmt(tt.brok)}</td>
           <td>${fmt(tt.br.base5)}</td>
@@ -2921,18 +2948,24 @@ function parseBrokerageFile(inputEl){
       const threshold  = parseFloat(document.getElementById('bro-client-threshold').value) || 100;
       const bonus      = parseFloat(document.getElementById('bro-client-bonus').value)     || 700;
 
+      const idxCode = findCol('client code', 'code', 'client_code');
+      const idxName = findCol('client name', 'name', 'client_name');
+
       const rmMap = {};
       let dataRows = 0;
       for(let i = headerRowIdx + 1; i < rawRows.length; i++){
         const row = rawRows[i];
-        const rm  = String(row[idxRm]  || '').trim().toUpperCase();
-        const bro = parseFloat(row[idxBro]) || 0;
+        const rm      = String(row[idxRm]  || '').trim().toUpperCase();
+        const bro     = parseFloat(row[idxBro]) || 0;
+        const code    = idxCode>=0 ? String(row[idxCode]||'').trim() : '';
+        const cliName = idxName>=0 ? String(row[idxName]||'').trim() : '';
         if(!rm) continue;
         dataRows++;
-        if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0};
+        if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0, clients:[]};
         rmMap[rm].totalClients++;
         rmMap[rm].totalBrokerage += bro;
         if(bro >= threshold) rmMap[rm].eligibleClients++;
+        rmMap[rm].clients.push({code, name:cliName, bro, eligible: bro>=threshold});
       }
 
       if(!dataRows){
@@ -2956,6 +2989,7 @@ function parseBrokerageFile(inputEl){
           totalClients: stats.totalClients,
           eligibleClients: stats.eligibleClients,
           totalBrokerage: stats.totalBrokerage,
+          clients: stats.clients,
           eligible,
           bonus: eligible ? bonus : 0
         });
@@ -3035,6 +3069,62 @@ function renderBroUploadResult(results, minClients, threshold, bonus){
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// Admin: show client-wise brokerage detail for any RM in a popup
+function showBroClientDetail(empName, month){
+  const monthData = getMfSipForMonth(month);
+  const mfsip = monthData[empName] || {};
+  const rows  = mfsip.broClientRows || [];
+  const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+
+  let overlay = document.getElementById('bro-result-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'bro-result-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto';
+    document.body.appendChild(overlay);
+  }
+
+  const eligibleCount = rows.filter(r=>r.eligible).length;
+  const totalBro = rows.reduce((s,r)=>s+r.bro,0);
+
+  let html = `<div style="background:var(--surface,#fff);border-radius:12px;padding:24px;width:min(800px,95vw);max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div style="font-weight:700;font-size:15px;color:var(--text1)">📋 ${escapeHtml(empName)} — Client Brokerage Detail</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${mLabel} &nbsp;·&nbsp; ${rows.length} clients &nbsp;·&nbsp; ${eligibleCount} eligible &nbsp;·&nbsp; Total ₹${Math.round(totalBro).toLocaleString('en-IN')}</div>
+      </div>
+      <button onclick="document.getElementById('bro-result-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:0 4px">✕</button>
+    </div>
+    ${rows.length===0?'<p style="color:var(--text3);font-size:13px">No client data available. Upload brokerage file first.</p>':`
+    <div style="overflow-x:auto">
+    <table style="font-size:12.5px;width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--surface2,#f5f5f5)">
+        <th style="padding:7px 10px;text-align:left">#</th>
+        <th style="padding:7px 10px;text-align:left">Client Code</th>
+        <th style="padding:7px 10px;text-align:left">Client Name</th>
+        <th style="padding:7px 10px;text-align:right">Brokerage (₹)</th>
+        <th style="padding:7px 10px;text-align:center">Eligible</th>
+      </tr></thead>
+      <tbody>
+      ${rows.map((c,i)=>`<tr style="border-bottom:1px solid var(--border,#eee);background:${c.eligible?'':'var(--surface,#fff)'}">
+        <td style="padding:5px 10px;color:var(--text3)">${i+1}</td>
+        <td style="padding:5px 10px;color:var(--text3);font-size:11.5px">${escapeHtml(String(c.code))}</td>
+        <td style="padding:5px 10px">${escapeHtml(c.name)}</td>
+        <td style="padding:5px 10px;text-align:right;font-weight:${c.eligible?'600':'400'}">${Number(c.bro).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td style="padding:5px 10px;text-align:center">${c.eligible?'<span style="color:var(--green);font-weight:700">✓</span>':'<span style="color:var(--text3)">—</span>'}</td>
+      </tr>`).join('')}
+      <tr style="background:var(--surface2);font-weight:700">
+        <td colspan="3" style="padding:7px 10px">Total</td>
+        <td style="padding:7px 10px;text-align:right">₹${Math.round(totalBro).toLocaleString('en-IN')}</td>
+        <td style="padding:7px 10px;text-align:center;color:var(--green)">${eligibleCount} ✓</td>
+      </tr>
+      </tbody>
+    </table></div>`}
+  </div>`;
+
+  overlay.innerHTML = html;
+}
+
 async function applyBroClientIncentive(){
   if(!_broParseResult){ alert('No file parsed yet.'); return; }
   const monthEl = document.getElementById('bro-upload-month');
@@ -3056,11 +3146,13 @@ async function applyBroClientIncentive(){
   matched.forEach(r => {
     if(!all[month][r.empName]) all[month][r.empName] = {brok:0,demat:0,mf:0,sip:0,other:0,otherRemark:''};
     // Save total brokerage from file — fills the Brokerage column in team incentive table
-    all[month][r.empName].brok           = Math.round(r.totalBrokerage);
+    all[month][r.empName].brok              = Math.round(r.totalBrokerage);
     all[month][r.empName].broClientInc      = r.eligible ? r.bonus : 0;
     all[month][r.empName].broClientEligible = r.eligible;
     all[month][r.empName].broClientCount    = r.eligibleClients;
     all[month][r.empName].broClientTotal    = r.totalClients;
+    // Save client-wise rows (code, name, brokerage) for RM's own detail view
+    all[month][r.empName].broClientRows     = (r.clients||[]).map(c=>({code:c.code, name:c.name, bro:Math.round(c.bro*100)/100, eligible:c.eligible}));
   });
   await saveMfSipByMonth(all);
 
