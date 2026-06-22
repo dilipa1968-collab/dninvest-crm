@@ -4555,7 +4555,9 @@ function saveBusinessEntry(){
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
-    status: 'Pending',
+    // RM & MF Desk entries always start as Pending (admin reviews/updates).
+    // Admin's own entries are auto-Approved (admin is the approving authority).
+    status: CU.role==='admin' ? 'Approved' : 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
@@ -5053,7 +5055,9 @@ function saveMfTxnEntry(){
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
-    status: 'Pending',
+    // RM & MF Desk entries always start as Pending (admin reviews/updates).
+    // Admin's own entries are auto-Approved (admin is the approving authority).
+    status: CU.role==='admin' ? 'Approved' : 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
   });
