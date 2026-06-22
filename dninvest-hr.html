@@ -2678,13 +2678,18 @@ function renderIncentivePage(){
     const tit=document.getElementById('team-incentive-table');
     if(tit){
       const payments=getPaymentsForMonth(selMonth);
-      tit.innerHTML=EMPLOYEES.map(e=>{
+      const T={incSal:0, brok:0, tier1:0, tier2:0, demat:0, mf:0, sip:0, broCl:0, other:0, total:0, paid:0, balance:0};
+      const rows=EMPLOYEES.map(e=>{
         const sal=getEmpSalary(e.name);
         const perf=getPerfIncentive(e.name);
         const tt=totalIncentive(e.name,sal,selMonth);
         const paid=(payments[e.name]&&payments[e.name].incPaid)||0;
         const balance=Math.max(0, tt.total-paid);
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
+        // accumulate column totals
+        T.incSal+=(sal+perf); T.brok+=tt.brok; T.tier1+=tt.br.base5; T.tier2+=tt.br.extra2;
+        T.demat+=tt.demat; T.mf+=tt.mf; T.sip+=tt.sip; T.broCl+=tt.broClientInc;
+        T.other+=tt.other; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
           <td title="Salary ${fmt(sal)}${perf>0?' + Perf. Inc. '+fmt(perf):''}">${fmt(sal+perf)}${perf>0?'<br><small style="font-weight:400;color:var(--text3)">('+fmt(sal)+'+'+fmt(perf)+')</small>':''}</td>
@@ -2702,6 +2707,23 @@ function renderIncentivePage(){
           <td><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
         </tr>`;
       }).join('');
+      const totalRow=`<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700">
+          <td>TOTAL</td>
+          <td>${fmt(T.incSal)}</td>
+          <td>${fmt(T.brok)}</td>
+          <td>${fmt(T.tier1)}</td>
+          <td>${fmt(T.tier2)}</td>
+          <td>${T.demat}</td>
+          <td>${fmt(T.mf)}</td>
+          <td>${fmt(T.sip)}</td>
+          <td style="color:${T.broCl>0?'var(--green)':'var(--text3)'}">${T.broCl>0?fmt(T.broCl):'—'}</td>
+          <td>${fmt(T.other)}</td>
+          <td style="color:var(--green)">${fmt(T.total)}</td>
+          <td style="color:var(--green)">${fmt(T.paid)}</td>
+          <td style="color:${T.balance>0?'var(--red)':'var(--green)'}">${fmt(T.balance)}</td>
+          <td></td>
+        </tr>`;
+      tit.innerHTML=rows+totalRow;
     }
 
     // rate inputs
