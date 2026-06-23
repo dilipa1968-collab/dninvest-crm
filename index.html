@@ -8533,7 +8533,7 @@ function renderActivityLog(){
   if(rmEl){
     const prevRm=rmEl.value;
     rmEl.innerHTML='<option value="">All RMs</option>';
-    const rms=[...new Set(all.map(l=>l.rm).filter(r=>r&&r!=='—'))].sort();
+    const rms=[...new Set(all.map(l=>normRm(l.rm)).filter(r=>r&&r!=='—'))].sort();
     rms.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; if(r===prevRm) o.selected=true; rmEl.appendChild(o); });
   }
   if(byEl){
@@ -8545,7 +8545,7 @@ function renderActivityLog(){
 
   // Apply filters
   if(seg) all=all.filter(l=>l.seg===seg);
-  if(rmF) all=all.filter(l=>l.rm===rmF);
+  if(rmF) all=all.filter(l=>normRm(l.rm)===rmF);
   if(typeF) all=all.filter(l=>l.type===typeF);
   if(byF) all=all.filter(l=>l.by===byF);
   if(fromF) all=all.filter(l=>l.date&&l.date>=fromF);
