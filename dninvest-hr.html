@@ -7,7 +7,7 @@
 <!-- Firebase SDK (same project as DNInvest CRM) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
@@ -1918,8 +1918,28 @@ function renderAttendanceSheet(){
   }).join('');
 }
 
+// Maps an attendance cell to a {bg, font} fill colour (ARGB) for the Excel export.
+// Mirrors the on-screen badge colours, including the in-time based Present shades
+// (early=green, just-late=blue, late=amber) via presentBadgeClass().
+function attExcelColors(r){
+  if(!r) return null;
+  let cls;
+  if(r.status==='Present') cls=presentBadgeClass(r);
+  else cls=(ATT_STATUS_BADGE[r.status]||'badge-gray');
+  switch(cls){
+    case 'badge-green': return {bg:'FFC6EFCE', font:'FF006100'}; // Present (on time)
+    case 'badge-blue' : return {bg:'FFBDD7EE', font:'FF1F4E78'}; // Present (slightly late) / Half day
+    case 'badge-amber': return {bg:'FFFFEB9C', font:'FF9C6500'}; // Late
+    case 'badge-red'  : return {bg:'FFFFC7CE', font:'FF9C0006'}; // Absent
+    case 'badge-gray' : return {bg:'FFE7E7E7', font:'FF808080'}; // Holiday
+    default           : return {bg:'FFF2F2F2', font:'FF666666'};
+  }
+}
+
 function downloadAttendanceSheet(){
   if(!isAdmin) return;
+  if(typeof XLSX==='undefined'){ alert('Excel library not loaded — please check your internet and try again.'); return; }
+
   const monthSel=document.getElementById('att-rpt-month');
   const empSel=document.getElementById('att-rpt-emp');
   const ym=monthSel.value || attMonthOptions()[0];
@@ -1928,25 +1948,112 @@ function downloadAttendanceSheet(){
   const numDays=attDaysInMonth(ym);
   const emps = empFilter ? EMPLOYEES.filter(e=>e.name===empFilter) : EMPLOYEES;
 
-  let csv='Employee,'+Array.from({length:numDays},(_,i)=>i+1).join(',')+'\n';
+  // Pretty month label e.g. "June 2026"
+  const [yStr,mStr]=ym.split('-');
+  const monthLabel=new Date(parseInt(yStr), parseInt(mStr)-1, 1)
+      .toLocaleString('en-US',{month:'long',year:'numeric'});
+
+  const thin={style:'thin', color:{rgb:'FFD0D0D0'}};
+  const border={top:thin,bottom:thin,left:thin,right:thin};
+  const SUM_COLS=['P','L','H','A','Ho']; // summary headers
+
+  // ── Build the 2D cell grid with styles ──
+  const rows=[];
+
+  // Row 0: Title (merged)
+  rows.push([{ v:'DN Investment — Attendance  ·  '+monthLabel, s:{
+    font:{bold:true, sz:14, color:{rgb:'FFFFFFFF'}},
+    fill:{fgColor:{rgb:'FF1F3864'}},
+    alignment:{horizontal:'left', vertical:'center'}
+  }}]);
+
+  // Row 1: Header
+  const headStyle={
+    font:{bold:true, color:{rgb:'FFFFFFFF'}},
+    fill:{fgColor:{rgb:'FF2E5A87'}},
+    alignment:{horizontal:'center', vertical:'center'},
+    border
+  };
+  const head=[{v:'Employee', s:{...headStyle, alignment:{horizontal:'left',vertical:'center'}}}];
+  for(let d=1; d<=numDays; d++){
+    const dow=new Date(parseInt(yStr), parseInt(mStr)-1, d).getDay();
+    const isWeekend = dow===0; // Sunday shaded slightly different
+    head.push({v:d, s:{...headStyle, fill:{fgColor:{rgb: isWeekend?'FF8A6D3B':'FF2E5A87'}}}});
+  }
+  SUM_COLS.forEach(h=> head.push({v:h, s:{...headStyle, fill:{fgColor:{rgb:'FF444444'}}}}));
+  rows.push(head);
+
+  // Data rows
   emps.forEach(e=>{
     const recs=att[e.name]||[];
     const byDate={};
     recs.forEach(r=>{ byDate[r.date]=r; });
-    const cells=[e.name];
+
+    const nameStyle={
+      font:{bold:true, color:{rgb:'FF1F3864'}},
+      fill:{fgColor:{rgb:'FFF2F4F7'}},
+      alignment:{horizontal:'left', vertical:'center'},
+      border
+    };
+    const row=[{v:e.name, s:nameStyle}];
+    const tally={P:0,L:0,H:0,A:0,Ho:0};
+
     for(let d=1; d<=numDays; d++){
       const dateStr=ym+'-'+String(d).padStart(2,'0');
       const r=byDate[dateStr];
-      cells.push(r ? (ATT_STATUS_SHORT[r.status]||r.status) : '');
+      const short = r ? (ATT_STATUS_SHORT[r.status]||r.status[0]) : '';
+      // tally
+      if(r){
+        if(r.status==='Present') tally.P++;
+        else if(r.status==='Late') tally.L++;
+        else if(r.status==='Half day') tally.H++;
+        else if(r.status==='Absent') tally.A++;
+        else if(r.status==='Holiday') tally.Ho++;
+      }
+      const col=attExcelColors(r);
+      const cellStyle={
+        alignment:{horizontal:'center', vertical:'center'},
+        border,
+        font:{bold:true, color:{rgb: col?col.font:'FF333333'}},
+        fill:{fgColor:{rgb: col?col.bg:'FFFFFFFF'}}
+      };
+      row.push({v: short==='—'?'H':short, s:cellStyle});
     }
-    csv+=cells.join(',')+'\n';
+
+    // Summary cells
+    const sumVals=[tally.P,tally.L,tally.H,tally.A,tally.Ho];
+    sumVals.forEach(v=> row.push({v, s:{
+      font:{bold:true, color:{rgb:'FF222222'}},
+      fill:{fgColor:{rgb:'FFEFEFEF'}},
+      alignment:{horizontal:'center', vertical:'center'},
+      border
+    }}));
+    rows.push(row);
   });
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='attendance-'+ym+(empFilter?'-'+empFilter:'')+'.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+
+  // ── Build worksheet ──
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths: Employee wide, day cols narrow, summary small
+  const cols=[{wch:18}];
+  for(let d=0; d<numDays; d++) cols.push({wch:4});
+  SUM_COLS.forEach(()=> cols.push({wch:5}));
+  ws['!cols']=cols;
+
+  // Row heights
+  ws['!rows']=[{hpt:26},{hpt:20}].concat(emps.map(()=>({hpt:20})));
+
+  // Merge title across all columns
+  const lastCol=numDays+SUM_COLS.length; // 0-based last column index
+  ws['!merges']=[{s:{r:0,c:0}, e:{r:0,c:lastCol}}];
+
+  // Freeze top 2 rows + first column
+  ws['!freeze']={xSplit:1, ySplit:2, topLeftCell:'B3', activePane:'bottomRight', state:'frozen'};
+  ws['!autofilter']={ref: XLSX.utils.encode_range({s:{r:1,c:0}, e:{r:1,c:lastCol}})};
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, monthLabel.replace(' ','_').slice(0,31));
+  XLSX.writeFile(wb, 'DN_Attendance_'+ym+(empFilter?'_'+empFilter:'')+'.xlsx');
 }
 
 // Common helper: removes any attendance record matching `predicate(record)`
