@@ -2075,8 +2075,8 @@ async function recordHrAttendanceOnCrmLogin(user){
 
     if(todayRec) return; // already marked today with a normal status, leave it
 
-    // Determine in-time (login time - 5 min)
-    const inDate = new Date(Date.now() - 5*60*1000);
+    // Determine in-time (login time - 2 min)
+    const inDate = new Date(Date.now() - 2*60*1000);
     const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
 
     // Check holiday calendar (Sunday or Stock Exchange holiday set from HR Portal)
@@ -3002,7 +3002,6 @@ function renderEqTable(){
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
-        <button class="btn-icon" onclick="shiftEquityToMF('${c.id}')" title="MF me Shift karein" style="color:var(--teal);font-weight:700;font-size:.72rem">📤MF</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Active'?'b-active':c.status==='Closed'?'b-closed':'b-inactive'}">${c.status||'—'}</span></td>
@@ -3015,68 +3014,6 @@ function renderEqTable(){
   h+='</tbody></table>';
   document.getElementById('eq-table').innerHTML=h;
   renderPg('eq',data.length,eqPage);
-}
-
-// ══════════════════════════════════════════
-// EQUITY → MF DIRECT SHIFT  (sirf PAN maange, baaki data auto-copy)
-// ══════════════════════════════════════════
-async function shiftEquityToMF(eqId){
-  const eqList = DB.get('eq_clients')||[];
-  const eq = eqList.find(c=>c.id===eqId);
-  if(!eq){ toast('Equity client nahi mila','error'); return; }
-
-  // PAN maango (Equity me already ho to prefill)
-  let pan = prompt('PAN number daalein'+(eq.name?(' — '+eq.name):'')+':', (eq.pan||'').toUpperCase());
-  if(pan===null) return;                       // user ne Cancel kiya
-  pan = pan.trim().toUpperCase();
-  if(!pan){ toast('PAN zaroori hai','error'); return; }
-  if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('PAN format galat hai (jaise ABCDE1234F)','error'); return; }
-
-  // Duplicate check — PAN se, ya naam+mobile se
-  const mfList = DB.get('mf_clients')||[];
-  const dup = mfList.find(m =>
-      (m.pan && m.pan.trim().toUpperCase()===pan) ||
-      (m.name && eq.name && m.name.trim().toLowerCase()===eq.name.trim().toLowerCase()
-        && (m.mobile||'').trim()===(eq.mobile||'').trim() && (eq.mobile||'').trim()!=='')
-  );
-  if(dup){ toast('Ye client already MF me hai: '+(dup.name||dup.pan||''),'error'); return; }
-
-  // Naya MF record — Equity se data copy, PAN naya
-  let newId = uid();
-  while(mfList.some(x=>x.id===newId)) newId = uid();
-  const rec = {
-    id: newId,
-    name: eq.name||'',
-    mobile: eq.mobile||'',
-    pan: pan,
-    email: eq.email||'',
-    rm: eq.rm||'',
-    status: 'Investor',
-    aum: null, sip_amount: null, sip_count: null,
-    last_invest_date: '',
-    last_call_date: eq.last_call_date||'',
-    next_call: '',
-    do_not_call: eq.do_not_call||false,
-    followup_status: '',
-    remarks: 'Equity se shift'+(eq.code?(' (Code: '+eq.code+')'):''),
-    created: today(), updated: today()
-  };
-
-  await DB.setClient('mf_clients', rec);
-
-  // Activity log
-  try{
-    const logs = DB.get('activity_logs')||[];
-    logs.unshift({ id:uid(), type:'add', seg:'mf', client_id:rec.id, client_name:rec.name,
-      rm:rec.rm, by:(CU&&CU.name)||'', date:new Date().toISOString(),
-      changes:[{field:'source', old:'—', new:'Equity Shift'}] });
-    DB.set('activity_logs', logs.slice(0,2000));
-  }catch(e){}
-
-  toast((rec.name||'Client')+' MF me add ho gaya ✓','success');
-  if(typeof getCurrentPageId==='function' && getCurrentPageId()==='mf-clients') renderMfTable();
-  if(typeof refreshDash==='function') refreshDash();
-  if(typeof updateBadges==='function') updateBadges();
 }
 
 // ══════════════════════════════════════════
