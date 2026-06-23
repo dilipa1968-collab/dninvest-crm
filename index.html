@@ -39,7 +39,114 @@ const firebaseConfig = {
 };
 try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
 </script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script>
+/* ─────────────────────────────────────────────────────────────────────────────
+   DN shared styled-Excel export engine (shared by CRM + HR Portal).
+   Produces colourful, consistent .xlsx files: navy title bar, teal header,
+   zebra-striped rows, thin borders, right-aligned money with ₹ formatting,
+   optional bold TOTAL row, frozen header + autofilter.
+
+     dnXlsx(filename, title, columns, rows, totalRow?)         // single sheet
+     dnXlsxBook(filename, [ {name,title,columns,rows,totalRow}, ... ])  // multi
+     dnStatusColor(value) -> {bg,font} | null    // green/red/amber by keyword
+
+   columns: [{header, width?, align?, money?, num?, color?:fn(value,row)}]
+   rows / totalRow: arrays of raw values aligned to columns.
+   ───────────────────────────────────────────────────────────────────────────── */
+window.dnStatusColor = function(v){
+  v = String(v==null?'':v).toLowerCase();
+  if(!v) return null;
+  if(/approv|present|paid|active|attended|matched|yes\b|complete/.test(v)) return {bg:'FFC6EFCE', font:'FF006100'};
+  if(/declin|absent|reject|unmatch|fail|overdue|\bno\b|cancel/.test(v))     return {bg:'FFFFC7CE', font:'FF9C0006'};
+  if(/pending|wait|hold|partial|late|due/.test(v))                          return {bg:'FFFFEB9C', font:'FF9C6500'};
+  return null;
+};
+
+window.dnXlsxBook = function(filename, sheets){
+  if(typeof XLSX==='undefined'){ alert('Excel library not loaded — please check your internet and try again.'); return; }
+  const wb = XLSX.utils.book_new();
+  const thin   = {style:'thin', color:{rgb:'FFD9DEE6'}};
+  const border = {top:thin, bottom:thin, left:thin, right:thin};
+  const num = v => (v===''||v==null) ? null : (isNaN(Number(String(v).replace(/[₹,%\s]/g,''))) ? v : Number(String(v).replace(/[₹,%\s]/g,'')));
+
+  sheets.forEach(sh=>{
+    const cols  = sh.columns || [];
+    const ncol  = cols.length;
+    const aoa   = [];
+
+    // Row 0 — title bar (merged, navy)
+    aoa.push([{ v: sh.title || sh.name || 'Report', s:{
+      font:{bold:true, sz:14, color:{rgb:'FFFFFFFF'}},
+      fill:{fgColor:{rgb:'FF1F3864'}},
+      alignment:{horizontal:'left', vertical:'center'}
+    }}]);
+
+    // Row 1 — header (teal)
+    aoa.push(cols.map(c=>({ v:c.header, s:{
+      font:{bold:true, color:{rgb:'FFFFFFFF'}},
+      fill:{fgColor:{rgb:'FF2E5A87'}},
+      alignment:{horizontal:'center', vertical:'center', wrapText:true},
+      border
+    }})));
+
+    // Data rows — zebra + per-column type/colour
+    (sh.rows||[]).forEach((r, ri)=>{
+      const zebra = ri%2===1 ? 'FFF4F7FB' : 'FFFFFFFF';
+      aoa.push(cols.map((c, ci)=>{
+        const raw = r[ci];
+        const isNum = c.num || c.money;
+        let v = isNum ? num(raw) : (raw==null ? '' : raw);
+        const align = c.align || (isNum ? 'right' : 'left');
+        let bg = zebra, font = 'FF222222';
+        if(typeof c.color==='function'){
+          const cc = c.color(raw, r);
+          if(cc){ bg = cc.bg||bg; font = cc.font||font; }
+        }
+        const cell = { v, s:{
+          alignment:{horizontal:align, vertical:'center'},
+          border, font:{color:{rgb:font}}, fill:{fgColor:{rgb:bg}}
+        }};
+        if(c.money && typeof v==='number') cell.z = '"₹"#,##0';
+        else if(isNum && typeof v==='number') cell.z = '#,##0';
+        return cell;
+      }));
+    });
+
+    // TOTAL row (bold, medium top border)
+    if(sh.totalRow){
+      aoa.push(cols.map((c, ci)=>{
+        const raw = sh.totalRow[ci];
+        const isNum = c.num || c.money;
+        let v = isNum ? num(raw) : (raw==null ? '' : raw);
+        const cell = { v, s:{
+          font:{bold:true, color:{rgb:'FF1F3864'}},
+          fill:{fgColor:{rgb:'FFE3E9F2'}},
+          alignment:{horizontal:c.align || (isNum?'right':'left'), vertical:'center'},
+          border:{...border, top:{style:'medium', color:{rgb:'FF1F3864'}}}
+        }};
+        if(c.money && typeof v==='number') cell.z = '"₹"#,##0';
+        else if(isNum && typeof v==='number') cell.z = '#,##0';
+        return cell;
+      }));
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']   = cols.map(c=>({wch: c.width || Math.max(10, String(c.header||'').length + 2)}));
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0, c:Math.max(0,ncol-1)}}];
+    ws['!rows']   = [{hpt:26},{hpt:22}];
+    ws['!freeze'] = {xSplit:0, ySplit:2, topLeftCell:'A3', activePane:'bottomRight', state:'frozen'};
+    if(ncol>0) ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:1,c:0}, e:{r:1,c:ncol-1}})};
+    XLSX.utils.book_append_sheet(wb, ws, String(sh.name||'Sheet').replace(/[\\/?*\[\]:]/g,' ').slice(0,31) || 'Sheet');
+  });
+
+  XLSX.writeFile(wb, filename);
+};
+
+window.dnXlsx = function(filename, title, columns, rows, totalRow){
+  window.dnXlsxBook(filename, [{name:(title||'Sheet'), title, columns, rows, totalRow:totalRow||null}]);
+};
+</script>
 <style>
 :root{
   --navy:#1a2744;--navy2:#243356;--navy3:#2d4a8a;
@@ -5193,15 +5300,22 @@ function deleteMfTxnEntry(id){
 function exportMfTxns(){
   const entries=getFilteredMfTxns();
   if(entries.length===0){ toast('No data to export','error'); return; }
-  const rows=[['Date','Client Name','RM','Type','Fund Name','Amount','Remarks','Status','Cross-Check Remark']];
-  entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,e.remarks||'',e.status||'Pending',e.cross_remark||'']));
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='MF_Transactions_'+today()+'.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  const cols=[
+    {header:'Date', width:12},
+    {header:'Client Name', width:24},
+    {header:'RM', width:14},
+    {header:'Type', width:14},
+    {header:'Fund Name', width:28},
+    {header:'Amount', width:14, money:true},
+    {header:'Remarks', width:26},
+    {header:'Status', width:12, color:dnStatusColor, align:'center'},
+    {header:'Cross-Check Remark', width:22}
+  ];
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,e.remarks||'',e.status||'Pending',e.cross_remark||'']);
+  const totAmt=entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const totalRow=['TOTAL','','','','',totAmt,'', '', ''];
+  dnXlsx('MF_Transactions_'+today()+'.xlsx', 'MF Transactions — '+today(), cols, rows, totalRow);
+  toast('Export done!','success');
 }
 
 // ══════════════════════════════════════════
@@ -5432,15 +5546,17 @@ function deleteEqDematEntry(id){
 function exportEqDemat(){
   const entries=getFilteredEqDemat();
   if(entries.length===0){ toast('No data to export','error'); return; }
-  const rows=[['Date','Client Name','Client Code','RM','Remarks','Status']];
-  entries.forEach(e=>rows.push([e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.remarks||'',e.status||'Pending']));
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='Demat_Account_Opening_'+today()+'.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  const cols=[
+    {header:'Date', width:12},
+    {header:'Client Name', width:24},
+    {header:'Client Code', width:14},
+    {header:'RM', width:14},
+    {header:'Remarks', width:28},
+    {header:'Status', width:12, color:dnStatusColor, align:'center'}
+  ];
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.remarks||'',e.status||'Pending']);
+  dnXlsx('Demat_Account_Opening_'+today()+'.xlsx', 'Demat Account Opening — '+today(), cols, rows);
+  toast('Export done!','success');
 }
 
 // ══════════════════════════════════════════
@@ -5765,7 +5881,7 @@ function reportCard(r){
 let _reportSort = {col:null, dir:1};
 
 function showReport(title, headers, rows){
-  currentReportData={headers,rows};
+  currentReportData={title,headers,rows};
   _reportSort = {col:null, dir:1};
   document.getElementById('reportModalTitle').textContent=title;
   renderReportTable();
@@ -5805,11 +5921,18 @@ function renderReportTable(){
 }
 
 function exportReportCSV(){
-  const {headers,rows}=currentReportData;
-  const csv=[headers,...rows.map(r=>r.map(upc))].map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-  a.download='report_'+Date.now()+'.csv'; a.click();
+  const {title,headers,rows}=currentReportData;
+  if(!headers||!headers.length){ toast('No data to export','error'); return; }
+  const moneyRe=/aum|sip|revenue|brokerage|turnover|amount|asset|business|salary|value/i;
+  const cols=headers.map(h=>{
+    const money=moneyRe.test(h);
+    return {header:h, money, align: money?'right':'left',
+            color: /status/i.test(h)?dnStatusColor:undefined};
+  });
+  const cleanRows=rows.map(r=>r.map((c,i)=> cols[i].money ? c : (c==null?'':c)));
+  const name=(title||'Report').replace(/[^a-z0-9]+/gi,'_').replace(/^_|_$/g,'').slice(0,40)||'Report';
+  dnXlsx(name+'_'+today()+'.xlsx', title||'Report', cols, cleanRows);
+  toast('Export done!','success');
 }
 
 function rmEqReport(){
@@ -6079,16 +6202,30 @@ function rmPerf(){
 function exportCSV(seg){
   const clients=seg==='equity'?getActiveEqClients():getMyMfClients();
   if(!clients.length){ toast('No data to export','error'); return; }
-  const headers=seg==='equity'
-    ?['Code','Name','Mobile','Email','RM','Status','Asset Value','Revenue','Last Trade Date','Last Trade Month','Last Call Date','Next Call Date','Follow-up Status','Remarks']
-    :['Name','Mobile','Email','RM','Status','AUM','SIP Amount','SIP Count','Last Invest Date','Last Call Date','Next Call Date','Follow-up Status','Remarks'];
-  const rows=seg==='equity'
-    ?clients.map(c=>[c.code||'',c.name,c.mobile||'',c.email||'',c.rm,c.status,c.asset_value||'',c.revenue||'',c.last_trade_date||'',c.last_trade_month||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||''])
-    :clients.map(c=>[c.name,c.mobile||'',c.email||'',c.rm,c.status,c.aum||'',c.sip_amount||'',c.sip_count||'',c.last_invest_date||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
-  const csv=[headers,...rows.map(r=>r.map(upc))].map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-  a.download=(seg==='equity'?'equity_clients_':'mf_investors_')+today()+'.csv'; a.click();
+  let cols, rows, title, fname;
+  if(seg==='equity'){
+    cols=[
+      {header:'Code',width:12},{header:'Name',width:22},{header:'Mobile',width:13},
+      {header:'Email',width:24},{header:'RM',width:14},{header:'Status',width:12,align:'center',color:dnStatusColor},
+      {header:'Asset Value',width:14,money:true},{header:'Revenue',width:13,money:true},
+      {header:'Last Trade Date',width:14},{header:'Last Trade Month',width:14},
+      {header:'Last Call Date',width:14},{header:'Next Call Date',width:14},
+      {header:'Follow-up Status',width:16},{header:'Remarks',width:26}
+    ];
+    rows=clients.map(c=>[c.code||'',c.name,c.mobile||'',c.email||'',c.rm,c.status,c.asset_value||0,c.revenue||0,c.last_trade_date||'',c.last_trade_month||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
+    title='Equity Clients'; fname='equity_clients_';
+  } else {
+    cols=[
+      {header:'Name',width:22},{header:'Mobile',width:13},{header:'Email',width:24},
+      {header:'RM',width:14},{header:'Status',width:12,align:'center',color:dnStatusColor},
+      {header:'AUM',width:14,money:true},{header:'SIP Amount',width:13,money:true},{header:'SIP Count',width:10,num:true},
+      {header:'Last Invest Date',width:14},{header:'Last Call Date',width:14},
+      {header:'Next Call Date',width:14},{header:'Follow-up Status',width:16},{header:'Remarks',width:26}
+    ];
+    rows=clients.map(c=>[c.name,c.mobile||'',c.email||'',c.rm,c.status,c.aum||0,c.sip_amount||0,c.sip_count||0,c.last_invest_date||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
+    title='MF Investors'; fname='mf_investors_';
+  }
+  dnXlsx(fname+today()+'.xlsx', title+' — '+today(), cols, rows);
   toast('Export done!','success');
 }
 
@@ -8274,8 +8411,6 @@ function renderActivityLog(){
 function exportActivityLog(){
   const tbl=document.getElementById('al-table');
   if(!tbl||!tbl.rows.length){ toast('No data to export','error'); return; }
-  const wb=XLSX.utils.book_new();
-  const rows=[['Date & Time','Type','Client Name','Segment','RM','By','Field','Old Value','New Value','Remarks']];
   const isAdmin = CU && CU.role==='admin';
   const callLogs=(DB.get('call_logs')||[]).map(l=>({type:'call',seg:l.seg||'equity',client_name:l.client_name||l.name||'',rm:l.rm||'',by:l.by||l.rm||'',date:l.date||'',call_status:l.status||'',next_call:l.next_call||'',remarks:l.remarks||'',changes:[]}));
   const editLogs=DB.get('activity_logs')||[];
@@ -8284,6 +8419,7 @@ function exportActivityLog(){
     const myRMs=[...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])].map(d=>d.trim().toUpperCase());
     all=all.filter(l=>myRMs.includes((l.rm||'').trim().toUpperCase()));
   }
+  const rows=[];
   all.forEach(l=>{
     const dt=l.date?new Date(l.date).toLocaleString('en-IN'):'';
     if(l.type==='call'){
@@ -8296,10 +8432,19 @@ function exportActivityLog(){
       });
     }
   });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:20},{wch:14},{wch:24},{wch:10},{wch:12},{wch:12},{wch:18},{wch:20},{wch:20},{wch:30}];
-  XLSX.utils.book_append_sheet(wb,ws,'Activity Log');
-  XLSX.writeFile(wb,`Activity_Log_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const typeColor=v=>{ v=String(v||'').toLowerCase();
+    if(v==='new client') return {bg:'FFC6EFCE',font:'FF006100'};
+    if(v==='edited')     return {bg:'FFBDD7EE',font:'FF1F4E78'};
+    if(v==='call log')   return {bg:'FFEDEDED',font:'FF555555'};
+    return null; };
+  const cols=[
+    {header:'Date & Time',width:20},{header:'Type',width:14,align:'center',color:typeColor},
+    {header:'Client Name',width:24},{header:'Segment',width:10,align:'center'},
+    {header:'RM',width:12},{header:'By',width:12},{header:'Field',width:18},
+    {header:'Old Value',width:20},{header:'New Value',width:20},{header:'Remarks',width:30}
+  ];
+  dnXlsx(`Activity_Log_${new Date().toISOString().slice(0,10)}.xlsx`, 'Activity Log — '+new Date().toLocaleDateString('en-IN'), cols, rows);
+  toast('Export done!','success');
 }
 
 // ══════════════════════════════════════════
@@ -8634,20 +8779,33 @@ function renderBrokeragePage(){
 function brkExport(){
   const r=brkCompute();
   if(!r){ toast('Please upload a file first','error'); return; }
-  const wb=XLSX.utils.book_new();
-  const clientData=[
-    ['Client Name','PAN','Client Code','RM','MF Brokerage','Equity Brokerage','Total Brokerage','New Business (MF)','Equity Turnover','Matched'],
-    ...r.clientRows.map(x=>[x.clientName,x.pan,x.code,x.rm,Math.round(x.mfBrokerage*100)/100,Math.round(x.eqBrokerage*100)/100,Math.round(x.totalBrokerage*100)/100,Math.round(x.newBusiness*100)/100,Math.round(x.eqTurnover*100)/100,x.matched?'Yes':'No']),
-    [],
-    ['TOTAL','','','',Math.round(r.totals.mfBrokerage*100)/100,Math.round(r.totals.eqBrokerage*100)/100,Math.round(r.totals.totalBrokerage*100)/100,Math.round(r.totals.newBusiness*100)/100,Math.round(r.totals.eqTurnover*100)/100,'']
+  const R=x=>Math.round((x||0)*100)/100;
+
+  const clientCols=[
+    {header:'Client Name',width:24},{header:'PAN',width:14},{header:'Client Code',width:14},
+    {header:'RM',width:14},{header:'MF Brokerage',width:14,money:true},{header:'Equity Brokerage',width:14,money:true},
+    {header:'Total Brokerage',width:14,money:true},{header:'New Business (MF)',width:15,money:true},
+    {header:'Equity Turnover',width:15,money:true},{header:'Matched',width:10,align:'center',color:dnStatusColor}
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clientData), 'Client-wise');
-  const rmData=[
-    ['RM','No. of Clients','MF Brokerage','Equity Brokerage','Total Brokerage','New Business (MF)','Equity Turnover'],
-    ...r.rmRows.map(x=>[x.rm,x.clientCount,Math.round(x.mfBrokerage*100)/100,Math.round(x.eqBrokerage*100)/100,Math.round(x.totalBrokerage*100)/100,Math.round(x.newBusiness*100)/100,Math.round(x.eqTurnover*100)/100])
+  const clientRows=r.clientRows.map(x=>[x.clientName,x.pan,x.code,x.rm,R(x.mfBrokerage),R(x.eqBrokerage),R(x.totalBrokerage),R(x.newBusiness),R(x.eqTurnover),x.matched?'Yes':'No']);
+  const clientTotal=['TOTAL','','','',R(r.totals.mfBrokerage),R(r.totals.eqBrokerage),R(r.totals.totalBrokerage),R(r.totals.newBusiness),R(r.totals.eqTurnover),''];
+
+  const rmCols=[
+    {header:'RM',width:16},{header:'No. of Clients',width:12,num:true},
+    {header:'MF Brokerage',width:14,money:true},{header:'Equity Brokerage',width:14,money:true},
+    {header:'Total Brokerage',width:14,money:true},{header:'New Business (MF)',width:15,money:true},
+    {header:'Equity Turnover',width:15,money:true}
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rmData), 'RM-wise');
-  XLSX.writeFile(wb, `Brokerage_Summary_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const rmRows=r.rmRows.map(x=>[x.rm,x.clientCount,R(x.mfBrokerage),R(x.eqBrokerage),R(x.totalBrokerage),R(x.newBusiness),R(x.eqTurnover)]);
+  const tRm=r.rmRows.reduce((a,x)=>({c:a.c+x.clientCount,mf:a.mf+x.mfBrokerage,eq:a.eq+x.eqBrokerage,tot:a.tot+x.totalBrokerage,nb:a.nb+x.newBusiness,et:a.et+x.eqTurnover}),{c:0,mf:0,eq:0,tot:0,nb:0,et:0});
+  const rmTotal=['TOTAL',tRm.c,R(tRm.mf),R(tRm.eq),R(tRm.tot),R(tRm.nb),R(tRm.et)];
+
+  const dt=new Date().toLocaleDateString('en-IN');
+  dnXlsxBook(`Brokerage_Summary_${new Date().toISOString().slice(0,10)}.xlsx`, [
+    {name:'Client-wise', title:'Brokerage Summary (Client-wise) — '+dt, columns:clientCols, rows:clientRows, totalRow:clientTotal},
+    {name:'RM-wise',     title:'Brokerage Summary (RM-wise) — '+dt,     columns:rmCols,     rows:rmRows,     totalRow:rmTotal}
+  ]);
+  toast('Export done!','success');
 }
 
 </script>
