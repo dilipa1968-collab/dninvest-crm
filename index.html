@@ -1093,8 +1093,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <input type="text" id="eqdemat-client-selected" placeholder="No client selected" readonly style="background:#f7f7f7">
             </div>
             <div class="form-field" style="min-width:120px">
-              <label>RM</label>
-              <input type="text" id="eqdemat-client-rm" readonly style="background:#f7f7f7">
+              <label>Trading RM (brokerage)</label>
+              <input type="text" id="eqdemat-client-rm" readonly style="background:#f7f7f7" title="Client's RM — gets brokerage incentive">
+            </div>
+            <div class="form-field" style="min-width:140px">
+              <label>Opening RM (gets opening bonus)</label>
+              <select id="eqdemat-opening-rm" title="RM who opened the account — gets the demat opening incentive"></select>
             </div>
           </div>
           <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
@@ -5675,6 +5679,14 @@ function renderEqDematPage(){
     rmFilter.innerHTML='<option value="">All RMs</option>'+eqRMs.map(r=>`<option>${r}</option>`).join('');
     if(CU.role!=='admin'){ rmFilter.value=CU.name; rmFilter.disabled=true; }
   }
+  // Populate Opening RM dropdown (who opened the account → gets opening bonus)
+  const openSel=document.getElementById('eqdemat-opening-rm');
+  if(openSel){
+    const allRMs = CU.role==='admin' ? getSegRMs('equity') : [CU.name];
+    openSel.innerHTML=allRMs.map(r=>`<option>${r}</option>`).join('');
+    openSel.value = CU.name && allRMs.includes(CU.name) ? CU.name : (allRMs[0]||'');
+    if(CU.role!=='admin') openSel.disabled=true;
+  }
 
   renderEqDematTable();
 }
@@ -5712,6 +5724,14 @@ function selectEqDematClient(clientId){
   eqDematSelectedClient = {id:c.id, name:c.name, rm:c.rm||''};
   document.getElementById('eqdemat-client-selected').value=c.name;
   document.getElementById('eqdemat-client-rm').value=c.rm||'—';
+  // Admin: default the Opening RM to the client's RM (can change if a different RM opened it)
+  if(CU.role==='admin'){
+    const openSel=document.getElementById('eqdemat-opening-rm');
+    if(openSel && c.rm){
+      if(![...openSel.options].some(o=>o.value===c.rm)) openSel.add(new Option(c.rm,c.rm));
+      openSel.value=c.rm;
+    }
+  }
   document.getElementById('eqdemat-client-search').value='';
   if(c.code) document.getElementById('eqdemat-code').value=c.code;
   const out=document.getElementById('eqdemat-client-results');
@@ -5735,6 +5755,9 @@ function saveEqDematEntry(){
 
   if(!date){ toast('Please enter the date','error'); return; }
 
+  const openingRm=(document.getElementById('eqdemat-opening-rm')?.value||CU.name||'').trim();
+  if(!openingRm){ toast('Please select the Opening RM','error'); return; }
+
   const eqEntries=getEqDematEntries();
   eqEntries.push({
     id: uid(),
@@ -5742,6 +5765,7 @@ function saveEqDematEntry(){
     client_name: eqDematSelectedClient.name,
     client_code: code,
     rm: eqDematSelectedClient.rm,
+    opening_rm: openingRm,
     type: 'Open Demat Account',
     date, remarks,
     mobile: '',
@@ -5766,9 +5790,10 @@ function saveEqDematEntry(){
 
 function getFilteredEqDemat(){
   let entries=getEqDematEntries();
-  // RM scoping — non-admin only sees their own entries
+  const me=(CU.name||'').trim().toLowerCase();
+  // RM scoping — non-admin sees entries where they are the trading RM OR the opening RM
   if(CU.role!=='admin'){
-    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===me||(e.opening_rm||'').trim().toLowerCase()===me);
   }
   const q=(document.getElementById('eqdemat-search')?.value||'').trim().toLowerCase();
   const rmF=document.getElementById('eqdemat-rm-filter')?.value||'';
@@ -5776,8 +5801,8 @@ function getFilteredEqDemat(){
   const fromD=document.getElementById('eqdemat-from-date')?.value||'';
   const toD=document.getElementById('eqdemat-to-date')?.value||'';
 
-  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.client_code||'').toLowerCase().includes(q));
-  if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
+  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.opening_rm||'').toLowerCase().includes(q)||(e.client_code||'').toLowerCase().includes(q));
+  if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF||(e.opening_rm||'')===rmF);
   if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
@@ -5798,7 +5823,7 @@ function renderEqDematTable(){
   }
 
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th><th>RM</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th><th>Trading RM</th><th>Opening RM</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const status = e.status||'Pending';
@@ -5807,6 +5832,7 @@ function renderEqDematTable(){
           <td>${escapeHtml(e.client_name||'—')}</td>
           <td>${escapeHtml(e.client_code||'—')}</td>
           <td>${escapeHtml(e.rm||'—')}</td>
+          <td><span style="background:var(--teal,#0d9488);color:#fff;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:600">${escapeHtml(e.opening_rm||e.rm||'—')}</span></td>
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
@@ -5873,11 +5899,12 @@ function exportEqDemat(){
     {header:'Date', width:12},
     {header:'Client Name', width:24},
     {header:'Client Code', width:14},
-    {header:'RM', width:14},
+    {header:'Trading RM', width:14},
+    {header:'Opening RM', width:14},
     {header:'Remarks', width:28},
     {header:'Status', width:12, color:dnStatusColor, align:'center'}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.remarks||'',e.status||'Pending']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.opening_rm||e.rm||'',e.remarks||'',e.status||'Pending']);
   dnXlsx('Demat_Account_Opening_'+today()+'.xlsx', 'Demat Account Opening — '+today(), cols, rows);
   toast('Export done!','success');
 }
