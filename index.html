@@ -1871,38 +1871,40 @@ const DB = {
     try{ localStorage.setItem('dninvest_'+key,JSON.stringify(val)); }catch(e){}
   },
   // Append one entry to the shared append-only call_logs array WITHOUT clobbering
-  // other RMs' concurrent entries. Uses Firestore arrayUnion (atomic server-side
-  // append); falls back to re-fetch + merge-by-id if arrayUnion is unavailable.
+  // other RMs' concurrent entries. Uses a Firestore transaction (re-fetch latest,
+  // merge this entry in by id, write back) — the same proven pattern as setClientsBulk.
   _clWriting:0,
-  addCallLog(entry){
+  async addCallLog(entry){
     // 1) optimistic local append
     let local=[];
     try{ local=JSON.parse(localStorage.getItem('dninvest_call_logs')||'[]'); }catch(e){ local=[]; }
     if(!local.some(x=>x.id===entry.id)) local.push(entry);
     try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(local)); }catch(e){}
-    // 2) atomic push to Firestore
+    // 2) transactional merge-write to Firestore (no clobber, retries on conflict)
     if(typeof fdb==='undefined') return;
     this._clWriting++;
     try{
-      if(typeof firebase!=='undefined' && firebase.firestore && firebase.firestore.FieldValue){
-        fdb.collection('crm_data').doc('call_logs').set({
-          data: firebase.firestore.FieldValue.arrayUnion(entry),
-          updated: new Date().toISOString()
-        },{merge:true})
-        .then(()=>{ this._clWriting=Math.max(0,this._clWriting-1); console.log('Call log synced'); })
-        .catch(e=>{ this._clWriting=Math.max(0,this._clWriting-1); console.log('Call log sync error:',e); toast('Call sync error: '+e.message,'error'); });
-      } else {
-        // Fallback: re-fetch latest, merge by id, write back
-        fdb.collection('crm_data').doc('call_logs').get().then(doc=>{
-          const server=(doc.exists&&doc.data()&&doc.data().data)?doc.data().data:[];
-          const byId={}; [...server,...local].forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-          const merged=Object.values(byId);
-          return fdb.collection('crm_data').doc('call_logs').set({data:merged,updated:new Date().toISOString()});
-        })
-        .then(()=>{ this._clWriting=Math.max(0,this._clWriting-1); })
-        .catch(e=>{ this._clWriting=Math.max(0,this._clWriting-1); console.log('Call log sync error:',e); });
+      const docRef = fdb.collection('crm_data').doc('call_logs');
+      let finalData = null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        const byId={};
+        latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+        if(entry&&entry.id) byId[entry.id]=entry;   // add/replace this entry
+        finalData = Object.values(byId);
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){
+        try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
       }
-    }catch(e){ this._clWriting=Math.max(0,this._clWriting-1); }
+      console.log('Call log transaction-synced');
+    }catch(e){
+      console.log('Call log sync error:',e);
+      toast('Call sync error: '+(e&&e.message?e.message:e),'error');
+    }finally{
+      this._clWriting=Math.max(0,this._clWriting-1);
+    }
   },
   // Save/update a single client record (eq_clients or mf_clients).
   // Merge-on-write: re-fetch latest array from Firestore, merge this one
@@ -1999,7 +2001,16 @@ const DB = {
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
           if(Array.isArray(d)){
-            if(d.length>0){
+            if(key==='call_logs'){
+              // append-only & shared: merge server + any local-only entries by id
+              let existing=[];
+              try{ existing=JSON.parse(localStorage.getItem('dninvest_call_logs')||'[]'); }catch(e){ existing=[]; }
+              const byId={};
+              existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+              d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+              localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
+              console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
+            } else if(d.length>0){
               localStorage.setItem('dninvest_'+key,JSON.stringify(d));
               console.log('Loaded from Firebase:',key, d.length,'records');
             }
