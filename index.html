@@ -3266,6 +3266,10 @@ function sortLeadsTable(colIndex){
 
 function renderLeadsTable(){
   let data=getMyLeads();
+  // Count calls logged per lead (from shared call_logs, seg='lead')
+  const _leadCallCounts={};
+  (DB.get('call_logs')||[]).forEach(l=>{ if(l.seg==='lead') _leadCallCounts[l.client_id]=(_leadCallCounts[l.client_id]||0)+1; });
+  window._leadCallCounts=_leadCallCounts;
   const q=(document.getElementById('leads-search')||{value:''}).value.toLowerCase();
   const rm=(document.getElementById('leads-rm')||{value:''}).value;
   const fu=(document.getElementById('leads-followup-filter')||{value:''}).value;
@@ -3284,10 +3288,14 @@ function renderLeadsTable(){
   const rc=document.getElementById('leads-count');
   if(rc) rc.textContent=data.length+' leads';
 
-  const leadsFieldMap={0:'name',1:'mobile',2:'rm',3:'last_call',4:'next_call',5:'followup_status',6:'remarks'};
+  const leadsFieldMap={0:'name',1:'mobile',2:'rm',3:'__calls',4:'last_call',5:'next_call',6:'followup_status',7:'remarks'};
   if(leadsSortField!==null){
     const field=leadsFieldMap[leadsSortField];
     data=data.slice().sort((a,b)=>{
+      if(field==='__calls'){
+        const ca=window._leadCallCounts[a.id]||0, cb=window._leadCallCounts[b.id]||0;
+        return leadsSortDir*(ca-cb);
+      }
       let va=a[field], vb=b[field];
       if(field==='next_call'){
         va=va||''; vb=vb||'';
@@ -3302,7 +3310,7 @@ function renderLeadsTable(){
   }
 
   const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
-  const cols=['Name','Mobile','RM','Last Call','Next Call','Follow-up','Remarks'];
+  const cols=['Name','Mobile','RM','Calls','Last Call','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = leadsSortField===i ? (leadsSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
@@ -3340,12 +3348,16 @@ function renderLeadsTable(){
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
+      <td style="text-align:center">${(window._leadCallCounts[c.id]||0)>0
+          ? `<span onclick="event.stopPropagation();viewLeadCalls('${c.id}')" title="View call history" style="cursor:pointer;background:var(--teal,#0d9488);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;font-weight:700">📞 ${window._leadCallCounts[c.id]}</span>`
+          : '<span style="color:#bbb">—</span>'}</td>
       <td>${fmtDate(c.last_call)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
         <button class="btn-icon" onclick="editLead('${c.id}')" title="Edit">✏️</button>
+        <button class="btn-icon" onclick="logCall('${c.id}','lead')" title="Log Call" style="color:var(--teal)">📞</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         <button class="btn-icon" onclick="convertLead('${c.id}','equity')" title="Convert to Equity Client" style="color:var(--orange)">📈</button>
         <button class="btn-icon" onclick="convertLead('${c.id}','mf')" title="Convert to MF Investor" style="color:var(--teal)">🏦</button>
@@ -4518,8 +4530,72 @@ function di(label,val){
 // ══════════════════════════════════════════
 // CALL LOG
 // ══════════════════════════════════════════
+function viewLeadCalls(id){
+  const leads=DB.get('leads')||[];
+  const c=leads.find(x=>x.id===id);
+  if(!c) return;
+  const logs=(DB.get('call_logs')||[]).filter(l=>l.seg==='lead'&&l.client_id===id)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('viewModalTitle').textContent=c.name+' — Lead Call History';
+  let body=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center">
+      ${c.mobile?`<a href="tel:${c.mobile}" class="btn btn-outline" style="padding:5px 14px">📞 ${c.mobile}</a>`:''}
+      ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px">💬 WhatsApp</a>`:''}
+      <button class="btn btn-gold" style="padding:5px 14px" onclick="closeModal('viewModal');logCall('${id}','lead')">📞 Log Call</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
+      ${di('RM',c.rm)}${di('Last Call',fmtDate(c.last_call))}${di('Next Call',fmtDate(c.next_call))}
+    </div>`;
+  body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
+  if(logs.length){
+    body+=logs.map(l=>`<div class="call-log-item mf">
+      <div class="call-date">${fmtDate(l.date)} — by ${l.by||l.rm||'—'}</div>
+      <div class="call-note">${l.note||'—'}</div>
+      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
+        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
+      </div></div>`).join('');
+  } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
+  document.getElementById('viewModalBody').innerHTML=body;
+  document.getElementById('viewModal').classList.add('open');
+}
+
 function logCall(id,seg){
   currentCallTarget={id,seg};
+  if(seg==='lead'){
+    const leads=DB.get('leads')||[];
+    const c=leads.find(x=>x.id===id);
+    if(!c) return;
+    document.getElementById('callModalTitle').textContent='Log Call — '+c.name+' (Lead)';
+    document.getElementById('callModalBody').innerHTML=`
+      <div class="form-row">
+        <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${today()}" max="${today()}"></div>
+        <div class="form-field"><label>Call Status</label><select id="cl_status">
+          <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option></select></div>
+      </div>
+      <div class="form-row full">
+        <div class="form-field"><label>Call Notes</label>
+          <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}" min="${today()}"></div>
+        <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">
+          <option ${c.followup_status==='Pending'?'selected':''}>Pending</option>
+          <option ${c.followup_status==='Done'?'selected':''}>Done</option>
+          <option ${c.followup_status==='Not Required'?'selected':''}>Not Required</option>
+          <option ${c.followup_status==='Not Interested'?'selected':''}>Not Interested</option>
+          <option ${c.followup_status==='Call Not Received'?'selected':''}>Call Not Received</option>
+          <option ${c.followup_status==='Call Not Connected'?'selected':''}>Call Not Connected</option>
+          <option ${c.followup_status==='Call After Some Time'?'selected':''}>Call After Some Time</option>
+          <option ${c.followup_status==='Interested In SIP'?'selected':''}>Interested In SIP</option>
+          <option ${c.followup_status==='Interested In Lumpsum'?'selected':''}>Interested In Lumpsum</option>
+          <option ${c.followup_status==='Interested In Other Product'?'selected':''}>Interested In Other Product</option>
+          <option ${c.followup_status==='Open Demat Account'?'selected':''}>Open Demat Account</option>
+          <option ${c.followup_status==='Come To Office'?'selected':''}>Come To Office</option>
+        </select></div>
+      </div>`;
+    document.getElementById('callModal').classList.add('open');
+    return;
+  }
   const clients=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
   const c=clients.find(x=>x.id===id);
   if(!c) return;
@@ -4554,6 +4630,34 @@ async function saveCallLog(){
   const note=document.getElementById('cl_note').value.trim();
   const nextCall=document.getElementById('cl_next').value;
   const fuStatus=document.getElementById('cl_followup').value;
+
+  if(seg==='lead'){
+    const leads=DB.get('leads')||[];
+    const lead=leads.find(x=>x.id===id);
+    const logs=DB.get('call_logs')||[];
+    logs.push({
+      id:uid(), client_id:id, seg:'lead', date, status, note,
+      next_call:nextCall, created:today(),
+      client_name: lead?lead.name:'',
+      rm: lead?lead.rm:'',
+      remarks: note,
+      by: CU.name
+    });
+    DB.set('call_logs',logs);
+    if(lead){
+      lead.last_call=date;
+      lead.next_call=nextCall;
+      lead.followup_status=fuStatus;
+      if(note) lead.remarks=note;
+      lead.updated=today();
+      await DB.setClient('leads',lead);
+    }
+    closeModal('callModal');
+    toast('Call logged!','success');
+    renderLeadsTable();
+    updateBadges();
+    return;
+  }
 
   const clients2=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
   const clientObj=clients2.find(x=>x.id===id);
