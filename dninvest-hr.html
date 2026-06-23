@@ -9,6 +9,113 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
+/* ─────────────────────────────────────────────────────────────────────────────
+   DN shared styled-Excel export engine (shared by CRM + HR Portal).
+   Produces colourful, consistent .xlsx files: navy title bar, teal header,
+   zebra-striped rows, thin borders, right-aligned money with ₹ formatting,
+   optional bold TOTAL row, frozen header + autofilter.
+
+     dnXlsx(filename, title, columns, rows, totalRow?)         // single sheet
+     dnXlsxBook(filename, [ {name,title,columns,rows,totalRow}, ... ])  // multi
+     dnStatusColor(value) -> {bg,font} | null    // green/red/amber by keyword
+
+   columns: [{header, width?, align?, money?, num?, color?:fn(value,row)}]
+   rows / totalRow: arrays of raw values aligned to columns.
+   ───────────────────────────────────────────────────────────────────────────── */
+window.dnStatusColor = function(v){
+  v = String(v==null?'':v).toLowerCase();
+  if(!v) return null;
+  if(/approv|present|paid|active|attended|matched|yes\b|complete/.test(v)) return {bg:'FFC6EFCE', font:'FF006100'};
+  if(/declin|absent|reject|unmatch|fail|overdue|\bno\b|cancel/.test(v))     return {bg:'FFFFC7CE', font:'FF9C0006'};
+  if(/pending|wait|hold|partial|late|due/.test(v))                          return {bg:'FFFFEB9C', font:'FF9C6500'};
+  return null;
+};
+
+window.dnXlsxBook = function(filename, sheets){
+  if(typeof XLSX==='undefined'){ alert('Excel library not loaded — please check your internet and try again.'); return; }
+  const wb = XLSX.utils.book_new();
+  const thin   = {style:'thin', color:{rgb:'FFD9DEE6'}};
+  const border = {top:thin, bottom:thin, left:thin, right:thin};
+  const num = v => (v===''||v==null) ? null : (isNaN(Number(String(v).replace(/[₹,%\s]/g,''))) ? v : Number(String(v).replace(/[₹,%\s]/g,'')));
+
+  sheets.forEach(sh=>{
+    const cols  = sh.columns || [];
+    const ncol  = cols.length;
+    const aoa   = [];
+
+    // Row 0 — title bar (merged, navy)
+    aoa.push([{ v: sh.title || sh.name || 'Report', s:{
+      font:{bold:true, sz:14, color:{rgb:'FFFFFFFF'}},
+      fill:{fgColor:{rgb:'FF1F3864'}},
+      alignment:{horizontal:'left', vertical:'center'}
+    }}]);
+
+    // Row 1 — header (teal)
+    aoa.push(cols.map(c=>({ v:c.header, s:{
+      font:{bold:true, color:{rgb:'FFFFFFFF'}},
+      fill:{fgColor:{rgb:'FF2E5A87'}},
+      alignment:{horizontal:'center', vertical:'center', wrapText:true},
+      border
+    }})));
+
+    // Data rows — zebra + per-column type/colour
+    (sh.rows||[]).forEach((r, ri)=>{
+      const zebra = ri%2===1 ? 'FFF4F7FB' : 'FFFFFFFF';
+      aoa.push(cols.map((c, ci)=>{
+        const raw = r[ci];
+        const isNum = c.num || c.money;
+        let v = isNum ? num(raw) : (raw==null ? '' : raw);
+        const align = c.align || (isNum ? 'right' : 'left');
+        let bg = zebra, font = 'FF222222';
+        if(typeof c.color==='function'){
+          const cc = c.color(raw, r);
+          if(cc){ bg = cc.bg||bg; font = cc.font||font; }
+        }
+        const cell = { v, s:{
+          alignment:{horizontal:align, vertical:'center'},
+          border, font:{color:{rgb:font}}, fill:{fgColor:{rgb:bg}}
+        }};
+        if(c.money && typeof v==='number') cell.z = '"₹"#,##0';
+        else if(isNum && typeof v==='number') cell.z = '#,##0';
+        return cell;
+      }));
+    });
+
+    // TOTAL row (bold, medium top border)
+    if(sh.totalRow){
+      aoa.push(cols.map((c, ci)=>{
+        const raw = sh.totalRow[ci];
+        const isNum = c.num || c.money;
+        let v = isNum ? num(raw) : (raw==null ? '' : raw);
+        const cell = { v, s:{
+          font:{bold:true, color:{rgb:'FF1F3864'}},
+          fill:{fgColor:{rgb:'FFE3E9F2'}},
+          alignment:{horizontal:c.align || (isNum?'right':'left'), vertical:'center'},
+          border:{...border, top:{style:'medium', color:{rgb:'FF1F3864'}}}
+        }};
+        if(c.money && typeof v==='number') cell.z = '"₹"#,##0';
+        else if(isNum && typeof v==='number') cell.z = '#,##0';
+        return cell;
+      }));
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']   = cols.map(c=>({wch: c.width || Math.max(10, String(c.header||'').length + 2)}));
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0, c:Math.max(0,ncol-1)}}];
+    ws['!rows']   = [{hpt:26},{hpt:22}];
+    ws['!freeze'] = {xSplit:0, ySplit:2, topLeftCell:'A3', activePane:'bottomRight', state:'frozen'};
+    if(ncol>0) ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:1,c:0}, e:{r:1,c:ncol-1}})};
+    XLSX.utils.book_append_sheet(wb, ws, String(sh.name||'Sheet').replace(/[\\/?*\[\]:]/g,' ').slice(0,31) || 'Sheet');
+  });
+
+  XLSX.writeFile(wb, filename);
+};
+
+window.dnXlsx = function(filename, title, columns, rows, totalRow){
+  window.dnXlsxBook(filename, [{name:(title||'Sheet'), title, columns, rows, totalRow:totalRow||null}]);
+};
+</script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
   authDomain: "dninvest-crm.firebaseapp.com",
@@ -753,9 +860,9 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
         <div class="card">
           <div class="card-title">Salary report</div>
           <div class="form-row single">
-            <div class="field-inline"><label>Month</label><select><option>June 2026</option><option>May 2026</option></select></div>
+            <div class="field-inline"><label>Month</label><select id="sal-rpt-month"></select></div>
           </div>
-          <button class="btn btn-primary" onclick="alert('Salary report downloading... (Demo)')">Download Excel</button>
+          <button class="btn btn-primary" onclick="downloadSalaryReport()">Download Excel</button>
         </div>
       </div>
     </div>
@@ -2326,7 +2433,61 @@ function viewSalMonth(){
   return today().slice(0,7); // YYYY-MM
 }
 
+// Populates the Salary-report month dropdown (current + previous 5 months)
+function populateSalRptMonths(){
+  const sel=document.getElementById('sal-rpt-month');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML=attMonthOptions().map(ym=>{
+    const lbl=new Date(ym+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+    return `<option value="${ym}">${lbl}</option>`;
+  }).join('');
+  if(cur) sel.value=cur;
+}
+
+// Builds a colourful, logical Salary report (.xlsx) for the chosen month.
+function downloadSalaryReport(){
+  if(!isAdmin){ alert('Only admin can download the salary report.'); return; }
+  const sel=document.getElementById('sal-rpt-month');
+  const month=(sel && sel.value) || viewSalMonth() || today().slice(0,7);
+  const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const payments=getPaymentsForMonth(month);
+
+  const cols=[
+    {header:'Employee',width:18},
+    {header:'Basic Salary',width:13,money:true},
+    {header:'Present',width:9,num:true,align:'center'},
+    {header:'Absent',width:9,num:true,align:'center'},
+    {header:'Half',width:8,num:true,align:'center'},
+    {header:'Deduction',width:12,money:true},
+    {header:'Advance Adj',width:12,money:true},
+    {header:'ESI',width:11,money:true},
+    {header:'Extra Ded',width:12,money:true},
+    {header:'Net Payable',width:13,money:true},
+    {header:'Paid',width:12,money:true},
+    {header:'Balance',width:12,money:true,
+      color:(v)=> (Number(String(v).replace(/[₹,]/g,''))>0 ? {bg:'FFFFC7CE',font:'FF9C0006'} : {bg:'FFC6EFCE',font:'FF006100'})}
+  ];
+
+  const tot={sal:0,pres:0,abs:0,half:0,ded:0,adv:0,esi:0,extra:0,net:0,paid:0,bal:0};
+  const rows=EMPLOYEES.map(e=>{
+    const r=calcMonthlySalary(e.name,month);
+    const adv=getAdvanceAdjustedForMonth(e.name,month);
+    const net=Math.max(0,r.net-adv);
+    const paid=(payments[e.name]&&payments[e.name].salaryPaid)||0;
+    const bal=Math.max(0,net-paid);
+    const esiAmt=r.esi.applicable?r.esi.employeeContribution:0;
+    tot.sal+=r.salary; tot.pres+=r.presentDays; tot.abs+=r.absentDays; tot.half+=r.halfDays;
+    tot.ded+=r.deduction; tot.adv+=adv; tot.esi+=esiAmt; tot.extra+=r.extra.amount; tot.net+=net; tot.paid+=paid; tot.bal+=bal;
+    return [e.name,r.salary,r.presentDays,r.absentDays,r.halfDays,r.deduction,adv,esiAmt,r.extra.amount,net,paid,bal];
+  });
+  const totalRow=['TOTAL',tot.sal,tot.pres,tot.abs,tot.half,tot.ded,tot.adv,tot.esi,tot.extra,tot.net,tot.paid,tot.bal];
+
+  dnXlsx('DN_Salary_'+month+'.xlsx', 'DN Investment — Salary Report · '+mLabel, cols, rows, totalRow);
+}
+
 function renderSalaryPage(){
+  populateSalRptMonths();
   const emp=EMPLOYEES.find(e=>e.name===currentUser);
   const vEl=document.getElementById('view-sal-month');
   if(vEl && !vEl.value) vEl.value=today().slice(0,7);
