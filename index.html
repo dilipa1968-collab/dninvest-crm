@@ -3218,6 +3218,7 @@ function renderEqTable(){
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
+        <button class="btn-icon" onclick="addEquityToMf('${c.id}')" title="Add to Mutual Fund" style="color:var(--teal)">🏦</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Active'?'b-active':c.status==='Closed'?'b-closed':'b-inactive'}">${c.status||'—'}</span></td>
@@ -3597,6 +3598,49 @@ async function confirmDeleteLead(id,name){
   toast('Lead deleted','success');
   renderLeadsTable();
   updateBadges();
+}
+
+// Adds an existing Equity client into Mutual Fund as an MF Investor.
+// The Equity record stays untouched — the client will exist in BOTH segments.
+async function addEquityToMf(eqId){
+  const eqClients=DB.get('eq_clients')||[];
+  const eq=eqClients.find(x=>x.id===eqId);
+  if(!eq){ toast('Equity client not found','error'); return; }
+
+  // PAN is mandatory for MF — prefill if equity already has one
+  let pan=prompt(`Add "${eq.name}" to Mutual Fund.\n\nEnter PAN (required for MF Investor):`, (eq.pan||'').toUpperCase());
+  if(pan===null) return;
+  pan=pan.trim().toUpperCase();
+  if(!pan){ toast('PAN is required to add as MF Investor','error'); return; }
+  if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+
+  const mfClients=DB.get('mf_clients')||[];
+  const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
+  // Duplicate guards: same PAN, or same mobile/name already in MF
+  const dupPan=mfClients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
+  if(dupPan){ toast(`⚠️ Already an MF Investor: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+  const mob=cleanMob(eq.mobile);
+  const dupOther=mfClients.find(c=>(mob && cleanMob(c.mobile)===mob) || (c.name||'').trim().toUpperCase()===(eq.name||'').trim().toUpperCase());
+  if(dupOther){ toast(`⚠️ "${dupOther.name}" already exists in Mutual Fund`,'error'); return; }
+
+  let newId=uid();
+  while(mfClients.some(x=>x.id===newId)) newId=uid();
+  const rec={
+    id:newId, name:eq.name, mobile:eq.mobile||'', pan, email:eq.email||'',
+    rm:eq.rm, status:'Prospect',
+    aum:null, sip_amount:null, sip_count:null,
+    last_invest_date:'', last_call_date:eq.last_call_date||'',
+    next_call:'', followup_status:'', remarks:`Added from Equity${eq.code?' (Code: '+eq.code+')':''}`,
+    created:today(), updated:today()
+  };
+  await DB.setClient('mf_clients', rec);
+  DB.addActivityLog({
+    id:uid(), type:'add', seg:'mf', client_id:newId,
+    client_name:eq.name, rm:eq.rm, by:CU.name,
+    date:new Date().toISOString(), changes:[]
+  });
+  toast(`✅ "${eq.name}" added to Mutual Fund! (Equity record kept)`,'success');
+  renderMfTable(); refreshDash(); updateBadges();
 }
 
 async function convertLead(id,seg){
