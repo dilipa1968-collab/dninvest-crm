@@ -665,6 +665,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       </div>
       <div class="nav-item" onclick="showPage('mf-txns')" id="nav-mf-txns">
         <span class="icon">💼</span> MF Transactions
+        <span class="nav-badge red" id="nb-mftxn-pending" style="display:none">0</span>
       </div>
 
       <div class="sidebar-section">Reports</div>
@@ -722,6 +723,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <div style="font-size:2rem;margin-bottom:8px">💼</div>
               <h3 style="color:#fff;margin:0">MF Transactions</h3>
               <p style="font-size:.78rem;color:#eafff5;margin-top:4px">Lumpsum · SIP · Switch · STP · Redemption</p>
+              <div id="dash-mftxn-pending" style="display:none;margin-top:6px"><span style="background:rgba(255,255,255,0.25);color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700">⏳ <span id="dash-mftxn-pending-count">0</span> Pending</span></div>
             </div>
           </div>
           <div class="dash-card" id="mfReminderCard" style="display:none">
@@ -742,6 +744,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <div style="font-size:2rem;margin-bottom:8px">📂</div>
               <h3 style="color:#fff;margin:0">Demat A/c Opening</h3>
               <p style="font-size:.78rem;color:#fdf3e0;margin-top:4px">Equity — New Account Entries</p>
+              <div id="dash-demat-pending" style="display:none;margin-top:6px"><span style="background:rgba(255,255,255,0.25);color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700">⏳ <span id="dash-demat-pending-count">0</span> Pending</span></div>
             </div>
           </div>
           <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 100%);color:#fff" onclick="openHrPortal()">
@@ -1586,6 +1589,34 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('businessModal')">Cancel</button>
       <button class="btn btn-success" onclick="saveBusinessEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Demat Edit Modal -->
+<div class="modal-overlay" id="dematEditModal" onclick="if(event.target===this)closeModal('dematEditModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="dematEditModalTitle">Edit Demat Entry</h3>
+      <button class="modal-close" onclick="closeModal('dematEditModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-field"><label>Selected Client</label><input type="text" id="demat_edit_client" readonly style="background:#f7f7f7"></div>
+        <div class="form-field"><label>Trading RM</label><input type="text" id="demat_edit_rm" readonly style="background:#f7f7f7"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Opening RM</label><select id="demat_edit_opening_rm"></select></div>
+        <div class="form-field"><label>Client Code / UCC</label><input type="text" id="demat_edit_code" placeholder="e.g. ABC1234"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Date *</label><input type="date" id="demat_edit_date"></div>
+        <div class="form-field"><label>Remarks</label><input type="text" id="demat_edit_remarks" placeholder="Optional notes"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('dematEditModal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveDematEdit()">Save Changes</button>
     </div>
   </div>
 </div>
@@ -3007,6 +3038,25 @@ function updateBadges(){
   document.getElementById('nb-eqnt').textContent=activeEq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
   document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
   document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
+
+  // Admin-only: Pending counts for MF Transactions and Demat (nav badge + dashboard card)
+  if(CU && CU.role==='admin'){
+    const mfPending = getMfBizEntries().filter(e=>(e.status||'Pending')==='Pending').length;
+    const dmPending = getEqDematEntries().filter(e=>(e.status||'Pending')==='Pending').length;
+
+    // MF Transactions nav badge
+    const nbMf = document.getElementById('nb-mftxn-pending');
+    if(nbMf){ nbMf.textContent=mfPending; nbMf.style.display=mfPending>0?'':'none'; }
+
+    // Dashboard card pending pills
+    const dmfCard = document.getElementById('dash-mftxn-pending');
+    const dmfCnt  = document.getElementById('dash-mftxn-pending-count');
+    if(dmfCard && dmfCnt){ dmfCnt.textContent=mfPending; dmfCard.style.display=mfPending>0?'':'none'; }
+
+    const ddCard = document.getElementById('dash-demat-pending');
+    const ddCnt  = document.getElementById('dash-demat-pending-count');
+    if(ddCard && ddCnt){ ddCnt.textContent=dmPending; ddCard.style.display=dmPending>0?'':'none'; }
+  }
 }
 
 // ══════════════════════════════════════════
@@ -5839,6 +5889,7 @@ function renderEqDematTable(){
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveEqDematEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineEqDematEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingEqDematEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
+            <button class="btn-icon" onclick="editEqDematEntry('${e.id}')" title="Edit">✏️</button>
             <button class="btn-icon" onclick="deleteEqDematEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
         </tr>`;
       }).join('')}
@@ -5889,6 +5940,49 @@ function deleteEqDematEntry(id){
   const entries = getEqDematEntries().filter(e=>e.id!==id);
   setEqDematEntries(entries);
   toast('Entry deleted','success');
+  renderEqDematTable();
+}
+
+let editingDematId = null;
+
+function editEqDematEntry(id){
+  if(CU.role!=='admin') return;
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  editingDematId = id;
+  document.getElementById('dematEditModalTitle').textContent = 'Edit Demat Entry — '+escapeHtml(e.client_name||'');
+  document.getElementById('demat_edit_client').value = e.client_name||'';
+  document.getElementById('demat_edit_rm').value = e.rm||'—';
+  document.getElementById('demat_edit_code').value = e.client_code||'';
+  document.getElementById('demat_edit_date').value = e.date||today();
+  document.getElementById('demat_edit_remarks').value = e.remarks||'';
+  // Populate opening RM dropdown
+  const sel = document.getElementById('demat_edit_opening_rm');
+  const allRMs = getSegRMs('equity');
+  sel.innerHTML = allRMs.map(r=>`<option value="${escapeHtml(r)}" ${r===(e.opening_rm||e.rm)?'selected':''}>${escapeHtml(r)}</option>`).join('');
+  if(!allRMs.includes(e.opening_rm||e.rm)){
+    sel.innerHTML = `<option value="${escapeHtml(e.opening_rm||e.rm)}" selected>${escapeHtml(e.opening_rm||e.rm)}</option>` + sel.innerHTML;
+  }
+  document.getElementById('dematEditModal').classList.add('open');
+}
+
+function saveDematEdit(){
+  if(CU.role!=='admin') return;
+  if(!editingDematId) return;
+  const date = document.getElementById('demat_edit_date').value;
+  if(!date){ toast('Date is required','error'); return; }
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===editingDematId);
+  if(!e){ toast('Entry not found','error'); return; }
+  e.client_code = document.getElementById('demat_edit_code').value.trim().toUpperCase();
+  e.date        = date;
+  e.remarks     = document.getElementById('demat_edit_remarks').value.trim();
+  e.opening_rm  = document.getElementById('demat_edit_opening_rm').value;
+  setEqDematEntries(entries);
+  toast('Demat entry updated!','success');
+  closeModal('dematEditModal');
+  editingDematId = null;
   renderEqDematTable();
 }
 
