@@ -3284,7 +3284,7 @@ function renderLeadsTable(){
   const rc=document.getElementById('leads-count');
   if(rc) rc.textContent=data.length+' leads';
 
-  const leadsFieldMap={0:'name',1:'mobile',2:'rm',3:'next_call',4:'followup_status',5:'remarks'};
+  const leadsFieldMap={0:'name',1:'mobile',2:'rm',3:'last_call',4:'next_call',5:'followup_status',6:'remarks'};
   if(leadsSortField!==null){
     const field=leadsFieldMap[leadsSortField];
     data=data.slice().sort((a,b)=>{
@@ -3302,7 +3302,7 @@ function renderLeadsTable(){
   }
 
   const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
-  const cols=['Name','Mobile','RM','Next Call','Follow-up','Remarks'];
+  const cols=['Name','Mobile','RM','Last Call','Next Call','Follow-up','Remarks'];
   let h=`<table><thead><tr>${cols.map((c,i)=>{
     let arrow = leadsSortField===i ? (leadsSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
@@ -3340,6 +3340,7 @@ function renderLeadsTable(){
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
+      <td>${fmtDate(c.last_call)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
@@ -3366,6 +3367,7 @@ function leadForm(c){
   </div>
   <div class="form-section">Follow-up</div>
   <div class="form-row three">
+    <div class="form-field"><label>Last Calling Date</label><input id="l_last_call" type="date" value="${c?.last_call||''}" max="${today()}"></div>
     <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}"></div>
     <div class="form-field"><label>Follow-up Status</label><select id="l_followup">
       <option value="">—</option>
@@ -3382,6 +3384,8 @@ function leadForm(c){
       <option ${c?.followup_status==='Open Demat Account'?'selected':''}>Open Demat Account</option>
       <option ${c?.followup_status==='Come To Office'?'selected':''}>Come To Office</option>
     </select></div>
+  </div>
+  <div class="form-row single">
     <div class="form-field"><label>Remarks</label><input id="l_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
   </div>`;
 }
@@ -3425,14 +3429,32 @@ async function saveLead(){
   const gv2=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
   const leads=DB.get('leads')||[];
 
+  // Mobile (digits only, last 10) for duplicate checks
+  const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
+  const mobileRaw=gv2('l_mobile');
+  const mob=cleanMob(mobileRaw);
+
+  // Duplicate checks only when adding a NEW lead (skip while editing existing)
+  if(!currentEditLeadId && mob){
+    // 1) Same mobile already present in Leads
+    const dupLead=leads.find(l=>cleanMob(l.mobile)===mob);
+    if(dupLead){ toast(`⚠️ This mobile already exists in Leads: "${dupLead.name}"`,'error'); return; }
+    // 2) Already an Equity client with a Client Code
+    const eqDup=(DB.get('eq_clients')||[]).find(c=>c.code && String(c.code).trim() && cleanMob(c.mobile)===mob);
+    if(eqDup){ toast(`⚠️ Already an Equity Client (Code: ${eqDup.code}): "${eqDup.name}"`,'error'); return; }
+    // 3) Already an MF investor with a PAN
+    const mfDup=(DB.get('mf_clients')||[]).find(c=>c.pan && String(c.pan).trim() && cleanMob(c.mobile)===mob);
+    if(mfDup){ toast(`⚠️ Already an MF Investor (PAN: ${mfDup.pan}): "${mfDup.name}"`,'error'); return; }
+  }
+
   let newId=currentEditLeadId;
   if(!newId){
     newId=uid();
     while(leads.some(x=>x.id===newId)) newId=uid();
   }
   const rec={
-    id:newId, name, mobile:gv2('l_mobile'), rm,
-    next_call:gv2('l_next_call'), followup_status:gv2('l_followup'), remarks:gv2('l_remarks'),
+    id:newId, name, mobile:mobileRaw, rm,
+    last_call:gv2('l_last_call'), next_call:gv2('l_next_call'), followup_status:gv2('l_followup'), remarks:gv2('l_remarks'),
     created:currentEditLeadId?undefined:today(), updated:today()
   };
   if(currentEditLeadId){
