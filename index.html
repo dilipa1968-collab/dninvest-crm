@@ -1170,6 +1170,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <option value="">All</option>
               <option value="equity">Equity</option>
               <option value="mf">Mutual Fund</option>
+              <option value="lead">Lead</option>
             </select>
           </div>
           <div class="form-field" style="min-width:160px">
@@ -1870,6 +1871,42 @@ const DB = {
   setLocal(key,val){
     try{ localStorage.setItem('dninvest_'+key,JSON.stringify(val)); }catch(e){}
   },
+  // Append one or more entries to the shared append-only activity_logs array
+  // WITHOUT clobbering other RMs' concurrent entries. Transaction merge-by-id,
+  // keeps the newest 2000 by date.
+  _alWriting:0,
+  async addActivityLog(entryOrArray){
+    const entries = Array.isArray(entryOrArray) ? entryOrArray : [entryOrArray];
+    if(!entries.length) return;
+    const capSort = arr => arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
+    // 1) optimistic local
+    let local=[];
+    try{ local=JSON.parse(localStorage.getItem('dninvest_activity_logs')||'[]'); }catch(e){ local=[]; }
+    const lById={}; local.forEach(x=>{ if(x&&x.id) lById[x.id]=x; });
+    entries.forEach(e=>{ if(e&&e.id) lById[e.id]=e; });
+    try{ localStorage.setItem('dninvest_activity_logs', JSON.stringify(capSort(Object.values(lById)))); }catch(e){}
+    // 2) transactional merge-write
+    if(typeof fdb==='undefined') return;
+    this._alWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('activity_logs');
+      let finalData = null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        const byId={};
+        latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+        entries.forEach(e=>{ if(e&&e.id) byId[e.id]=e; });
+        finalData = capSort(Object.values(byId));
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){ try{ localStorage.setItem('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
+    }catch(e){
+      console.log('Activity log sync error:',e);
+    }finally{
+      this._alWriting=Math.max(0,this._alWriting-1);
+    }
+  },
   // Append one entry to the shared append-only call_logs array WITHOUT clobbering
   // other RMs' concurrent entries. Uses a Firestore transaction (re-fetch latest,
   // merge this entry in by id, write back) — the same proven pattern as setClientsBulk.
@@ -2010,6 +2047,15 @@ const DB = {
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
               console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
+            } else if(key==='activity_logs'){
+              let existing=[];
+              try{ existing=JSON.parse(localStorage.getItem('dninvest_activity_logs')||'[]'); }catch(e){ existing=[]; }
+              const byId={};
+              existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+              d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+              const merged=Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
+              localStorage.setItem('dninvest_activity_logs', JSON.stringify(merged));
+              console.log('Loaded+merged from Firebase: activity_logs', merged.length);
             } else if(d.length>0){
               localStorage.setItem('dninvest_'+key,JSON.stringify(d));
               console.log('Loaded from Firebase:',key, d.length,'records');
@@ -2424,17 +2470,20 @@ function initApp(){
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
             const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
-            // call_logs is append-only & shared by all RMs: MERGE by id so neither
-            // a just-added local entry nor another RM's entry is lost to a stale snapshot.
-            if(key==='call_logs'){
+            // call_logs & activity_logs are append-only & shared by all RMs:
+            // MERGE by id so neither a just-added local entry nor another RM's
+            // entry is lost to a stale snapshot.
+            if(key==='call_logs' || key==='activity_logs'){
               const byId={};
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               newData.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-              const merged=Object.values(byId);
+              let merged=Object.values(byId);
+              if(key==='activity_logs') merged=merged.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
               if(JSON.stringify(merged)!==JSON.stringify(existing)){
-                localStorage.setItem('dninvest_call_logs', JSON.stringify(merged));
-                console.log('Real-time merge: call_logs');
-                if(getCurrentPageId()==='leads') renderLeadsTable();
+                localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+                console.log('Real-time merge:', key);
+                if(key==='call_logs' && getCurrentPageId()==='leads') renderLeadsTable();
+                if(getCurrentPageId()==='activity-log') renderActivityLog();
                 refreshDash(); updateBadges();
               }
               return;
@@ -4534,8 +4583,7 @@ async function saveClient(){
         if(ov!==nv) changes.push({field:f, old:ov||'—', new:nv||'—'});
       });
       if(changes.length>0){
-        const logs = DB.get('activity_logs')||[];
-        logs.unshift({
+        DB.addActivityLog({
           id: uid(),
           type: 'edit',
           seg,
@@ -4546,15 +4594,12 @@ async function saveClient(){
           date: new Date().toISOString(),
           changes
         });
-        // Keep last 2000 logs only
-        DB.set('activity_logs', logs.slice(0,2000));
       }
     }
   } else {
     rec.created=today();
     // Audit log - new client added
-    const logs = DB.get('activity_logs')||[];
-    logs.unshift({
+    DB.addActivityLog({
       id: uid(),
       type: 'add',
       seg,
@@ -4565,7 +4610,6 @@ async function saveClient(){
       date: new Date().toISOString(),
       changes: []
     });
-    DB.set('activity_logs', logs.slice(0,2000));
   }
   await DB.setClient(key,rec);
   maybeLogMergedCall(seg, rec.id, rec.name, rec.rm);
@@ -4803,14 +4847,12 @@ async function saveCallLog(){
     await DB.setClient(key, clients[idx]);
     // Save field changes to activity_logs too (so changes are visible in Activity Log)
     if(callChanges.length>0){
-      const actLogs = DB.get('activity_logs')||[];
-      actLogs.unshift({
+      DB.addActivityLog({
         id: uid(), type: 'call_update', seg,
         client_id: id, client_name: oldClient.name, rm,
         by: CU.name, date: new Date().toISOString(),
         changes: callChanges
       });
-      DB.set('activity_logs', actLogs.slice(0,2000));
     }
   }
   closeModal('callModal');
@@ -8208,7 +8250,7 @@ async function doEqRmUpdate(){
 
   let updated=0, notFound=0, invalidRm=0;
   const touched = [];
-  const actLogs = DB.get('activity_logs')||[];
+  const newLogs = [];
 
   eqRmUpdateData.forEach(row=>{
     if(!validRms.has(row.rm)){ invalidRm++; return; }
@@ -8220,7 +8262,7 @@ async function doEqRmUpdate(){
     ex.updated = today();
     touched.push(ex);
     updated++;
-    actLogs.unshift({
+    newLogs.push({
       id: uid(), type: 'bulk_rm_update', seg:'equity',
       client_id: ex.id, client_name: ex.name, rm: row.rm,
       by: CU.name, date: new Date().toISOString(),
@@ -8229,7 +8271,7 @@ async function doEqRmUpdate(){
   });
 
   if(touched.length) await DB.setClientsBulk('eq_clients', touched);
-  if(updated) DB.set('activity_logs', actLogs.slice(0,2000));
+  if(newLogs.length) await DB.addActivityLog(newLogs);
 
   closeModal('eqRmUpdateModal');
   let msg = `✅ RM Update done! ${updated} client(s) updated`;
@@ -8632,7 +8674,7 @@ function renderActivityLog(){
       <td style="font-size:.8rem;white-space:nowrap">${dt}</td>
       <td><span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:700">${typeLabel[l.type]||l.type}</span></td>
       <td style="font-weight:600">${l.client_name||'—'}</td>
-      <td style="font-size:.8rem">${l.seg==='equity'?'📈 Equity':'🏦 MF'}</td>
+      <td style="font-size:.8rem">${l.seg==='equity'?'📈 Equity':l.seg==='lead'?'👤 Lead':'🏦 MF'}</td>
       <td style="font-size:.8rem">${l.rm||'—'}</td>
       <td style="font-size:.8rem">${l.by||'—'}</td>
       <td>${detail}</td>
