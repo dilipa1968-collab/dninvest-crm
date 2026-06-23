@@ -4253,19 +4253,35 @@ function rmFieldHtml(seg, c, label){
 // Lets the RM optionally log the edit as a call (so call history + count stay accurate).
 function callMergeSection(){
   return `
-  <div class="form-section">📞 Call Update <span style="font-weight:400;font-size:.75rem;color:var(--gray)">(optional)</span></div>
-  <div class="form-row three">
-    <div class="form-field">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem">
-        <input type="checkbox" id="m_log_call"> Log this update as a call
-      </label>
-      <span style="font-size:.72rem;color:var(--gray)">Tick if you called / attempted now</span>
+  <div class="form-section" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <button type="button" class="btn btn-success" id="m_call_toggle" style="padding:5px 14px;font-size:.85rem" onclick="toggleCallLogSection(this)">✓ Call will be logged (click to skip)</button>
+    <span style="font-size:.72rem;color:var(--gray)">On by default — turn off only if you didn't call</span>
+  </div>
+  <div id="m_call_fields">
+    <input type="checkbox" id="m_log_call" checked style="display:none">
+    <div class="form-row">
+      <div class="form-field"><label>Call Status</label><select id="m_call_status">
+        <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option>
+      </select></div>
+      <div class="form-field"><label>Call Notes</label><input id="m_call_note" placeholder="What was discussed?"></div>
     </div>
-    <div class="form-field"><label>Call Status</label><select id="m_call_status">
-      <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option>
-    </select></div>
-    <div class="form-field"><label>Call Notes</label><input id="m_call_note" placeholder="What was discussed?"></div>
   </div>`;
+}
+
+// Shows/hides the call-log fields. Default ON (RM usually updates after a call);
+// turning it off skips logging the call for this save.
+function toggleCallLogSection(btn){
+  const div=document.getElementById('m_call_fields');
+  const chk=document.getElementById('m_log_call');
+  if(!div) return;
+  const open = div.style.display==='none';
+  div.style.display = open ? '' : 'none';
+  if(chk) chk.checked = open;
+  if(btn){
+    btn.textContent = open ? '✓ Call will be logged (click to skip)' : '📞 Call NOT logged (click to log)';
+    btn.classList.toggle('btn-success', open);
+    btn.classList.toggle('btn-outline', !open);
+  }
 }
 
 // If the "Log this update as a call" box is ticked, push a call_logs entry.
