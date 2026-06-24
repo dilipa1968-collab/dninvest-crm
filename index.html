@@ -4457,7 +4457,7 @@ function maybeLogMergedCall(seg, id, name, rm){
   const nextCall=nextEl?nextEl.value:'';
   DB.addCallLog({
     id:uid(), client_id:id, seg, date, status, note,
-    next_call:nextCall, created:today(),
+    next_call:nextCall, created:today(), ts:new Date().toISOString(),
     client_name:name||'', rm:rm||'', remarks:note, by:CU.name
   });
 }
@@ -4905,7 +4905,7 @@ async function saveCallLog(){
     const lead=leads.find(x=>x.id===id);
     DB.addCallLog({
       id:uid(), client_id:id, seg:'lead', date, status, note,
-      next_call:nextCall, created:today(),
+      next_call:nextCall, created:today(), ts:new Date().toISOString(),
       client_name: lead?lead.name:'',
       rm: lead?lead.rm:'',
       remarks: note,
@@ -4930,7 +4930,7 @@ async function saveCallLog(){
   const clientObj=clients2.find(x=>x.id===id);
   DB.addCallLog({
     id:uid(), client_id:id, seg, date, status, note,
-    next_call:nextCall, created:today(),
+    next_call:nextCall, created:today(), ts:new Date().toISOString(),
     client_name: clientObj?clientObj.name:'',
     rm: clientObj?clientObj.rm:'',
     remarks: note,
@@ -8720,6 +8720,21 @@ function toggleAlView(){
   renderActivityLog();
 }
 
+// Formats a log's timestamp for the Activity Log. Edit logs & new call logs carry
+// a full ISO timestamp (ts/date with 'T') → date+time. Old call logs only have a
+// date (no time) → show date only, so a date never renders as a bogus 05:30 AM.
+function alWhen(l, withYear){
+  const w = l.ts || l.date;
+  if(!w) return '—';
+  if(/T\d/.test(w)){
+    const o = withYear ? {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}
+                       : {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'};
+    return new Date(w).toLocaleString('en-IN',o);
+  }
+  const o = withYear ? {day:'2-digit',month:'short',year:'numeric'} : {day:'2-digit',month:'short'};
+  return new Date(w+'T00:00:00').toLocaleDateString('en-IN',o);
+}
+
 function renderActivityLog(){
   const isAdmin = CU && CU.role==='admin';
   const seg = (document.getElementById('al-seg')||{value:''}).value;
@@ -8748,6 +8763,7 @@ function renderActivityLog(){
       rm: l.rm||c.rm||'—',
       by: l.by||l.rm||c.rm||'—',
       date: l.date||'',
+      ts: l.ts||'',
       changes: [],
       call_status: l.status||'',
       next_call: l.next_call||'',
@@ -8755,7 +8771,7 @@ function renderActivityLog(){
     };
   });
   const editLogs = DB.get('activity_logs')||[];
-  let all = [...editLogs, ...callLogs].sort((a,b)=>b.date.localeCompare(a.date));
+  let all = [...editLogs, ...callLogs].sort((a,b)=>String(b.ts||b.date).localeCompare(String(a.ts||a.date)));
 
   // Staff only sees their own RM logs
   if(!isAdmin){
@@ -8806,7 +8822,7 @@ function renderActivityLog(){
   if(alViewMode==='compact'){
     let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>RM</th><th>By</th><th>Summary</th></tr></thead><tbody>';
     all.forEach(l=>{
-      const dt = l.date ? new Date(l.date).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      const dt = alWhen(l,false);
       const typeBadge=`<span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:1px 6px;border-radius:8px;font-size:.72rem;font-weight:700">${typeLabel[l.type]||l.type}</span>`;
       let summary='';
       if(l.type==='call') summary=`${l.call_status||''}${l.next_call?' → '+fmtDate(l.next_call):''}${l.remarks?' | '+l.remarks:''}`;
@@ -8833,7 +8849,7 @@ function renderActivityLog(){
   // ── DETAILED VIEW (default) ──
   let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>Segment</th><th>RM</th><th>By</th><th>Changes / Details</th></tr></thead><tbody>';
   all.forEach(l=>{
-    const dt = l.date ? new Date(l.date).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const dt = alWhen(l,true);
     let detail='';
     if(l.type==='call'){
       detail=`<span style="color:var(--gray);font-size:.8rem">Status: <b>${l.call_status||'—'}</b>${l.next_call?` | Next Call: <b>${fmtDate(l.next_call)}</b>`:''} ${l.remarks?`| <i>${l.remarks}</i>`:''}</span>`;
@@ -8865,16 +8881,16 @@ function exportActivityLog(){
   const tbl=document.getElementById('al-table');
   if(!tbl||!tbl.rows.length){ toast('No data to export','error'); return; }
   const isAdmin = CU && CU.role==='admin';
-  const callLogs=(DB.get('call_logs')||[]).map(l=>({type:'call',seg:l.seg||'equity',client_name:l.client_name||l.name||'',rm:l.rm||'',by:l.by||l.rm||'',date:l.date||'',call_status:l.status||'',next_call:l.next_call||'',remarks:l.remarks||'',changes:[]}));
+  const callLogs=(DB.get('call_logs')||[]).map(l=>({type:'call',seg:l.seg||'equity',client_name:l.client_name||l.name||'',rm:l.rm||'',by:l.by||l.rm||'',date:l.date||'',ts:l.ts||'',call_status:l.status||'',next_call:l.next_call||'',remarks:l.remarks||'',changes:[]}));
   const editLogs=DB.get('activity_logs')||[];
-  let all=[...editLogs,...callLogs].sort((a,b)=>b.date.localeCompare(a.date));
+  let all=[...editLogs,...callLogs].sort((a,b)=>String(b.ts||b.date).localeCompare(String(a.ts||a.date)));
   if(!isAdmin){
     const myRMs=[...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])].map(d=>d.trim().toUpperCase());
     all=all.filter(l=>myRMs.includes((l.rm||'').trim().toUpperCase()));
   }
   const rows=[];
   all.forEach(l=>{
-    const dt=l.date?new Date(l.date).toLocaleString('en-IN'):'';
+    const dt=alWhen(l,true);
     if(l.type==='call'){
       rows.push([dt,'Call Log',l.client_name,l.seg,l.rm,l.by,'—','—','—',`Status: ${l.call_status}${l.next_call?' | Next: '+l.next_call:''} ${l.remarks}`]);
     } else if(!l.changes||!l.changes.length){
