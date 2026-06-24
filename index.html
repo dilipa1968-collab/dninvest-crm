@@ -5685,6 +5685,12 @@ function renderMfTxnTable(){
         </tr>`;
       }).join('')}
     </tbody>
+    <tfoot><tr style="font-weight:700;background:var(--bg,#f6f7fb);border-top:2px solid var(--border,#ddd)">
+      <td colspan="5" style="text-align:right">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</td>
+      <td style="text-align:right">₹${brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))}</td>
+      <td style="text-align:right">${INC.fmt(INC.total('mf',entries))}</td>
+      <td colspan="4"></td>
+    </tr></tfoot>
   </table>`;
 }
 
@@ -5920,6 +5926,11 @@ function renderEqDematTable(){
         </tr>`;
       }).join('')}
     </tbody>
+    <tfoot><tr style="font-weight:700;background:var(--bg,#f6f7fb);border-top:2px solid var(--border,#ddd)">
+      <td colspan="5" style="text-align:right">TOTAL${(document.getElementById('eqdemat-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('eqdemat-rm-filter').value):''} (${entries.length} demat)</td>
+      <td style="text-align:right">${INC.fmt(INC.total('demat',entries))}</td>
+      <td colspan="2"></td>
+    </tr></tfoot>
   </table>`;
 }
 
