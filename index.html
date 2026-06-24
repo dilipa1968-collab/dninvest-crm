@@ -9299,13 +9299,24 @@ function brkExport(){
    {mf_pct, demat_fixed, mf_types[]}. Per-entry override: inc_mode + inc_value.
    ══════════════════════════════════════════════════════════════════════════ */
 const INC = {
-  DEFAULTS: { mf_pct:1, demat_fixed:100, mf_types:['Lumpsum','SIP','Additional Buy','SIP Bounce Buy','Switch','STP'] },
+  DEFAULTS: { mf_rates:{'Lumpsum':1,'SIP':1,'Additional Buy':1,'SIP Bounce Buy':1,'Switch':1,'STP':1}, demat_fixed:100 },
+  MF_TYPES: ['Lumpsum','SIP','Additional Buy','SIP Bounce Buy','Switch','STP','SWP','Redemption','SIP Stop','SIP Pause'],
   cfg(){
     const c = DB.get('incentive_config') || {};
+    let rates;
+    if(c.mf_rates && typeof c.mf_rates==='object' && !Array.isArray(c.mf_rates)){
+      rates = c.mf_rates;
+    } else if(c.mf_pct!=null || Array.isArray(c.mf_types)){
+      // migrate old single-rate model → per-type
+      rates = {};
+      const pct = c.mf_pct!=null ? Number(c.mf_pct) : 1;
+      (Array.isArray(c.mf_types)?c.mf_types:Object.keys(this.DEFAULTS.mf_rates)).forEach(t=>{ rates[t]=pct; });
+    } else {
+      rates = Object.assign({}, this.DEFAULTS.mf_rates);
+    }
     return {
-      mf_pct: (c.mf_pct!=null ? Number(c.mf_pct) : this.DEFAULTS.mf_pct),
-      demat_fixed: (c.demat_fixed!=null ? Number(c.demat_fixed) : this.DEFAULTS.demat_fixed),
-      mf_types: Array.isArray(c.mf_types) ? c.mf_types : this.DEFAULTS.mf_types.slice()
+      mf_rates: rates,
+      demat_fixed: (c.demat_fixed!=null ? Number(c.demat_fixed) : this.DEFAULTS.demat_fixed)
     };
   },
   fmt(n){ n=Number(n)||0; return '₹'+n.toLocaleString('en-IN',{maximumFractionDigits:0}); },
@@ -9314,7 +9325,8 @@ const INC = {
     const cfg=this.cfg();
     if(e.inc_mode==='fixed') return {amt:Number(e.inc_value)||0, over:true, label:'₹ fixed'};
     if(e.inc_mode==='pct')   return {amt:(Number(e.amount)||0)*(Number(e.inc_value)||0)/100, over:true, label:(Number(e.inc_value)||0)+'%'};
-    if(cfg.mf_types.includes(e.type)) return {amt:(Number(e.amount)||0)*cfg.mf_pct/100, over:false, label:cfg.mf_pct+'% auto'};
+    const rate = Number(cfg.mf_rates[e.type]||0);
+    if(rate>0) return {amt:(Number(e.amount)||0)*rate/100, over:false, label:rate+'% auto'};
     return {amt:0, over:false, label:'—'};
   },
   demat(e){
@@ -9429,14 +9441,11 @@ const INC = {
         <div class="modal-hdr"><h3>⚙️ Incentive Rates</h3>
           <button class="modal-close" onclick="closeModal('incSettingsModal')">×</button></div>
         <div class="modal-body">
-          <div class="form-row">
-            <div class="form-field"><label>MF Business — % of amount</label>
-              <input type="number" id="incSetMfPct" step="0.01" placeholder="e.g. 1"></div>
-            <div class="form-field"><label>Demat — fixed ₹ per account</label>
-              <input type="number" id="incSetDemat" step="1" placeholder="e.g. 100"></div>
-          </div>
-          <div style="margin-top:14px"><label style="font-weight:600;font-size:.85rem">MF types that earn incentive (auto)</label>
-            <div id="incSetTypes" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div></div>
+          <div class="form-field" style="max-width:240px"><label>Demat — fixed ₹ per account</label>
+            <input type="number" id="incSetDemat" step="1" placeholder="e.g. 100"></div>
+          <div style="margin-top:16px"><label style="font-weight:600;font-size:.85rem">MF Business — % per type</label>
+            <div style="font-size:.74rem;color:var(--gray);margin:2px 0 8px">Har type ka alag rate. 0 ya blank = us type pe incentive nahi.</div>
+            <div id="incSetRates" style="display:grid;grid-template-columns:1fr 86px 1fr 86px;gap:8px 12px;align-items:center"></div></div>
           <div style="margin-top:12px;font-size:.78rem;color:var(--gray)">Individual entries ko ✏️ se override kar sakte ho.</div>
         </div>
         <div class="modal-footer">
@@ -9445,21 +9454,23 @@ const INC = {
         </div></div>`;
       document.body.appendChild(m);
     }
-    document.getElementById('incSetMfPct').value = cfg.mf_pct;
     document.getElementById('incSetDemat').value = cfg.demat_fixed;
-    const allTypes=['Lumpsum','SIP','Additional Buy','SIP Bounce Buy','Switch','STP','SWP','Redemption','SIP Stop','SIP Pause'];
-    document.getElementById('incSetTypes').innerHTML = allTypes.map(t=>{
-      const on=cfg.mf_types.includes(t)?'checked':'';
-      return `<label style="display:flex;align-items:center;gap:5px;font-size:.8rem"><input type="checkbox" class="incSetType" value="${t}" ${on}>${t}</label>`;
+    document.getElementById('incSetRates').innerHTML = this.MF_TYPES.map(t=>{
+      const v = cfg.mf_rates[t]!=null ? cfg.mf_rates[t] : '';
+      return `<label style="font-size:.8rem">${escapeHtml(t)}</label>`
+        + `<input type="number" class="incRateInput" data-type="${escapeHtml(t)}" step="0.01" value="${v}" placeholder="0" style="width:80px;padding:5px 7px">`;
     }).join('');
     m.classList.add('open');
   },
   saveSettings(){
     if(!(CU&&CU.role==='admin')) return;
-    const mf_pct=Number(document.getElementById('incSetMfPct').value)||0;
     const demat_fixed=Number(document.getElementById('incSetDemat').value)||0;
-    const mf_types=[...document.querySelectorAll('.incSetType:checked')].map(c=>c.value);
-    DB.set('incentive_config', {mf_pct, demat_fixed, mf_types});
+    const mf_rates={};
+    document.querySelectorAll('.incRateInput').forEach(inp=>{
+      const t=inp.getAttribute('data-type'); const v=Number(inp.value)||0;
+      if(v>0) mf_rates[t]=v;
+    });
+    DB.set('incentive_config', {mf_rates, demat_fixed});
     closeModal('incSettingsModal');
     toast('Incentive rates updated','success');
     const pg=getCurrentPageId();
