@@ -979,7 +979,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
             <div class="form-field" style="min-width:160px">
               <label>Type *</label>
-              <select id="mftxn-type">
+              <select id="mftxn-type" onchange="toggleMfTxnTarget()">
                 <option value="Lumpsum">Lumpsum</option>
                 <option value="SIP">New SIP</option>
                 <option value="SIP Stop">SIP Stop</option>
@@ -1000,6 +1000,11 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <label>Fund Name *</label>
               <input type="text" id="mftxn-fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('mftxn-fund','mftxn-fund-results')" onfocus="searchFundName('mftxn-fund','mftxn-fund-results')">
               <div id="mftxn-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+            </div>
+            <div class="form-field" id="mftxn-target-wrap" style="min-width:200px;position:relative;display:none">
+              <label id="mftxn-fund-label-hint" style="font-size:.74rem;color:var(--gray)">Target Scheme *</label>
+              <input type="text" id="mftxn-target-fund" placeholder="Switch / STP into..." autocomplete="off" oninput="searchFundName('mftxn-target-fund','mftxn-target-fund-results')" onfocus="searchFundName('mftxn-target-fund','mftxn-target-fund-results')">
+              <div id="mftxn-target-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Date *</label>
@@ -1544,7 +1549,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       </div>
       <div class="form-row">
         <div class="form-field"><label>Type *</label>
-          <select id="biz_type">
+          <select id="biz_type" onchange="toggleBizTarget()">
             <option value="Lumpsum">Lumpsum</option>
             <option value="SIP">New SIP</option>
             <option value="SIP Stop">SIP Stop</option>
@@ -1565,6 +1570,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div id="biz-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
         </div>
         <div class="form-field"><label>Date *</label><input id="biz_date" type="date"></div>
+      </div>
+      <div class="form-row" id="biz_target_wrap" style="display:none">
+        <div class="form-field" style="position:relative"><label>Target Scheme (Switch / STP into) *</label>
+          <input id="biz_target_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_target_fund','biz-target-fund-results')" onfocus="searchFundName('biz_target_fund','biz-target-fund-results')">
+          <div id="biz-target-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-field"><label>Remarks</label><input id="biz_remarks" placeholder="Optional notes"></div>
@@ -4977,6 +4988,8 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
+  const btEl=document.getElementById('biz_target_fund'); if(btEl) btEl.value='';
+  toggleBizTarget();
   document.getElementById('biz_date').value = today();
   document.getElementById('biz_remarks').value = '';
   document.getElementById('businessModal').classList.add('open');
@@ -4987,11 +5000,13 @@ function saveBusinessEntry(){
   const type = document.getElementById('biz_type').value;
   const amount = parseFloat(document.getElementById('biz_amount').value);
   const fundName = (document.getElementById('biz_fund')?.value||'').trim();
+  const targetScheme = (document.getElementById('biz_target_fund')?.value||'').trim();
   const date = document.getElementById('biz_date').value;
   const remarks = document.getElementById('biz_remarks').value.trim();
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
   if(!fundName){ toast('Please enter the fund name','error'); return; }
+  if(mfTxnTypeNeedsTarget(type) && !targetScheme){ toast('Please enter the target scheme','error'); return; }
   if(!date){ toast('Please enter the date','error'); return; }
 
   const biz = DB.get('mf_business');
@@ -5013,12 +5028,14 @@ function saveBusinessEntry(){
       entries[idx].type = type;
       entries[idx].amount = amount;
       entries[idx].fund_name = fundName;
+      entries[idx].target_scheme = mfTxnTypeNeedsTarget(type) ? targetScheme : '';
       entries[idx].date = date;
       entries[idx].remarks = remarks;
     }
     const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
     DB.set('mf_business', {entries, eq_entries: eqEntries});
     learnFundName(fundName);
+    if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
     closeModal('businessModal');
     toast('Business entry updated!','success');
     editingBusinessId = null;
@@ -5036,7 +5053,9 @@ function saveBusinessEntry(){
     client_id: currentBusinessTarget.id,
     client_name: currentBusinessTarget.name,
     rm,
-    type, amount, fund_name: fundName, date, remarks,
+    type, amount, fund_name: fundName,
+    target_scheme: mfTxnTypeNeedsTarget(type) ? targetScheme : '',
+    date, remarks,
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
@@ -5049,6 +5068,7 @@ function saveBusinessEntry(){
   const eqEntries2 = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
   DB.set('mf_business', {entries, eq_entries: eqEntries2});
   learnFundName(fundName);
+  if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
   closeModal('businessModal');
   toast('Business entry saved!','success');
 }
@@ -5185,6 +5205,42 @@ function setMfBizEntries(entries){
   DB.set('mf_business', {entries, eq_entries: eqEntries});
 }
 
+// Switch & STP move money OUT of one scheme and INTO another, so they need a
+// second "Target Scheme" field. Everything else is a single-scheme txn.
+function mfTxnTypeNeedsTarget(t){ return t==='Switch' || t==='STP'; }
+
+// Show/hide the Target Scheme field on the MF Transactions form based on Type,
+// and relabel the Fund Name field as "Source Scheme (From)" for Switch/STP so
+// it's clear which scheme is which.
+function toggleMfTxnTarget(){
+  const type = document.getElementById('mftxn-type')?.value || '';
+  const needs = mfTxnTypeNeedsTarget(type);
+  const wrap = document.getElementById('mftxn-target-wrap');
+  if(wrap) wrap.style.display = needs ? '' : 'none';
+  const fundInput = document.getElementById('mftxn-fund');
+  const fundLabel = fundInput ? fundInput.previousElementSibling : null;
+  if(fundLabel) fundLabel.textContent = needs ? 'Source Scheme (From) *' : 'Fund Name *';
+  if(!needs){
+    const t=document.getElementById('mftxn-target-fund'); if(t) t.value='';
+    const tr=document.getElementById('mftxn-target-fund-results'); if(tr){ tr.style.display='none'; tr.innerHTML=''; }
+  }
+}
+
+// Same Target-Scheme show/hide logic for the Add/Edit Business modal.
+function toggleBizTarget(){
+  const type = document.getElementById('biz_type')?.value || '';
+  const needs = mfTxnTypeNeedsTarget(type);
+  const wrap = document.getElementById('biz_target_wrap');
+  if(wrap) wrap.style.display = needs ? '' : 'none';
+  const fundInput = document.getElementById('biz_fund');
+  const fundLabel = fundInput ? fundInput.previousElementSibling : null;
+  if(fundLabel) fundLabel.textContent = needs ? 'Source Scheme (From) *' : 'Fund Name *';
+  if(!needs){
+    const t=document.getElementById('biz_target_fund'); if(t) t.value='';
+    const tr=document.getElementById('biz-target-fund-results'); if(tr){ tr.style.display='none'; tr.innerHTML=''; }
+  }
+}
+
 // Jumps straight to the MF Transactions page with the Type pre-selected and
 // focus on client search — used by the Dashboard "Don't Forget" reminder card
 // so logging a Redemption / SIP Stop takes one click instead of three.
@@ -5205,6 +5261,8 @@ function renderMfTxnPage(){
   const srch=document.getElementById('mftxn-client-search'); if(srch) srch.value='';
   const res=document.getElementById('mftxn-client-results'); if(res){ res.style.display='none'; res.innerHTML=''; }
   const fundEl=document.getElementById('mftxn-fund'); if(fundEl) fundEl.value='';
+  const tgtEl=document.getElementById('mftxn-target-fund'); if(tgtEl) tgtEl.value='';
+  toggleMfTxnTarget();
   const dateEl=document.getElementById('mftxn-date'); if(dateEl && !dateEl.value) dateEl.value=today();
 
   // Populate RM filter dropdown (admin / MF Desk sees all MF RMs, RM sees just themself)
@@ -5393,7 +5451,7 @@ function selectFundName(inputId, resultsId, name){
 
 // Close fund-search dropdowns when clicking elsewhere
 document.addEventListener('click', e=>{
-  [['mftxn-fund','mftxn-fund-results'], ['biz_fund','biz-fund-results']].forEach(([inputId,resultsId])=>{
+  [['mftxn-fund','mftxn-fund-results'], ['mftxn-target-fund','mftxn-target-fund-results'], ['biz_fund','biz-fund-results'], ['biz_target_fund','biz-target-fund-results']].forEach(([inputId,resultsId])=>{
     const wrap=document.getElementById(inputId);
     const out=document.getElementById(resultsId);
     if(wrap && out && !wrap.contains(e.target) && !out.contains(e.target)) out.style.display='none';
@@ -5523,11 +5581,13 @@ function saveMfTxnEntry(){
   const type=document.getElementById('mftxn-type').value;
   const amount=parseFloat(document.getElementById('mftxn-amount').value);
   const fundName=document.getElementById('mftxn-fund').value.trim();
+  const targetScheme=(document.getElementById('mftxn-target-fund')?.value||'').trim();
   const date=document.getElementById('mftxn-date').value;
   const remarks=document.getElementById('mftxn-remarks').value.trim();
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
   if(!fundName){ toast('Please enter the fund name','error'); return; }
+  if(mfTxnTypeNeedsTarget(type) && !targetScheme){ toast('Please enter the target scheme','error'); return; }
   if(!date){ toast('Please enter the date','error'); return; }
 
   const entries=getMfBizEntries();
@@ -5536,7 +5596,9 @@ function saveMfTxnEntry(){
     client_id: mfTxnSelectedClient.id,
     client_name: mfTxnSelectedClient.name,
     rm: mfTxnSelectedClient.rm,
-    type, amount, fund_name: fundName, date, remarks,
+    type, amount, fund_name: fundName,
+    target_scheme: mfTxnTypeNeedsTarget(type) ? targetScheme : '',
+    date, remarks,
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
@@ -5548,6 +5610,7 @@ function saveMfTxnEntry(){
   });
   setMfBizEntries(entries);
   learnFundName(fundName);
+  if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
   toast(`${type} entry saved — ${mfTxnSelectedClient.name}`,'success');
 
   // Reset form for next entry but keep date/type for fast repeated entry
@@ -5557,6 +5620,8 @@ function saveMfTxnEntry(){
   document.getElementById('mftxn-client-search').value='';
   document.getElementById('mftxn-amount').value='';
   document.getElementById('mftxn-fund').value='';
+  const tgtReset=document.getElementById('mftxn-target-fund'); if(tgtReset) tgtReset.value='';
+  toggleMfTxnTarget();
   document.getElementById('mftxn-remarks').value='';
 
   renderMfTxnTable();
@@ -5597,7 +5662,7 @@ function getFilteredMfTxns(){
   const fromD=document.getElementById('mftxn-from-date')?.value||'';
   const toD=document.getElementById('mftxn-to-date')?.value||'';
 
-  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.fund_name||'').toLowerCase().includes(q));
+  if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.fund_name||'').toLowerCase().includes(q)||(e.target_scheme||'').toLowerCase().includes(q));
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
   if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
@@ -5649,7 +5714,7 @@ function renderMfTxnTable(){
           <td>${escapeHtml(e.client_name||'—')}</td>
           <td>${escapeHtml(e.rm||'—')}</td>
           <td><span class="badge" style="background:${color}22;color:${color}">${escapeHtml(e.type||'—')}</span></td>
-          <td style="font-size:.82rem">${escapeHtml(e.fund_name||'—')}</td>
+          <td style="font-size:.82rem">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<div style="font-size:.74rem;color:var(--teal,#0891B2);margin-top:2px">↳ ${escapeHtml(e.target_scheme)}</div>`:''}</td>
           <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
           ${INC.cell('mf',e)}
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
@@ -5691,16 +5756,17 @@ function exportMfTxns(){
     {header:'RM', width:14},
     {header:'Type', width:14},
     {header:'Fund Name', width:28},
+    {header:'Target Scheme', width:28},
     {header:'Amount', width:14, money:true},
     {header:'Incentive', width:14, money:true},
     {header:'Remarks', width:26},
     {header:'Status', width:12, color:dnStatusColor, align:'center'},
     {header:'Cross-Check Remark', width:22}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.remarks||'',e.status||'Pending',e.cross_remark||'']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.target_scheme||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.remarks||'',e.status||'Pending',e.cross_remark||'']);
   const totAmt=entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
   const totInc=Math.round(INC.total('mf',entries));
-  const totalRow=['TOTAL','','','','',totAmt,totInc,'', '', ''];
+  const totalRow=['TOTAL','','','','','',totAmt,totInc,'', '', ''];
   dnXlsx('MF_Transactions_'+today()+'.xlsx', 'MF Transactions — '+today(), cols, rows, totalRow);
   toast('Export done!','success');
 }
@@ -6587,6 +6653,8 @@ function editBusinessEntry(id){
   document.getElementById('biz_type').value = e.type;
   document.getElementById('biz_amount').value = e.amount;
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value = e.fund_name||'';
+  const btEl=document.getElementById('biz_target_fund'); if(btEl) btEl.value = e.target_scheme||'';
+  toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
   document.getElementById('biz_remarks').value = e.remarks||'';
   document.getElementById('businessModal').classList.add('open');
