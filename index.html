@@ -2749,6 +2749,7 @@ function getCurrentPageId(){
   return el ? el.id.replace('page-','') : '';
 }
 function showPage(id){
+  if(typeof BULK!=='undefined' && BULK.clearAll) BULK.clearAll();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
@@ -3225,7 +3226,8 @@ function renderEqTable(){
 
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
   const cols=['Code','Name','Mobile','RM','Assets','Last Trade','Last Call','Next Call','Follow-up','Remarks'];
-  let h=`<table><thead><tr>${cols.map((c,i)=>{
+  const isAdmin = CU.role==='admin';
+  let h=`<table><thead><tr>${BULK.th('eq')}${cols.map((c,i)=>{
     let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
       return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
@@ -3252,13 +3254,13 @@ function renderEqTable(){
     return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th><th>Status</th><th>Call</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+3}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+3+(isAdmin?1:0)}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
     const rowCls=days>=90?'row-alert':c.status==='Inactive'?'row-inactive':'';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
-    h+=`<tr class="${rowCls}">
+    h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
@@ -3283,6 +3285,7 @@ function renderEqTable(){
   });
   h+='</tbody></table>';
   document.getElementById('eq-table').innerHTML=h;
+  BULK.afterRender('eq');
   renderPg('eq',data.length,eqPage);
 }
 
@@ -3356,7 +3359,8 @@ function renderMfTable(){
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
   const cols=['Name','Mobile','PAN','MF RM','AUM','SIP Amt','SIP Cnt','Last Call','Next Call','Follow-up','Remarks'];
-  let h=`<table><thead><tr>${cols.map((c,i)=>{
+  const isAdmin = CU.role==='admin';
+  let h=`<table><thead><tr>${BULK.th('mf')}${cols.map((c,i)=>{
     let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
       return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
@@ -3382,11 +3386,11 @@ function renderMfTable(){
     return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th><th>Status</th><th>Call</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+3}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+3+(isAdmin?1:0)}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
-    h+=`<tr class="row-mf">
+    h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
@@ -3412,6 +3416,7 @@ function renderMfTable(){
   });
   h+='</tbody></table>';
   document.getElementById('mf-table').innerHTML=h;
+  BULK.afterRender('mf');
   renderPg('mf',data.length,mfPage);
 }
 
@@ -3473,7 +3478,8 @@ function renderLeadsTable(){
 
   const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
   const cols=['Name','Mobile','RM','Calls','Last Call','Next Call','Follow-up','Remarks'];
-  let h=`<table><thead><tr>${cols.map((c,i)=>{
+  const isAdmin = CU.role==='admin';
+  let h=`<table><thead><tr>${BULK.th('leads')}${cols.map((c,i)=>{
     let arrow = leadsSortField===i ? (leadsSortDir===1?' ▲':' ▼') : '';
     if(c==='Follow-up'){
       return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
@@ -3502,11 +3508,11 @@ function renderLeadsTable(){
     return `<th onclick="sortLeadsTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
   }).join('')}<th>Actions</th></tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="${cols.length+1+(isAdmin?1:0)}" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
-    h+=`<tr class="row-leads">
+    h+=`<tr class="row-leads">${BULK.td('leads',c.id)}
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
@@ -3527,6 +3533,7 @@ function renderLeadsTable(){
   });
   h+='</tbody></table>';
   document.getElementById('leads-table').innerHTML=h;
+  BULK.afterRender('leads');
   renderPg('leads',data.length,leadsPage);
 }
 
@@ -9248,6 +9255,354 @@ function brkExport(){
   ]);
   toast('Export done!','success');
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ADMIN BULK OPERATIONS  (Equity / MF / Leads)
+   Select clients via checkbox → Set RM (map/change) · Unmap RM ·
+   Shift segment (Equity↔MF copy, Lead→Equity/MF move) · Delete.
+   Admin-only. All ops show a confirmation summary before applying and write
+   an activity-log entry. Uses the same merge-on-write DB helpers.
+   ══════════════════════════════════════════════════════════════════════════ */
+const BULK = {
+  sel: { eq:new Set(), mf:new Set(), leads:new Set() },
+  KEY: { eq:'eq_clients', mf:'mf_clients', leads:'leads' },
+  LBL: { eq:'Equity', mf:'MF', leads:'Lead' },
+
+  isAdmin(){ return CU && CU.role==='admin'; },
+  _esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); },
+  filtered(seg){ return seg==='eq'?eqFiltered : seg==='mf'?mfFiltered : leadsFiltered; },
+
+  // ── table cell builders (called from render functions) ──
+  th(seg){
+    if(!this.isAdmin()) return '';
+    return `<th style="width:36px;text-align:center" onclick="event.stopPropagation()">`
+      + `<input type="checkbox" id="bulk-all-${seg}" title="Select all on this page" `
+      + `onclick="event.stopPropagation()" onchange="BULK.togglePage('${seg}',this.checked)"></th>`;
+  },
+  td(seg,id){
+    if(!this.isAdmin()) return '';
+    const ck=this.sel[seg].has(id)?'checked':'';
+    return `<td style="text-align:center" onclick="event.stopPropagation()">`
+      + `<input type="checkbox" class="bulk-cb" data-id="${id}" ${ck} `
+      + `onclick="event.stopPropagation()" onchange="BULK.toggle('${seg}','${id}',this.checked)"></td>`;
+  },
+
+  // ── selection ──
+  toggle(seg,id,checked){
+    if(checked) this.sel[seg].add(id); else this.sel[seg].delete(id);
+    this.syncHeader(seg); this.updateBar(seg);
+  },
+  togglePage(seg,checked){
+    document.querySelectorAll(`#${seg}-table .bulk-cb`).forEach(cb=>{
+      cb.checked=checked; const id=cb.getAttribute('data-id');
+      if(checked) this.sel[seg].add(id); else this.sel[seg].delete(id);
+    });
+    this.updateBar(seg);
+  },
+  selectAllFiltered(seg){
+    this.filtered(seg).forEach(c=>this.sel[seg].add(c.id));
+    this._rerender(seg); this.updateBar(seg);
+  },
+  clear(seg){ this.sel[seg].clear(); this._rerender(seg); this.updateBar(seg); },
+  clearAll(){ this.sel.eq.clear(); this.sel.mf.clear(); this.sel.leads.clear(); this.hideBar(); },
+
+  _rerender(seg){ if(seg==='eq') renderEqTable(); else if(seg==='mf') renderMfTable(); else renderLeadsTable(); },
+
+  afterRender(seg){
+    if(!this.isAdmin()) return;
+    this.syncHeader(seg);
+    this.updateBar(seg);
+  },
+  syncHeader(seg){
+    const box=document.getElementById('bulk-all-'+seg); if(!box) return;
+    const cbs=[...document.querySelectorAll(`#${seg}-table .bulk-cb`)];
+    const checkedCount=cbs.filter(cb=>cb.checked).length;
+    box.checked = cbs.length>0 && checkedCount===cbs.length;
+    box.indeterminate = checkedCount>0 && checkedCount<cbs.length;
+  },
+
+  // ── RM option list ──
+  rmList(seg){
+    const users=(DB.get('users')||DEFAULT_USERS).filter(u=>u.active!==false && u.role!=='admin' && u.role!=='mf_desk');
+    let pool;
+    if(seg==='eq') pool=users.filter(u=>(u.segments||[]).includes('equity'));
+    else if(seg==='mf') pool=users.filter(u=>(u.segments||[]).includes('mf'));
+    else pool=users; // leads: any RM
+    return [...new Set(pool.map(u=>u.name))].sort((a,b)=>a.localeCompare(b));
+  },
+
+  // ── floating action bar ──
+  ensureBar(){
+    let bar=document.getElementById('bulkBar');
+    if(bar) return bar;
+    bar=document.createElement('div');
+    bar.id='bulkBar'; bar.className='bulk-bar'; bar.style.display='none';
+    document.body.appendChild(bar);
+    return bar;
+  },
+  hideBar(){ const b=document.getElementById('bulkBar'); if(b) b.style.display='none'; },
+  updateBar(seg){
+    if(!this.isAdmin()) return;
+    const bar=this.ensureBar();
+    const n=this.sel[seg].size;
+    if(n===0){ bar.style.display='none'; return; }
+    bar.dataset.seg=seg;
+    const totalFiltered=this.filtered(seg).length;
+    const rmOpts=this.rmList(seg).map(r=>`<option value="${this._esc(r)}">${this._esc(r)}</option>`).join('');
+    let shift='';
+    if(seg==='eq') shift=`<button class="bb-btn bb-shift" onclick="BULK.shift('eq')">🏦 Shift→MF</button>`;
+    else if(seg==='mf') shift=`<button class="bb-btn bb-shift" onclick="BULK.shift('mf')">📈 Shift→Equity</button>`;
+    else shift=`<button class="bb-btn bb-shift" onclick="BULK.shift('leads','equity')">📈 →Equity</button>`
+              +`<button class="bb-btn bb-shift" onclick="BULK.shift('leads','mf')">🏦 →MF</button>`;
+    const selAll = n<totalFiltered
+      ? `<a class="bb-link" onclick="BULK.selectAllFiltered('${seg}')">Select all ${totalFiltered}</a>` : '';
+    bar.innerHTML=`
+      <div class="bb-left">
+        <span class="bb-count">${n} selected</span>${selAll}
+      </div>
+      <div class="bb-right">
+        <select id="bb-rm" class="bb-sel"><option value="">— RM —</option>${rmOpts}</select>
+        <button class="bb-btn bb-set" onclick="BULK.setRm()">✔ Set RM</button>
+        <button class="bb-btn bb-unmap" onclick="BULK.unmap()">⊘ Unmap</button>
+        ${shift}
+        <button class="bb-btn bb-del" onclick="BULK.del()">🗑️ Delete</button>
+        <button class="bb-btn bb-close" onclick="BULK.clear('${seg}')">✕</button>
+      </div>`;
+    bar.style.display='flex';
+  },
+
+  _selRecords(seg){
+    const ids=this.sel[seg]; const key=this.KEY[seg];
+    return (DB.get(key)||[]).filter(c=>ids.has(c.id));
+  },
+
+  // ── confirmation modal ──
+  confirm(title, bodyHtml, okLabel, okClass, onYes){
+    let m=document.getElementById('bulkConfirmModal');
+    if(!m){
+      m=document.createElement('div');
+      m.id='bulkConfirmModal'; m.className='modal-overlay';
+      m.setAttribute('onclick',"if(event.target===this)closeModal('bulkConfirmModal')");
+      m.innerHTML=`<div class="modal" style="width:460px">
+        <div class="modal-hdr"><h3 id="bulkConfirmTitle"></h3>
+          <button class="modal-close" onclick="closeModal('bulkConfirmModal')">×</button></div>
+        <div class="modal-body" id="bulkConfirmBody" style="font-size:.9rem;line-height:1.55"></div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('bulkConfirmModal')">Cancel</button>
+          <button id="bulkConfirmOk" class="btn"></button>
+        </div></div>`;
+      document.body.appendChild(m);
+    }
+    document.getElementById('bulkConfirmTitle').textContent=title;
+    document.getElementById('bulkConfirmBody').innerHTML=bodyHtml;
+    const ok=document.getElementById('bulkConfirmOk');
+    ok.textContent=okLabel; ok.className='btn '+(okClass||'btn-primary');
+    ok.onclick=async()=>{ closeModal('bulkConfirmModal'); await onYes(); };
+    m.classList.add('open');
+  },
+
+  // ── 1) SET RM (map / change) ──
+  setRm(){
+    const seg=this.ensureBar().dataset.seg;
+    const newRm=normRm((document.getElementById('bb-rm')||{value:''}).value.trim());
+    if(!newRm){ toast('Pehle RM choose karo','error'); return; }
+    const recs=this._selRecords(seg);
+    const change=recs.filter(c=>(c.rm||'').trim().toLowerCase()!==newRm.toLowerCase());
+    if(!change.length){ toast('In sabhi ka RM already '+newRm+' hai','error'); return; }
+    this.confirm('Bulk RM Change',
+      `<b>${change.length}</b> ${this.LBL[seg]} client(s) ka RM <b>${this._esc(newRm)}</b> set hoga.`
+      + (recs.length-change.length?`<br><span style="color:var(--gray)">${recs.length-change.length} already ${this._esc(newRm)} — skip.</span>`:''),
+      '✔ Confirm','', async()=>{
+        const key=this.KEY[seg], logs=[];
+        change.forEach(c=>{ const old=c.rm||'—'; c.rm=newRm; c.updated=today();
+          logs.push({id:uid(),type:'bulk_rm_update',seg,client_id:c.id,client_name:c.name,rm:newRm,by:CU.name,date:new Date().toISOString(),changes:[{field:'rm',old,new:newRm}]}); });
+        await DB.setClientsBulk(key,change);
+        if(logs.length) await DB.addActivityLog(logs);
+        this._done(seg,`✅ ${change.length} client(s) ka RM ${newRm} set ho gaya`);
+      });
+  },
+
+  // ── 2) UNMAP (clear RM) ──
+  unmap(){
+    const seg=this.ensureBar().dataset.seg;
+    const recs=this._selRecords(seg).filter(c=>(c.rm||'').trim()!=='');
+    if(!recs.length){ toast('Inme se kisi ka RM mapped nahi hai','error'); return; }
+    this.confirm('Bulk Unmap RM',
+      `<b>${recs.length}</b> ${this.LBL[seg]} client(s) se RM hata diya jayega (unassigned).`,
+      '⊘ Unmap','btn-danger', async()=>{
+        const key=this.KEY[seg], logs=[];
+        recs.forEach(c=>{ const old=c.rm||'—'; c.rm=''; c.updated=today();
+          logs.push({id:uid(),type:'bulk_rm_update',seg,client_id:c.id,client_name:c.name,rm:'',by:CU.name,date:new Date().toISOString(),changes:[{field:'rm',old,new:'(unmapped)'}]}); });
+        await DB.setClientsBulk(key,recs);
+        if(logs.length) await DB.addActivityLog(logs);
+        this._done(seg,`✅ ${recs.length} client(s) unmap ho gaye`);
+      });
+  },
+
+  // ── 3) SHIFT segment ──
+  shift(seg,target){
+    const recs=this._selRecords(seg);
+    if(!recs.length) return;
+    const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
+    const validPan=p=>/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(p||'').trim().toUpperCase());
+
+    if(seg==='eq'){ // Equity → MF (copy, keep equity). PAN required.
+      const mf=DB.get('mf_clients')||[];
+      const panSet=new Set(mf.filter(c=>c.pan).map(c=>c.pan.trim().toUpperCase()));
+      const mobSet=new Set(mf.map(c=>cleanMob(c.mobile)).filter(Boolean));
+      const nameSet=new Set(mf.map(c=>(c.name||'').trim().toUpperCase()));
+      let create=[], noPan=0, dup=0;
+      recs.forEach(c=>{
+        const pan=(c.pan||'').trim().toUpperCase();
+        if(!validPan(pan)){ noPan++; return; }
+        if(panSet.has(pan) || mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
+        panSet.add(pan); create.push(c);
+      });
+      if(!create.length){ toast(`Koi shift nahi hua — ${noPan} bina PAN, ${dup} pehle se MF me`,'error'); return; }
+      this.confirm('Shift Equity → MF',
+        `<b>${create.length}</b> Equity client MF me add honge <i>(Equity record bana rahega — copy)</i>.`
+        + (noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} ko valid PAN nahi — skip (PAN ke bina MF nahi banta).</span>`:'')
+        + (dup?`<br><span style="color:var(--gray)">${dup} pehle se MF me — skip.</span>`:''),
+        '🏦 Shift','', async()=>{
+          const recsNew=[], logs=[];
+          create.forEach(c=>{ let id=uid(); while(mf.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
+            recsNew.push({id,name:c.name,mobile:c.mobile||'',pan:(c.pan||'').trim().toUpperCase(),email:c.email||'',rm:c.rm||'',status:'Prospect',aum:null,sip_amount:null,sip_count:null,last_invest_date:'',last_call_date:c.last_call_date||'',next_call:'',followup_status:'',remarks:`Shifted from Equity${c.code?' (Code: '+c.code+')':''}`,created:today(),updated:today()});
+            logs.push({id:uid(),type:'add',seg:'mf',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
+          await DB.setClientsBulk('mf_clients',recsNew);
+          if(logs.length) await DB.addActivityLog(logs);
+          this._done('eq',`✅ ${recsNew.length} client MF me add ho gaye (Equity intact)`); renderMfTable();
+        });
+
+    } else if(seg==='mf'){ // MF → Equity (copy, keep MF). Code blank allowed.
+      const eq=DB.get('eq_clients')||[];
+      const mobSet=new Set(eq.map(c=>cleanMob(c.mobile)).filter(Boolean));
+      const nameSet=new Set(eq.map(c=>(c.name||'').trim().toUpperCase()));
+      let create=[], dup=0;
+      recs.forEach(c=>{
+        if(mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
+        nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
+      });
+      if(!create.length){ toast(`Koi shift nahi hua — ${dup} pehle se Equity me`,'error'); return; }
+      this.confirm('Shift MF → Equity',
+        `<b>${create.length}</b> MF client Equity me add honge <i>(MF record bana rahega — copy)</i>.<br>`
+        + `<span style="color:var(--gray)">Client Code blank rahega — baad me edit karke daal dena.</span>`
+        + (dup?`<br><span style="color:var(--gray)">${dup} pehle se Equity me — skip.</span>`:''),
+        '📈 Shift','', async()=>{
+          const recsNew=[], logs=[];
+          create.forEach(c=>{ let id=uid(); while(eq.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
+            recsNew.push({id,code:'',name:c.name,mobile:c.mobile||'',email:c.email||'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:c.last_call_date||'',next_call:'',followup_status:'',remarks:`Shifted from MF${c.pan?' (PAN: '+c.pan+')':''}`,created:today(),updated:today()});
+            logs.push({id:uid(),type:'add',seg:'equity',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
+          await DB.setClientsBulk('eq_clients',recsNew);
+          if(logs.length) await DB.addActivityLog(logs);
+          this._done('mf',`✅ ${recsNew.length} client Equity me add ho gaye (MF intact)`); renderEqTable();
+        });
+
+    } else { // Leads → Equity / MF (MOVE — lead delete after convert, like single convertLead)
+      const toMf = target==='mf';
+      const key = toMf?'mf_clients':'eq_clients';
+      const existing = DB.get(key)||[];
+      const mobSet=new Set(existing.map(c=>cleanMob(c.mobile)).filter(Boolean));
+      const nameSet=new Set(existing.map(c=>(c.name||'').trim().toUpperCase()));
+      const panSet=new Set(existing.filter(c=>c.pan).map(c=>c.pan.trim().toUpperCase()));
+      let create=[], noPan=0, dup=0;
+      recs.forEach(c=>{
+        if(toMf){ const pan=(c.pan||'').trim().toUpperCase();
+          if(!validPan(pan)){ noPan++; return; }
+          if(panSet.has(pan)){ dup++; return; } panSet.add(pan); }
+        if(mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
+        nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
+      });
+      if(!create.length){ toast(`Koi convert nahi hua — ${toMf?noPan+' bina PAN, ':''}${dup} duplicate`,'error'); return; }
+      this.confirm(`Convert Lead → ${toMf?'MF':'Equity'}`,
+        `<b>${create.length}</b> lead ${toMf?'MF Investor':'Equity Client'} ban jayenge <i>(lead list se hat jayenge — move)</i>.`
+        + (toMf&&noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} lead me valid PAN nahi — skip.</span>`:'')
+        + (dup?`<br><span style="color:var(--gray)">${dup} duplicate — skip.</span>`:''),
+        toMf?'🏦 Convert':'📈 Convert','', async()=>{
+          const recsNew=[], logs=[], movedIds=[];
+          create.forEach(c=>{ let id=uid(); while(existing.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
+            let rec = toMf
+              ? {id,name:c.name,mobile:c.mobile||'',pan:(c.pan||'').trim().toUpperCase(),email:'',rm:c.rm||'',status:'Prospect',aum:null,sip_amount:null,sip_count:null,last_invest_date:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()}
+              : {id,code:'',name:c.name,mobile:c.mobile||'',email:'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()};
+            recsNew.push(rec); movedIds.push(c.id);
+            logs.push({id:uid(),type:'add',seg:toMf?'mf':'equity',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
+          await DB.setClientsBulk(key,recsNew);
+          await this._bulkDelete('leads',movedIds);
+          if(logs.length) await DB.addActivityLog(logs);
+          this._done('leads',`✅ ${recsNew.length} lead ${toMf?'MF':'Equity'} me convert ho gaye`);
+          if(toMf) renderMfTable(); else renderEqTable();
+        });
+    }
+  },
+
+  // ── 4) DELETE ──
+  del(){
+    const seg=this.ensureBar().dataset.seg;
+    const recs=this._selRecords(seg);
+    if(!recs.length) return;
+    this.confirm('Bulk Delete',
+      `<b style="color:var(--red)">${recs.length}</b> ${this.LBL[seg]} record(s) <b>permanently delete</b> ho jayenge. Ye undo nahi hoga.`,
+      '🗑️ Delete','btn-danger', async()=>{
+        const ids=recs.map(c=>c.id), logs=[];
+        recs.forEach(c=>logs.push({id:uid(),type:'delete',seg:seg==='eq'?'equity':seg,client_id:c.id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}));
+        await this._bulkDelete(this.KEY[seg],ids);
+        if(logs.length) await DB.addActivityLog(logs);
+        this._done(seg,`✅ ${ids.length} record delete ho gaye`);
+      });
+  },
+
+  // ── shared: bulk delete via transaction (no clobber) ──
+  async _bulkDelete(key,ids){
+    const idSet=new Set(ids);
+    let arr=(DB.get(key)||[]).filter(c=>!idSet.has(c.id));
+    DB.setLocal(key,arr);
+    if(typeof fdb!=='undefined'){
+      try{
+        const ref=fdb.collection('crm_data').doc(key);
+        await fdb.runTransaction(async tx=>{
+          const doc=await tx.get(ref);
+          let latest=(doc.exists&&doc.data()&&doc.data().data)?doc.data().data:arr;
+          latest=latest.filter(c=>!idSet.has(c.id));
+          tx.set(ref,{data:latest,updated:new Date().toISOString()});
+        });
+      }catch(e){ toast('Delete sync error: '+(e.message||e),'error'); }
+    }
+  },
+
+  _done(seg,msg){
+    this.sel[seg].clear();
+    this._rerender(seg);
+    this.hideBar();
+    refreshDash(); updateBadges();
+    toast(msg,'success');
+  }
+};
+
+/* bulk bar + checkbox styling */
+(function(){
+  const css=`
+  .bulk-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:480;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:var(--navy,#0f2c5c);color:#fff;padding:10px 16px;border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.28);max-width:96vw}
+  .bulk-bar .bb-left{display:flex;align-items:center;gap:10px}
+  .bulk-bar .bb-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .bulk-bar .bb-count{font-weight:700;white-space:nowrap}
+  .bulk-bar .bb-link{color:#7fd4ff;cursor:pointer;font-size:.82rem;text-decoration:underline;white-space:nowrap}
+  .bulk-bar .bb-sel{padding:6px 8px;border-radius:8px;border:none;font-size:.85rem;max-width:130px}
+  .bulk-bar .bb-btn{border:none;border-radius:9px;padding:7px 11px;font-size:.82rem;font-weight:600;
+    cursor:pointer;background:#fff;color:var(--navy,#0f2c5c);white-space:nowrap}
+  .bulk-bar .bb-btn:hover{opacity:.9}
+  .bulk-bar .bb-set{background:#16a34a;color:#fff}
+  .bulk-bar .bb-unmap{background:#f59e0b;color:#fff}
+  .bulk-bar .bb-shift{background:#0ea5e9;color:#fff}
+  .bulk-bar .bb-del{background:#dc2626;color:#fff}
+  .bulk-bar .bb-close{background:transparent;color:#fff;font-size:1rem;padding:6px 9px}
+  .bulk-cb,#bulk-all-eq,#bulk-all-mf,#bulk-all-leads{width:16px;height:16px;cursor:pointer;accent-color:var(--navy,#0f2c5c)}
+  @media(max-width:640px){.bulk-bar{bottom:8px;gap:8px;padding:9px 12px;font-size:.85rem}.bulk-bar .bb-btn{padding:6px 9px;font-size:.78rem}}
+  `;
+  const st=document.createElement('style'); st.textContent=css;
+  (document.head||document.documentElement).appendChild(st);
+})();
 
 </script>
 </body>
