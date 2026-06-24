@@ -991,6 +991,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportMfTxns()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-inc" style="display:none" onclick="INC.openSettings()">⚙️ Incentive Rates</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="RMSUM.open()">📊 RM Summary</button>
           </div>
         </div>
 
@@ -1083,6 +1084,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportEqDemat()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-inc" style="display:none" onclick="INC.openSettings()">⚙️ Incentive Rates</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="RMSUM.open()">📊 RM Summary</button>
           </div>
         </div>
 
@@ -2070,7 +2072,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -2502,7 +2504,7 @@ function initApp(){
       });
 
       // Real-time listeners for small array collections (users, call_logs, mf_business)
-      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config'].forEach(key=>{
+      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
@@ -9476,6 +9478,136 @@ const INC = {
     const pg=getCurrentPageId();
     if(pg==='mf-txns') renderMfTxnTable();
     if(pg==='eq-demat') renderEqDematTable();
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RM-WISE SALES SUMMARY  (MF Sales ₹ + SIP ₹ + Demat opened count + incentive)
+   Admin can Push to HR Portal (writes crm_data/rm_sales_summary that HR reads)
+   or Remove. Final HR-side consumption wired when HR file is provided.
+   ══════════════════════════════════════════════════════════════════════════ */
+const RMSUM = {
+  SALES_TYPES: ['Lumpsum','Additional Buy','Switch','STP','SIP Bounce Buy'],
+  monthsAvailable(){
+    const set=new Set();
+    getMfBizEntries().forEach(e=>{ if(e.date) set.add(e.date.slice(0,7)); });
+    getEqDematEntries().forEach(e=>{ if(e.date) set.add(e.date.slice(0,7)); });
+    return [...set].sort().reverse();
+  },
+  compute(month){
+    const inMonth = d => !month || (d||'').slice(0,7)===month;
+    const map={};
+    const get=rm=>{ rm=normRm(rm||'')||'(No RM)'; if(!map[rm]) map[rm]={rm,mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0}; return map[rm]; };
+    getMfBizEntries().forEach(e=>{
+      if((e.status||'Pending')==='Declined') return;
+      if(!inMonth(e.date)) return;
+      const r=get(e.rm); const amt=Number(e.amount)||0;
+      if(e.type==='SIP') r.sip_amount+=amt;
+      else if(this.SALES_TYPES.includes(e.type)) r.mf_sales+=amt;
+      r.mf_inc += INC.mf(e).amt;
+    });
+    getEqDematEntries().forEach(e=>{
+      if((e.status||'Pending')==='Declined') return;
+      if(!inMonth(e.date)) return;
+      const r=get(e.opening_rm||e.rm); r.demat_count++; r.demat_inc += INC.demat(e).amt;
+    });
+    return Object.values(map).map(r=>({...r,total_inc:r.mf_inc+r.demat_inc}))
+      .sort((a,b)=>(b.mf_sales+b.sip_amount)-(a.mf_sales+a.sip_amount));
+  },
+  open(){
+    if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); return; }
+    let m=document.getElementById('rmSumModal');
+    if(!m){
+      m=document.createElement('div'); m.id='rmSumModal'; m.className='modal-overlay';
+      m.setAttribute('onclick',"if(event.target===this)closeModal('rmSumModal')");
+      m.innerHTML=`<div class="modal" style="width:780px;max-width:96vw">
+        <div class="modal-hdr"><h3>📊 RM-wise Sales Summary</h3>
+          <button class="modal-close" onclick="closeModal('rmSumModal')">×</button></div>
+        <div class="modal-body">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <label style="font-size:.85rem;font-weight:600">Month:</label>
+            <select id="rmSumMonth" onchange="RMSUM.render()" style="max-width:150px"></select>
+            <button class="btn btn-outline" onclick="RMSUM.exportXlsx()">⬇️ Export</button>
+            <span style="flex:1"></span>
+            <button class="btn btn-primary" onclick="RMSUM.pushHR()">📤 Push to HR Portal</button>
+            <button class="btn btn-outline" style="color:var(--red)" onclick="RMSUM.removeHR()">🗑️ Remove from HR</button>
+          </div>
+          <div id="rmSumStatus" style="font-size:.78rem;color:var(--gray);margin-bottom:8px"></div>
+          <div class="tbl-wrap"><div id="rmSumTable" style="overflow:auto"></div></div>
+          <div style="font-size:.72rem;color:var(--gray);margin-top:8px">MF Sales = Lumpsum + Additional Buy + Switch + STP + SIP Bounce Buy. SIP = New SIP. Declined entries excluded.</div>
+        </div>
+      </div>`;
+      document.body.appendChild(m);
+    }
+    const months=this.monthsAvailable();
+    const cur=new Date().toISOString().slice(0,7);
+    const sel=document.getElementById('rmSumMonth');
+    sel.innerHTML=`<option value="">All months</option>`+months.map(mo=>`<option value="${mo}" ${mo===cur?'selected':''}>${mo}</option>`).join('');
+    if(!months.includes(cur)) sel.value='';
+    this.render();
+    m.classList.add('open');
+  },
+  render(){
+    const month=document.getElementById('rmSumMonth').value;
+    const rows=this.compute(month);
+    const tbl=document.getElementById('rmSumTable');
+    const f=n=>INC.fmt(n);
+    if(!rows.length){ tbl.innerHTML='<div style="padding:24px;text-align:center;color:var(--gray)">No data for this period</div>'; this._showStatus(); return; }
+    const tot=rows.reduce((a,r)=>({mf_sales:a.mf_sales+r.mf_sales,sip_amount:a.sip_amount+r.sip_amount,demat_count:a.demat_count+r.demat_count,mf_inc:a.mf_inc+r.mf_inc,demat_inc:a.demat_inc+r.demat_inc,total_inc:a.total_inc+r.total_inc}),{mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0,total_inc:0});
+    tbl.innerHTML=`<table><thead><tr>
+      <th>RM</th><th style="text-align:right">MF Sales</th><th style="text-align:right">SIP Amount</th>
+      <th style="text-align:right">Demat Opened</th><th style="text-align:right">MF Incentive</th>
+      <th style="text-align:right">Demat Incentive</th><th style="text-align:right">Total Incentive</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr>
+        <td style="font-weight:600">${escapeHtml(r.rm)}</td>
+        <td style="text-align:right">${f(r.mf_sales)}</td>
+        <td style="text-align:right">${f(r.sip_amount)}</td>
+        <td style="text-align:right">${r.demat_count}</td>
+        <td style="text-align:right">${f(r.mf_inc)}</td>
+        <td style="text-align:right">${f(r.demat_inc)}</td>
+        <td style="text-align:right;font-weight:700">${f(r.total_inc)}</td></tr>`).join('')}
+      <tr style="font-weight:700;background:var(--bg,#f6f7fb)">
+        <td>TOTAL</td><td style="text-align:right">${f(tot.mf_sales)}</td><td style="text-align:right">${f(tot.sip_amount)}</td>
+        <td style="text-align:right">${tot.demat_count}</td><td style="text-align:right">${f(tot.mf_inc)}</td>
+        <td style="text-align:right">${f(tot.demat_inc)}</td><td style="text-align:right">${f(tot.total_inc)}</td></tr>
+      </tbody></table>`;
+    this._showStatus();
+  },
+  _showStatus(){
+    const s=document.getElementById('rmSumStatus'); if(!s) return;
+    const hr=DB.get('rm_sales_summary');
+    if(hr && Array.isArray(hr.rows) && hr.rows.length){
+      s.innerHTML=`✅ HR Portal me pushed: <b>${escapeHtml(hr.month||'all')}</b> · ${hr.rows.length} RMs · ${hr.generated_at?new Date(hr.generated_at).toLocaleString('en-IN'):''} by ${escapeHtml(hr.by||'')}`;
+    } else {
+      s.innerHTML='HR Portal me abhi kuch push nahi kiya.';
+    }
+  },
+  pushHR(){
+    if(!(CU&&CU.role==='admin')) return;
+    const month=document.getElementById('rmSumMonth').value;
+    const rows=this.compute(month).map(r=>({rm:r.rm,mf_sales:Math.round(r.mf_sales),sip_amount:Math.round(r.sip_amount),demat_count:r.demat_count,mf_incentive:Math.round(r.mf_inc),demat_incentive:Math.round(r.demat_inc),total_incentive:Math.round(r.total_inc)}));
+    if(!rows.length){ toast('Is period me koi data nahi','error'); return; }
+    DB.set('rm_sales_summary', {month:month||'all', rows, generated_at:new Date().toISOString(), by:CU.name});
+    toast('HR Portal ke liye push ho gaya','success');
+    this._showStatus();
+  },
+  removeHR(){
+    if(!(CU&&CU.role==='admin')) return;
+    if(!confirm('HR Portal se ye summary remove karein?')) return;
+    DB.set('rm_sales_summary', {month:'', rows:[], cleared_at:new Date().toISOString(), by:CU.name});
+    toast('HR se remove ho gaya','success');
+    this._showStatus();
+  },
+  exportXlsx(){
+    const month=document.getElementById('rmSumMonth').value;
+    const rows=this.compute(month);
+    if(!rows.length){ toast('No data','error'); return; }
+    const cols=[{header:'RM',width:18},{header:'MF Sales',width:16,money:true},{header:'SIP Amount',width:16,money:true},{header:'Demat Opened',width:14,align:'center'},{header:'MF Incentive',width:16,money:true},{header:'Demat Incentive',width:16,money:true},{header:'Total Incentive',width:16,money:true}];
+    const data=rows.map(r=>[r.rm,Math.round(r.mf_sales),Math.round(r.sip_amount),r.demat_count,Math.round(r.mf_inc),Math.round(r.demat_inc),Math.round(r.total_inc)]);
+    const tot=rows.reduce((a,r)=>[null,a[1]+r.mf_sales,a[2]+r.sip_amount,a[3]+r.demat_count,a[4]+r.mf_inc,a[5]+r.demat_inc,a[6]+r.total_inc],[null,0,0,0,0,0,0]);
+    const totalRow=['TOTAL',Math.round(tot[1]),Math.round(tot[2]),tot[3],Math.round(tot[4]),Math.round(tot[5]),Math.round(tot[6])];
+    dnXlsx('RM_Sales_Summary_'+(month||'all')+'.xlsx','RM-wise Sales Summary — '+(month||'All months'),cols,data,totalRow);
+    toast('Export done!','success');
   }
 };
 
