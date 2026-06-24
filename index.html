@@ -2720,23 +2720,25 @@ function populateRmDropdowns(){
     eqRMs = [CU.name];
     mfRMs = [CU.name];
   }
+  // Admin gets a "No RM" filter to find unassigned clients and shift them
+  const noRmOpt = CU.role==='admin' ? '<option value="__NONE__">— No RM (Unassigned) —</option>' : '';
   ['eq-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
-    el.innerHTML='<option value="">All RMs</option>'+eqRMs.map(r=>`<option>${r}</option>`).join('');
+    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+eqRMs.map(r=>`<option>${r}</option>`).join('');
     if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
   });
   ['mf-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
-    el.innerHTML='<option value="">All RMs</option>'+mfRMs.map(r=>`<option>${r}</option>`).join('');
+    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+mfRMs.map(r=>`<option>${r}</option>`).join('');
     if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
   });
   ['leads-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
     const allRMs=[...new Set([...eqRMs,...mfRMs])];
-    el.innerHTML='<option value="">All RMs</option>'+allRMs.map(r=>`<option>${r}</option>`).join('');
+    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+allRMs.map(r=>`<option>${r}</option>`).join('');
     if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
   });
 }
@@ -3185,7 +3187,8 @@ function renderEqTable(){
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
   else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
-  if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
+  else if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
@@ -3322,7 +3325,8 @@ function renderMfTable(){
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
   else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
-  if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
+  else if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
@@ -3443,7 +3447,8 @@ function renderLeadsTable(){
   const nextCallDate=(document.getElementById('leads-next-call-date')||{value:''}).value;
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
-  if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
+  else if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(fu&&!['today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
