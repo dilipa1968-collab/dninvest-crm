@@ -624,9 +624,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">🎤</span> Seminars
         <span class="nav-badge" id="nb-seminars">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('meeting-agenda')" id="nav-meeting-agenda">
-        <span class="icon">🗓️</span> Meeting Agenda
-      </div>
 
       <div class="sidebar-section" id="eq-nav-section">Equity</div>
       <div class="nav-item" onclick="showPage('eq-clients')" id="nav-eq-clients">
@@ -758,41 +755,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
       </div>
 
-      <!-- ── MEETING AGENDA ── -->
-      <div class="page" id="page-meeting-agenda">
-        <div class="page-hdr">
-          <div class="page-title">🗓️ Office Meeting Agenda</div>
-          <div class="hdr-actions admin-only" id="ma-admin-actions" style="display:none">
-            <button class="btn btn-danger" onclick="clearMeetingAgenda()">🗑️ Clear for New Meeting</button>
-          </div>
-        </div>
-
-        <div class="ann-card">
-          <h3>➕ Add to Agenda</h3>
-          <div class="form-row">
-            <div class="form-field">
-              <label>Type</label>
-              <select id="ma-type">
-                <option value="idea">💡 Idea</option>
-                <option value="problem">⚠️ Problem</option>
-                <option value="target">🎯 Target</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-field" style="margin-top:4px">
-            <label>Your point</label>
-            <textarea id="ma-text" placeholder="Type your idea, problem, or target here..."></textarea>
-          </div>
-          <button class="btn btn-gold" style="margin-top:10px" onclick="submitAgendaItem()">➕ Add to Agenda</button>
-        </div>
-
-        <div class="ma-board" id="ma-board"></div>
-
-        <div class="ann-card admin-only" id="ma-history-card" style="display:none;margin-top:18px">
-          <h3>📜 Past Meetings</h3>
-          <div id="ma-history-list"></div>
-        </div>
-      </div>
 
 
       <!-- ── LEADS ── -->
@@ -2639,7 +2601,7 @@ function initApp(){
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
   // but get no other access — everything else in the sidebar stays hidden.
   if(CU.role==='mf_desk'){
-    ['nav-dashboard','nav-leads','nav-seminars','nav-meeting-agenda',
+    ['nav-dashboard','nav-leads','nav-seminars',
      'nav-mf-clients','nav-mf-followup','nav-mf-sip','nav-mf-nocall',
      'nav-reports','nav-activity-log'].forEach(id=>{
       const el=document.getElementById(id);
@@ -2784,7 +2746,6 @@ function showPage(id){
   else if(id==='mf-clients') renderMfTable();
   else if(id==='leads') renderLeadsTable();
   else if(id==='seminars') renderSeminarsTable();
-  else if(id==='meeting-agenda') renderMeetingAgenda();
   else if(id==='eq-followup'){ renderFollowup('eqf'); }
   else if(id==='mf-followup'){ renderFollowup('mff'); }
   else if(id==='eq-notrade') renderNoTrade();
