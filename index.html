@@ -68,7 +68,7 @@ window.dnXlsxBook = function(filename, sheets){
   const wb = XLSX.utils.book_new();
   const thin   = {style:'thin', color:{rgb:'FFD9DEE6'}};
   const border = {top:thin, bottom:thin, left:thin, right:thin};
-  const num = v => (v===''||v==null) ? null : (isNaN(Number(String(v).replace(/[₹,%\s]/g,''))) ? v : Number(String(v).replace(/[₹,%\s]/g,'')));
+  const num = v => (v===''||v==null) ? null : (isNaN(Number(String(v).replace(/[₹,%\s]/g,''))) ? v : Math.round(Number(String(v).replace(/[₹,%\s]/g,''))*100)/100);
 
   sheets.forEach(sh=>{
     const cols  = sh.columns || [];
@@ -107,8 +107,8 @@ window.dnXlsxBook = function(filename, sheets){
           alignment:{horizontal:align, vertical:'center'},
           border, font:{color:{rgb:font}}, fill:{fgColor:{rgb:bg}}
         }};
-        if(c.money && typeof v==='number') cell.z = '"₹"#,##0';
-        else if(isNum && typeof v==='number') cell.z = '#,##0';
+        if(c.money && typeof v==='number') cell.z = '"₹"#,##0.##';
+        else if(isNum && typeof v==='number') cell.z = '#,##0.##';
         return cell;
       }));
     });
@@ -125,8 +125,8 @@ window.dnXlsxBook = function(filename, sheets){
           alignment:{horizontal:c.align || (isNum?'right':'left'), vertical:'center'},
           border:{...border, top:{style:'medium', color:{rgb:'FF1F3864'}}}
         }};
-        if(c.money && typeof v==='number') cell.z = '"₹"#,##0';
-        else if(isNum && typeof v==='number') cell.z = '#,##0';
+        if(c.money && typeof v==='number') cell.z = '"₹"#,##0.##';
+        else if(isNum && typeof v==='number') cell.z = '#,##0.##';
         return cell;
       }));
     }
