@@ -1010,10 +1010,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
               <label>Date *</label>
               <input type="date" id="mftxn-date">
             </div>
-            <div class="form-field" style="min-width:220px">
-              <label>Remarks</label>
-              <input type="text" id="mftxn-remarks" placeholder="Optional notes">
-            </div>
             <div class="form-field" style="justify-content:flex-end">
               <label>&nbsp;</label>
               <button class="btn btn-success" onclick="saveMfTxnEntry()">Save Transaction</button>
@@ -1576,9 +1572,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <input id="biz_target_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_target_fund','biz-target-fund-results')" onfocus="searchFundName('biz_target_fund','biz-target-fund-results')">
           <div id="biz-target-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
         </div>
-      </div>
-      <div class="form-row">
-        <div class="form-field"><label>Remarks</label><input id="biz_remarks" placeholder="Optional notes"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -4992,7 +4985,6 @@ function openBusinessModal(clientId, clientName){
   const btEl=document.getElementById('biz_target_fund'); if(btEl) btEl.value='';
   toggleBizTarget();
   document.getElementById('biz_date').value = today();
-  document.getElementById('biz_remarks').value = '';
   document.getElementById('businessModal').classList.add('open');
 }
 
@@ -5003,7 +4995,6 @@ function saveBusinessEntry(){
   const fundName = (document.getElementById('biz_fund')?.value||'').trim();
   const targetScheme = (document.getElementById('biz_target_fund')?.value||'').trim();
   const date = document.getElementById('biz_date').value;
-  const remarks = document.getElementById('biz_remarks').value.trim();
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
   if(!fundName){ toast('Please enter the fund name','error'); return; }
@@ -5031,7 +5022,6 @@ function saveBusinessEntry(){
       entries[idx].fund_name = fundName;
       entries[idx].target_scheme = mfTxnTypeNeedsTarget(type) ? targetScheme : '';
       entries[idx].date = date;
-      entries[idx].remarks = remarks;
     }
     const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
     DB.set('mf_business', {entries, eq_entries: eqEntries});
@@ -5056,7 +5046,7 @@ function saveBusinessEntry(){
     rm,
     type, amount, fund_name: fundName,
     target_scheme: mfTxnTypeNeedsTarget(type) ? targetScheme : '',
-    date, remarks,
+    date,
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
@@ -5585,7 +5575,6 @@ function saveMfTxnEntry(){
   const fundName=document.getElementById('mftxn-fund').value.trim();
   const targetScheme=(document.getElementById('mftxn-target-fund')?.value||'').trim();
   const date=document.getElementById('mftxn-date').value;
-  const remarks=document.getElementById('mftxn-remarks').value.trim();
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
   if(!fundName){ toast('Please enter the fund name','error'); return; }
@@ -5600,7 +5589,7 @@ function saveMfTxnEntry(){
     rm: mfTxnSelectedClient.rm,
     type, amount, fund_name: fundName,
     target_scheme: mfTxnTypeNeedsTarget(type) ? targetScheme : '',
-    date, remarks,
+    date,
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
@@ -5624,7 +5613,6 @@ function saveMfTxnEntry(){
   document.getElementById('mftxn-fund').value='';
   const tgtReset=document.getElementById('mftxn-target-fund'); if(tgtReset) tgtReset.value='';
   toggleMfTxnTarget();
-  document.getElementById('mftxn-remarks').value='';
 
   renderMfTxnTable();
 }
@@ -5703,7 +5691,7 @@ function renderMfTxnTable(){
   const sTh=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
   wrap.innerHTML=`<table>
-    <thead><tr>${MFTBULK.th()}${sTh('date','Date')}${sTh('client','Client')}${sTh('rm','RM')}${sTh('type','Type')}${sTh('fund','Fund Name')}${sTh('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th><th>Cross-Check</th>${sTh('status','Status')}<th></th></tr></thead>
+    <thead><tr>${MFTBULK.th()}${sTh('date','Date')}${sTh('client','Client')}${sTh('rm','RM')}${sTh('type','Type')}${sTh('fund','Fund Name')}${sTh('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
@@ -5721,7 +5709,6 @@ function renderMfTxnTable(){
           <td style="font-size:.82rem">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<div style="font-size:.74rem;color:var(--teal,#0891B2);margin-top:2px">↳ ${escapeHtml(e.target_scheme)}</div>`:''}</td>
           <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
           ${INC.cell('mf',e)}
-          <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
           <td style="min-width:140px">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
@@ -5737,7 +5724,7 @@ function renderMfTxnTable(){
       <td colspan="${CU.role==='admin'?6:5}" style="text-align:right">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</td>
       <td style="text-align:right">₹${brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))}</td>
       <td style="text-align:right">${INC.fmt(INC.total('mf',entries))}</td>
-      <td colspan="4"></td>
+      <td colspan="3"></td>
     </tr></tfoot>
   </table>`;
   MFTBULK.afterRender();
@@ -5764,14 +5751,13 @@ function exportMfTxns(){
     {header:'Target Scheme', width:28},
     {header:'Amount', width:14, money:true},
     {header:'Incentive', width:14, money:true},
-    {header:'Remarks', width:26},
     {header:'Status', width:12, color:dnStatusColor, align:'center'},
     {header:'Cross-Check Remark', width:22}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.target_scheme||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.remarks||'',e.status||'Pending',e.cross_remark||'']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.target_scheme||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.status||'Pending',e.cross_remark||'']);
   const totAmt=entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
   const totInc=Math.round(INC.total('mf',entries));
-  const totalRow=['TOTAL','','','','','',totAmt,totInc,'', '', ''];
+  const totalRow=['TOTAL','','','','','',totAmt,totInc,'', ''];
   dnXlsx('MF_Transactions_'+today()+'.xlsx', 'MF Transactions — '+today(), cols, rows, totalRow);
   toast('Export done!','success');
 }
@@ -6661,7 +6647,6 @@ function editBusinessEntry(id){
   const btEl=document.getElementById('biz_target_fund'); if(btEl) btEl.value = e.target_scheme||'';
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
-  document.getElementById('biz_remarks').value = e.remarks||'';
   document.getElementById('businessModal').classList.add('open');
 }
 
