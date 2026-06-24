@@ -717,6 +717,15 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div id="bro-upload-result" style="margin-top:8px"></div>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
+          <div class="card-title">📥 CRM Sales Data <span id="crm-sales-meta" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">CRM se push hota hai (MF Transactions / Demat → 📊 RM Summary → Push to HR). "Apply" se MF Sale / SIP / Demat figures uss month me auto-bhar jayenge (Brokerage / Other waise hi rahega).</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn btn-sm" onclick="fetchCrmSalesSummary(true)">🔄 Refresh from CRM</button>
+            <button class="btn btn-primary btn-sm" onclick="applyCrmToBusiness()">⬇ Apply to Business Figures</button>
+          </div>
+          <div class="tbl-wrap"><div id="crm-sales-table"></div></div>
+        </div>
+        <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
@@ -1169,6 +1178,68 @@ async function saveMfSip(d){ await DB.set('mfsip', d); }
 // The selected month comes from the #inc-month picker (defaults to current month).
 function getMfSipByMonth(){ return DB.get('mfsip_by_month', {}) || {}; }
 async function saveMfSipByMonth(d){ await DB.set('mfsip_by_month', d); }
+
+// ─── CRM SALES DATA (pushed from CRM: MF Transactions/Demat → RM Summary → Push to HR) ───
+// CRM writes crm_data/rm_sales_summary = {month, rows:[{rm,mf_sales,sip_amount,demat_count,...}], generated_at, by}
+function getCrmSalesSummary(){ return DB.get('crm_sales_summary', null); }
+async function fetchCrmSalesSummary(showAlert){
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc=await fdb.collection('crm_data').doc('rm_sales_summary').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        DB.setLocal('crm_sales_summary', doc.data().data);
+      }
+    }
+  }catch(e){ console.log('CRM sales fetch error:',e); }
+  renderCrmSalesSummary();
+  if(showAlert) alert('CRM se sales data refresh ho gaya');
+}
+function renderCrmSalesSummary(){
+  const wrap=document.getElementById('crm-sales-table');
+  const meta=document.getElementById('crm-sales-meta');
+  if(!wrap) return;
+  const s=getCrmSalesSummary();
+  if(!s || !Array.isArray(s.rows) || !s.rows.length){
+    wrap.innerHTML='<p style="font-size:12px;color:var(--text3);padding:8px 0">CRM se abhi koi data push nahi hua.</p>';
+    if(meta) meta.textContent='';
+    return;
+  }
+  if(meta) meta.textContent='— '+(s.month||'all')+' · pushed '+(s.generated_at?new Date(s.generated_at).toLocaleString('en-IN'):'')+(s.by?(' by '+s.by):'');
+  const empLower=EMPLOYEES.map(e=>e.name.toLowerCase());
+  wrap.innerHTML='<table><thead><tr><th>RM</th><th>MF Sales</th><th>SIP Amount</th><th>Demat</th><th>Total Inc. (CRM)</th><th>Match</th></tr></thead><tbody>'
+    + s.rows.map(r=>{
+        const matched=empLower.includes((r.rm||'').toLowerCase());
+        return '<tr><td>'+escapeHtml(r.rm||'')+'</td><td>'+fmt(r.mf_sales||0)+'</td><td>'+fmt(r.sip_amount||0)+'</td><td style="text-align:center">'+(r.demat_count||0)+'</td><td>'+fmt(r.total_incentive||0)+'</td><td>'+(matched?'<span style="color:#16a34a;font-weight:600">✓ emp</span>':'<span style="color:var(--text3)">— skip</span>')+'</td></tr>';
+      }).join('')
+    + '</tbody></table>';
+}
+async function applyCrmToBusiness(){
+  const s=getCrmSalesSummary();
+  if(!s || !Array.isArray(s.rows) || !s.rows.length){ alert('CRM se koi data nahi mila. Pehle CRM me 📊 RM Summary se "Push to HR Portal" karo.'); return; }
+  const month = (s.month && s.month!=='all') ? s.month : currentIncMonth();
+  if(!month){ alert('Month nahi mila'); return; }
+  const empByLower={}; EMPLOYEES.forEach(e=>empByLower[e.name.toLowerCase()]=e.name);
+  const all=getMfSipByMonth();
+  if(!all[month]) all[month]={};
+  let applied=0, skipped=0;
+  const pending=[];
+  s.rows.forEach(r=>{
+    const name=empByLower[(r.rm||'').toLowerCase()];
+    if(!name){ skipped++; return; }
+    pending.push({name, r}); applied++;
+  });
+  if(!applied){ alert('Koi RM employee se match nahi hua. (CRM ke RM naam aur HR ke employee naam same hone chahiye)'); return; }
+  const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  if(!confirm(mLabel+' me '+applied+' RM ke MF Sale / SIP / Demat figures CRM se update honge'+(skipped?(' ('+skipped+' skip — employee match nahi)'):'')+'.\nBrokerage / Other waise hi rahenge. Confirm?')) return;
+  pending.forEach(({name,r})=>{
+    const prev=all[month][name]||{};
+    all[month][name]=Object.assign({}, prev, { demat:r.demat_count||0, mf:r.mf_sales||0, sip:r.sip_amount||0 });
+  });
+  await saveMfSipByMonth(all);
+  renderIncentivePage();
+  loadIncEmp();
+  alert('Done! '+applied+' RM ke figures update ho gaye'+(skipped?(', '+skipped+' skip.'):'.'));
+}
 function currentIncMonth(){
   const el=document.getElementById('inc-month');
   if(el && el.value) return el.value;
@@ -1580,6 +1651,7 @@ function startApp(){
   renderLeavePage();
   renderSalaryPage();
   renderIncentivePage();
+  fetchCrmSalesSummary();
   if(isAdmin) renderEmployees();
   calcSalary();
   renderAdvanceBox();
@@ -1599,10 +1671,23 @@ function startApp(){
     renderLeavePage();
     renderSalaryPage();
     renderIncentivePage();
+    renderCrmSalesSummary();
     renderEsiBox();
     renderExtraDeductionBox();
     if(isAdmin){ renderEmployees(); renderAdvanceBox(); renderAdvanceHistory(); loadEsiSettingsIntoUI(); renderEsiOverrideTable(); }
   });
+
+  // Live listener for CRM-pushed sales summary (crm_data collection, not hr_data)
+  try{
+    if(typeof fdb!=='undefined'){
+      fdb.collection('crm_data').doc('rm_sales_summary').onSnapshot(doc=>{
+        if(doc.exists && doc.data() && doc.data().data){
+          DB.setLocal('crm_sales_summary', doc.data().data);
+          renderCrmSalesSummary();
+        }
+      }, err=>console.log('CRM sales listener error:',err));
+    }
+  }catch(e){ console.log('CRM sales listener setup error:',e); }
 }
 
 function doLogout(){
