@@ -990,6 +990,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="page-title">MF Transactions</div>
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportMfTxns()">⬇️ Export</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="INC.openSettings()">⚙️ Incentive Rates</button>
           </div>
         </div>
 
@@ -1081,6 +1082,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="page-title">Demat Account Opening</div>
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportEqDemat()">⬇️ Export</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="INC.openSettings()">⚙️ Incentive Rates</button>
           </div>
         </div>
 
@@ -2068,7 +2070,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -2500,7 +2502,7 @@ function initApp(){
       });
 
       // Real-time listeners for small array collections (users, call_logs, mf_business)
-      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names'].forEach(key=>{
+      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
@@ -2542,6 +2544,11 @@ function initApp(){
                 }
               }
               if((key==='meeting_agenda'||key==='meeting_agenda_archive') && getCurrentPageId()==='meeting-agenda') renderMeetingAgenda();
+              if(key==='incentive_config' || key==='mf_business'){
+                const pg=getCurrentPageId();
+                if(pg==='mf-txns' && typeof renderMfTxnTable==='function') renderMfTxnTable();
+                if(pg==='eq-demat' && typeof renderEqDematTable==='function') renderEqDematTable();
+              }
               refreshDash(); updateBadges();
             }
           }
@@ -2647,6 +2654,7 @@ function initApp(){
   if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
   if(leadsImportBtn) leadsImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  document.querySelectorAll('.admin-only-inc').forEach(el=>el.style.display=CU.role==='admin'?'inline-flex':'none');
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -5635,7 +5643,7 @@ function renderMfTxnTable(){
   if(!wrap) return;
   const entries=getFilteredMfTxns();
   const cnt=document.getElementById('mftxn-count');
-  if(cnt) cnt.textContent=entries.length+' entries';
+  if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('mf',entries))+'</b>';
 
   if(entries.length===0){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">No transactions found</div>';
@@ -5646,7 +5654,7 @@ function renderMfTxnTable(){
   const sTh=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
   wrap.innerHTML=`<table>
-    <thead><tr>${sTh('date','Date')}${sTh('client','Client')}${sTh('rm','RM')}${sTh('type','Type')}${sTh('fund','Fund Name')}${sTh('amount','Amount (₹)','text-align:right')}<th>Remarks</th><th>Cross-Check</th>${sTh('status','Status')}<th></th></tr></thead>
+    <thead><tr>${sTh('date','Date')}${sTh('client','Client')}${sTh('rm','RM')}${sTh('type','Type')}${sTh('fund','Fund Name')}${sTh('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th><th>Cross-Check</th>${sTh('status','Status')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
@@ -5662,6 +5670,7 @@ function renderMfTxnTable(){
           <td><span class="badge" style="background:${color}22;color:${color}">${escapeHtml(e.type||'—')}</span></td>
           <td style="font-size:.82rem">${escapeHtml(e.fund_name||'—')}</td>
           <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
+          ${INC.cell('mf',e)}
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
           <td style="min-width:140px">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
@@ -5696,13 +5705,15 @@ function exportMfTxns(){
     {header:'Type', width:14},
     {header:'Fund Name', width:28},
     {header:'Amount', width:14, money:true},
+    {header:'Incentive', width:14, money:true},
     {header:'Remarks', width:26},
     {header:'Status', width:12, color:dnStatusColor, align:'center'},
     {header:'Cross-Check Remark', width:22}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,e.remarks||'',e.status||'Pending',e.cross_remark||'']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,Math.round(INC.mf(e).amt),e.remarks||'',e.status||'Pending',e.cross_remark||'']);
   const totAmt=entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
-  const totalRow=['TOTAL','','','','',totAmt,'', '', ''];
+  const totInc=Math.round(INC.total('mf',entries));
+  const totalRow=['TOTAL','','','','',totAmt,totInc,'', '', ''];
   dnXlsx('MF_Transactions_'+today()+'.xlsx', 'MF Transactions — '+today(), cols, rows, totalRow);
   toast('Export done!','success');
 }
@@ -5877,7 +5888,7 @@ function renderEqDematTable(){
   if(!wrap) return;
   const entries=getFilteredEqDemat();
   const cnt=document.getElementById('eqdemat-count');
-  if(cnt) cnt.textContent=entries.length+' entries';
+  if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('demat',entries))+'</b>';
 
   if(entries.length===0){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">No Demat account entries found</div>';
@@ -5885,7 +5896,7 @@ function renderEqDematTable(){
   }
 
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th><th>Trading RM</th><th>Opening RM</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th><th>Trading RM</th><th>Opening RM</th><th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const status = e.status||'Pending';
@@ -5895,6 +5906,7 @@ function renderEqDematTable(){
           <td>${escapeHtml(e.client_code||'—')}</td>
           <td>${escapeHtml(e.rm||'—')}</td>
           <td><span style="background:var(--teal,#0d9488);color:#fff;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:600">${escapeHtml(e.opening_rm||e.rm||'—')}</span></td>
+          ${INC.cell('demat',e)}
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
@@ -6007,11 +6019,14 @@ function exportEqDemat(){
     {header:'Client Code', width:14},
     {header:'Trading RM', width:14},
     {header:'Opening RM', width:14},
+    {header:'Incentive', width:14, money:true},
     {header:'Remarks', width:28},
     {header:'Status', width:12, color:dnStatusColor, align:'center'}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.opening_rm||e.rm||'',e.remarks||'',e.status||'Pending']);
-  dnXlsx('Demat_Account_Opening_'+today()+'.xlsx', 'Demat Account Opening — '+today(), cols, rows);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.opening_rm||e.rm||'',Math.round(INC.demat(e).amt),e.remarks||'',e.status||'Pending']);
+  const totInc=Math.round(INC.total('demat',entries));
+  const totalRow=['TOTAL','','','','',totInc,'',''];
+  dnXlsx('Demat_Account_Opening_'+today()+'.xlsx', 'Demat Account Opening — '+today(), cols, rows, totalRow);
   toast('Export done!','success');
 }
 
@@ -9276,6 +9291,182 @@ function brkExport(){
   ]);
   toast('Export done!','success');
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INCENTIVE ENGINE — MF Business (% of amount) + Demat (fixed ₹ per a/c).
+   Auto global rate with optional per-entry override. CRM side only for now;
+   HR Portal sync wired later. Config in crm_data/incentive_config:
+   {mf_pct, demat_fixed, mf_types[]}. Per-entry override: inc_mode + inc_value.
+   ══════════════════════════════════════════════════════════════════════════ */
+const INC = {
+  DEFAULTS: { mf_pct:1, demat_fixed:100, mf_types:['Lumpsum','SIP','Additional Buy','SIP Bounce Buy','Switch','STP'] },
+  cfg(){
+    const c = DB.get('incentive_config') || {};
+    return {
+      mf_pct: (c.mf_pct!=null ? Number(c.mf_pct) : this.DEFAULTS.mf_pct),
+      demat_fixed: (c.demat_fixed!=null ? Number(c.demat_fixed) : this.DEFAULTS.demat_fixed),
+      mf_types: Array.isArray(c.mf_types) ? c.mf_types : this.DEFAULTS.mf_types.slice()
+    };
+  },
+  fmt(n){ n=Number(n)||0; return '₹'+n.toLocaleString('en-IN',{maximumFractionDigits:0}); },
+
+  mf(e){
+    const cfg=this.cfg();
+    if(e.inc_mode==='fixed') return {amt:Number(e.inc_value)||0, over:true, label:'₹ fixed'};
+    if(e.inc_mode==='pct')   return {amt:(Number(e.amount)||0)*(Number(e.inc_value)||0)/100, over:true, label:(Number(e.inc_value)||0)+'%'};
+    if(cfg.mf_types.includes(e.type)) return {amt:(Number(e.amount)||0)*cfg.mf_pct/100, over:false, label:cfg.mf_pct+'% auto'};
+    return {amt:0, over:false, label:'—'};
+  },
+  demat(e){
+    const cfg=this.cfg();
+    if(e.inc_mode==='fixed') return {amt:Number(e.inc_value)||0, over:true, label:'₹ fixed'};
+    return {amt:cfg.demat_fixed, over:false, label:'auto'};
+  },
+
+  cell(kind, e){
+    const r = kind==='mf' ? this.mf(e) : this.demat(e);
+    const isAdmin = CU && CU.role==='admin';
+    const tag = r.over
+      ? `<span style="font-size:.62rem;background:#fde68a;color:#92400e;border-radius:6px;padding:0 5px;margin-left:4px" title="Manual override">${r.label}</span>`
+      : `<span style="font-size:.62rem;color:var(--gray);margin-left:4px">${r.label}</span>`;
+    const edit = isAdmin
+      ? ` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="INC.openOverride('${kind}','${e.id}')" title="Set incentive override">✏️</span>` : '';
+    return `<td style="text-align:right;white-space:nowrap;font-weight:600">${this.fmt(r.amt)}${tag}${edit}</td>`;
+  },
+
+  total(kind, entries){ return (entries||[]).reduce((s,e)=> s + ((kind==='mf'?this.mf(e):this.demat(e)).amt||0), 0); },
+
+  // ── per-entry override modal ──
+  openOverride(kind, id){
+    if(!(CU&&CU.role==='admin')) return;
+    const list = kind==='mf' ? getMfBizEntries() : getEqDematEntries();
+    const e = list.find(x=>x.id===id); if(!e) return;
+    this._editKind=kind; this._editId=id;
+    let m=document.getElementById('incOverrideModal');
+    if(!m){
+      m=document.createElement('div'); m.id='incOverrideModal'; m.className='modal-overlay';
+      m.setAttribute('onclick',"if(event.target===this)closeModal('incOverrideModal')");
+      m.innerHTML=`<div class="modal" style="width:420px">
+        <div class="modal-hdr"><h3 id="incOvTitle">Incentive Override</h3>
+          <button class="modal-close" onclick="closeModal('incOverrideModal')">×</button></div>
+        <div class="modal-body">
+          <div id="incOvInfo" style="font-size:.82rem;color:var(--gray);margin-bottom:12px"></div>
+          <div class="form-field"><label>Mode</label>
+            <select id="incOvMode" onchange="INC._toggleVal()">
+              <option value="">Auto (global rate)</option>
+              <option value="pct">Percentage of amount</option>
+              <option value="fixed">Fixed ₹</option>
+            </select></div>
+          <div class="form-field" id="incOvValWrap" style="margin-top:10px;display:none">
+            <label id="incOvValLbl">Value</label>
+            <input type="number" id="incOvVal" placeholder="e.g. 500" step="0.01"></div>
+          <div id="incOvPreview" style="margin-top:12px;font-weight:600"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('incOverrideModal')">Cancel</button>
+          <button class="btn btn-success" onclick="INC.saveOverride()">Save</button>
+        </div></div>`;
+      document.body.appendChild(m);
+    }
+    const isMf = kind==='mf';
+    document.getElementById('incOvTitle').textContent = 'Incentive — '+(e.client_name||'');
+    document.getElementById('incOvInfo').innerHTML = isMf
+      ? `Type: <b>${escapeHtml(e.type||'—')}</b> · Amount: <b>${INC.fmt(e.amount)}</b>`
+      : `Demat A/c · Opening RM: <b>${escapeHtml(e.opening_rm||e.rm||'—')}</b>`;
+    const modeSel=document.getElementById('incOvMode');
+    modeSel.querySelector('option[value="pct"]').style.display = isMf ? '' : 'none';
+    modeSel.value = e.inc_mode || '';
+    document.getElementById('incOvVal').value = (e.inc_value!=null && e.inc_mode) ? e.inc_value : '';
+    this._toggleVal();
+    m.classList.add('open');
+  },
+  _toggleVal(){
+    const mode=document.getElementById('incOvMode').value;
+    document.getElementById('incOvValWrap').style.display = mode ? '' : 'none';
+    const lbl=document.getElementById('incOvValLbl');
+    if(lbl) lbl.textContent = mode==='pct' ? 'Percentage (%)' : 'Fixed amount (₹)';
+    const inp=document.getElementById('incOvVal'); if(inp) inp.oninput=()=>this._preview();
+    this._preview();
+  },
+  _preview(){
+    const kind=this._editKind;
+    const list = kind==='mf' ? getMfBizEntries() : getEqDematEntries();
+    const e = list.find(x=>x.id===this._editId); if(!e) return;
+    const mode=document.getElementById('incOvMode').value;
+    const val=Number(document.getElementById('incOvVal').value)||0;
+    const probe = Object.assign({}, e, {inc_mode:mode||undefined, inc_value:mode?val:undefined});
+    const r = kind==='mf' ? this.mf(probe) : this.demat(probe);
+    document.getElementById('incOvPreview').innerHTML = 'Incentive: '+this.fmt(r.amt)+(r.over?' <span style="color:#92400e">(override)</span>':' <span style="color:var(--gray)">(auto)</span>');
+  },
+  saveOverride(){
+    if(!(CU&&CU.role==='admin')) return;
+    const kind=this._editKind, id=this._editId;
+    const mode=document.getElementById('incOvMode').value;
+    const val=Number(document.getElementById('incOvVal').value)||0;
+    if(mode && val<0){ toast('Value galat hai','error'); return; }
+    if(kind==='mf'){
+      const entries=getMfBizEntries(); const e=entries.find(x=>x.id===id); if(!e) return;
+      if(mode){ e.inc_mode=mode; e.inc_value=val; } else { delete e.inc_mode; delete e.inc_value; }
+      setMfBizEntries(entries); renderMfTxnTable();
+    } else {
+      const entries=getEqDematEntries(); const e=entries.find(x=>x.id===id); if(!e) return;
+      if(mode){ e.inc_mode=mode; e.inc_value=val; } else { delete e.inc_mode; delete e.inc_value; }
+      setEqDematEntries(entries); renderEqDematTable();
+    }
+    closeModal('incOverrideModal');
+    toast('Incentive override saved','success');
+  },
+
+  // ── global rate settings modal (admin) ──
+  openSettings(){
+    if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); return; }
+    const cfg=this.cfg();
+    let m=document.getElementById('incSettingsModal');
+    if(!m){
+      m=document.createElement('div'); m.id='incSettingsModal'; m.className='modal-overlay';
+      m.setAttribute('onclick',"if(event.target===this)closeModal('incSettingsModal')");
+      m.innerHTML=`<div class="modal" style="width:480px">
+        <div class="modal-hdr"><h3>⚙️ Incentive Rates</h3>
+          <button class="modal-close" onclick="closeModal('incSettingsModal')">×</button></div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-field"><label>MF Business — % of amount</label>
+              <input type="number" id="incSetMfPct" step="0.01" placeholder="e.g. 1"></div>
+            <div class="form-field"><label>Demat — fixed ₹ per account</label>
+              <input type="number" id="incSetDemat" step="1" placeholder="e.g. 100"></div>
+          </div>
+          <div style="margin-top:14px"><label style="font-weight:600;font-size:.85rem">MF types that earn incentive (auto)</label>
+            <div id="incSetTypes" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div></div>
+          <div style="margin-top:12px;font-size:.78rem;color:var(--gray)">Individual entries ko ✏️ se override kar sakte ho.</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('incSettingsModal')">Cancel</button>
+          <button class="btn btn-success" onclick="INC.saveSettings()">Save Rates</button>
+        </div></div>`;
+      document.body.appendChild(m);
+    }
+    document.getElementById('incSetMfPct').value = cfg.mf_pct;
+    document.getElementById('incSetDemat').value = cfg.demat_fixed;
+    const allTypes=['Lumpsum','SIP','Additional Buy','SIP Bounce Buy','Switch','STP','SWP','Redemption','SIP Stop','SIP Pause'];
+    document.getElementById('incSetTypes').innerHTML = allTypes.map(t=>{
+      const on=cfg.mf_types.includes(t)?'checked':'';
+      return `<label style="display:flex;align-items:center;gap:5px;font-size:.8rem"><input type="checkbox" class="incSetType" value="${t}" ${on}>${t}</label>`;
+    }).join('');
+    m.classList.add('open');
+  },
+  saveSettings(){
+    if(!(CU&&CU.role==='admin')) return;
+    const mf_pct=Number(document.getElementById('incSetMfPct').value)||0;
+    const demat_fixed=Number(document.getElementById('incSetDemat').value)||0;
+    const mf_types=[...document.querySelectorAll('.incSetType:checked')].map(c=>c.value);
+    DB.set('incentive_config', {mf_pct, demat_fixed, mf_types});
+    closeModal('incSettingsModal');
+    toast('Incentive rates updated','success');
+    const pg=getCurrentPageId();
+    if(pg==='mf-txns') renderMfTxnTable();
+    if(pg==='eq-demat') renderEqDematTable();
+  }
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    ADMIN BULK OPERATIONS  (Equity / MF / Leads)
