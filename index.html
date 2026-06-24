@@ -1332,6 +1332,18 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         </div>
 
         <div id="user-list"></div>
+
+        <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
+          <h3 style="margin:0 0 6px">💾 Data Backup &amp; Restore</h3>
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Poora data (CRM + HR Portal + access settings) ek JSON file me. Hafte/mahine me ek baar le lena. Restore se Firebase me wapas chadh jata hai.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary" onclick="BK.backup()">⬇️ Download Full Backup</button>
+            <button class="btn btn-outline" onclick="document.getElementById('bk-restore-file').click()">⬆️ Restore from File</button>
+            <input type="file" id="bk-restore-file" accept="application/json,.json" style="display:none" onchange="BK.restore(this)">
+            <span id="bk-status" style="font-size:.8rem;color:var(--gray)"></span>
+          </div>
+          <p style="color:#b91c1c;font-size:.75rem;margin:12px 0 0">⚠️ Restore current data ko backup file ke data se replace kar deta hai — sambhaal ke use karna.</p>
+        </div>
       </div>
 
       <!-- ── ANNOUNCEMENTS PAGE ── -->
@@ -9627,6 +9639,70 @@ const RMSUM = {
     const totalRow=['TOTAL',Math.round(tot[1]),Math.round(tot[2]),tot[3],Math.round(tot[4]),Math.round(tot[5]),Math.round(tot[6])];
     dnXlsx('RM_Sales_Summary_'+(month||'all')+'.xlsx','RM-wise Sales Summary — '+(month||'All months'),cols,data,totalRow);
     toast('Export done!','success');
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FULL BACKUP & RESTORE (admin) — dumps ALL Firestore data (crm_data + hr_data
+   + shared_control) to one JSON file; restore writes it back. Covers both apps.
+   ══════════════════════════════════════════════════════════════════════════ */
+const BK = {
+  COLLECTIONS: ['crm_data','hr_data','shared_control'],
+  setStatus(msg){ const el=document.getElementById('bk-status'); if(el) el.textContent=msg||''; },
+  async backup(){
+    if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); return; }
+    if(typeof fdb==='undefined'){ toast('Firebase connect nahi hai','error'); return; }
+    this.setStatus('Backup ban raha hai…');
+    try{
+      const out={app:'DNInvest', type:'full_backup', version:1, created:new Date().toISOString(), by:CU.name, data:{}};
+      let docCount=0;
+      for(const col of this.COLLECTIONS){
+        out.data[col]={};
+        const snap=await fdb.collection(col).get();
+        snap.forEach(doc=>{ out.data[col][doc.id]=doc.data(); docCount++; });
+      }
+      const blob=new Blob([JSON.stringify(out)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='DNInvest_Backup_'+today()+'_'+Date.now()+'.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      this.setStatus('✅ Backup downloaded — '+docCount+' records · '+new Date().toLocaleString('en-IN'));
+      toast('Backup download ho gaya','success');
+    }catch(e){
+      this.setStatus('❌ Backup error');
+      toast('Backup error: '+(e.message||e),'error');
+    }
+  },
+  async restore(input){
+    if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); if(input) input.value=''; return; }
+    const file=input && input.files && input.files[0]; if(input) input.value='';
+    if(!file) return;
+    if(typeof fdb==='undefined'){ toast('Firebase connect nahi hai','error'); return; }
+    let parsed;
+    try{ parsed=JSON.parse(await file.text()); }catch(e){ toast('File padh nahi paya (galat JSON)','error'); return; }
+    if(!parsed || parsed.type!=='full_backup' || !parsed.data){ toast('Ye valid DNInvest backup file nahi hai','error'); return; }
+    let n=0; Object.keys(parsed.data).forEach(c=>{ n+=Object.keys(parsed.data[c]||{}).length; });
+    const when = parsed.created ? new Date(parsed.created).toLocaleString('en-IN') : 'unknown';
+    if(!confirm('RESTORE karein?\n\nBackup date: '+when+' (by '+(parsed.by||'?')+')\nRecords: '+n+'\n\nYe CURRENT data ko is file ke data se REPLACE kar dega.\nPehle abhi ka backup le lena behtar hai.')) return;
+    const typed = prompt('Confirm karne ke liye "RESTORE" type karo:');
+    if((typed||'').trim().toUpperCase()!=='RESTORE'){ toast('Restore cancel','error'); return; }
+    this.setStatus('Restore ho raha hai… (page band/refresh mat karo)');
+    try{
+      let done=0;
+      for(const col of Object.keys(parsed.data)){
+        for(const docId of Object.keys(parsed.data[col])){
+          await fdb.collection(col).doc(docId).set(parsed.data[col][docId]);
+          done++; this.setStatus('Restore: '+done+'/'+n+'…');
+        }
+      }
+      this.setStatus('✅ Restore complete — '+done+' records. Reloading…');
+      toast('Restore complete! Reloading…','success');
+      setTimeout(()=>location.reload(), 1500);
+    }catch(e){
+      this.setStatus('❌ Restore error');
+      toast('Restore error: '+(e.message||e),'error');
+    }
   }
 };
 
