@@ -954,6 +954,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <button class="btn btn-outline" onclick="exportMfTxns()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-inc" style="display:none" onclick="INC.openSettings()">⚙️ Incentive Rates</button>
             <button class="btn btn-outline admin-only-inc" style="display:none" onclick="RMSUM.open()">📊 RM Summary</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="MFUP.mfTemplate()">📄 Template</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="document.getElementById('mfup-file').click()">⬆️ Bulk Upload</button>
+            <input type="file" id="mfup-file" accept=".xlsx,.xls" style="display:none" onchange="MFUP.mfUpload(this)">
           </div>
         </div>
 
@@ -1047,6 +1050,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <button class="btn btn-outline" onclick="exportEqDemat()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-inc" style="display:none" onclick="INC.openSettings()">⚙️ Incentive Rates</button>
             <button class="btn btn-outline admin-only-inc" style="display:none" onclick="RMSUM.open()">📊 RM Summary</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="MFUP.dematTemplate()">📄 Template</button>
+            <button class="btn btn-outline admin-only-inc" style="display:none" onclick="document.getElementById('demup-file').click()">⬆️ Bulk Upload</button>
+            <input type="file" id="demup-file" accept=".xlsx,.xls" style="display:none" onchange="MFUP.dematUpload(this)">
           </div>
         </div>
 
@@ -9600,6 +9606,147 @@ const RMSUM = {
     const totalRow=['TOTAL',Math.round(tot[1]),Math.round(tot[2]),tot[3],Math.round(tot[4]),Math.round(tot[5]),Math.round(tot[6])];
     dnXlsx('RM_Sales_Summary_'+(month||'all')+'.xlsx','RM-wise Sales Summary — '+(month||'All months'),cols,data,totalRow);
     toast('Export done!','success');
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BULK UPLOAD — MF Business (MF Transactions) + Demat Open. Admin only.
+   Template download + Excel upload (header-name based mapping, order-flexible).
+   Uploaded entries are auto-Approved (admin upload).
+   ══════════════════════════════════════════════════════════════════════════ */
+const MFUP = {
+  TYPES: ['Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Additional Buy','SIP Bounce Buy','SIP Pause'],
+  cleanRm(v){ return normRm(String(v||'').replace(/\(.*?\)/g,'').trim()); },
+  buildColMap(headerRow, spec){
+    const map={};
+    (headerRow||[]).forEach((cell,ci)=>{
+      const h=normHdr(cell);
+      for(const key in spec){ if(map[key]===undefined && spec[key].includes(h)) map[key]=ci; }
+    });
+    return map;
+  },
+
+  // ── MF BUSINESS ──
+  mfTemplate(){
+    const cols=[{header:'Date',width:12},{header:'Type',width:16},{header:'Client Name',width:24},{header:'Mobile',width:14},{header:'PAN',width:14},{header:'Fund Name',width:32},{header:'Amount',width:12,money:true},{header:'RM',width:14},{header:'Remark',width:20}];
+    const rows=[
+      ['2026-04-01','Lumpsum','RAMESH AGARWAL','9431523242','AAWPA4903C','HDFC Flexi Cap Fund - Regular Plan - Growth',25000,'Komal','SENT'],
+      ['2026-04-02','SIP','REKHA RANI','9431793095','CQBPP7850A','TATA India Innovation Fund',5000,'Megha','']
+    ];
+    dnXlsx('MF_Business_Template.xlsx','MF Business Upload Template', cols, rows);
+    toast('MF template downloaded','success');
+  },
+  mfUpload(input){
+    if(CU.role!=='admin'){ toast('Admin only','error'); if(input) input.value=''; return; }
+    const file=input&&input.files&&input.files[0]; if(input) input.value='';
+    if(!file) return;
+    readExcel(file,(err,rows)=>{
+      if(err||!rows||!rows.length){ toast('File padh nahi paya','error'); return; }
+      const spec={date:['date'],type:['type','txntype','transactiontype'],client_name:['clientname','name','client'],mobile:['mobile','mobileno','phone','contact'],pan:['pan','pancard','panno'],fund_name:['fundname','fund','scheme','schemename'],amount:['amount','amt'],rm:['rm','dealer','relationshipmanager','dealername'],remarks:['remark','remarks','note']};
+      let hdrIdx=-1, colMap={};
+      for(let i=0;i<Math.min(rows.length,15);i++){
+        const map=this.buildColMap(rows[i],spec);
+        if(map.client_name!==undefined && (map.date!==undefined||map.amount!==undefined)){ hdrIdx=i; colMap=map; break; }
+      }
+      if(hdrIdx<0){ toast('Header row nahi mila — Template ke columns use karo','error'); return; }
+      const mf=DB.get('mf_clients')||[];
+      const findClient=(name,pan,mob)=>{
+        pan=(pan||'').trim().toUpperCase(); mob=(mob||'').replace(/\D/g,'').slice(-10); name=(name||'').trim().toLowerCase();
+        return mf.find(c=>(pan&&(c.pan||'').trim().toUpperCase()===pan)||(mob&&String(c.mobile||'').replace(/\D/g,'').slice(-10)===mob)||(name&&(c.name||'').trim().toLowerCase()===name));
+      };
+      const newEntries=[]; let skipped=0;
+      for(let i=hdrIdx+1;i<rows.length;i++){
+        const r=rows[i]; if(!r) continue;
+        const name=colMap.client_name!==undefined?String(r[colMap.client_name]||'').trim():'';
+        const date=colMap.date!==undefined?parseExcelDate(r[colMap.date]):'';
+        if(!name && !date) continue;
+        if(!name){ skipped++; continue; }
+        let type=colMap.type!==undefined?String(r[colMap.type]||'').trim():'';
+        const tmatch=this.TYPES.find(t=>t.toLowerCase()===type.toLowerCase());
+        type=tmatch||type||'Lumpsum';
+        const amount=colMap.amount!==undefined?(parseFloat(String(r[colMap.amount]).replace(/[^0-9.\-]/g,''))||0):0;
+        const pan=colMap.pan!==undefined?String(r[colMap.pan]||'').trim().toUpperCase():'';
+        const mob=colMap.mobile!==undefined?String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10):'';
+        const client=findClient(name,pan,mob);
+        newEntries.push({
+          id:uid(), client_id:client?client.id:'', client_name:name,
+          rm:this.cleanRm(colMap.rm!==undefined?r[colMap.rm]:(client?client.rm:'')),
+          type, amount, pan,
+          fund_name:colMap.fund_name!==undefined?String(r[colMap.fund_name]||'').trim():'',
+          date:date||today(),
+          remarks:colMap.remarks!==undefined?String(r[colMap.remarks]||'').trim():'',
+          created_by:CU.name, created_by_role:CU.role, created:today(),
+          status:'Approved', decline_reason:'', cross_remark:'', cross_remark_by:'', cross_remark_at:''
+        });
+      }
+      if(!newEntries.length){ toast('Koi valid row nahi mili','error'); return; }
+      if(!confirm(newEntries.length+' MF business entries upload hongi (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skip'):'')+'.\nConfirm?')) return;
+      const biz=DB.get('mf_business');
+      const entries=(Array.isArray(biz)?biz:(biz?.entries||[])).concat(newEntries);
+      const eqEntries=Array.isArray(biz)?[]:(biz?.eq_entries||[]);
+      DB.set('mf_business',{entries,eq_entries:eqEntries});
+      if(typeof renderMfTxnTable==='function') renderMfTxnTable();
+      refreshDash&&refreshDash();
+      toast(newEntries.length+' MF entries upload ho gayi','success');
+    });
+  },
+
+  // ── DEMAT OPEN ──
+  dematTemplate(){
+    const cols=[{header:'Date',width:12},{header:'Client Name',width:24},{header:'Client Code',width:14},{header:'Mobile',width:14},{header:'Trading RM',width:14},{header:'Opening RM',width:14},{header:'Remark',width:20}];
+    const rows=[
+      ['2026-04-01','RAMESH AGARWAL','ABC1234','9431523242','Komal','Rohit','New a/c'],
+      ['2026-04-02','BALRAM DAS','XYZ5678','9470573834','Megha','Megha','']
+    ];
+    dnXlsx('Demat_Open_Template.xlsx','Demat Open Upload Template', cols, rows);
+    toast('Demat template downloaded','success');
+  },
+  dematUpload(input){
+    if(CU.role!=='admin'){ toast('Admin only','error'); if(input) input.value=''; return; }
+    const file=input&&input.files&&input.files[0]; if(input) input.value='';
+    if(!file) return;
+    readExcel(file,(err,rows)=>{
+      if(err||!rows||!rows.length){ toast('File padh nahi paya','error'); return; }
+      const spec={date:['date'],client_name:['clientname','name','client'],client_code:['clientcode','code','ucc','clientcodeucc'],mobile:['mobile','mobileno','phone','contact'],rm:['rm','tradingrm','dealer','relationshipmanager'],opening_rm:['openingrm','openrm','openingrelationshipmanager','openingdealer'],remarks:['remark','remarks','note']};
+      let hdrIdx=-1, colMap={};
+      for(let i=0;i<Math.min(rows.length,15);i++){
+        const map=this.buildColMap(rows[i],spec);
+        if(map.client_name!==undefined && (map.date!==undefined||map.client_code!==undefined)){ hdrIdx=i; colMap=map; break; }
+      }
+      if(hdrIdx<0){ toast('Header row nahi mila — Template ke columns use karo','error'); return; }
+      const eq=DB.get('eq_clients')||[];
+      const findClient=(name,code,mob)=>{
+        code=(code||'').trim().toUpperCase(); mob=(mob||'').replace(/\D/g,'').slice(-10); name=(name||'').trim().toLowerCase();
+        return eq.find(c=>(code&&(c.code||'').trim().toUpperCase()===code)||(mob&&String(c.mobile||'').replace(/\D/g,'').slice(-10)===mob)||(name&&(c.name||'').trim().toLowerCase()===name));
+      };
+      const newEntries=[]; let skipped=0;
+      for(let i=hdrIdx+1;i<rows.length;i++){
+        const r=rows[i]; if(!r) continue;
+        const name=colMap.client_name!==undefined?String(r[colMap.client_name]||'').trim():'';
+        const date=colMap.date!==undefined?parseExcelDate(r[colMap.date]):'';
+        if(!name && !date) continue;
+        if(!name){ skipped++; continue; }
+        const code=colMap.client_code!==undefined?String(r[colMap.client_code]||'').trim().toUpperCase():'';
+        const mob=colMap.mobile!==undefined?String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10):'';
+        const client=findClient(name,code,mob);
+        const tradeRm=this.cleanRm(colMap.rm!==undefined?r[colMap.rm]:(client?client.rm:''));
+        const openRm=this.cleanRm(colMap.opening_rm!==undefined?r[colMap.opening_rm]:'')||tradeRm||CU.name;
+        newEntries.push({
+          id:uid(), client_id:client?client.id:'', client_name:name, client_code:code,
+          rm:tradeRm||(client?client.rm:''), opening_rm:openRm,
+          type:'Open Demat Account', date:date||today(),
+          remarks:colMap.remarks!==undefined?String(r[colMap.remarks]||'').trim():'',
+          mobile:mob, created_by:CU.name, created:today(),
+          status:'Approved', decline_reason:''
+        });
+      }
+      if(!newEntries.length){ toast('Koi valid row nahi mili','error'); return; }
+      if(!confirm(newEntries.length+' Demat entries upload hongi (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skip'):'')+'.\nConfirm?')) return;
+      setEqDematEntries(getEqDematEntries().concat(newEntries));
+      if(typeof renderEqDematTable==='function') renderEqDematTable();
+      refreshDash&&refreshDash();
+      toast(newEntries.length+' Demat entries upload ho gayi','success');
+    });
   }
 };
 
