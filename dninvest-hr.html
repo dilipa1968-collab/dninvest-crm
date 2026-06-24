@@ -808,7 +808,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>Login</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>ESI Registered</th><th>Login</th><th>Status</th><th></th></tr></thead>
           <tbody id="emp-table"></tbody>
         </table>
       </div>
@@ -937,7 +937,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','extra_deductions'];
+    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -1304,6 +1304,11 @@ function getEsiOverrides(){ return DB.get('esi_overrides', {}) || {}; }
 async function setEsiOverride(name, mode){ await DB.setMerged('esi_overrides', {[name]: mode}); }
 function getEsiOverride(name){ return (getEsiOverrides()[name]) || 'auto'; }
 
+// Per-employee ESI registration flag — false = NOT registered with ESIC (always excluded regardless of salary)
+function getEsiRegistered(){ return DB.get('esi_registered', {}) || {}; }
+async function setEsiRegisteredFlag(name, val){ await DB.setMerged('esi_registered', {[name]: val}); }
+function isEsiRegistered(name){ const r=getEsiRegistered(); return r[name]!==false; } // default true (registered)
+
 // grossWage = the wage figure used to (a) check ceiling eligibility and (b) compute
 // the contribution amount. We use the employee's configured basic salary for the
 // ceiling check (matches how wages are declared to ESIC), and the actual earned
@@ -1311,6 +1316,8 @@ function getEsiOverride(name){ return (getEsiOverrides()[name]) || 'auto'; }
 function calcESI(name, basicSalary, earnedWage){
   const s=getEsiSettings();
   if(!s.enabled) return {applicable:false, employeeContribution:0, employerContribution:0, settings:s};
+  // If employee is NOT registered with ESIC — always exclude, no deduction
+  if(!isEsiRegistered(name)) return {applicable:false, employeeContribution:0, employerContribution:0, settings:s};
   const override=getEsiOverride(name);
   let applicable;
   if(override==='include') applicable=true;
@@ -2801,13 +2808,13 @@ function renderEsiOverrideTable(){
     return `<tr>
       <td>${e.name}</td>
       <td>${fmt(sal)}</td>
-      <td style="color:${esi.applicable?'var(--red)':'var(--text3)'}">${esi.applicable?'Covered':'Not covered'}</td>
+      <td style="color:${!isEsiRegistered(e.name)?'var(--text3)':esi.applicable?'var(--red)':'var(--text3)'}">${!isEsiRegistered(e.name)?'Not registered':esi.applicable?'Covered':'Not covered'}</td>
       <td>
-        <select onchange="setEsiOverrideFromUI('${safeName}', this.value)" style="font-size:12px">
+        ${isEsiRegistered(e.name)?`<select onchange="setEsiOverrideFromUI('${safeName}', this.value)" style="font-size:12px">
           <option value="auto" ${override==='auto'?'selected':''}>Auto (Basic vs ceiling)</option>
           <option value="include" ${override==='include'?'selected':''}>Always include</option>
           <option value="exclude" ${override==='exclude'?'selected':''}>Always exclude</option>
-        </select>
+        </select>`:'<span style="font-size:11px;color:var(--text3)">N/A — not registered</span>'}
       </td>
     </tr>`;
   }).join('');
@@ -3614,6 +3621,12 @@ function renderEmployees(){
           <button class="btn btn-sm btn-primary" onclick="saveEmpPerfInc('${e.name}')">Set</button>
         </div>
       </td>
+      <td>
+        <select onchange="toggleEsiRegistered('${e.name}', this.value==='1')" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px">
+          <option value="1" ${isEsiRegistered(e.name)?'selected':''}>Yes</option>
+          <option value="0" ${!isEsiRegistered(e.name)?'selected':''}>No</option>
+        </select>
+      </td>
       <td><span style="font-size:11px;color:var(--text3)">CRM credentials</span></td>
       <td><span class="badge badge-green">Active</span></td>
       <td>
@@ -3691,6 +3704,15 @@ async function addEmployee(){
   if(perfVal>0) await setPerfIncentive(name, perfVal);
   toggleAddForm();renderEmployees();
   alert(name+' added!\n\nAlso create a new user in CRM for login, so they can log in here too.');
+}
+
+async function toggleEsiRegistered(name, val){
+  await setEsiRegisteredFlag(name, val);
+  renderEmployees();
+  renderEsiOverrideTable();
+  renderEsiBox();
+  calcSalary && calcSalary();
+  renderSalaryPage && renderSalaryPage();
 }
 
 async function deleteEmployee(name){
