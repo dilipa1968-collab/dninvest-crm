@@ -5712,7 +5712,7 @@ function exportMfTxns(){
     {header:'Status', width:12, color:dnStatusColor, align:'center'},
     {header:'Cross-Check Remark', width:22}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,Math.round(INC.mf(e).amt),e.remarks||'',e.status||'Pending',e.cross_remark||'']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.remarks||'',e.status||'Pending',e.cross_remark||'']);
   const totAmt=entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
   const totInc=Math.round(INC.total('mf',entries));
   const totalRow=['TOTAL','','','','',totAmt,totInc,'', '', ''];
@@ -6025,7 +6025,7 @@ function exportEqDemat(){
     {header:'Remarks', width:28},
     {header:'Status', width:12, color:dnStatusColor, align:'center'}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.opening_rm||e.rm||'',Math.round(INC.demat(e).amt),e.remarks||'',e.status||'Pending']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.client_code||'',e.rm||'',e.opening_rm||e.rm||'',(INC.isApproved(e)?Math.round(INC.demat(e).amt):0),e.remarks||'',e.status||'Pending']);
   const totInc=Math.round(INC.total('demat',entries));
   const totalRow=['TOTAL','','','','',totInc,'',''];
   dnXlsx('Demat_Account_Opening_'+today()+'.xlsx', 'Demat Account Opening — '+today(), cols, rows, totalRow);
@@ -9337,18 +9337,26 @@ const INC = {
     return {amt:cfg.demat_fixed, over:false, label:'auto'};
   },
 
+  isApproved(e){ return (e && (e.status||'Pending'))==='Approved'; },
+
   cell(kind, e){
     const r = kind==='mf' ? this.mf(e) : this.demat(e);
     const isAdmin = CU && CU.role==='admin';
+    const approved = this.isApproved(e);
+    const edit = isAdmin
+      ? ` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="INC.openOverride('${kind}','${e.id}')" title="Set incentive override">✏️</span>` : '';
+    if(!approved){
+      // Commission calculates only AFTER approval — show as not-yet-counted
+      return `<td style="text-align:right;white-space:nowrap;color:var(--gray)" title="Approve hone par hi count hoga">${this.fmt(r.amt)} <span style="font-size:.62rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">pending</span>${edit}</td>`;
+    }
     const tag = r.over
       ? `<span style="font-size:.62rem;background:#fde68a;color:#92400e;border-radius:6px;padding:0 5px;margin-left:4px" title="Manual override">${r.label}</span>`
       : `<span style="font-size:.62rem;color:var(--gray);margin-left:4px">${r.label}</span>`;
-    const edit = isAdmin
-      ? ` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="INC.openOverride('${kind}','${e.id}')" title="Set incentive override">✏️</span>` : '';
     return `<td style="text-align:right;white-space:nowrap;font-weight:600">${this.fmt(r.amt)}${tag}${edit}</td>`;
   },
 
-  total(kind, entries){ return (entries||[]).reduce((s,e)=> s + ((kind==='mf'?this.mf(e):this.demat(e)).amt||0), 0); },
+  // Totals count ONLY approved entries (commission = approved only)
+  total(kind, entries){ return (entries||[]).reduce((s,e)=> s + (this.isApproved(e) ? ((kind==='mf'?this.mf(e):this.demat(e)).amt||0) : 0), 0); },
 
   // ── per-entry override modal ──
   openOverride(kind, id){
@@ -9499,7 +9507,7 @@ const RMSUM = {
     const map={};
     const get=rm=>{ rm=normRm(rm||'')||'(No RM)'; if(!map[rm]) map[rm]={rm,mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0}; return map[rm]; };
     getMfBizEntries().forEach(e=>{
-      if((e.status||'Pending')==='Declined') return;
+      if((e.status||'Pending')!=='Approved') return;
       if(!inMonth(e.date)) return;
       const r=get(e.rm); const amt=Number(e.amount)||0;
       if(e.type==='SIP') r.sip_amount+=amt;
@@ -9507,7 +9515,7 @@ const RMSUM = {
       r.mf_inc += INC.mf(e).amt;
     });
     getEqDematEntries().forEach(e=>{
-      if((e.status||'Pending')==='Declined') return;
+      if((e.status||'Pending')!=='Approved') return;
       if(!inMonth(e.date)) return;
       const r=get(e.opening_rm||e.rm); r.demat_count++; r.demat_inc += INC.demat(e).amt;
     });
@@ -9534,7 +9542,7 @@ const RMSUM = {
           </div>
           <div id="rmSumStatus" style="font-size:.78rem;color:var(--gray);margin-bottom:8px"></div>
           <div class="tbl-wrap"><div id="rmSumTable" style="overflow:auto"></div></div>
-          <div style="font-size:.72rem;color:var(--gray);margin-top:8px">MF Sales = Lumpsum + Additional Buy + Switch + STP + SIP Bounce Buy. SIP = New SIP. Declined entries excluded.</div>
+          <div style="font-size:.72rem;color:var(--gray);margin-top:8px">MF Sales = Lumpsum + Additional Buy + Switch + STP + SIP Bounce Buy. SIP = New SIP. <b>Sirf Approved entries count hoti hain.</b></div>
         </div>
       </div>`;
       document.body.appendChild(m);
