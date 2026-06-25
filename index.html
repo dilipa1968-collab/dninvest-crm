@@ -778,6 +778,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <button class="btn btn-outline" onclick="exportCSV('equity')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openEqImportModal()" id="eqImportBtn">📥 Import Excel</button>
             <button class="btn btn-outline" onclick="openEqRmUpdateModal()" id="eqRmUpdateBtn" style="display:none">⇅ Bulk RM Update</button>
+            <button class="btn btn-outline" onclick="openEqPanUpdateModal()" id="eqPanUpdateBtn" style="display:none">🪪 Bulk PAN Update</button>
             <button class="btn btn-primary" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
@@ -884,6 +885,10 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <input type="date" onchange="filterMf()" id="mf-last-call-date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
             <input type="date" onchange="filterMf()" id="mf-next-call-date" style="padding:6px;font-size:.78rem"></label>
+          <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Business:
+            <input type="date" onchange="filterMf()" id="mf-last-biz-from" title="From date" style="padding:6px;font-size:.78rem">
+            <span style="font-size:.72rem">to</span>
+            <input type="date" onchange="filterMf()" id="mf-last-biz-to" title="To date" style="padding:6px;font-size:.78rem"></label>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('mf',this.value)" id="mf-pagesize">
             <option value="50">50 / page</option>
@@ -1833,6 +1838,36 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
   </div>
 </div>
 
+<!-- Bulk PAN Update Modal (Equity) -->
+<div class="modal-overlay" id="eqPanUpdateModal" onclick="if(event.target===this)closeModal('eqPanUpdateModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>🪪 Equity — Bulk PAN Update</h3>
+      <button class="modal-close" onclick="closeModal('eqPanUpdateModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+        Upload an Excel file with only <b>Client Code</b> and <b>PAN</b>. Matching will be done on <b>Client Code</b> (exact) — only the <b>PAN field will be updated</b>, nothing else (RM, Asset Value, Status, Remarks etc.) will be touched.
+      </p>
+      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
+        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>PAN</b> (Name column is optional and will be ignored)
+      </p>
+      <div style="margin-bottom:12px">
+        <a href="#" onclick="downloadEqPanTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
+      </div>
+      <div class="import-zone" id="eq-pan-zone" onclick="document.getElementById('eq-pan-file').click()">
+        📊 Drag the Excel file here or click to browse
+        <input type="file" id="eq-pan-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqPanUpdateFile(this)">
+      </div>
+      <div id="eq-pan-preview" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('eqPanUpdateModal')">Cancel</button>
+      <button class="btn btn-teal" id="eqPanUpdateBtnGo" onclick="doEqPanUpdate()" disabled>Update PAN</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -2622,6 +2657,8 @@ function initApp(){
   if(eqImportBtn) eqImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqRmUpdateBtn=document.getElementById('eqRmUpdateBtn');
   if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqPanUpdateBtn=document.getElementById('eqPanUpdateBtn');
+  if(eqPanUpdateBtn) eqPanUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
   if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
@@ -3124,7 +3161,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-from','last-trade-to'].forEach(f=>{
+  ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -3285,6 +3322,8 @@ function renderMfTable(){
   const fu=(document.getElementById('mf-followup-filter')||{value:''}).value;
   const nextCallDate=(document.getElementById('mf-next-call-date')||{value:''}).value;
   const lastCallDate=(document.getElementById('mf-last-call-date')||{value:''}).value;
+  const lbFrom=(document.getElementById('mf-last-biz-from')||{value:''}).value;
+  const lbTo=(document.getElementById('mf-last-biz-to')||{value:''}).value;
 
   if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.pan||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
@@ -3298,6 +3337,12 @@ function renderMfTable(){
   if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
+  if(lbFrom||lbTo) data=data.filter(c=>{
+    const d=c.last_invest_date; if(!d) return false;
+    if(lbFrom && d<lbFrom) return false;
+    if(lbTo && d>lbTo) return false;
+    return true;
+  });
 
   mfFiltered=data;
   const lbl=document.getElementById('mf-total-label');
@@ -4436,8 +4481,9 @@ function clientForm(seg, c){
       <div class="form-field"><label>Client Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
       <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row three">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
+      <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
       ${rmFieldHtml('equity', c, 'Equity RM *')}
     </div>
     <div class="form-section">Trading Info</div>
@@ -4615,7 +4661,7 @@ async function saveClient(){
   if(seg==='equity'){
     rec={
       id: newId,
-      code:gv2('f_code'), name, mobile:gv2('f_mobile'), email:gv2('f_email'),
+      code:gv2('f_code'), name, mobile:gv2('f_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Active',
       asset_value:parseFloat(gv2('f_asset'))||null,
       revenue:parseFloat(gv2('f_revenue'))||null,
@@ -8505,6 +8551,123 @@ async function doEqRmUpdate(){
   let msg = `✅ RM Update done! ${updated} client(s) updated`;
   if(notFound) msg += `, ${notFound} Client Code not found`;
   if(invalidRm) msg += `, ${invalidRm} invalid RM name`;
+  toast(msg, updated>0?'success':'error');
+  renderEqTable(); refreshDash(); updateBadges();
+}
+
+
+// ══ EQUITY BULK PAN UPDATE (Admin only) ══
+let eqPanUpdateData = null;
+
+function openEqPanUpdateModal(){
+  if(CU.role!=='admin') return;
+  eqPanUpdateData = null;
+  document.getElementById('eq-pan-preview').innerHTML='';
+  document.getElementById('eqPanUpdateBtnGo').disabled=true;
+  document.getElementById('eq-pan-file').value='';
+  document.getElementById('eqPanUpdateModal').classList.add('open');
+}
+
+function downloadEqPanTemplate(){
+  const wsData = [
+    ['Client Code','Client Name (reference only)','PAN'],
+    ['EQ12345','Example: Ramesh Kumar','ABCDE1234F'],
+    ['EQ67890','Example: Sunita Devi','PQRSX6789K']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:18},{wch:32},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'PAN Update');
+  XLSX.writeFile(wb, 'Equity_PAN_Update_Template.xlsx');
+}
+
+function handleEqPanUpdateFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    let hdrIdx=-1, colMap={};
+    const wanted = {
+      code: ['code','clientcode','clientid','ucccode','ucc'],
+      pan: ['pan','pancard','panno','pannumber','pancardno','pancardnumber']
+    };
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const map = {};
+      rows[i].forEach((cell,ci)=>{
+        const h = normHdr(cell);
+        for(const [field, variants] of Object.entries(wanted)){
+          if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+        }
+      });
+      if(map.code!==undefined && map.pan!==undefined){ hdrIdx=i; colMap=map; break; }
+    }
+    if(hdrIdx===-1){
+      toast('Header row not found. Excel must have Client Code and PAN columns.','error');
+      return;
+    }
+    const data = rows.slice(hdrIdx+1)
+      .filter(r=>r.some(c=>c!==''))
+      .map(r=>({
+        code: String(r[colMap.code]||'').trim(),
+        pan: String(r[colMap.pan]||'').trim().toUpperCase()
+      }))
+      .filter(r=>r.code && r.pan);
+
+    if(!data.length){
+      toast('No valid rows found (both Client Code and PAN are required).','error');
+      return;
+    }
+
+    const panRe = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    const badFmt = data.filter(r=>!panRe.test(r.pan));
+
+    eqPanUpdateData = data;
+    let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${data.length} rows found</div>`;
+    if(badFmt.length){
+      html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
+       ⚠️ ${badFmt.length} row(s) have a PAN that doesn't look like a standard PAN (ABCDE1234F). They will still be uploaded as-is — please double-check.</div>`;
+    }
+    document.getElementById('eq-pan-preview').innerHTML = html;
+    document.getElementById('eqPanUpdateBtnGo').disabled = data.length===0;
+  });
+}
+
+async function doEqPanUpdate(){
+  if(CU.role!=='admin') return;
+  if(!eqPanUpdateData || !eqPanUpdateData.length) return;
+  const existing = DB.get('eq_clients')||[];
+  const byCode = {};
+  existing.forEach(c=>{ if(c.code) byCode[String(c.code).trim().toUpperCase()] = c; });
+
+  let updated=0, notFound=0, unchanged=0;
+  const touched = [];
+  const newLogs = [];
+
+  eqPanUpdateData.forEach(row=>{
+    const ex = byCode[row.code.trim().toUpperCase()];
+    if(!ex){ notFound++; return; }
+    const oldPan = (ex.pan||'').trim().toUpperCase();
+    if(oldPan===row.pan){ unchanged++; return; }
+    ex.pan = row.pan;
+    ex.updated = today();
+    touched.push(ex);
+    updated++;
+    newLogs.push({
+      id: uid(), type: 'bulk_pan_update', seg:'equity',
+      client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
+      by: CU.name, date: new Date().toISOString(),
+      changes: [{field:'pan', old:oldPan||'—', new:row.pan}]
+    });
+  });
+
+  if(touched.length) await DB.setClientsBulk('eq_clients', touched);
+  if(newLogs.length) await DB.addActivityLog(newLogs);
+
+  closeModal('eqPanUpdateModal');
+  let msg = `✅ PAN Update done! ${updated} client(s) updated`;
+  if(unchanged) msg += `, ${unchanged} already same`;
+  if(notFound) msg += `, ${notFound} Client Code not found`;
   toast(msg, updated>0?'success':'error');
   renderEqTable(); refreshDash(); updateBadges();
 }
