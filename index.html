@@ -334,16 +334,16 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .modal-hdr h3{font-size:1rem;font-weight:800;}
 .modal-close{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;}
 .modal-body{padding:24px;}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;}
 .form-row.full{grid-template-columns:1fr;}
 .form-row.three{grid-template-columns:1fr 1fr 1fr;}
-.form-field label{display:block;font-size:.73rem;font-weight:700;color:var(--gray);
-  text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
-.form-field input,.form-field select,.form-field textarea{width:100%;padding:9px 12px;
-  border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;
+.form-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);
+  text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
+.form-field input,.form-field select,.form-field textarea{width:100%;padding:6px 10px;
+  border:1.5px solid var(--border);border-radius:7px;font-size:.82rem;outline:none;
   background:#fff;transition:border .2s;font-family:inherit;}
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--navy);}
-.form-field textarea{resize:vertical;min-height:72px;}
+.form-field textarea{resize:vertical;min-height:56px;}
 .form-section{font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;
   letter-spacing:1px;padding:14px 0 8px;border-bottom:1.5px solid var(--border);margin-bottom:14px;}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;
@@ -722,15 +722,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
           <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
 
-          <div class="dash-card" id="mfReminderCard" style="display:none">
-            <h3>📋 Don't Forget</h3>
-            <p style="font-size:.82rem;color:var(--gray);margin-bottom:10px">Redemptions and SIP Stops are easy to forget to log — add them here as soon as they happen.</p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-outline" onclick="quickMfTxn('Redemption')">➖ Log Redemption</button>
-              <button class="btn btn-outline" onclick="quickMfTxn('SIP Stop')">⏸️ Log SIP Stop</button>
-            </div>
-            <p style="font-size:.74rem;color:var(--gray);margin-top:10px" id="mfReminderLastEntry"></p>
-          </div>
           <div class="dash-card collapsible admin-only" id="mfAuditCard" style="display:none">
             <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
             <div class="dc-body"><div id="mfAuditTable"></div></div>
@@ -2941,27 +2932,6 @@ function refreshDash(){
           <span style="font-size:.75rem;color:var(--gray)">${c.rm}</span>
         </div>`).join('')
     : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No follow-ups scheduled for today</p>';
-
-  // Redemption / SIP Stop reminder (RM side) — these are the two transaction
-  // types people most often forget to log since they're "negative" events.
-  // Shows each RM how long it's been since their own last entry of each type.
-  const reminderCard = document.getElementById('mfReminderCard');
-  if(reminderCard && hasMf && CU.role!=='admin'){
-    reminderCard.style.display='';
-    const myEntries = getMfBizEntries().filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
-    const lastOf = type=>{
-      const list = myEntries.filter(e=>e.type===type).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-      return list[0]?.date || null;
-    };
-    const lastRed = lastOf('Redemption');
-    const lastStop = lastOf('SIP Stop');
-    const dRed = daysDiff(lastRed), dStop = daysDiff(lastStop);
-    const partRed = lastRed ? `Redemption: ${dRed} day${dRed===1?'':'s'} ago` : 'Redemption: never logged';
-    const partStop = lastStop ? `SIP Stop: ${dStop} day${dStop===1?'':'s'} ago` : 'SIP Stop: never logged';
-    document.getElementById('mfReminderLastEntry').textContent = `Your last entry — ${partRed} · ${partStop}`;
-  } else if(reminderCard){
-    reminderCard.style.display='none';
-  }
 
   // Redemption / SIP Stop audit (Admin side) — last entry date per MF RM,
   // sorted with the most overdue (or never-logged) RM at the top, so Admin
