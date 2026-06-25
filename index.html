@@ -2171,6 +2171,8 @@ function today(){
 }
 function upc(v){ return v==null?'':String(v).toUpperCase(); }
 function fmtDate(d){ if(!d) return ''; try{const dt=new Date(d); if(isNaN(dt)) return d; return dt.getDate()+'-'+MN[dt.getMonth()+1]+'-'+dt.getFullYear();}catch(e){return d||'';} }
+// Time from a call log's ISO timestamp (e.g. "3:45 PM"). Purane logs me ts na ho to khali.
+function fmtTime(ts){ if(!ts) return ''; try{const dt=new Date(ts); if(isNaN(dt)) return ''; return dt.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true});}catch(e){return '';} }
 function daysDiff(d){ if(!d) return null; const diff=new Date()-new Date(d); return Math.floor(diff/(1000*60*60*24)); }
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
 let _uidCounter=0;
@@ -4800,7 +4802,7 @@ function viewClient(id,seg){
   body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
   if(logs.length){
     body+=logs.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
-      <div class="call-date">${fmtDate(l.date)} — ${l.seg==='equity'?'Equity':'MF'}</div>
+      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — ${l.seg==='equity'?'Equity':'MF'}</div>
       <div class="call-note">${l.note||'—'}</div>
       <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status}</span>
         ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
@@ -4837,7 +4839,7 @@ function viewLeadCalls(id){
   body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
   if(logs.length){
     body+=logs.map(l=>`<div class="call-log-item mf">
-      <div class="call-date">${fmtDate(l.date)} — by ${l.by||l.rm||'—'}</div>
+      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — by ${l.by||l.rm||'—'}</div>
       <div class="call-note">${l.note||'—'}</div>
       <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
         ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
