@@ -603,6 +603,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <button class="btn-sm" id="changeCredBtn" onclick="openChangeCredModal()" style="background:var(--teal);display:none" title="Change PIN/Password">
         🔑 <span class="cred-btn-text">Change PIN/Password</span>
       </button>
+      <button class="btn-sm" id="hrPortalTopBtn" onclick="openHrPortal()" title="HR Portal kholo" style="background:#7c3aed;display:none;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
+        👔 HR
+      </button>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
   </div>
@@ -663,6 +666,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('mf-txns')" id="nav-mf-txns">
         <span class="icon">💼</span> MF Transactions
         <span class="nav-badge red" id="nb-mftxn-pending" style="display:none">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('eq-demat')" id="nav-eq-demat">
+        <span class="icon">🏦</span> Demat A/c Opening
       </div>
 
       <div class="sidebar-section">Reports</div>
@@ -2630,6 +2636,14 @@ function initApp(){
   // Show Change PIN/Password button for all users
   const credBtn = document.getElementById('changeCredBtn');
   if(credBtn) credBtn.style.display = '';
+
+  // HR Portal shortcut button — visible only to admin (top-right corner)
+  const hrBtn = document.getElementById('hrPortalTopBtn');
+  if(hrBtn) hrBtn.style.display = CU.role==='admin' ? '' : 'none';
+
+  // Demat A/c Opening nav item — visible when user has Equity access
+  const dematNav = document.getElementById('nav-eq-demat');
+  if(dematNav) dematNav.style.display = hasEq ? 'flex' : 'none';
 
   // Bulk Excel import is admin-only
   const eqImportBtn=document.getElementById('eqImportBtn');
