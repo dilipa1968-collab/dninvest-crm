@@ -9522,6 +9522,8 @@ const INC = {
 
   mf(e){
     const cfg=this.cfg();
+    // Admin khud ke MF transaction pe incentive nahi kamata — Approve ke baad bhi 0.
+    if((e.rm||'').trim().toLowerCase()==='admin') return {amt:0, over:false, label:'admin · nil'};
     if(e.inc_mode==='fixed') return {amt:Number(e.inc_value)||0, over:true, label:'₹ fixed'};
     if(e.inc_mode==='pct')   return {amt:(Number(e.amount)||0)*(Number(e.inc_value)||0)/100, over:true, label:(Number(e.inc_value)||0)+'%'};
     const rate = Number(cfg.mf_rates[e.type]||0);
@@ -9796,13 +9798,18 @@ const RMSUM = {
   pushHR(){
     if(!(CU&&CU.role==='admin')) return;
     const month=document.getElementById('rmSumMonth').value;
-    const rows=this.compute(month, true)
-      // Admin ka incentive HR Portal me na jaaye (MF Transaction + Demat Open dono)
+    // Incentive-only figures: zero-incentive scheme ke amount in figures me nahi aate.
+    const incMap={};
+    this.compute(month, true).forEach(r=>{ incMap[r.rm]=r; });
+    // Base list = is period me jis bhi RM ki approved activity hai (Admin chhod ke).
+    // NIL incentive wale RM ka naam bhi rahe — figures 0 ke saath.
+    const rows=this.compute(month)
       .filter(r=>(r.rm||'').trim().toLowerCase()!=='admin')
-      // Sirf wahi RM push ho jisne incentive earn kiya — zero wale skip
-      .filter(r=>Math.round(r.total_inc)>0)
-      .map(r=>({rm:r.rm,mf_sales:Math.round(r.mf_sales),sip_amount:Math.round(r.sip_amount),demat_count:r.demat_count,mf_incentive:Math.round(r.mf_inc),demat_incentive:Math.round(r.demat_inc),total_incentive:Math.round(r.total_inc)}));
-    if(!rows.length){ toast('Is period me koi (non-zero) incentive wala RM nahi','error'); return; }
+      .map(r=>{
+        const i=incMap[r.rm]||{mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0,total_inc:0};
+        return {rm:r.rm,mf_sales:Math.round(i.mf_sales),sip_amount:Math.round(i.sip_amount),demat_count:i.demat_count,mf_incentive:Math.round(i.mf_inc),demat_incentive:Math.round(i.demat_inc),total_incentive:Math.round(i.total_inc)};
+      });
+    if(!rows.length){ toast('Is period me koi RM activity nahi','error'); return; }
     DB.set('rm_sales_summary', {month:month||'all', rows, generated_at:new Date().toISOString(), by:CU.name});
     toast('HR Portal ke liye push ho gaya','success');
     this._showStatus();
