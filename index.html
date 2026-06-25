@@ -795,7 +795,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
             <input type="date" onchange="filterEq()" id="eq-next-call-date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Trade:
-            <input type="date" onchange="filterEq()" id="eq-last-trade-date" style="padding:6px;font-size:.78rem"></label>
+            <input type="date" onchange="filterEq()" id="eq-last-trade-from" title="From date" style="padding:6px;font-size:.78rem">
+            <span style="font-size:.72rem">to</span>
+            <input type="date" onchange="filterEq()" id="eq-last-trade-to" title="To date" style="padding:6px;font-size:.78rem"></label>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('eq',this.value)" id="eq-pagesize">
             <option value="50">50 / page</option>
@@ -3122,7 +3124,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-date'].forEach(f=>{
+  ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-from','last-trade-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -3138,7 +3140,8 @@ function renderEqTable(){
   const fu=(document.getElementById('eq-followup-filter')||{value:''}).value;
   const lastCallDate=(document.getElementById('eq-last-call-date')||{value:''}).value;
   const nextCallDate=(document.getElementById('eq-next-call-date')||{value:''}).value;
-  const lastTradeDate=(document.getElementById('eq-last-trade-date')||{value:''}).value;
+  const ltFrom=(document.getElementById('eq-last-trade-from')||{value:''}).value;
+  const ltTo=(document.getElementById('eq-last-trade-to')||{value:''}).value;
 
   if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.code||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
@@ -3152,7 +3155,12 @@ function renderEqTable(){
   if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
-  if(lastTradeDate) data=data.filter(c=>c.last_trade_date===lastTradeDate);
+  if(ltFrom||ltTo) data=data.filter(c=>{
+    const d=c.last_trade_date; if(!d) return false;
+    if(ltFrom && d<ltFrom) return false;
+    if(ltTo && d>ltTo) return false;
+    return true;
+  });
 
   eqFiltered=data;
   const lbl=document.getElementById('eq-total-label');
