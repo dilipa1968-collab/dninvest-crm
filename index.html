@@ -10373,6 +10373,66 @@ const MFTBULK = {
   (document.head||document.documentElement).appendChild(st);
 })();
 
+/* ──────────────────────────────────────────────────────────────
+   APP ZOOM CONTROL
+   Floating −/+ control (bottom-right) to shrink/enlarge the whole
+   app so all columns fit in one window. Level is saved in
+   localStorage so it persists across logins/reloads.
+   Click the % label to reset to 100%.
+   ────────────────────────────────────────────────────────────── */
+(function(){
+  const MIN=0.5, MAX=1.5, STEP=0.1, KEY='dnAppZoom';
+  function clamp(z){ return Math.min(MAX, Math.max(MIN, Math.round(z*100)/100)); }
+  function apply(z){
+    document.body.style.zoom = z;            // Chrome/Edge: true zoom, layout reflows so columns fit
+    const lbl=document.getElementById('dnZoomVal');
+    if(lbl) lbl.textContent = Math.round(z*100)+'%';
+  }
+  window.dnAppZoom=function(delta, reset){
+    let z=parseFloat(localStorage.getItem(KEY)||'1');
+    z = reset ? 1 : clamp(z+delta);
+    localStorage.setItem(KEY, z);
+    apply(z);
+  };
+  function build(){
+    if(document.getElementById('dnZoomBar')) return;
+    const bar=document.createElement('div');
+    bar.id='dnZoomBar';
+    bar.innerHTML =
+      '<button id="dnZoomOut" title="Chota karo (Ctrl -)">−</button>'+
+      '<span id="dnZoomVal" title="Reset 100%">100%</span>'+
+      '<button id="dnZoomIn" title="Bada karo (Ctrl +)">+</button>';
+    const s=document.createElement('style');
+    s.textContent=
+      '#dnZoomBar{position:fixed;bottom:14px;right:14px;z-index:2147483000;'+
+      'display:flex;align-items:center;gap:4px;background:#0f2c5c;'+
+      'padding:5px 8px;border-radius:30px;box-shadow:0 4px 16px rgba(0,0,0,.35);'+
+      'font-family:inherit;}'+
+      '#dnZoomBar button{width:30px;height:30px;border:none;border-radius:50%;'+
+      'background:#1e3a6b;color:#fff;font-size:19px;line-height:1;cursor:pointer;'+
+      'display:flex;align-items:center;justify-content:center;transition:background .15s;}'+
+      '#dnZoomBar button:hover{background:#2d508f;}'+
+      '#dnZoomBar #dnZoomVal{color:#fff;font-size:12px;font-weight:700;min-width:42px;'+
+      'text-align:center;cursor:pointer;user-select:none;}'+
+      '@media print{#dnZoomBar{display:none!important;}}';
+    document.head.appendChild(s);
+    document.body.appendChild(bar);
+    document.getElementById('dnZoomOut').onclick=()=>window.dnAppZoom(-STEP);
+    document.getElementById('dnZoomIn').onclick =()=>window.dnAppZoom(STEP);
+    document.getElementById('dnZoomVal').onclick=()=>window.dnAppZoom(0,true);
+    apply(clamp(parseFloat(localStorage.getItem(KEY)||'1')));
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',build);
+  else build();
+  // Keyboard shortcuts: Ctrl/Cmd + / - / 0 (in-app, doesn't touch browser zoom)
+  document.addEventListener('keydown',e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    if(e.key==='='||e.key==='+'){e.preventDefault();window.dnAppZoom(STEP);}
+    else if(e.key==='-'||e.key==='_'){e.preventDefault();window.dnAppZoom(-STEP);}
+    else if(e.key==='0'){e.preventDefault();window.dnAppZoom(0,true);}
+  });
+})();
+
 </script>
 </body>
 </html>
