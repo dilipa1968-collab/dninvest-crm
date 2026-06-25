@@ -10367,19 +10367,21 @@ const MFTBULK = {
       '<button id="dnZoomIn" title="Bada karo (Ctrl +)">+</button>';
     const s=document.createElement('style');
     s.textContent=
-      '#dnZoomBar{position:fixed;top:64px;right:170px;z-index:2147483000;'+
-      'display:flex;align-items:center;gap:4px;background:#0f2c5c;'+
-      'padding:5px 8px;border-radius:30px;box-shadow:0 4px 16px rgba(0,0,0,.35);'+
-      'font-family:inherit;}'+
-      '#dnZoomBar button{width:30px;height:30px;border:none;border-radius:50%;'+
-      'background:#1e3a6b;color:#fff;font-size:19px;line-height:1;cursor:pointer;'+
+      '#dnZoomBar{display:inline-flex;align-items:center;gap:3px;background:#1e3a6b;'+
+      'padding:3px 6px;border-radius:30px;margin-right:6px;font-family:inherit;'+
+      'box-shadow:0 1px 4px rgba(0,0,0,.25);flex-shrink:0;}'+
+      '#dnZoomBar button{width:24px;height:24px;border:none;border-radius:50%;'+
+      'background:#2d508f;color:#fff;font-size:16px;line-height:1;cursor:pointer;'+
       'display:flex;align-items:center;justify-content:center;transition:background .15s;}'+
-      '#dnZoomBar button:hover{background:#2d508f;}'+
-      '#dnZoomBar #dnZoomVal{color:#fff;font-size:12px;font-weight:700;min-width:42px;'+
+      '#dnZoomBar button:hover{background:#3d63ad;}'+
+      '#dnZoomBar #dnZoomVal{color:#fff;font-size:11px;font-weight:700;min-width:38px;'+
       'text-align:center;cursor:pointer;user-select:none;}'+
       '@media print{#dnZoomBar{display:none!important;}}';
     document.head.appendChild(s);
-    document.body.appendChild(bar);
+    var host=document.querySelector('.topbar-right');
+    var anchor=document.getElementById('segBadge');
+    if(host){ host.insertBefore(bar, anchor||host.firstChild); }
+    else { document.body.appendChild(bar); }
     document.getElementById('dnZoomOut').onclick=()=>window.dnAppZoom(-STEP);
     document.getElementById('dnZoomIn').onclick =()=>window.dnAppZoom(STEP);
     document.getElementById('dnZoomVal').onclick=()=>window.dnAppZoom(0,true);
