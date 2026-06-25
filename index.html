@@ -645,6 +645,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-eqnc">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('eq-demat')" id="nav-eq-demat">
+        <span class="icon">📂</span> Demat A/c Opening
+      </div>
 
       <div class="sidebar-section" id="mf-nav-section">Mutual Fund</div>
       <div class="nav-item" onclick="showPage('mf-clients')" id="nav-mf-clients">
@@ -666,9 +669,6 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
       <div class="nav-item" onclick="showPage('mf-txns')" id="nav-mf-txns">
         <span class="icon">💼</span> MF Transactions
         <span class="nav-badge red" id="nb-mftxn-pending" style="display:none">0</span>
-      </div>
-      <div class="nav-item" onclick="showPage('eq-demat')" id="nav-eq-demat">
-        <span class="icon">🏦</span> Demat A/c Opening
       </div>
 
       <div class="sidebar-section">Reports</div>
@@ -721,14 +721,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
           <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
-          <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,#185FA5 0%,#1D9E75 100%);color:#fff" onclick="showPage('mf-txns')">
-            <div style="text-align:center">
-              <div style="font-size:2rem;margin-bottom:8px">💼</div>
-              <h3 style="color:#fff;margin:0">MF Transactions</h3>
-              <p style="font-size:.78rem;color:#eafff5;margin-top:4px">Lumpsum · SIP · Switch · STP · Redemption</p>
-              <div id="dash-mftxn-pending" style="display:none;margin-top:6px"><span style="background:rgba(255,255,255,0.25);color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700">⏳ <span id="dash-mftxn-pending-count">0</span> Pending</span></div>
-            </div>
-          </div>
+
           <div class="dash-card" id="mfReminderCard" style="display:none">
             <h3>📋 Don't Forget</h3>
             <p style="font-size:.82rem;color:var(--gray);margin-bottom:10px">Redemptions and SIP Stops are easy to forget to log — add them here as soon as they happen.</p>
@@ -742,21 +735,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
             <div class="dc-body"><div id="mfAuditTable"></div></div>
           </div>
-          <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,#7D3C98 0%,#B7950B 100%);color:#fff" onclick="showPage('eq-demat')">
-            <div style="text-align:center">
-              <div style="font-size:2rem;margin-bottom:8px">📂</div>
-              <h3 style="color:#fff;margin:0">Demat A/c Opening</h3>
-              <p style="font-size:.78rem;color:#fdf3e0;margin-top:4px">Equity — New Account Entries</p>
-              <div id="dash-demat-pending" style="display:none;margin-top:6px"><span style="background:rgba(255,255,255,0.25);color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700">⏳ <span id="dash-demat-pending-count">0</span> Pending</span></div>
-            </div>
-          </div>
-          <div class="dash-card" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:140px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 100%);color:#fff" onclick="openHrPortal()">
-            <div style="text-align:center">
-              <div style="font-size:2rem;margin-bottom:8px">👥</div>
-              <h3 style="color:#fff;margin:0">HR Portal</h3>
-              <p style="font-size:.78rem;color:var(--gold2);margin-top:4px">Attendance · Salary · Incentive</p>
-            </div>
-          </div>
+
 
         </div>
       </div>
