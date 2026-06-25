@@ -5711,7 +5711,13 @@ function deleteMfTxnEntry(id){
 }
 
 function exportMfTxns(){
-  const entries=getFilteredMfTxns();
+  let entries=getFilteredMfTxns();
+  let onlySel=false;
+  if(typeof MFTBULK!=='undefined' && MFTBULK.sel && MFTBULK.sel.size>0){
+    const ids=MFTBULK.sel;
+    entries=entries.filter(e=>ids.has(e.id));
+    onlySel=true;
+  }
   if(entries.length===0){ toast('No data to export','error'); return; }
   const cols=[
     {header:'Date', width:12},
@@ -5730,7 +5736,7 @@ function exportMfTxns(){
   const totInc=Math.round(INC.total('mf',entries));
   const totalRow=['TOTAL','','','','','',totAmt,totInc,'', ''];
   dnXlsx('MF_Transactions_'+today()+'.xlsx', 'MF Transactions — '+today(), cols, rows, totalRow);
-  toast('Export done!','success');
+  toast(onlySel?`Exported ${entries.length} selected`:'Export done!','success');
 }
 
 // ══════════════════════════════════════════
@@ -6689,7 +6695,16 @@ function rmPerf(){
 // EXPORT
 // ══════════════════════════════════════════
 function exportCSV(seg){
-  const clients=seg==='equity'?getActiveEqClients():getMyMfClients();
+  const bseg = seg==='equity' ? 'eq' : 'mf';
+  const key  = seg==='equity' ? 'eq_clients' : 'mf_clients';
+  let clients, onlySel=false;
+  if(typeof BULK!=='undefined' && BULK.sel && BULK.sel[bseg] && BULK.sel[bseg].size>0){
+    const ids=BULK.sel[bseg];
+    clients=(DB.get(key)||[]).filter(c=>ids.has(c.id));
+    onlySel=true;
+  } else {
+    clients=seg==='equity'?getActiveEqClients():getMyMfClients();
+  }
   if(!clients.length){ toast('No data to export','error'); return; }
   let cols, rows, title, fname;
   if(seg==='equity'){
@@ -6715,7 +6730,7 @@ function exportCSV(seg){
     title='MF Investors'; fname='mf_investors_';
   }
   dnXlsx(fname+today()+'.xlsx', title+' — '+today(), cols, rows);
-  toast('Export done!','success');
+  toast(onlySel?`Exported ${clients.length} selected`:'Export done!','success');
 }
 
 // ══════════════════════════════════════════
