@@ -9699,22 +9699,28 @@ const RMSUM = {
     getEqDematEntries().forEach(e=>{ if(e.date) set.add(e.date.slice(0,7)); });
     return [...set].sort().reverse();
   },
-  compute(month){
+  // incentiveOnly=true → sirf wahi entries figures me jodo jinpe incentive >0 mila.
+  // Aise schemes jisme amount hai lekin incentive zero hai, wo HR push me na aaye.
+  compute(month, incentiveOnly){
     const inMonth = d => !month || (d||'').slice(0,7)===month;
     const map={};
     const get=rm=>{ rm=normRm(rm||'')||'(No RM)'; if(!map[rm]) map[rm]={rm,mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0}; return map[rm]; };
     getMfBizEntries().forEach(e=>{
       if((e.status||'Pending')!=='Approved') return;
       if(!inMonth(e.date)) return;
+      const inc=INC.mf(e).amt;
+      if(incentiveOnly && !(inc>0)) return; // zero-incentive scheme skip
       const r=get(e.rm); const amt=Number(e.amount)||0;
       if(e.type==='SIP') r.sip_amount+=amt;
       else if(this.SALES_TYPES.includes(e.type)) r.mf_sales+=amt;
-      r.mf_inc += INC.mf(e).amt;
+      r.mf_inc += inc;
     });
     getEqDematEntries().forEach(e=>{
       if((e.status||'Pending')!=='Approved') return;
       if(!inMonth(e.date)) return;
-      const r=get(e.opening_rm||e.rm); r.demat_count++; r.demat_inc += INC.demat(e).amt;
+      const inc=INC.demat(e).amt;
+      if(incentiveOnly && !(inc>0)) return; // zero-incentive demat skip
+      const r=get(e.opening_rm||e.rm); r.demat_count++; r.demat_inc += inc;
     });
     return Object.values(map).map(r=>({...r,total_inc:r.mf_inc+r.demat_inc}))
       .sort((a,b)=>(b.mf_sales+b.sip_amount)-(a.mf_sales+a.sip_amount));
@@ -9790,8 +9796,13 @@ const RMSUM = {
   pushHR(){
     if(!(CU&&CU.role==='admin')) return;
     const month=document.getElementById('rmSumMonth').value;
-    const rows=this.compute(month).map(r=>({rm:r.rm,mf_sales:Math.round(r.mf_sales),sip_amount:Math.round(r.sip_amount),demat_count:r.demat_count,mf_incentive:Math.round(r.mf_inc),demat_incentive:Math.round(r.demat_inc),total_incentive:Math.round(r.total_inc)}));
-    if(!rows.length){ toast('Is period me koi data nahi','error'); return; }
+    const rows=this.compute(month, true)
+      // Admin ka incentive HR Portal me na jaaye (MF Transaction + Demat Open dono)
+      .filter(r=>(r.rm||'').trim().toLowerCase()!=='admin')
+      // Sirf wahi RM push ho jisne incentive earn kiya — zero wale skip
+      .filter(r=>Math.round(r.total_inc)>0)
+      .map(r=>({rm:r.rm,mf_sales:Math.round(r.mf_sales),sip_amount:Math.round(r.sip_amount),demat_count:r.demat_count,mf_incentive:Math.round(r.mf_inc),demat_incentive:Math.round(r.demat_inc),total_incentive:Math.round(r.total_inc)}));
+    if(!rows.length){ toast('Is period me koi (non-zero) incentive wala RM nahi','error'); return; }
     DB.set('rm_sales_summary', {month:month||'all', rows, generated_at:new Date().toISOString(), by:CU.name});
     toast('HR Portal ke liye push ho gaya','success');
     this._showStatus();
