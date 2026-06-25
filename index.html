@@ -200,6 +200,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--na
 #app{display:none;}
 .topbar{background:var(--navy);color:#fff;padding:0 24px;display:flex;align-items:center;
   justify-content:space-between;height:56px;position:sticky;top:0;z-index:200;box-shadow:var(--shadow2);min-width:0;overflow:hidden;}
+.topbar>div:first-child{min-width:0;flex:0 1 auto;overflow:hidden;}
+.topbar-right{flex:0 0 auto;}
 .topbar-brand{font-size:1.2rem;font-weight:900;letter-spacing:1px;}
 .topbar-brand span{color:var(--gold);}
 .topbar-logo-img{width:32px;height:32px;object-fit:contain;}
@@ -513,13 +515,19 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 /* ── RESPONSIVE ── */
 @media(max-width:800px){
   .hamburger-btn{display:inline-block;}
-  .topbar-brand{font-size:1rem;}
+  .topbar{padding:0 8px;}
+  .topbar-brand{font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .topbar-logo-img{width:26px;height:26px;}
   .user-pill{display:none;}
-  #changeCredBtn{font-size:.7rem;padding:4px 7px;}
+  #changeCredBtn{font-size:.7rem;padding:4px 6px;}
   #changeCredBtn .cred-btn-text{display:none;}
-  .topbar-right{gap:5px;}
-  .btn-sm{font-size:.72rem;padding:5px 8px;}
+  .topbar-right{gap:4px;}
+  .btn-sm{font-size:.7rem;padding:5px 7px;}
   .seg-indicator{display:none;}
+  /* Zoom widget compact on mobile so 🔑 / 👔 HR / Logout sab fit ho */
+  #dnZoomBar{margin-right:2px!important;padding:2px 4px!important;gap:2px!important;}
+  #dnZoomBar button{width:20px!important;height:20px!important;font-size:14px!important;}
+  #dnZoomBar #dnZoomVal{min-width:30px!important;font-size:10px!important;}
   .sidebar{position:fixed;left:0;top:56px;height:calc(100vh - 56px);z-index:160;
     transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow2);}
   .sidebar.open{transform:translateX(0);}
