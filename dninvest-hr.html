@@ -919,15 +919,20 @@ const DB = {
     }catch(e){ console.log('setMerged error:',key,e); }
   },
   // merge-on-write for attendance: {employeeName: [{date,in,out,status}, ...]}
+  // Retries up to 4 times (2s→4s→8s→16s backoff) so transient Firestore
+  // network blips don't silently drop the attendance record (e.g. early-morning logins).
   async setAttendanceRecord(name, record){
     const local = this.get('attendance', {}) || {};
     if(!local[name]) local[name]=[];
     let idx = local[name].findIndex(r=>r.date===record.date);
     if(idx>=0) local[name][idx]=record; else local[name].push(record);
-    this.setLocal('attendance', local);
-    try{
-      if(typeof fdb!=='undefined'){
-        const docRef = fdb.collection('hr_data').doc('attendance');
+    this.setLocal('attendance', local); // always update cache immediately
+    if(typeof fdb==='undefined') return;
+    const docRef = fdb.collection('hr_data').doc('attendance');
+    const MAX_ATTEMPTS = 5;   // 1 try + 4 retries
+    const BASE_DELAY   = 2000; // 2s, 4s, 8s, 16s
+    for(let attempt=1; attempt<=MAX_ATTEMPTS; attempt++){
+      try{
         await fdb.runTransaction(async (tx)=>{
           const doc = await tx.get(docRef);
           let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
@@ -936,8 +941,16 @@ const DB = {
           if(lidx>=0) latest[name][lidx]=record; else latest[name].push(record);
           tx.set(docRef, {data:latest, updated:new Date().toISOString()});
         });
+        return; // success — stop retrying
+      }catch(e){
+        console.log('setAttendanceRecord attempt '+attempt+' failed:',e);
+        if(attempt < MAX_ATTEMPTS){
+          await new Promise(r=>setTimeout(r, BASE_DELAY * Math.pow(2, attempt-1)));
+        } else {
+          console.warn('setAttendanceRecord: all '+MAX_ATTEMPTS+' attempts failed for '+name+' on '+record.date);
+        }
       }
-    }catch(e){ console.log('setAttendanceRecord error:',e); }
+    }
   },
   // Real-time listeners: when Firestore data changes (from ANY device), refresh local
   // cache and re-render. This is how Admin's changes instantly reach every RM's screen.
