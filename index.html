@@ -1024,6 +1024,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="SIP Bounce Buy">SIP Bounce Buy</option>
             <option value="SIP Pause">SIP Pause</option>
           </select>
+          <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="Month-wise dekho">
+            <option value="">All Months</option>
+          </select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:6px;font-size:.78rem"></label>
@@ -5293,6 +5296,33 @@ function renderMfTxnPage(){
     if(!isFullAccess){ rmFilter.value=CU.name; rmFilter.disabled=true; }
   }
 
+  populateMfTxnMonths();
+  renderMfTxnTable();
+}
+
+// Month dropdown me wahi mahine bhare jo data me actually hain (RM ke apne, Admin ke saare).
+function populateMfTxnMonths(){
+  const sel=document.getElementById('mftxn-month-filter');
+  if(!sel) return;
+  let entries=getMfBizEntries();
+  if(CU.role!=='admin' && !hasMfDeskAccess(CU)){
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
+  }
+  const months=[...new Set(entries.map(e=>(e.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const cur=sel.value;
+  const MNF=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const label=m=>{const [y,mo]=m.split('-');return MNF[+mo]+' '+y;};
+  sel.innerHTML='<option value="">All Months</option>'+months.map(m=>`<option value="${m}">${label(m)}</option>`).join('');
+  if(months.includes(cur)) sel.value=cur;
+}
+
+// Month chunne pe From/To date clear kar do taaki conflict na ho.
+function onMfTxnMonthChange(){
+  const m=document.getElementById('mftxn-month-filter')?.value||'';
+  if(m){
+    const fromEl=document.getElementById('mftxn-from-date'); if(fromEl) fromEl.value='';
+    const toEl=document.getElementById('mftxn-to-date'); if(toEl) toEl.value='';
+  }
   renderMfTxnTable();
 }
 
@@ -5676,12 +5706,14 @@ function getFilteredMfTxns(){
   const q=(document.getElementById('mftxn-search')?.value||'').trim().toLowerCase();
   const rmF=document.getElementById('mftxn-rm-filter')?.value||'';
   const typeF=document.getElementById('mftxn-type-filter')?.value||'';
+  const monthF=document.getElementById('mftxn-month-filter')?.value||'';
   const fromD=document.getElementById('mftxn-from-date')?.value||'';
   const toD=document.getElementById('mftxn-to-date')?.value||'';
 
   if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.fund_name||'').toLowerCase().includes(q)||(e.target_scheme||'').toLowerCase().includes(q));
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
   if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
+  if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
 
@@ -5704,6 +5736,7 @@ const MFTXN_TYPE_COLOR = {
 function renderMfTxnTable(){
   const wrap=document.getElementById('mftxn-table');
   if(!wrap) return;
+  populateMfTxnMonths();
   const entries=getFilteredMfTxns();
   const cnt=document.getElementById('mftxn-count');
   if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('mf',entries))+'</b>';
