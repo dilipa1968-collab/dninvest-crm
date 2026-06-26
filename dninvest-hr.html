@@ -1244,12 +1244,16 @@ function renderCrmSalesSummary(){
   }
   if(meta) meta.textContent='— '+(s.month||'all')+' · pushed '+(s.generated_at?new Date(s.generated_at).toLocaleString('en-IN'):'')+(s.by?(' by '+s.by):'');
   const empLower=EMPLOYEES.map(e=>e.name.toLowerCase());
+  const tot={mf:0,sip:0,demat:0,inc:0};
+  s.rows.forEach(r=>{ tot.mf+=Number(r.mf_sales)||0; tot.sip+=Number(r.sip_amount)||0; tot.demat+=Number(r.demat_count)||0; tot.inc+=Number(r.total_incentive)||0; });
   wrap.innerHTML='<table><thead><tr><th>RM</th><th>MF Sales</th><th>SIP Amount</th><th>Demat</th><th>Total Inc. (CRM)</th><th>Match</th></tr></thead><tbody>'
     + s.rows.map(r=>{
         const matched=empLower.includes((r.rm||'').toLowerCase());
         return '<tr><td>'+escapeHtml(r.rm||'')+'</td><td>'+fmt(r.mf_sales||0)+'</td><td>'+fmt(r.sip_amount||0)+'</td><td style="text-align:center">'+(r.demat_count||0)+'</td><td>'+fmt(r.total_incentive||0)+'</td><td>'+(matched?'<span style="color:#16a34a;font-weight:600">✓ emp</span>':'<span style="color:var(--text3)">— skip</span>')+'</td></tr>';
       }).join('')
-    + '</tbody></table>';
+    + '</tbody><tfoot><tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border2)">'
+      + '<td>TOTAL</td><td>'+fmt(tot.mf)+'</td><td>'+fmt(tot.sip)+'</td><td style="text-align:center">'+tot.demat+'</td><td>'+fmt(tot.inc)+'</td><td></td>'
+      + '</tr></tfoot></table>';
 }
 async function applyCrmToBusiness(){
   const s=getCrmSalesSummary();
@@ -2670,13 +2674,17 @@ function renderSalaryPage(){
     const tst=document.getElementById('team-salary-table');
     if(tst){
       const payments=getPaymentsForMonth(month);
-      tst.innerHTML=EMPLOYEES.map(e=>{
+      const T={sal:0,abs:0,ded:0,adv:0,esi:0,extra:0,net:0,paid:0,bal:0};
+      const body=EMPLOYEES.map(e=>{
         const r=calcMonthlySalary(e.name,month);
         const advDeducted=getAdvanceAdjustedForMonth(e.name, month);
         const netAfterAdv=Math.max(0, r.net-advDeducted);
         const paid=(payments[e.name]&&payments[e.name].salaryPaid)||0;
         const balance=Math.max(0, netAfterAdv-paid);
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
+        T.sal+=r.salary; T.abs+=r.absentDays; T.ded+=r.deduction; T.adv+=advDeducted;
+        T.esi+=(r.esi.applicable?r.esi.employeeContribution:0); T.extra+=(r.extra.amount||0);
+        T.net+=netAfterAdv; T.paid+=paid; T.bal+=balance;
         return `<tr>
           <td>${e.name}</td>
           <td>${fmt(r.salary)}</td>
@@ -2691,6 +2699,20 @@ function renderSalaryPage(){
           <td><button class="btn btn-sm" onclick="markSalaryPaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
         </tr>`;
       }).join('');
+      const totalRow=`<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700">
+          <td>TOTAL</td>
+          <td>${fmt(T.sal)}</td>
+          <td>${T.abs}</td>
+          <td style="color:var(--red)">− ${fmt(T.ded)}</td>
+          <td style="color:${T.adv>0?'var(--red)':'var(--text3)'}">${T.adv>0?'− '+fmt(T.adv):'—'}</td>
+          <td style="color:${T.esi>0?'var(--red)':'var(--text3)'}">${T.esi>0?'− '+fmt(T.esi):'—'}</td>
+          <td style="color:${T.extra>0?'var(--red)':'var(--text3)'}">${T.extra>0?'− '+fmt(T.extra):'—'}</td>
+          <td style="color:var(--green)">${fmt(T.net)}</td>
+          <td style="color:var(--green)">${fmt(T.paid)}</td>
+          <td style="color:${T.bal>0?'var(--red)':'var(--green)'}">${fmt(T.bal)}</td>
+          <td></td>
+        </tr>`;
+      tst.innerHTML=body+totalRow;
     }
     calcSalary();
     renderAdvanceHistory();
