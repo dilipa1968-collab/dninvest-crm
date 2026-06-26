@@ -1530,6 +1530,33 @@ function presentBadgeClass(rec){
   return 'badge-green';
 }
 
+// Whole-month tally of on-time(green) / slightly-late(blue) / late(yellow/amber)
+// Present days for one employee, for the given YYYY-MM (defaults to current month).
+// Uses the SAME cutoffs as presentBadgeClass, so chips match the day badges.
+function monthPresenceCounts(name, monthPrefix){
+  const mp = monthPrefix || today().slice(0,7);
+  const recs = (getAtt()[name]||[]).filter(r=>r.status==='Present' && (r.date||'').slice(0,7)===mp);
+  let green=0, blue=0, yellow=0;
+  recs.forEach(r=>{
+    const cls=presentBadgeClass(r);
+    if(cls==='badge-amber') yellow++;
+    else if(cls==='badge-blue') blue++;
+    else green++;
+  });
+  return {green, blue, yellow};
+}
+
+// Three coloured chips (G / B / Y counts) for the month, shown next to an RM.
+function monthChipsHtml(name, monthPrefix){
+  const c=monthPresenceCounts(name, monthPrefix);
+  const chip=(bg,txt,n,title)=>`<span title="${title}" style="display:inline-flex;align-items:center;gap:2px;background:${bg};color:${txt};font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:10px">${n}</span>`;
+  return `<span style="display:inline-flex;gap:3px;margin-left:6px">`
+    + chip('var(--green-bg)','var(--green-text)',c.green,'On-time (green) this month')
+    + chip('var(--blue-bg)','var(--blue-text)',c.blue,'Slightly late (blue) this month')
+    + chip('var(--amber-bg)','var(--amber-text)',c.yellow,'Late (yellow) this month')
+    + `</span>`;
+}
+
 function daysBetween(f,t){
   const ms=new Date(t)-new Date(f);
   return Math.max(1,Math.round(ms/86400000)+1);
@@ -1908,13 +1935,20 @@ function renderDashboard(){
   const tal=document.getElementById('today-att-list');
   if(tal){
     tal.innerHTML='';
+    const mLabel=new Date(td+'T00:00:00').toLocaleDateString('en-IN',{month:'long'});
+    tal.innerHTML+=`<div style="font-size:10.5px;color:var(--text3);margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <span>${mLabel} count:</span>
+      <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:50%;background:var(--green)"></span>On-time</span>
+      <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:50%;background:var(--blue)"></span>Slightly late</span>
+      <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:50%;background:var(--amber)"></span>Late</span>
+    </div>`;
     EMPLOYEES.forEach(e=>{
       const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
       let badge='',inT='—';
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
       else{badge='<span class="badge badge-red">Absent</span>'}
-      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
+      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}${monthChipsHtml(e.name)}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
     });
   }
 
