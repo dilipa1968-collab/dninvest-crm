@@ -2930,8 +2930,10 @@ function refreshDash(){
     mf.forEach(c=>{ rmA[c.rm]=(rmA[c.rm]||0)+(parseFloat(c.aum)||0); });
     const rs2=Object.entries(rmA).sort((a,b)=>b[1]-a[1]);
     const mx2=rs2[0]?.[1]||1;
+    const totMfAum=rs2.reduce((s,[,v])=>s+v,0);
     document.getElementById('rmMfChart').innerHTML = rs2.length
       ? rs2.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx2*100).toFixed(0)}%;background:var(--teal)"></div></div><span class="bar-num">₹${fmtNum(v)}</span></div>`).join('')
+        + `<div class="bar-row" style="font-weight:700;border-top:2px solid var(--border,#ddd);margin-top:4px;padding-top:6px"><span class="bar-name">TOTAL</span><div class="bar-wrap"></div><span class="bar-num">₹${fmtNum(totMfAum)}</span></div>`
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No MF clients yet</p>';
     document.getElementById('rmMfCard').style.display=hasMf?'':'none';
     const rmMfCountEl=document.getElementById('rmMfCount'); if(rmMfCountEl) rmMfCountEl.textContent=rs2.length+' RMs';
