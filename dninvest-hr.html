@@ -2076,12 +2076,20 @@ function attMonthLabel(ym){
 }
 function populateAttMonthSelect(){
   const sel=document.getElementById('att-rpt-month');
-  if(!sel || sel.options.length) return; // already populated
-  attMonthOptions().forEach(ym=>{
+  if(!sel) return;
+  const cur=sel.value;
+  const wanted=attMonthOptions();
+  // Agar list pehle se sahi hai to chhedo mat (selection preserve).
+  const existing=Array.from(sel.options).map(o=>o.value);
+  const same = existing.length===wanted.length && wanted.every((v,i)=>existing[i]===v);
+  if(same) return;
+  sel.innerHTML='';
+  wanted.forEach(ym=>{
     const o=document.createElement('option');
     o.value=ym; o.textContent=attMonthLabel(ym);
     sel.appendChild(o);
   });
+  if(cur && wanted.includes(cur)) sel.value=cur;
 }
 function attDaysInMonth(ym){
   const [y,m]=ym.split('-').map(Number);
