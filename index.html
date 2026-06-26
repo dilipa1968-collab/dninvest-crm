@@ -4202,11 +4202,11 @@ async function addSeminarAttendeesToLeads(){
 
     const mob=cleanMob(att.mobile||'');
 
-    // Duplicate checks
+    // Duplicate checks — mobile match anywhere (leads, eq, mf)
     if(mob){
-      if(leads.find(l=>cleanMob(l.mobile)===mob)){ skippedDup.push(att.name); continue; }
-      if((DB.get('eq_clients')||[]).find(c=>c.code && cleanMob(c.mobile)===mob)){ skippedDup.push(att.name+' (Eq Client)'); continue; }
-      if((DB.get('mf_clients')||[]).find(c=>c.pan && cleanMob(c.mobile)===mob)){ skippedDup.push(att.name+' (MF Investor)'); continue; }
+      if(leads.find(l=>cleanMob(l.mobile)===mob)){ skippedDup.push(att.name+' (already in Leads)'); continue; }
+      if((DB.get('eq_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ skippedDup.push(att.name+' (Equity Client)'); continue; }
+      if((DB.get('mf_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ skippedDup.push(att.name+' (MF Investor)'); continue; }
     }
 
     // Build lead record
