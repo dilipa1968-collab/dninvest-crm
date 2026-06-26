@@ -1464,6 +1464,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('seminarDetailModal')">Close</button>
+      <button class="btn btn-teal" onclick="addSeminarAttendeesToLeads()" id="semAddLeadBtn" style="display:none">➕ Add Selected to Leads</button>
       <button class="btn btn-primary" onclick="saveSeminarAttendeeChanges()">💾 Save Changes</button>
     </div>
   </div>
@@ -4114,7 +4115,11 @@ function renderSeminarAttendees(){
     return;
   }
   const arrow=(c)=> col===c ? (dir===1?' ▲':' ▼') : '';
+  // hide/show "Add Selected to Leads" button
+  const semAddBtn = document.getElementById('semAddLeadBtn');
+  if(semAddBtn) semAddBtn.style.display='none';
   let h=`<table><thead><tr>
+    <th style="width:32px"><input type="checkbox" id="semChkAll" title="Select All" onchange="toggleAllSeminarChk(this)"></th>
     <th onclick="sortSeminarAttendees('name')" style="cursor:pointer" title="Click to sort">Name${arrow('name')}</th>
     <th>Mobile</th>
     <th onclick="sortSeminarAttendees('rm')" style="cursor:pointer" title="Click to sort">RM${arrow('rm')}</th>
@@ -4123,6 +4128,7 @@ function renderSeminarAttendees(){
     const isMyAttendee = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
     const dis = isMyAttendee ? '' : 'disabled style="opacity:0.45;pointer-events:none"';
     h+=`<tr data-id="${a.id}">
+      <td><input type="checkbox" class="sem-chk" data-id="${a.id}" onchange="onSemChkChange()"></td>
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
@@ -4146,6 +4152,99 @@ function renderSeminarAttendees(){
   h+='</tbody></table>';
   cont.innerHTML=h;
 }
+
+// ── Seminar → Lead helpers ──────────────────────────────────────────────────
+
+function toggleAllSeminarChk(masterChk){
+  document.querySelectorAll('.sem-chk').forEach(c=>{ c.checked=masterChk.checked; });
+  onSemChkChange();
+}
+
+function onSemChkChange(){
+  const anyChecked = !!document.querySelector('.sem-chk:checked');
+  const btn=document.getElementById('semAddLeadBtn');
+  if(btn) btn.style.display = anyChecked ? '' : 'none';
+  // update select-all state
+  const all=document.querySelectorAll('.sem-chk');
+  const checked=document.querySelectorAll('.sem-chk:checked');
+  const masterChk=document.getElementById('semChkAll');
+  if(masterChk){
+    masterChk.indeterminate = checked.length>0 && checked.length<all.length;
+    masterChk.checked = all.length>0 && checked.length===all.length;
+  }
+}
+
+async function addSeminarAttendeesToLeads(){
+  const checked=[...document.querySelectorAll('.sem-chk:checked')].map(c=>c.dataset.id);
+  if(!checked.length){ toast('Koi attendee select nahi hai','error'); return; }
+
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+
+  // Only admin or own-RM attendees selectable — but we still double-check
+  const isAllowed = att => CU.role==='admin' || (att.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+
+  const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
+  const leads=DB.get('leads')||[];
+
+  let added=0, skippedDup=[], skippedGuest=[];
+
+  for(const aid of checked){
+    const att=(s.attendees||[]).find(x=>x.id===aid);
+    if(!att || !isAllowed(att)) continue;
+
+    // Guests (no mobile/name link) — skip with note
+    if(att.type==='guest'){
+      skippedGuest.push(att.name||'Guest');
+      continue;
+    }
+
+    const mob=cleanMob(att.mobile||'');
+
+    // Duplicate checks
+    if(mob){
+      if(leads.find(l=>cleanMob(l.mobile)===mob)){ skippedDup.push(att.name); continue; }
+      if((DB.get('eq_clients')||[]).find(c=>c.code && cleanMob(c.mobile)===mob)){ skippedDup.push(att.name+' (Eq Client)'); continue; }
+      if((DB.get('mf_clients')||[]).find(c=>c.pan && cleanMob(c.mobile)===mob)){ skippedDup.push(att.name+' (MF Investor)'); continue; }
+    }
+
+    // Build lead record
+    const newId=uid();
+    const rm = normRm(att.rm||CU.name||'');
+    const rec={
+      id:newId,
+      name:att.name||'',
+      mobile:att.mobile||'',
+      rm,
+      last_call:'',
+      next_call:'',
+      followup_status:'Pending',
+      remarks:`Seminar: ${s.name}${s.date?' ('+fmtDate(s.date)+')':''}`,
+      created:today(),
+      updated:today()
+    };
+    await DB.setClient('leads', rec);
+    added++;
+  }
+
+  // Uncheck all
+  document.querySelectorAll('.sem-chk').forEach(c=>c.checked=false);
+  const masterChk=document.getElementById('semChkAll');
+  if(masterChk){ masterChk.checked=false; masterChk.indeterminate=false; }
+  document.getElementById('semAddLeadBtn').style.display='none';
+
+  // Summary toast
+  let msg=`${added} lead${added!==1?'s':''} add ho gaye!`;
+  if(skippedDup.length) msg+=` | ${skippedDup.length} already exist (skip).`;
+  if(skippedGuest.length) msg+=` | ${skippedGuest.length} guest skip.`;
+  toast(msg, added>0?'success':'error');
+
+  renderLeadsTable();
+  updateBadges();
+}
+
+// ── End Seminar → Lead helpers ───────────────────────────────────────────────
 
 async function setAttendeeStatus(attendeeId,status){
   const seminars=DB.get('seminars')||[];
