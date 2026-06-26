@@ -1028,23 +1028,47 @@ function populateEmpDropdowns(){
   }
 }
 
+// Read-modify-write employee_changes against the LATEST Firestore copy inside a
+// transaction, so a background sync can't clobber a fresh add/remove. Falls back
+// to a plain local+set write when offline.
+async function _commitEmployeeChanges(mutate){
+  if(typeof fdb!=='undefined'){
+    try{
+      const docRef=fdb.collection('hr_data').doc('employee_changes');
+      await fdb.runTransaction(async(tx)=>{
+        const doc=await tx.get(docRef);
+        const cur=(doc.exists && doc.data() && doc.data().data) ? doc.data().data : {added:[],removed:[]};
+        const next=mutate({added:cur.added||[], removed:cur.removed||[]});
+        tx.set(docRef,{data:next, updated:new Date().toISOString()});
+        DB.setLocal('employee_changes', next);
+      });
+      applyEmployeeChanges();
+      return true;
+    }catch(e){ console.log('employee_changes tx error:',e); /* fall through to local */ }
+  }
+  // Offline / no Firestore — at least persist locally so the UI updates.
+  const cur=getEmployeeChanges();
+  const next=mutate({added:cur.added||[], removed:cur.removed||[]});
+  DB.set('employee_changes', next);
+  applyEmployeeChanges();
+  return false;
+}
+
 // Persist a newly added employee to Firestore so it survives refresh / syncs to all devices.
 async function persistAddEmployee(emp){
-  const changes=getEmployeeChanges();
-  const added=(changes.added||[]).filter(e=>e.name!==emp.name);
-  added.push(emp);
-  await DB.set('employee_changes', {added, removed:changes.removed||[]});
-  applyEmployeeChanges();
+  await _commitEmployeeChanges(({added,removed})=>({
+    added:[...added.filter(e=>e.name!==emp.name), emp],
+    removed:removed.filter(n=>n!==emp.name)   // un-delete if they were soft-removed
+  }));
 }
 
 // Persist an employee removal to Firestore (soft-delete: removes from active list,
 // does NOT touch their historical attendance/salary/incentive records).
 async function persistRemoveEmployee(name){
-  const changes=getEmployeeChanges();
-  const added=(changes.added||[]).filter(e=>e.name!==name);
-  const removed=(changes.removed||[]).indexOf(name)===-1 ? (changes.removed||[]).concat([name]) : (changes.removed||[]);
-  await DB.set('employee_changes', {added, removed});
-  applyEmployeeChanges();
+  await _commitEmployeeChanges(({added,removed})=>({
+    added:added.filter(e=>e.name!==name),
+    removed:removed.indexOf(name)===-1 ? removed.concat([name]) : removed
+  }));
 }
 
 // Brokerage turnover — empty by default. Admin enters monthly data from Incentive page (April 2026 onwards).
@@ -3805,12 +3829,25 @@ async function addEmployee(){
   const name=document.getElementById('ne-name').value.trim();
   if(!name){alert('Please enter a name');return}
   if(EMPLOYEES.find(e=>e.name.toLowerCase()===name.toLowerCase())){alert('An employee with this name already exists');return}
-  const emp={name,role:document.getElementById('ne-role').value||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000};
-  await persistAddEmployee(emp);
-  const perfVal=parseInt(document.getElementById('ne-perf').value)||0;
-  if(perfVal>0) await setPerfIncentive(name, perfVal);
-  toggleAddForm();renderEmployees();
-  alert(name+' added!\n\nAlso create a new user in CRM for login, so they can log in here too.');
+  const emp={name,role:document.getElementById('ne-role').value.trim()||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000};
+  try{
+    await persistAddEmployee(emp);
+    const perfVal=parseInt(document.getElementById('ne-perf').value)||0;
+    if(perfVal>0) await setPerfIncentive(name, perfVal);
+  }catch(e){
+    alert('Could not save '+name+'. Please check your internet and try again.');
+    return;
+  }
+  // Refresh everywhere the new name should appear.
+  applyEmployeeChanges();
+  populateEmpDropdowns();
+  renderEmployees();
+  renderSalaryPage && renderSalaryPage();
+  renderIncentivePage && renderIncentivePage();
+  // Clear the form for the next entry.
+  ['ne-name','ne-role','ne-mob','ne-doj','ne-sal','ne-perf'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  toggleAddForm();
+  alert('✅ '+name+' added to HR Portal (salary '+fmt(emp.salary)+').\n\nZaroori: HR me employee add karne se uska CRM login nahi banta. Login ke liye CRM ke Users & Settings me isi naam se user banana hoga — tabhi ye HR me login kar payega aur attendance track hogi.');
 }
 
 async function toggleEsiRegistered(name, val){
