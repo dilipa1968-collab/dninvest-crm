@@ -2483,7 +2483,7 @@ function initApp(){
       checkAnnouncement();
       updateMsgBadge();
       checkRmReply();
-      runAutoSchedule(); // Run auto-schedule on load
+      refreshHolidaySet().then(runAutoSchedule); // Load holidays, then run auto-schedule on load
       cleanExpiredTempAccess(); // Clean expired temp access
 
       // Real-time listener for announcements (single object, not array)
@@ -7066,8 +7066,8 @@ async function fixRmCasing(){
 // Mon-Fri: 8:00 AM – 7:00 PM IST (active window)
 // Saturday: 9:30 AM – 2:00 PM IST (shorter window, same as HR attendance rule)
 // Sunday: always inactive (no active window)
-// Holidays are NOT auto-handled here — Admin manually deactivates RMs on
-// declared holidays if needed (manual override below still applies).
+// Stock Exchange holidays (from HR Portal's holiday calendar, hr_data/holidays):
+// treated exactly like Sunday — RMs auto-deactivate on both portals for that day.
 function getISTHour(){
   // IST = UTC+5:30
   const now = new Date();
@@ -7084,8 +7084,29 @@ function getISTDayOfWeek(){
   return ist.getDay();
 }
 
+// Today's date (YYYY-MM-DD) in IST — used to match the HR holiday calendar.
+function getISTDateStr(){
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset()*60000;
+  const ist = new Date(utc + 5.5*3600000);
+  return ist.getFullYear()+'-'+String(ist.getMonth()+1).padStart(2,'0')+'-'+String(ist.getDate()).padStart(2,'0');
+}
+
+// Cached holiday set from HR Portal (hr_data/holidays). Refreshed periodically
+// so a holiday declared in HR auto-flows here without a CRM reload.
+let _holidaySet = new Set();
+async function refreshHolidaySet(){
+  try{
+    const holDoc = await fdb.collection('hr_data').doc('holidays').get();
+    const holidays = (holDoc.exists && holDoc.data() && holDoc.data().data) ? holDoc.data().data : [];
+    _holidaySet = new Set(holidays.map(h=>h.date));
+  }catch(e){ /* keep last known set on error */ }
+}
+function isHolidayToday(){ return _holidaySet.has(getISTDateStr()); }
+
 // Returns {start, end} active-window boundaries (in IST decimal hours) for
-// the given day-of-week. Sunday returns null (no active window at all).
+// the given day-of-week. Sunday (and holidays, handled in runAutoSchedule)
+// return null (no active window at all).
 function getActiveWindowForDay(dow){
   if(dow===0) return null;           // Sunday — always inactive
   if(dow===6) return {start:9.5, end:14}; // Saturday — 9:30 AM to 2:00 PM
@@ -7096,7 +7117,8 @@ function runAutoSchedule(){
   const users = DB.get('users') || [];
   const istHour = getISTHour();
   const dow = getISTDayOfWeek();
-  const win = getActiveWindowForDay(dow);
+  // Holiday → behave exactly like Sunday (no active window, RMs deactivate).
+  const win = isHolidayToday() ? null : getActiveWindowForDay(dow);
   const shouldBeActive = win ? (istHour >= win.start && istHour < win.end) : false;
   let changed = false;
   users.forEach((u, idx) => {
@@ -7108,7 +7130,7 @@ function runAutoSchedule(){
       const istO = new Date(utc + 5.5*3600000);
       const overrideHour = istO.getHours() + istO.getMinutes()/60;
       const overrideDow = istO.getDay();
-      const overrideWin = getActiveWindowForDay(overrideDow);
+      const overrideWin = isHolidayToday() ? null : getActiveWindowForDay(overrideDow);
       // Has the day changed since the override, or has the active window
       // (start/end) for today been crossed since the override was set?
       const dayChanged = new Date().getDate() !== overrideTime.getDate();
@@ -7136,8 +7158,9 @@ function runAutoSchedule(){
   }
 }
 
-// Auto-schedule every minute
-setInterval(runAutoSchedule, 60000);
+// Auto-schedule every minute (refresh holiday calendar first so a holiday
+// declared in HR Portal flows here without a CRM reload).
+setInterval(()=>{ refreshHolidaySet().then(runAutoSchedule); }, 60000);
 
 // ── 10 AM Late-Login Auto-Absent ──
 // On working days (same Mon-Sat window as the auto-schedule, no Sunday/holiday
