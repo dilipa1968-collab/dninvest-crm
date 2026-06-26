@@ -1100,6 +1100,9 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
             <option value="Approved">Approved</option>
             <option value="Declined">Declined</option>
           </select>
+          <select onchange="onEqDematMonthChange()" id="eqdemat-month-filter" title="Month-wise dekho">
+            <option value="">All Months</option>
+          </select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
             <input type="date" onchange="renderEqDematTable()" id="eqdemat-from-date" style="padding:6px;font-size:.78rem"></label>
@@ -5871,6 +5874,34 @@ function renderEqDematPage(){
     if(CU.role!=='admin') openSel.disabled=true;
   }
 
+  populateEqDematMonths();
+  renderEqDematTable();
+}
+
+// Demat month dropdown — wahi mahine jo data me hain (RM ke apne, Admin ke saare).
+function populateEqDematMonths(){
+  const sel=document.getElementById('eqdemat-month-filter');
+  if(!sel) return;
+  let entries=getEqDematEntries();
+  const me=(CU.name||'').trim().toLowerCase();
+  if(CU.role!=='admin'){
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===me||(e.opening_rm||'').trim().toLowerCase()===me);
+  }
+  const months=[...new Set(entries.map(e=>(e.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const cur=sel.value;
+  const MNF=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const label=m=>{const [y,mo]=m.split('-');return MNF[+mo]+' '+y;};
+  sel.innerHTML='<option value="">All Months</option>'+months.map(m=>`<option value="${m}">${label(m)}</option>`).join('');
+  if(months.includes(cur)) sel.value=cur;
+}
+
+// Month chunne pe From/To date clear taaki conflict na ho.
+function onEqDematMonthChange(){
+  const m=document.getElementById('eqdemat-month-filter')?.value||'';
+  if(m){
+    const fromEl=document.getElementById('eqdemat-from-date'); if(fromEl) fromEl.value='';
+    const toEl=document.getElementById('eqdemat-to-date'); if(toEl) toEl.value='';
+  }
   renderEqDematTable();
 }
 
@@ -5981,12 +6012,14 @@ function getFilteredEqDemat(){
   const q=(document.getElementById('eqdemat-search')?.value||'').trim().toLowerCase();
   const rmF=document.getElementById('eqdemat-rm-filter')?.value||'';
   const statusF=document.getElementById('eqdemat-status-filter')?.value||'';
+  const monthF=document.getElementById('eqdemat-month-filter')?.value||'';
   const fromD=document.getElementById('eqdemat-from-date')?.value||'';
   const toD=document.getElementById('eqdemat-to-date')?.value||'';
 
   if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.opening_rm||'').toLowerCase().includes(q)||(e.client_code||'').toLowerCase().includes(q));
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF||(e.opening_rm||'')===rmF);
   if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
+  if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
 
@@ -5996,6 +6029,7 @@ function getFilteredEqDemat(){
 function renderEqDematTable(){
   const wrap=document.getElementById('eqdemat-table');
   if(!wrap) return;
+  populateEqDematMonths();
   const entries=getFilteredEqDemat();
   const cnt=document.getElementById('eqdemat-count');
   if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('demat',entries))+'</b>';
