@@ -227,7 +227,7 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 
 /* ── SIDEBAR + CONTENT ── */
 .app-body{display:flex;min-height:calc(100vh - 56px);}
-.sidebar{width:225px;background:var(--white);border-right:1px solid var(--border);
+.sidebar{width:210px;background:var(--white);border-right:1px solid var(--border);
   flex-shrink:0;padding:6px 0;position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto;box-shadow:2px 0 8px rgba(10,20,50,.04);}
 .sidebar-section{padding:6px 16px 2px;font-size:.62rem;font-weight:800;color:#8899bb;
   text-transform:uppercase;letter-spacing:1.5px;margin-top:6px;}
@@ -241,7 +241,7 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
   padding:2px 7px;border-radius:10px;font-weight:700;}
 .nav-badge.red{background:var(--red2);color:var(--red);}
 
-.content{flex:1;padding:24px 28px;min-width:0;overflow-x:hidden;}
+.content{flex:1;padding:18px 20px;min-width:0;overflow-x:hidden;}
 .page{display:none;}
 .page.active{display:block;}
 
@@ -287,8 +287,8 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 /* ── FILTERS ── */
 .filters{background:#fff;border-radius:var(--radius);padding:12px 16px;display:flex;flex-wrap:wrap;
   gap:8px;margin-bottom:14px;box-shadow:0 1px 6px rgba(10,20,50,.06);align-items:center;border:1px solid var(--border);}
-.filters input,.filters select{padding:7px 11px;border:1.5px solid var(--border);border-radius:8px;
-  font-size:.82rem;outline:none;background:var(--bg);transition:border .2s;}
+.filters input,.filters select{padding:6px 9px;border:1.5px solid var(--border);border-radius:8px;
+  font-size:.79rem;outline:none;background:var(--bg);transition:border .2s;}
 .filters input:focus,.filters select:focus{border-color:var(--navy);background:#fff;}
 .filters input[type=text]{min-width:200px;}
 .filter-sep{width:1px;height:24px;background:var(--border);}
@@ -296,8 +296,8 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 
 /* ── TABLE ── */
 .tbl-wrap{background:#fff;border-radius:var(--radius);box-shadow:0 2px 12px rgba(10,20,50,.08);overflow:hidden;border:1px solid var(--border);}
-.tbl-scroll{overflow-x:auto;max-height:58vh;overflow-y:auto;}
-table{width:100%;border-collapse:collapse;font-size:.63rem;}
+.tbl-scroll{overflow-x:auto;max-height:62vh;overflow-y:auto;width:100%;}
+table{width:100%;border-collapse:collapse;font-size:.61rem;table-layout:auto;}
 thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:7px 6px;text-align:left;font-weight:700;
   white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;font-size:.67rem;letter-spacing:.4px;text-transform:uppercase;}
 thead th:hover{background:var(--navy2);}
@@ -307,7 +307,7 @@ tbody tr:hover{background:var(--blue2)!important;}
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
-tbody td{padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;text-transform:uppercase;}
+tbody td{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
@@ -5940,14 +5940,14 @@ function renderMfTxnTable(){
           : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
         return `<tr>
           ${MFTBULK.td(e.id)}
-          <td>${e.date||'—'}</td>
-          <td>${escapeHtml(e.client_name||'—')}</td>
-          <td>${escapeHtml(e.rm||'—')}</td>
-          <td><span class="badge" style="background:${color}22;color:${color}">${escapeHtml(e.type||'—')}</span></td>
-          <td style="font-size:.82rem">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<div style="font-size:.74rem;color:var(--teal,#0891B2);margin-top:2px">↳ ${escapeHtml(e.target_scheme)}</div>`:''}</td>
-          <td style="text-align:right;font-weight:600">₹${brkFmt(e.amount)}</td>
+          <td style="min-width:72px;max-width:78px">${e.date||'—'}</td>
+          <td style="min-width:100px;max-width:140px">${escapeHtml(e.client_name||'—')}</td>
+          <td style="min-width:46px;max-width:60px">${escapeHtml(e.rm||'—')}</td>
+          <td style="min-width:70px"><span class="badge" style="background:${color}22;color:${color};white-space:nowrap">${escapeHtml(e.type||'—')}</span></td>
+          <td style="min-width:130px;max-width:200px;font-size:.78rem;white-space:normal;line-height:1.3">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<div style="font-size:.7rem;color:var(--teal,#0891b2);margin-top:1px">↳ ${escapeHtml(e.target_scheme)}</div>`:''}</td>
+          <td style="text-align:right;font-weight:600;min-width:70px">₹${brkFmt(e.amount)}</td>
           ${INC.cell('mf',e)}
-          <td style="min-width:140px">${remarkCell}</td>
+          <td style="min-width:110px;max-width:150px;white-space:normal;font-size:.72rem">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
