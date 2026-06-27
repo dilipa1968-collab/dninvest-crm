@@ -2278,7 +2278,7 @@ async function isCrmBlockedForRm(){
 // status is recorded as "Holiday" instead of "Present".
 async function recordHrAttendanceOnCrmLogin(user){
   try{
-    if(typeof fdb==='undefined') return;
+    if(typeof fdb==='undefined'){ console.log('[ATT] fdb undefined, skip'); return; }
     // Canonical HR employee names — MUST match dninvest-hr.html's EMPLOYEES list
     // exactly, so attendance is saved under the same key the HR Portal reads.
     const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
@@ -2291,12 +2291,14 @@ async function recordHrAttendanceOnCrmLogin(user){
     );
     const name = match || rawName;
     const td = today();
+    console.log('[ATT] user='+rawName+' matched='+name+' date='+td);
 
     // Read current doc first
     const docRef = fdb.collection('hr_data').doc('attendance');
     const snap = await docRef.get();
     const existing = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
     const todayRec = existing[name] && existing[name].find(r=>r.date===td);
+    console.log('[ATT] todayRec='+JSON.stringify(todayRec||null));
 
     // If today was auto-marked "Absent" by the 10 AM late-login check, this is
     // a delayed login — flip it to "Late" and reactivate the user immediately,
@@ -2326,7 +2328,7 @@ async function recordHrAttendanceOnCrmLogin(user){
       return;
     }
 
-    if(todayRec) return; // already marked today with a normal status, leave it
+    if(todayRec) { console.log('[ATT] already marked, skip'); return; } // already marked today with a normal status, leave it
 
     // Determine in-time (login time - 2 min)
     const inDate = new Date(Date.now() - 2*60*1000);
@@ -2345,6 +2347,7 @@ async function recordHrAttendanceOnCrmLogin(user){
       }catch(e){}
     }
 
+    console.log('[ATT] saving record: name='+name+' in='+inTime+' status='+status);
     const record = {date:td, in:inTime, out:'', status};
 
     await fdb.runTransaction(async (tx)=>{
@@ -2355,8 +2358,9 @@ async function recordHrAttendanceOnCrmLogin(user){
       if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
       tx.set(docRef, {data:latest, updated:new Date().toISOString()});
     });
+    console.log('[ATT] ✅ saved successfully for '+name);
   }catch(e){
-    console.log('CRM auto-attendance error:', e);
+    console.log('[ATT] ❌ CRM auto-attendance error:', e);
   }
 }
 
