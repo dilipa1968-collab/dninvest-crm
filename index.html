@@ -1121,7 +1121,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         </div>
 
         <div class="filters">
-          <input type="text" placeholder="🔍 Search client / RM..." oninput="renderEqDematTable()" id="eqdemat-search">
+          <input type="text" placeholder="🔍 Search client..." oninput="renderEqDematTable()" id="eqdemat-search">
           <select onchange="renderEqDematTable()" id="eqdemat-rm-filter"><option value="">All RMs</option></select>
           <select onchange="renderEqDematTable()" id="eqdemat-status-filter">
             <option value="">All Status</option>
@@ -1325,7 +1325,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         <!-- Filters -->
         <div class="filter-bar" style="gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <input type="text" class="filter-input" id="op-search" placeholder="🔍 Search client / RM..." oninput="renderOpTable()" style="min-width:180px">
-          <select class="filter-select" id="op-rm-filter" onchange="renderOpTable()"><option value="">All RMs</option></select>
+          <select class="filter-select" id="op-rm-filter" onchange="renderOpTable()" style="display:none"><option value="">All RMs</option></select>
           <select class="filter-select" id="op-status-filter" onchange="renderOpTable()">
             <option value="">All Status</option>
             <option>Active</option><option>Pending</option><option>Closed</option>
@@ -11218,6 +11218,12 @@ function opSwitchTab(tab){
 function populateOpRmFilter(){
   const sel = document.getElementById('op-rm-filter');
   if(!sel) return;
+  // Show RM filter only for Admin
+  if(!CU || CU.role!=='admin'){
+    sel.style.display='none';
+    return;
+  }
+  sel.style.display='';
   const rms = [...new Set(getMyOpEntries().map(e=>e.rm||'').filter(Boolean))].sort();
   const cur = sel.value;
   sel.innerHTML = '<option value="">All RMs</option>' + rms.map(r=>`<option${r===cur?' selected':''}>${r}</option>`).join('');
@@ -11727,3 +11733,4 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 </body>
 </html>
+
