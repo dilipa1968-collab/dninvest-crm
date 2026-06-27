@@ -3277,7 +3277,7 @@ function renderEqTable(){
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
   const isAdmin = CU.role==='admin';
   const _eqArrow=i=>eqSortField===i?(eqSortDir===1?' ▲':' ▼'):'';
-  const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`,'','');
+  const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
   let h=`<table><thead><tr>${BULK.th('eq')}
     ${_eqSortTh(0,'Code','code')}
     ${_eqSortTh(1,'Name','name')}
@@ -3287,9 +3287,9 @@ function renderEqTable(){
     <th onclick="sortEqTable(5)" style="cursor:pointer;white-space:nowrap">Last Trade${_eqArrow(5)}</th>
     <th onclick="sortEqTable(6)" style="cursor:pointer;white-space:nowrap">Last Call${_eqArrow(6)}</th>
     <th onclick="sortEqTable(7)" style="cursor:pointer;white-space:nowrap">Next Call${_eqArrow(7)}</th>
-    ${CF.th('eq','followup_status',`<span onclick="sortEqTable(8)" style="cursor:pointer">Follow-up${_eqArrow(8)}</span>`,'')}
+    ${CF.th('eq','followup_status',`<span onclick="sortEqTable(8)" style="cursor:pointer">Follow-up${_eqArrow(8)}</span>`)}
     <th onclick="sortEqTable(9)" style="cursor:pointer">Remarks${_eqArrow(9)}</th>
-    <th>Actions</th>${CF.th('eq','status','Status','')}<th>Call</th>
+    <th>Actions</th>${CF.th('eq','status','Status')}<th>Call</th>
   </tr></thead><tbody>`;
 
   if(!rows.length) h+=`<tr><td colspan="14" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
@@ -3410,7 +3410,7 @@ function renderMfTable(){
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
   const isAdmin = CU.role==='admin';
   const _mfArrow=i=>mfSortField===i?(mfSortDir===1?' ▲':' ▼'):'';
-  const _mfSortTh=(i,label,cfCol)=>CF.th('mf',cfCol,`<span onclick="sortMfTable(${i})" style="cursor:pointer">${label}${_mfArrow(i)}</span>`,'','');
+  const _mfSortTh=(i,label,cfCol)=>CF.th('mf',cfCol,`<span onclick="sortMfTable(${i})" style="cursor:pointer">${label}${_mfArrow(i)}</span>`);
   let h=`<table><thead><tr>${BULK.th('mf')}
     ${_mfSortTh(0,'Name','name')}
     ${_mfSortTh(1,'Mobile','mobile')}
@@ -3421,9 +3421,9 @@ function renderMfTable(){
     <th onclick="sortMfTable(6)" style="cursor:pointer;white-space:nowrap">SIP Cnt${_mfArrow(6)}</th>
     <th onclick="sortMfTable(7)" style="cursor:pointer;white-space:nowrap">Last Call${_mfArrow(7)}</th>
     <th onclick="sortMfTable(8)" style="cursor:pointer;white-space:nowrap">Next Call${_mfArrow(8)}</th>
-    ${CF.th('mf','followup_status',`<span onclick="sortMfTable(9)" style="cursor:pointer">Follow-up${_mfArrow(9)}</span>`,'')}
+    ${CF.th('mf','followup_status',`<span onclick="sortMfTable(9)" style="cursor:pointer">Follow-up${_mfArrow(9)}</span>`)}
     <th onclick="sortMfTable(10)" style="cursor:pointer">Remarks${_mfArrow(10)}</th>
-    <th>Actions</th>${CF.th('mf','status','Status','')}<th>Call</th>
+    <th>Actions</th>${CF.th('mf','status','Status')}<th>Call</th>
   </tr></thead><tbody>`;
 
   if(!rows.length) h+=`<tr><td colspan="15" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
@@ -3524,7 +3524,7 @@ function renderLeadsTable(){
   const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
   const isAdmin = CU.role==='admin';
   const _lArrow=i=>leadsSortField===i?(leadsSortDir===1?' ▲':' ▼'):'';
-  const _lSortTh=(i,label,cfCol)=>CF.th('leads',cfCol,`<span onclick="sortLeadsTable(${i})" style="cursor:pointer">${label}${_lArrow(i)}</span>`,'','');
+  const _lSortTh=(i,label,cfCol)=>CF.th('leads',cfCol,`<span onclick="sortLeadsTable(${i})" style="cursor:pointer">${label}${_lArrow(i)}</span>`);
   let h=`<table><thead><tr>${BULK.th('leads')}
     ${_lSortTh(0,'Name','name')}
     ${_lSortTh(1,'Mobile','mobile')}
@@ -3532,11 +3532,11 @@ function renderLeadsTable(){
     <th onclick="sortLeadsTable(3)" style="cursor:pointer;white-space:nowrap">Calls${_lArrow(3)}</th>
     <th onclick="sortLeadsTable(4)" style="cursor:pointer;white-space:nowrap">Last Call${_lArrow(4)}</th>
     <th onclick="sortLeadsTable(5)" style="cursor:pointer;white-space:nowrap">Next Call${_lArrow(5)}</th>
-    ${CF.th('leads','followup_status',`<span onclick="sortLeadsTable(6)" style="cursor:pointer">Follow-up${_lArrow(6)}</span>`,'')}
+    ${CF.th('leads','followup_status',`<span onclick="sortLeadsTable(6)" style="cursor:pointer">Follow-up${_lArrow(6)}</span>`)}
     <th onclick="sortLeadsTable(7)" style="cursor:pointer">Remarks${_lArrow(7)}</th>
-    ${CF.th('leads','source','Source','')}
-    ${CF.th('leads','segment','Segment','')}
-    ${CF.th('leads','status','Status','')}
+    ${CF.th('leads','source','Source')}
+    ${CF.th('leads','segment','Segment')}
+    ${CF.th('leads','status','Status')}
     <th>Actions</th>
   </tr></thead><tbody>`;
 
@@ -5852,7 +5852,7 @@ function renderMfTxnTable(){
   }
 
   const arrow=k=> mfTxnSort.key===k ? (mfTxnSort.dir==='asc'?' ▲':' ▼') : ' ⇅';
-  const sTh=(k,label,cfCol,extra='')=>CF.th('mftxn',cfCol,`<span onclick="setMfTxnSort('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></span>`,'',extra);
+  const sTh=(k,label,cfCol,extra='')=>CF.th('mftxn',cfCol,`<span onclick="setMfTxnSort('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></span>`);
   const sThNoFilter=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
   wrap.innerHTML=`<table>
@@ -6144,7 +6144,7 @@ function renderEqDematTable(){
   }
 
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th>${CF.th('demat','rm','Trading RM','')}${CF.th('demat','rm','Opening RM','')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th>${CF.th('demat','status','Status','')}<th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th>${CF.th('demat','rm','Trading RM')}${CF.th('demat','rm','Opening RM')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th>${CF.th('demat','status','Status')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const status = e.status||'Pending';
@@ -9166,231 +9166,241 @@ function alWhen(l, withYear){
 
 // ══════════════════════════════════════════════════════════════════
 // COLUMN AUTO-FILTER ENGINE (CF)
-// Usage:
-//   CF.th(tableId, colKey, label, sortFn?)  → renders <th> with filter btn
-//   CF.apply(tableId, data)                 → returns filtered data
-//   CF.reset(tableId)                       → clears all filters for table
-// ══════════════════════════════════════════════════════════════════
+// Usage: CF.th(tid, col, labelHTML) → <th> string with ▾ filter button
+//        CF.applyXxx(data)          → filtered array
+//        CF.reset(tid)              → clear all filters
 const CF = (function(){
-  // state: { tableId: { colKey: Set<string> } }
-  const _filters = {};
-  // open dropdown tracking
-  let _openTid = null, _openCol = null, _openEl = null;
+  const _filters = {}; // { tid: { col: Set<string> } }
+  let _openDd = null;  // currently open dropdown DOM element
 
   function _init(tid){ if(!_filters[tid]) _filters[tid]={}; }
+  function hasActive(tid,col){ const f=(_filters[tid]||{})[col]; return !!(f&&f.size>0); }
 
-  function hasActive(tid,col){ const f=(_filters[tid]||{})[col]; return f && f.size>0; }
-
-  function apply(tid, data, colKeyFn){
-    // colKeyFn: function(row) → { colKey: value, ... }
-    const f = _filters[tid]||{};
-    return data.filter(row=>{
-      const vals = colKeyFn(row);
-      for(const [col, sel] of Object.entries(f)){
-        if(!sel || sel.size===0) continue;
-        const v = String(vals[col]||'');
-        if(!sel.has(v)) return false;
-      }
-      return true;
-    });
-  }
-
+  // Close any open dropdown
   function _closeAll(){
-    document.querySelectorAll('.col-filter-dd').forEach(d=>d.remove());
-    _openTid=null; _openCol=null; _openEl=null;
+    if(_openDd){ _openDd.remove(); _openDd=null; }
   }
 
-  function open(tid, col, btnEl, allValues, labelMap){
-    if(_openTid===tid && _openCol===col){ _closeAll(); return; }
+  // Open filter dropdown for a column
+  function _openFromBtn(btnEl, tid, col){
+    // Toggle: click same btn again → close
+    if(_openDd && _openDd.dataset.tid===tid && _openDd.dataset.col===col){
+      _closeAll(); return;
+    }
     _closeAll();
     _init(tid);
-    _openTid=tid; _openCol=col; _openEl=btnEl;
 
-    const current = _filters[tid][col] || new Set();
-    const uniqueVals = [...new Set(allValues.map(v=>String(v||'')))].sort((a,b)=>{
+    // Gather all raw values from FULL (unfiltered) dataset
+    const allData = _getData(tid);
+    const rawVals = allData.map(r=>String(_getVal(tid,col,r)||''));
+    const uniqueVals = [...new Set(rawVals)].sort((a,b)=>{
       if(a===''&&b!=='') return 1; if(b===''&&a!=='') return -1;
       return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});
     });
 
-    const dd = document.createElement('div');
-    dd.className='col-filter-dd';
-    dd.innerHTML=`
-      <input class="cf-search" placeholder="Search..." oninput="CF._searchFilter(this)">
-      <div class="cf-list">
-        <div class="cf-item ${current.size===0?'selected':''}" data-val="__ALL__">
-          <input type="checkbox" ${current.size===0?'checked':''}>
-          <span>(Select All)</span>
-        </div>
-        ${uniqueVals.map(v=>`
-          <div class="cf-item ${current.has(v)?'selected':''}" data-val="${v.replace(/"/g,'&quot;')}">
-            <input type="checkbox" ${current.has(v)?'checked':''}>
-            <span>${labelMap&&labelMap[v]?labelMap[v]:(v||'(blank)')}</span>
-          </div>
-        `).join('')}
-      </div>
-      <div class="cf-footer">
-        <button class="cf-clear" onclick="CF._clearCol('${tid}','${col}')">✕ Clear</button>
-        <button class="cf-apply" onclick="CF._applyCol('${tid}','${col}')">✔ Apply</button>
-      </div>`;
+    const current = _filters[tid][col] || new Set();
 
-    // click handler on items
-    dd.querySelectorAll('.cf-item').forEach(item=>{
-      item.addEventListener('click',function(e){
-        if(e.target.tagName==='INPUT') return; // let checkbox handle itself
-        const cb=this.querySelector('input[type=checkbox]');
-        if(cb) cb.checked=!cb.checked;
-        CF._syncCheckState(dd);
+    // Build dropdown
+    const dd = document.createElement('div');
+    dd.className = 'col-filter-dd';
+    dd.dataset.tid = tid;
+    dd.dataset.col = col;
+
+    // Search box
+    const srch = document.createElement('input');
+    srch.className = 'cf-search';
+    srch.placeholder = 'Search...';
+    srch.addEventListener('input', function(){
+      const q = this.value.toLowerCase();
+      dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])').forEach(item=>{
+        item.style.display = (item.dataset.label||'').toLowerCase().includes(q) ? '' : 'none';
       });
-      const cb=item.querySelector('input[type=checkbox]');
-      if(cb) cb.addEventListener('change',()=>CF._syncCheckState(dd));
+    });
+    dd.appendChild(srch);
+
+    // List
+    const list = document.createElement('div');
+    list.className = 'cf-list';
+
+    // "Select All" item
+    const allChecked = current.size===0;
+    const allItem = _mkItem('__ALL__', '(Select All)', allChecked);
+    list.appendChild(allItem);
+
+    uniqueVals.forEach(v=>{
+      const item = _mkItem(v, v||'(blank)', allChecked || current.has(v));
+      list.appendChild(item);
     });
 
-    // position
-    btnEl.style.position='relative';
-    btnEl.appendChild(dd);
+    // Sync on any checkbox change
+    list.addEventListener('change', ()=>_syncAll(dd));
+    // Click on row (not checkbox) toggles checkbox
+    list.querySelectorAll('.cf-item').forEach(item=>{
+      item.addEventListener('click', function(e){
+        if(e.target.tagName==='INPUT') return;
+        const cb = this.querySelector('input[type=checkbox]');
+        if(cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true})); }
+      });
+    });
 
-    // close on outside click
+    dd.appendChild(list);
+
+    // Footer buttons
+    const footer = document.createElement('div');
+    footer.className = 'cf-footer';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'cf-clear';
+    clearBtn.textContent = '✕ Clear';
+    clearBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      _init(tid);
+      delete _filters[tid][col];
+      _closeAll();
+      _rerender(tid);
+    });
+
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'cf-apply';
+    applyBtn.textContent = '✔ Apply';
+    applyBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      _init(tid);
+      const allCb = dd.querySelector('[data-val="__ALL__"] input[type=checkbox]');
+      if(allCb && allCb.checked){
+        delete _filters[tid][col];
+      } else {
+        const sel = new Set(
+          [...dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])')].filter(i=>{
+            const cb=i.querySelector('input[type=checkbox]'); return cb&&cb.checked;
+          }).map(i=>i.dataset.val)
+        );
+        if(sel.size===0) delete _filters[tid][col];
+        else _filters[tid][col] = sel;
+      }
+      _closeAll();
+      _rerender(tid);
+    });
+
+    footer.appendChild(clearBtn);
+    footer.appendChild(applyBtn);
+    dd.appendChild(footer);
+
+    // Position: attach to document.body, place near button
+    document.body.appendChild(dd);
+    _openDd = dd;
+
+    const rect = btnEl.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.zIndex = '9999';
+    dd.style.top = (rect.bottom + window.scrollY + 2) + 'px';
+    // Check if would overflow right edge
+    const ddW = 200;
+    let left = rect.left + window.scrollX;
+    if(left + ddW > window.innerWidth) left = window.innerWidth - ddW - 8;
+    dd.style.left = left + 'px';
+
+    // Close on outside click
     setTimeout(()=>{
-      document.addEventListener('click', function _(e){
+      function outsideClick(e){
         if(!dd.contains(e.target) && e.target!==btnEl){
           _closeAll();
-          document.removeEventListener('click',_);
+          document.removeEventListener('click', outsideClick);
         }
-      });
-    },10);
+      }
+      document.addEventListener('click', outsideClick);
+    }, 10);
   }
 
-  function _syncCheckState(dd){
-    const allItem=dd.querySelector('[data-val="__ALL__"]');
-    const items=[...dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])')];
-    const allChecked=items.every(i=>i.querySelector('input').checked);
+  function _mkItem(val, label, checked){
+    const div = document.createElement('div');
+    div.className = 'cf-item' + (checked?' selected':'');
+    div.dataset.val = val;
+    div.dataset.label = label;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = checked;
+    const sp = document.createElement('span');
+    sp.textContent = label;
+    div.appendChild(cb);
+    div.appendChild(sp);
+    return div;
+  }
+
+  function _syncAll(dd){
+    const allItem = dd.querySelector('[data-val="__ALL__"]');
+    const items = [...dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])')].filter(i=>i.style.display!=='none');
+    const allChecked = items.every(i=>i.querySelector('input[type=checkbox]').checked);
     if(allItem){
-      const cb=allItem.querySelector('input');
-      cb.checked=allChecked;
+      const cb=allItem.querySelector('input[type=checkbox]');
+      if(cb) cb.checked=allChecked;
       allItem.classList.toggle('selected',allChecked);
     }
-    items.forEach(i=>i.classList.toggle('selected',i.querySelector('input').checked));
+    items.forEach(i=>i.classList.toggle('selected',i.querySelector('input[type=checkbox]').checked));
   }
 
-  function _searchFilter(inp){
-    const q=inp.value.toLowerCase();
-    const dd=inp.closest('.col-filter-dd');
-    dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])').forEach(item=>{
-      const txt=(item.querySelector('span')||{}).textContent||'';
-      item.style.display=txt.toLowerCase().includes(q)?'':'none';
-    });
-  }
-
-  function _applyCol(tid,col){
-    _init(tid);
-    const dd=document.querySelector('.col-filter-dd');
-    if(!dd){_closeAll();return;}
-    const allCb=dd.querySelector('[data-val="__ALL__"] input');
-    const items=[...dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])')];
-    if(allCb&&allCb.checked){
-      delete _filters[tid][col];
-    } else {
-      const sel=new Set(items.filter(i=>i.querySelector('input').checked).map(i=>i.dataset.val));
-      if(sel.size===0) delete _filters[tid][col];
-      else _filters[tid][col]=sel;
-    }
-    _closeAll();
-    _rerender(tid);
-  }
-
-  function _clearCol(tid,col){
-    _init(tid);
-    delete _filters[tid][col];
-    _closeAll();
-    _rerender(tid);
-  }
-
-  function reset(tid){
-    _filters[tid]={};
-    _rerender(tid);
+  // Build <th> HTML string - labelHTML can contain sort spans
+  function th(tid, col, labelHTML){
+    const active = hasActive(tid,col);
+    const dot = active?'<span class="col-filter-active-dot"></span>':'';
+    return `<th style="white-space:nowrap">
+      ${labelHTML}${dot}
+      <button class="col-filter-btn${active?' active':''}" onclick="event.stopPropagation();CF._openFromBtn(this,'${tid}','${col}')" title="Filter">▾</button>
+    </th>`;
   }
 
   function _rerender(tid){
     if(tid==='eq') renderEqTable();
     else if(tid==='mf') renderMfTable();
-    else if(tid==='leads') { leadsPage=1; renderLeadsTable(); }
+    else if(tid==='leads'){ leadsPage=1; renderLeadsTable(); }
     else if(tid==='mftxn') renderMfTxnTable();
     else if(tid==='demat') renderEqDematTable();
     else if(tid==='sip') renderSip();
   }
 
-  // Build a <th> string with sort + filter button
-  function th(tid, col, label, sortFn, extraStyle=''){
-    const active = hasActive(tid,col);
-    const dot = active?'<span class="col-filter-active-dot"></span>':'';
-    const sortPart = sortFn ? `<span style="cursor:pointer" onclick="${sortFn}">${label}${dot}</span>` : `<span>${label}${dot}</span>`;
-    return `<th style="white-space:nowrap;${extraStyle}">
-      ${sortPart}
-      <span class="col-filter-wrap">
-        <button class="col-filter-btn${active?' active':''}" onclick="event.stopPropagation();CF._openFromBtn(this,'${tid}','${col}')" title="Filter">▾</button>
-      </span>
-    </th>`;
+  function _getData(tid){
+    if(tid==='eq') return getMyEqClients();
+    if(tid==='mf') return getMyMfClients();
+    if(tid==='leads') return Object.values(DB.get('leads')||{});
+    if(tid==='mftxn') return getMfBizEntries();
+    if(tid==='demat') return getEqDematEntries();
+    if(tid==='sip') return (DB.get('sip_data')||[]);
+    return [];
   }
 
-  function _openFromBtn(btnEl, tid, col){
-    // gather all values dynamically based on current UNFILTERED data
-    let allData=[];
-    if(tid==='eq') allData=getMyEqClients().filter(c=>!c.do_not_call||true);
-    else if(tid==='mf') allData=getMyMfClients();
-    else if(tid==='leads') allData=Object.values(DB.get('leads')||{});
-    else if(tid==='mftxn') allData=getMfBizEntries();
-    else if(tid==='demat') allData=getEqDematEntries();
-    else if(tid==='sip') allData=(DB.get('sip_data')||[]);
+  function _getVal(tid,col,r){
+    const map = {
+      eq:  {code:r.code,name:r.name,mobile:r.mobile,rm:r.rm,status:r.status,followup_status:r.followup_status},
+      mf:  {name:r.name,mobile:r.mobile,pan:r.pan,rm:r.rm,status:r.status,followup_status:r.followup_status},
+      leads:{name:r.name,mobile:r.mobile,source:r.source,segment:r.segment,rm:r.rm,status:r.status,followup_status:r.followup_status},
+      mftxn:{rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending'},
+      demat:{rm:r.rm,status:r.status||'Pending'},
+      sip:  {rm:r.rm,fund_name:r.fund_name,sip_type:r.sip_type,status:r.status}
+    };
+    return (map[tid]||{})[col];
+  }
 
-    const vals = allData.map(r=>{
-      if(tid==='eq') return _eqVal(r,col);
-      if(tid==='mf') return _mfVal(r,col);
-      if(tid==='leads') return _leadsVal(r,col);
-      if(tid==='mftxn') return _mftxnVal(r,col);
-      if(tid==='demat') return _dematVal(r,col);
-      if(tid==='sip') return _sipVal(r,col);
-      return '';
+  function _applyFilter(tid,data){
+    const f = _filters[tid]||{};
+    return data.filter(r=>{
+      for(const [col,sel] of Object.entries(f)){
+        if(!sel||sel.size===0) continue;
+        if(!sel.has(String(_getVal(tid,col,r)||''))) return false;
+      }
+      return true;
     });
-    open(tid, col, btnEl, vals, null);
   }
 
-  // Value extractors per table
-  function _eqVal(r,col){
-    const m={code:r.code,name:r.name,mobile:r.mobile,rm:r.rm,status:r.status,followup_status:r.followup_status};
-    return m[col]!=null?m[col]:'';
-  }
-  function _mfVal(r,col){
-    const m={name:r.name,mobile:r.mobile,pan:r.pan,rm:r.rm,status:r.status,followup_status:r.followup_status};
-    return m[col]!=null?m[col]:'';
-  }
-  function _leadsVal(r,col){
-    const m={name:r.name,mobile:r.mobile,source:r.source,segment:r.segment,rm:r.rm,status:r.status,followup_status:r.followup_status};
-    return m[col]!=null?m[col]:'';
-  }
-  function _mftxnVal(r,col){
-    const m={rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending'};
-    return m[col]!=null?m[col]:'';
-  }
-  function _dematVal(r,col){
-    const m={rm:r.rm,status:r.status||'Pending'};
-    return m[col]!=null?m[col]:'';
-  }
-  function _sipVal(r,col){
-    const m={rm:r.rm,fund_name:r.fund_name,sip_type:r.sip_type,status:r.status};
-    return m[col]!=null?m[col]:'';
-  }
-
-  // Apply filter on data using column-value extractor
-  function applyEq(data){ return apply('eq',data,r=>({code:r.code,name:r.name,mobile:r.mobile,rm:r.rm,status:r.status,followup_status:r.followup_status})); }
-  function applyMf(data){ return apply('mf',data,r=>({name:r.name,mobile:r.mobile,pan:r.pan,rm:r.rm,status:r.status,followup_status:r.followup_status})); }
-  function applyLeads(data){ return apply('leads',data,r=>({name:r.name,mobile:r.mobile,source:r.source,segment:r.segment,rm:r.rm,status:r.status,followup_status:r.followup_status})); }
-  function applyMftxn(data){ return apply('mftxn',data,r=>({rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending'})); }
-  function applyDemat(data){ return apply('demat',data,r=>({rm:r.rm,status:r.status||'Pending'})); }
-  function applySip(data){ return apply('sip',data,r=>({rm:r.rm,fund_name:r.fund_name,sip_type:r.sip_type,status:r.status})); }
+  function reset(tid){ _filters[tid]={}; _rerender(tid); }
 
   return {
-    th, open, _openFromBtn, _searchFilter, _applyCol, _clearCol, reset, hasActive,
-    applyEq, applyMf, applyLeads, applyMftxn, applyDemat, applySip
+    th, _openFromBtn, reset, hasActive,
+    applyEq:  d=>_applyFilter('eq',d),
+    applyMf:  d=>_applyFilter('mf',d),
+    applyLeads:d=>_applyFilter('leads',d),
+    applyMftxn:d=>_applyFilter('mftxn',d),
+    applyDemat:d=>_applyFilter('demat',d),
+    applySip:  d=>_applyFilter('sip',d),
   };
 })();
 
