@@ -320,6 +320,23 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 .fu-filter-menu{position:absolute;top:100%;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);min-width:120px;z-index:1000;font-weight:400;text-align:left;font-size:.78rem;}
 .fu-filter-menu div{padding:7px 12px;color:#333;white-space:nowrap;}
 .fu-filter-menu div:hover{background:var(--gray2,#f0f2f5);}
+/* ── COLUMN AUTO-FILTER ── */
+.col-filter-wrap{position:relative;display:inline-block;vertical-align:middle;}
+.col-filter-btn{background:none;border:none;cursor:pointer;padding:0 2px;font-size:.8em;color:var(--gray);line-height:1;vertical-align:middle;transition:color .15s;}
+.col-filter-btn:hover,.col-filter-btn.active{color:var(--teal);}
+.col-filter-btn.active{color:var(--teal);font-weight:700;}
+.col-filter-dd{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.15);min-width:160px;max-width:260px;z-index:2000;font-weight:400;text-align:left;font-size:.78rem;overflow:hidden;}
+.col-filter-dd .cf-search{display:block;width:100%;box-sizing:border-box;padding:7px 10px;border:none;border-bottom:1px solid #eee;font-size:.8rem;outline:none;}
+.col-filter-dd .cf-list{max-height:200px;overflow-y:auto;}
+.col-filter-dd .cf-item{padding:6px 12px;color:#333;white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;}
+.col-filter-dd .cf-item:hover{background:var(--gray2,#f0f2f5);}
+.col-filter-dd .cf-item.selected{background:var(--teal2,#e0f9f9);color:var(--teal);}
+.col-filter-dd .cf-item input[type=checkbox]{accent-color:var(--teal);flex-shrink:0;}
+.col-filter-dd .cf-footer{display:flex;gap:6px;padding:7px 10px;border-top:1px solid #eee;}
+.col-filter-dd .cf-footer button{flex:1;padding:4px 6px;font-size:.75rem;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#fff;}
+.col-filter-dd .cf-footer button.cf-apply{background:var(--teal);color:#fff;border-color:var(--teal);}
+.col-filter-dd .cf-footer button.cf-clear{background:#fff;color:var(--red);border-color:var(--red);}
+th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-left:3px;vertical-align:middle;}
 .b-done{background:#d1fae5;color:#065f46;}
 .b-na{background:var(--bg);color:var(--gray);}
 .b-eq{background:var(--gold3);color:var(--orange);}
@@ -3224,6 +3241,9 @@ function renderEqTable(){
     return true;
   });
 
+  // Column AutoFilter
+  data = CF.applyEq(data);
+
   eqFiltered=data;
   const lbl=document.getElementById('eq-total-label');
   if(lbl) lbl.textContent=`(${data.length})`;
@@ -3255,36 +3275,24 @@ function renderEqTable(){
   }
 
   const rows=data.slice((eqPage-1)*PG_SIZE, eqPage*PG_SIZE);
-  const cols=['Code','Name','Mobile','RM','Assets','Last Trade','Last Call','Next Call','Follow-up','Remarks'];
   const isAdmin = CU.role==='admin';
-  let h=`<table><thead><tr>${BULK.th('eq')}${cols.map((c,i)=>{
-    let arrow = eqSortField===i ? (eqSortDir===1?' ▲':' ▼') : '';
-    if(c==='Follow-up'){
-      return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
-        <span onclick="sortEqTable(${i})">${c}${arrow}</span>
-        <span onclick="event.stopPropagation();toggleFuFilterMenu('eq')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
-          <div id="eq-fu-menu" class="fu-filter-menu" style="display:none">
-            <div onclick="event.stopPropagation();setFuFilter('eq','')">All Follow-ups</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','today')">Due Today</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','overdue')">Overdue</div>
-            <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','NOT INTERESTED')">NOT INTERESTED</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','CALL NOT RECEIVED')">CALL NOT RECEIVED</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','CALL NOT CONNECTED')">CALL NOT CONNECTED</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','CALL LATER')">CALL LATER</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','TRADE')">TRADE</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','INTERESTED IN OTHER PRODUCT')">INTERESTED IN OTHER PRODUCT</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','POSITIVE')">POSITIVE</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','WRONG NUMBER')">WRONG NUMBER</div>
-            <div onclick="event.stopPropagation();setFuFilter('eq','COME TO OFFICE')">COME TO OFFICE</div>
-          </div>
-        </span>
-      </th>`;
-    }
-    return `<th onclick="sortEqTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th><th>Status</th><th>Call</th></tr></thead><tbody>`;
+  const _eqArrow=i=>eqSortField===i?(eqSortDir===1?' ▲':' ▼'):'';
+  const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`,'','');
+  let h=`<table><thead><tr>${BULK.th('eq')}
+    ${_eqSortTh(0,'Code','code')}
+    ${_eqSortTh(1,'Name','name')}
+    ${_eqSortTh(2,'Mobile','mobile')}
+    ${_eqSortTh(3,'RM','rm')}
+    <th onclick="sortEqTable(4)" style="cursor:pointer;white-space:nowrap">Assets${_eqArrow(4)}</th>
+    <th onclick="sortEqTable(5)" style="cursor:pointer;white-space:nowrap">Last Trade${_eqArrow(5)}</th>
+    <th onclick="sortEqTable(6)" style="cursor:pointer;white-space:nowrap">Last Call${_eqArrow(6)}</th>
+    <th onclick="sortEqTable(7)" style="cursor:pointer;white-space:nowrap">Next Call${_eqArrow(7)}</th>
+    ${CF.th('eq','followup_status',`<span onclick="sortEqTable(8)" style="cursor:pointer">Follow-up${_eqArrow(8)}</span>`,'')}
+    <th onclick="sortEqTable(9)" style="cursor:pointer">Remarks${_eqArrow(9)}</th>
+    <th>Actions</th>${CF.th('eq','status','Status','')}<th>Call</th>
+  </tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+3+(isAdmin?1:0)}" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="14" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -3369,6 +3377,9 @@ function renderMfTable(){
     return true;
   });
 
+  // Column AutoFilter
+  data = CF.applyMf(data);
+
   mfFiltered=data;
   const lbl=document.getElementById('mf-total-label');
   if(lbl) lbl.textContent=`(${data.length})`;
@@ -3397,35 +3408,25 @@ function renderMfTable(){
   }
 
   const rows=data.slice((mfPage-1)*PG_SIZE,mfPage*PG_SIZE);
-  const cols=['Name','Mobile','PAN','MF RM','AUM','SIP Amt','SIP Cnt','Last Call','Next Call','Follow-up','Remarks'];
   const isAdmin = CU.role==='admin';
-  let h=`<table><thead><tr>${BULK.th('mf')}${cols.map((c,i)=>{
-    let arrow = mfSortField===i ? (mfSortDir===1?' ▲':' ▼') : '';
-    if(c==='Follow-up'){
-      return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
-        <span onclick="sortMfTable(${i})">${c}${arrow}</span>
-        <span onclick="event.stopPropagation();toggleFuFilterMenu('mf')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
-          <div id="mf-fu-menu" class="fu-filter-menu" style="display:none">
-            <div onclick="event.stopPropagation();setFuFilter('mf','')">All Follow-ups</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','today')">Due Today</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','overdue')">Overdue</div>
-            <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','NOT INTERESTED')">NOT INTERESTED</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','CALL NOT RECEIVED')">CALL NOT RECEIVED</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','CALL NOT CONNECTED')">CALL NOT CONNECTED</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','CALL LATER')">CALL LATER</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','INTERESTED IN SIP')">INTERESTED IN SIP</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','INTERESTED IN LUMPSUM')">INTERESTED IN LUMPSUM</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','INTERESTED IN OTHER PRODUCT')">INTERESTED IN OTHER PRODUCT</div>
-            <div onclick="event.stopPropagation();setFuFilter('mf','COME TO OFFICE')">COME TO OFFICE</div>
-          </div>
-        </span>
-      </th>`;
-    }
-    return `<th onclick="sortMfTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th><th>Status</th><th>Call</th></tr></thead><tbody>`;
+  const _mfArrow=i=>mfSortField===i?(mfSortDir===1?' ▲':' ▼'):'';
+  const _mfSortTh=(i,label,cfCol)=>CF.th('mf',cfCol,`<span onclick="sortMfTable(${i})" style="cursor:pointer">${label}${_mfArrow(i)}</span>`,'','');
+  let h=`<table><thead><tr>${BULK.th('mf')}
+    ${_mfSortTh(0,'Name','name')}
+    ${_mfSortTh(1,'Mobile','mobile')}
+    ${_mfSortTh(2,'PAN','pan')}
+    ${_mfSortTh(3,'MF RM','rm')}
+    <th onclick="sortMfTable(4)" style="cursor:pointer;white-space:nowrap">AUM${_mfArrow(4)}</th>
+    <th onclick="sortMfTable(5)" style="cursor:pointer;white-space:nowrap">SIP Amt${_mfArrow(5)}</th>
+    <th onclick="sortMfTable(6)" style="cursor:pointer;white-space:nowrap">SIP Cnt${_mfArrow(6)}</th>
+    <th onclick="sortMfTable(7)" style="cursor:pointer;white-space:nowrap">Last Call${_mfArrow(7)}</th>
+    <th onclick="sortMfTable(8)" style="cursor:pointer;white-space:nowrap">Next Call${_mfArrow(8)}</th>
+    ${CF.th('mf','followup_status',`<span onclick="sortMfTable(9)" style="cursor:pointer">Follow-up${_mfArrow(9)}</span>`,'')}
+    <th onclick="sortMfTable(10)" style="cursor:pointer">Remarks${_mfArrow(10)}</th>
+    <th>Actions</th>${CF.th('mf','status','Status','')}<th>Call</th>
+  </tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+3+(isAdmin?1:0)}" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="15" style="text-align:center;padding:36px;color:#bbb">No MF investors. <a href="#" onclick="openAddClient('mf')" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
@@ -3516,39 +3517,30 @@ function renderLeadsTable(){
     leadsFiltered=data;
   }
 
-  const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
-  const cols=['Name','Mobile','RM','Calls','Last Call','Next Call','Follow-up','Remarks'];
-  const isAdmin = CU.role==='admin';
-  let h=`<table><thead><tr>${BULK.th('leads')}${cols.map((c,i)=>{
-    let arrow = leadsSortField===i ? (leadsSortDir===1?' ▲':' ▼') : '';
-    if(c==='Follow-up'){
-      return `<th style="cursor:pointer;white-space:nowrap" title="Click to sort">
-        <span onclick="sortLeadsTable(${i})">${c}${arrow}</span>
-        <span onclick="event.stopPropagation();toggleFuFilterMenu('leads')" style="cursor:pointer;margin-left:4px;position:relative;display:inline-block" title="Click to select">▾
-          <div id="leads-fu-menu" class="fu-filter-menu" style="display:none">
-            <div onclick="event.stopPropagation();setFuFilter('leads','')">All Follow-ups</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','today')">Due Today</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','overdue')">Overdue</div>
-            <div style="border-top:1px solid #eee;margin:4px 0"></div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Pending')">Pending</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Done')">Done</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Not Required')">Not Required</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Not Interested')">Not Interested</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Call Not Received')">Call Not Received</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Call Not Connected')">Call Not Connected</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Call After Some Time')">Call After Some Time</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Interested In SIP')">Interested In SIP</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Interested In Lumpsum')">Interested In Lumpsum</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Interested In Other Product')">Interested In Other Product</div>
-            <div onclick="event.stopPropagation();setFuFilter('leads','Come To Office')">Come To Office</div>
-          </div>
-        </span>
-      </th>`;
-    }
-    return `<th onclick="sortLeadsTable(${i})" style="cursor:pointer" title="Click to sort">${c}${arrow}</th>`;
-  }).join('')}<th>Actions</th></tr></thead><tbody>`;
+  // Column AutoFilter
+  data = CF.applyLeads(data);
+  leadsFiltered=data;
 
-  if(!rows.length) h+=`<tr><td colspan="${cols.length+1+(isAdmin?1:0)}" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
+  const rows=data.slice((leadsPage-1)*PG_SIZE,leadsPage*PG_SIZE);
+  const isAdmin = CU.role==='admin';
+  const _lArrow=i=>leadsSortField===i?(leadsSortDir===1?' ▲':' ▼'):'';
+  const _lSortTh=(i,label,cfCol)=>CF.th('leads',cfCol,`<span onclick="sortLeadsTable(${i})" style="cursor:pointer">${label}${_lArrow(i)}</span>`,'','');
+  let h=`<table><thead><tr>${BULK.th('leads')}
+    ${_lSortTh(0,'Name','name')}
+    ${_lSortTh(1,'Mobile','mobile')}
+    ${_lSortTh(2,'RM','rm')}
+    <th onclick="sortLeadsTable(3)" style="cursor:pointer;white-space:nowrap">Calls${_lArrow(3)}</th>
+    <th onclick="sortLeadsTable(4)" style="cursor:pointer;white-space:nowrap">Last Call${_lArrow(4)}</th>
+    <th onclick="sortLeadsTable(5)" style="cursor:pointer;white-space:nowrap">Next Call${_lArrow(5)}</th>
+    ${CF.th('leads','followup_status',`<span onclick="sortLeadsTable(6)" style="cursor:pointer">Follow-up${_lArrow(6)}</span>`,'')}
+    <th onclick="sortLeadsTable(7)" style="cursor:pointer">Remarks${_lArrow(7)}</th>
+    ${CF.th('leads','source','Source','')}
+    ${CF.th('leads','segment','Segment','')}
+    ${CF.th('leads','status','Status','')}
+    <th>Actions</th>
+  </tr></thead><tbody>`;
+
+  if(!rows.length) h+=`<tr><td colspan="13" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
@@ -5847,7 +5839,9 @@ function renderMfTxnTable(){
   const wrap=document.getElementById('mftxn-table');
   if(!wrap) return;
   populateMfTxnMonths();
-  const entries=getFilteredMfTxns();
+  let entries=getFilteredMfTxns();
+  // Column AutoFilter
+  entries = CF.applyMftxn(entries);
   const cnt=document.getElementById('mftxn-count');
   if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('mf',entries))+'</b>';
 
@@ -5858,10 +5852,11 @@ function renderMfTxnTable(){
   }
 
   const arrow=k=> mfTxnSort.key===k ? (mfTxnSort.dir==='asc'?' ▲':' ▼') : ' ⇅';
-  const sTh=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
+  const sTh=(k,label,cfCol,extra='')=>CF.th('mftxn',cfCol,`<span onclick="setMfTxnSort('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></span>`,'',extra);
+  const sThNoFilter=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
   wrap.innerHTML=`<table>
-    <thead><tr>${MFTBULK.th()}${sTh('date','Date')}${sTh('client','Client')}${sTh('rm','RM')}${sTh('type','Type')}${sTh('fund','Fund Name')}${sTh('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status')}<th></th></tr></thead>
+    <thead><tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
@@ -6137,7 +6132,9 @@ function renderEqDematTable(){
   const wrap=document.getElementById('eqdemat-table');
   if(!wrap) return;
   populateEqDematMonths();
-  const entries=getFilteredEqDemat();
+  let entries=getFilteredEqDemat();
+  // Column AutoFilter
+  entries = CF.applyDemat(entries);
   const cnt=document.getElementById('eqdemat-count');
   if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('demat',entries))+'</b>';
 
@@ -6147,7 +6144,7 @@ function renderEqDematTable(){
   }
 
   wrap.innerHTML=`<table>
-    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th><th>Trading RM</th><th>Opening RM</th><th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Client</th><th>Client Code</th>${CF.th('demat','rm','Trading RM','')}${CF.th('demat','rm','Opening RM','')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Remarks</th>${CF.th('demat','status','Status','')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const status = e.status||'Pending';
@@ -9166,6 +9163,236 @@ function alWhen(l, withYear){
   const o = withYear ? {day:'2-digit',month:'short',year:'numeric'} : {day:'2-digit',month:'short'};
   return new Date(w+'T00:00:00').toLocaleDateString('en-IN',o);
 }
+
+// ══════════════════════════════════════════════════════════════════
+// COLUMN AUTO-FILTER ENGINE (CF)
+// Usage:
+//   CF.th(tableId, colKey, label, sortFn?)  → renders <th> with filter btn
+//   CF.apply(tableId, data)                 → returns filtered data
+//   CF.reset(tableId)                       → clears all filters for table
+// ══════════════════════════════════════════════════════════════════
+const CF = (function(){
+  // state: { tableId: { colKey: Set<string> } }
+  const _filters = {};
+  // open dropdown tracking
+  let _openTid = null, _openCol = null, _openEl = null;
+
+  function _init(tid){ if(!_filters[tid]) _filters[tid]={}; }
+
+  function hasActive(tid,col){ const f=(_filters[tid]||{})[col]; return f && f.size>0; }
+
+  function apply(tid, data, colKeyFn){
+    // colKeyFn: function(row) → { colKey: value, ... }
+    const f = _filters[tid]||{};
+    return data.filter(row=>{
+      const vals = colKeyFn(row);
+      for(const [col, sel] of Object.entries(f)){
+        if(!sel || sel.size===0) continue;
+        const v = String(vals[col]||'');
+        if(!sel.has(v)) return false;
+      }
+      return true;
+    });
+  }
+
+  function _closeAll(){
+    document.querySelectorAll('.col-filter-dd').forEach(d=>d.remove());
+    _openTid=null; _openCol=null; _openEl=null;
+  }
+
+  function open(tid, col, btnEl, allValues, labelMap){
+    if(_openTid===tid && _openCol===col){ _closeAll(); return; }
+    _closeAll();
+    _init(tid);
+    _openTid=tid; _openCol=col; _openEl=btnEl;
+
+    const current = _filters[tid][col] || new Set();
+    const uniqueVals = [...new Set(allValues.map(v=>String(v||'')))].sort((a,b)=>{
+      if(a===''&&b!=='') return 1; if(b===''&&a!=='') return -1;
+      return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});
+    });
+
+    const dd = document.createElement('div');
+    dd.className='col-filter-dd';
+    dd.innerHTML=`
+      <input class="cf-search" placeholder="Search..." oninput="CF._searchFilter(this)">
+      <div class="cf-list">
+        <div class="cf-item ${current.size===0?'selected':''}" data-val="__ALL__">
+          <input type="checkbox" ${current.size===0?'checked':''}>
+          <span>(Select All)</span>
+        </div>
+        ${uniqueVals.map(v=>`
+          <div class="cf-item ${current.has(v)?'selected':''}" data-val="${v.replace(/"/g,'&quot;')}">
+            <input type="checkbox" ${current.has(v)?'checked':''}>
+            <span>${labelMap&&labelMap[v]?labelMap[v]:(v||'(blank)')}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="cf-footer">
+        <button class="cf-clear" onclick="CF._clearCol('${tid}','${col}')">✕ Clear</button>
+        <button class="cf-apply" onclick="CF._applyCol('${tid}','${col}')">✔ Apply</button>
+      </div>`;
+
+    // click handler on items
+    dd.querySelectorAll('.cf-item').forEach(item=>{
+      item.addEventListener('click',function(e){
+        if(e.target.tagName==='INPUT') return; // let checkbox handle itself
+        const cb=this.querySelector('input[type=checkbox]');
+        if(cb) cb.checked=!cb.checked;
+        CF._syncCheckState(dd);
+      });
+      const cb=item.querySelector('input[type=checkbox]');
+      if(cb) cb.addEventListener('change',()=>CF._syncCheckState(dd));
+    });
+
+    // position
+    btnEl.style.position='relative';
+    btnEl.appendChild(dd);
+
+    // close on outside click
+    setTimeout(()=>{
+      document.addEventListener('click', function _(e){
+        if(!dd.contains(e.target) && e.target!==btnEl){
+          _closeAll();
+          document.removeEventListener('click',_);
+        }
+      });
+    },10);
+  }
+
+  function _syncCheckState(dd){
+    const allItem=dd.querySelector('[data-val="__ALL__"]');
+    const items=[...dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])')];
+    const allChecked=items.every(i=>i.querySelector('input').checked);
+    if(allItem){
+      const cb=allItem.querySelector('input');
+      cb.checked=allChecked;
+      allItem.classList.toggle('selected',allChecked);
+    }
+    items.forEach(i=>i.classList.toggle('selected',i.querySelector('input').checked));
+  }
+
+  function _searchFilter(inp){
+    const q=inp.value.toLowerCase();
+    const dd=inp.closest('.col-filter-dd');
+    dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])').forEach(item=>{
+      const txt=(item.querySelector('span')||{}).textContent||'';
+      item.style.display=txt.toLowerCase().includes(q)?'':'none';
+    });
+  }
+
+  function _applyCol(tid,col){
+    _init(tid);
+    const dd=document.querySelector('.col-filter-dd');
+    if(!dd){_closeAll();return;}
+    const allCb=dd.querySelector('[data-val="__ALL__"] input');
+    const items=[...dd.querySelectorAll('.cf-item:not([data-val="__ALL__"])')];
+    if(allCb&&allCb.checked){
+      delete _filters[tid][col];
+    } else {
+      const sel=new Set(items.filter(i=>i.querySelector('input').checked).map(i=>i.dataset.val));
+      if(sel.size===0) delete _filters[tid][col];
+      else _filters[tid][col]=sel;
+    }
+    _closeAll();
+    _rerender(tid);
+  }
+
+  function _clearCol(tid,col){
+    _init(tid);
+    delete _filters[tid][col];
+    _closeAll();
+    _rerender(tid);
+  }
+
+  function reset(tid){
+    _filters[tid]={};
+    _rerender(tid);
+  }
+
+  function _rerender(tid){
+    if(tid==='eq') renderEqTable();
+    else if(tid==='mf') renderMfTable();
+    else if(tid==='leads') { leadsPage=1; renderLeadsTable(); }
+    else if(tid==='mftxn') renderMfTxnTable();
+    else if(tid==='demat') renderEqDematTable();
+    else if(tid==='sip') renderSip();
+  }
+
+  // Build a <th> string with sort + filter button
+  function th(tid, col, label, sortFn, extraStyle=''){
+    const active = hasActive(tid,col);
+    const dot = active?'<span class="col-filter-active-dot"></span>':'';
+    const sortPart = sortFn ? `<span style="cursor:pointer" onclick="${sortFn}">${label}${dot}</span>` : `<span>${label}${dot}</span>`;
+    return `<th style="white-space:nowrap;${extraStyle}">
+      ${sortPart}
+      <span class="col-filter-wrap">
+        <button class="col-filter-btn${active?' active':''}" onclick="event.stopPropagation();CF._openFromBtn(this,'${tid}','${col}')" title="Filter">▾</button>
+      </span>
+    </th>`;
+  }
+
+  function _openFromBtn(btnEl, tid, col){
+    // gather all values dynamically based on current UNFILTERED data
+    let allData=[];
+    if(tid==='eq') allData=getMyEqClients().filter(c=>!c.do_not_call||true);
+    else if(tid==='mf') allData=getMyMfClients();
+    else if(tid==='leads') allData=Object.values(DB.get('leads')||{});
+    else if(tid==='mftxn') allData=getMfBizEntries();
+    else if(tid==='demat') allData=getEqDematEntries();
+    else if(tid==='sip') allData=(DB.get('sip_data')||[]);
+
+    const vals = allData.map(r=>{
+      if(tid==='eq') return _eqVal(r,col);
+      if(tid==='mf') return _mfVal(r,col);
+      if(tid==='leads') return _leadsVal(r,col);
+      if(tid==='mftxn') return _mftxnVal(r,col);
+      if(tid==='demat') return _dematVal(r,col);
+      if(tid==='sip') return _sipVal(r,col);
+      return '';
+    });
+    open(tid, col, btnEl, vals, null);
+  }
+
+  // Value extractors per table
+  function _eqVal(r,col){
+    const m={code:r.code,name:r.name,mobile:r.mobile,rm:r.rm,status:r.status,followup_status:r.followup_status};
+    return m[col]!=null?m[col]:'';
+  }
+  function _mfVal(r,col){
+    const m={name:r.name,mobile:r.mobile,pan:r.pan,rm:r.rm,status:r.status,followup_status:r.followup_status};
+    return m[col]!=null?m[col]:'';
+  }
+  function _leadsVal(r,col){
+    const m={name:r.name,mobile:r.mobile,source:r.source,segment:r.segment,rm:r.rm,status:r.status,followup_status:r.followup_status};
+    return m[col]!=null?m[col]:'';
+  }
+  function _mftxnVal(r,col){
+    const m={rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending'};
+    return m[col]!=null?m[col]:'';
+  }
+  function _dematVal(r,col){
+    const m={rm:r.rm,status:r.status||'Pending'};
+    return m[col]!=null?m[col]:'';
+  }
+  function _sipVal(r,col){
+    const m={rm:r.rm,fund_name:r.fund_name,sip_type:r.sip_type,status:r.status};
+    return m[col]!=null?m[col]:'';
+  }
+
+  // Apply filter on data using column-value extractor
+  function applyEq(data){ return apply('eq',data,r=>({code:r.code,name:r.name,mobile:r.mobile,rm:r.rm,status:r.status,followup_status:r.followup_status})); }
+  function applyMf(data){ return apply('mf',data,r=>({name:r.name,mobile:r.mobile,pan:r.pan,rm:r.rm,status:r.status,followup_status:r.followup_status})); }
+  function applyLeads(data){ return apply('leads',data,r=>({name:r.name,mobile:r.mobile,source:r.source,segment:r.segment,rm:r.rm,status:r.status,followup_status:r.followup_status})); }
+  function applyMftxn(data){ return apply('mftxn',data,r=>({rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending'})); }
+  function applyDemat(data){ return apply('demat',data,r=>({rm:r.rm,status:r.status||'Pending'})); }
+  function applySip(data){ return apply('sip',data,r=>({rm:r.rm,fund_name:r.fund_name,sip_type:r.sip_type,status:r.status})); }
+
+  return {
+    th, open, _openFromBtn, _searchFilter, _applyCol, _clearCol, reset, hasActive,
+    applyEq, applyMf, applyLeads, applyMftxn, applyDemat, applySip
+  };
+})();
 
 function renderActivityLog(){
   const isAdmin = CU && CU.role==='admin';
