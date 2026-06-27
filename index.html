@@ -11422,29 +11422,48 @@ async function saveOpEntry(){
   if(!clientName){ toast('Client name required','error'); return; }
   if(!rm){ toast('RM required','error'); return; }
 
-  // ── Duplicate check: same client_id + same product_type (skip on edit) ──
+  // ── Duplicate check: same client_id OR same PAN + same product_type (skip on edit) ──
   if(!id){
     const clientId = document.getElementById('op-client-id').value;
-    const existing = getOpEntries().find(e=>
-      e.product_type===type &&
-      (
-        (clientId && e.client_id===clientId) ||
-        (!clientId && (e.client_name||'').trim().toUpperCase()===(clientName||'').trim().toUpperCase())
-      )
-    );
+    const clientSeg = document.getElementById('op-client-seg').value;
+    // Get PAN of selected client
+    let clientPan = '';
+    if(clientId && clientSeg){
+      const srcList = DB.get(clientSeg==='equity'?'eq_clients':'mf_clients')||[];
+      const srcClient = srcList.find(x=>x.id===clientId);
+      if(srcClient) clientPan = (srcClient.pan||'').toUpperCase().trim();
+    }
+    const existing = getOpEntries().find(e=>{
+      if(e.product_type!==type) return false;
+      if(clientId && e.client_id===clientId) return true;
+      if(clientPan && (e.pan||'').toUpperCase().trim()===clientPan) return true;
+      if(!clientId && (e.client_name||'').trim().toUpperCase()===(clientName||'').trim().toUpperCase()) return true;
+      return false;
+    });
     if(existing){
       const cfg2 = OP_TYPES[type]||{};
-      toast(`⚠️ "${existing.client_name}" already has a ${cfg2.label} entry! Edit existing instead.`,'error');
+      toast(`⚠️ "${existing.client_name}" already has a ${cfg2.label} entry (RM: ${existing.rm||'—'})! Edit existing instead.`,'error');
       return;
     }
+  }
+
+  // Get PAN for cross-RM duplicate detection
+  const _cid2 = document.getElementById('op-client-id').value;
+  const _cseg2 = document.getElementById('op-client-seg').value;
+  let _pan2 = '';
+  if(_cid2 && _cseg2){
+    const _sl2 = DB.get(_cseg2==='equity'?'eq_clients':'mf_clients')||[];
+    const _sc2 = _sl2.find(x=>x.id===_cid2);
+    if(_sc2) _pan2 = (_sc2.pan||'').toUpperCase().trim();
   }
 
   const entry = {
     id: id || uid(),
     product_type: type,
     client_name: clientName,
-    client_id: document.getElementById('op-client-id').value,
-    source_seg: document.getElementById('op-client-seg').value,
+    client_id: _cid2,
+    source_seg: _cseg2,
+    pan: _pan2,
     mobile: document.getElementById('op-mobile').value,
     rm,
     amount: parseFloat(document.getElementById('op-amount').value)||0,
@@ -11573,10 +11592,57 @@ function renderOpPicker(){
 
   if(!all.length){ list.innerHTML='<div style="padding:20px;text-align:center;color:var(--gray)">No clients found</div>'; return; }
 
+  // Build set of already-added PANs + client_ids across ALL RMs (any product type)
+  const opEntries = getOpEntries();
+  const currentProductType = document.getElementById('op-type') ? document.getElementById('op-type').value : '';
+  const currentEditId = document.getElementById('op-edit-id') ? document.getElementById('op-edit-id').value : '';
+  // PAN-based: collect all PANs already in other_products for this product type
+  const addedPans = new Set();
+  const addedIds  = new Set();
+  opEntries.forEach(e=>{
+    if(e.id === currentEditId) return; // skip current entry being edited
+    if(currentProductType && e.product_type !== currentProductType) return; // only same product type
+    if(e.pan)  addedPans.add((e.pan||'').toUpperCase().trim());
+    if(e.client_id) addedIds.add(e.client_id);
+  });
+
+  // Also get PANs from eq/mf client records for cross-reference
+  const allEqClients = DB.get('eq_clients')||[];
+  const allMfClients = DB.get('mf_clients')||[];
+
   list.innerHTML = all.map(c=>{
     const badge = c._seg==='equity'
       ? '<span style="font-size:.68rem;background:var(--gold3,#fef3c7);color:var(--orange,#d97706);border-radius:4px;padding:1px 6px;margin-left:4px">EQ</span>'
       : '<span style="font-size:.68rem;background:var(--teal2,#ccfbf1);color:var(--teal,#0d9488);border-radius:4px;padding:1px 6px;margin-left:4px">MF</span>';
+
+    // Check if already added: by client_id OR by PAN match across all clients
+    const cPan = (c.pan||'').toUpperCase().trim();
+    const alreadyById  = addedIds.has(c.id);
+    const alreadyByPan = cPan && addedPans.has(cPan);
+    const isAlready = alreadyById || alreadyByPan;
+
+    // Find which RM added this client
+    let addedByRm = '';
+    if(isAlready){
+      const matchEntry = opEntries.find(e=>{
+        if(currentProductType && e.product_type !== currentProductType) return false;
+        if(e.client_id===c.id) return true;
+        if(cPan && (e.pan||'').toUpperCase().trim()===cPan) return true;
+        return false;
+      });
+      if(matchEntry) addedByRm = matchEntry.rm || '';
+    }
+
+    if(isAlready){
+      return `<div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;opacity:.55;cursor:not-allowed;background:#f8f9fa">
+        <div>
+          <b>${c.name}</b>${badge}
+          <div style="font-size:.78rem;color:var(--gray)">${c.mobile||'—'} &nbsp;•&nbsp; RM: ${c.rm||'—'}</div>
+        </div>
+        <span style="font-size:.7rem;background:#e2e8f0;color:#64748b;border-radius:6px;padding:2px 8px;white-space:nowrap">✅ Already added${addedByRm?' by '+addedByRm:''}</span>
+      </div>`;
+    }
+
     return `<div onclick="selectOpClient('${c.id}','${c._seg}')"
       style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"
       onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
