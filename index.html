@@ -11522,8 +11522,8 @@ function renderOpPicker(){
   const list = document.getElementById('op-picker-list');
   if(!list) return;
 
-  let eqClients = seg==='' || seg==='equity' ? (DB.get('eq_clients')||[]).map(c=>({...c,_seg:'equity'})) : [];
-  let mfClients = seg==='' || seg==='mf' ? (DB.get('mf_clients')||[]).map(c=>({...c,_seg:'mf'})) : [];
+  let eqClients = seg==='' || seg==='equity' ? getMyEqClients().map(c=>({...c,_seg:'equity'})) : [];
+  let mfClients = seg==='' || seg==='mf' ? getMyMfClients().map(c=>({...c,_seg:'mf'})) : [];
   let all = [...eqClients, ...mfClients];
 
   if(q) all = all.filter(c=>
