@@ -1,4 +1,4 @@
-   <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1181,9 +1181,9 @@ function officeWindowStatus(crmUser){
     return {open:false, reason:'Sunday — office is closed'};
   }
   if(dow===6){
-    // Saturday: 9:30 AM – 2:00 PM
-    if(istHour<9.5 || istHour>=14){
-      return {open:false, reason:'Saturday office time: 9:30 AM – 2:00 PM'};
+    // Saturday: 9:00 AM – 3:00 PM
+    if(istHour<9 || istHour>=15){
+      return {open:false, reason:'Saturday office time: 9:00 AM – 3:00 PM'};
     }
     return {open:true};
   }
@@ -1530,7 +1530,7 @@ function attTime5(){
 
 // Returns badge class for a "Present" record based on login time vs cutoffs.
 // Mon-Fri: green 8:45-8:54, blue 8:55-8:59, yellow (amber) >= 9:00. Before 8:45 also green.
-// Saturday: green before 10:00, blue 10:00-10:14, yellow (amber) >= 10:15
+// Saturday: green before 10:00, blue 10:00-10:15, yellow (amber) > 10:15
 // Status text stays "Present" — only the badge color reflects punctuality.
 function presentBadgeClass(rec){
   if(!rec || rec.status!=='Present' || !rec.in) return 'badge-green';
@@ -1539,7 +1539,7 @@ function presentBadgeClass(rec){
   const mins=h*60+m;
   const day=rec.date ? new Date(rec.date+'T00:00:00').getDay() : null; // 0=Sun..6=Sat
   let blueCutoff, amberCutoff;
-  if(day===6){ blueCutoff=10*60; amberCutoff=10*60+15; }       // Saturday: 10:00 / 10:15
+  if(day===6){ blueCutoff=10*60; amberCutoff=10*60+16; }       // Saturday: 10:00 / 10:16
   else { blueCutoff=8*60+55; amberCutoff=9*60; }                // Mon-Fri: 8:55 / 9:00
   if(mins>=amberCutoff) return 'badge-amber';
   if(mins>=blueCutoff) return 'badge-blue';
@@ -2409,7 +2409,7 @@ async function clearTodayAttendance(){
 }
 
 // When admin picks a date in the manual attendance form, auto-fill the default
-// in/out times: Mon-Fri => 8:45 AM – 6:00 PM, Saturday => 9:30 AM – 2:00 PM.
+// in/out times: Mon-Fri => 8:45 AM – 6:00 PM, Saturday => 9:00 AM – 3:00 PM.
 function setManualTimesByDate(){
   const dateStr=document.getElementById('man-date').value;
   if(!dateStr) return;
@@ -2417,7 +2417,7 @@ function setManualTimesByDate(){
   const inEl=document.getElementById('man-in');
   const outEl=document.getElementById('man-out');
   if(day===6){ // Saturday
-    inEl.value='09:30'; outEl.value='14:00';
+    inEl.value='09:00'; outEl.value='15:00';
   } else {
     inEl.value='08:45'; outEl.value='18:00';
   }
