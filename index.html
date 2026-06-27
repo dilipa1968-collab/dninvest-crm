@@ -474,6 +474,11 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 
 /* ── TABS ── */
 .tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:18px;}
+/* Other Products tabs */
+.op-tab-btn{padding:8px 16px;border-radius:20px;cursor:pointer;font-size:.82rem;font-weight:700;
+  transition:all .18s;opacity:.55;border-width:2px;border-style:solid;}
+.op-tab-btn:hover{opacity:.8;transform:translateY(-1px);}
+.op-tab-btn.active{opacity:1;box-shadow:0 3px 10px rgba(0,0,0,.15);transform:translateY(-2px);}
 .tab-item{padding:10px 18px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--gray);
   border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s;}
 .tab-item:hover{color:var(--navy);}
@@ -1299,18 +1304,26 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           <div class="page-title">🎯 Other Products</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <span id="op-count" style="color:var(--gray);font-size:.85rem"></span>
+            <button class="btn btn-primary" onclick="openAddOpModal()" style="font-size:.82rem;padding:6px 14px">＋ Add Entry</button>
           </div>
         </div>
-        <!-- Tabs -->
-        <div class="tab-bar" id="op-tab-bar">
-          <div class="tab-item active" onclick="opSwitchTab('health')" id="op-tab-health">🏥 Health Insurance</div>
-          <div class="tab-item" onclick="opSwitchTab('life')" id="op-tab-life">🛡️ Life Insurance</div>
-          <div class="tab-item" onclick="opSwitchTab('fd')" id="op-tab-fd">🏦 Corporate FD</div>
-          <div class="tab-item" onclick="opSwitchTab('lamf')" id="op-tab-lamf">📋 LAMF</div>
-          <div class="tab-item" onclick="opSwitchTab('las')" id="op-tab-las">📄 LAS</div>
+        <!-- Colored Product Tabs -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px" id="op-tab-bar">
+          <button class="op-tab-btn active" id="op-tab-health" onclick="opSwitchTab('health')"
+            style="background:#dcfce7;color:#15803d;border:2px solid #86efac">🏥 Health Insurance</button>
+          <button class="op-tab-btn" id="op-tab-life" onclick="opSwitchTab('life')"
+            style="background:#ede9fe;color:#6d28d9;border:2px solid #c4b5fd">🛡️ Life Insurance</button>
+          <button class="op-tab-btn" id="op-tab-fd" onclick="opSwitchTab('fd')"
+            style="background:#fef3c7;color:#92400e;border:2px solid #fcd34d">🏦 Corporate FD</button>
+          <button class="op-tab-btn" id="op-tab-lamf" onclick="opSwitchTab('lamf')"
+            style="background:#dbeafe;color:#1e40af;border:2px solid #93c5fd">📋 LAMF</button>
+          <button class="op-tab-btn" id="op-tab-las" onclick="opSwitchTab('las')"
+            style="background:#fce7f3;color:#9d174d;border:2px solid #f9a8d4">📄 LAS</button>
         </div>
+        <!-- Active tab banner -->
+        <div id="op-active-banner" style="border-radius:10px;padding:10px 16px;margin-bottom:14px;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px"></div>
         <!-- Filters -->
-        <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
+        <div class="filter-bar" style="gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <input type="text" class="filter-input" id="op-search" placeholder="🔍 Search client / RM..." oninput="renderOpTable()" style="min-width:180px">
           <select class="filter-select" id="op-rm-filter" onchange="renderOpTable()"><option value="">All RMs</option></select>
           <select class="filter-select" id="op-status-filter" onchange="renderOpTable()">
@@ -1323,7 +1336,6 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
             <option value="overdue">Overdue</option>
             <option value="pending">Pending</option>
           </select>
-          <button class="btn btn-primary" onclick="openAddOpModal()" style="margin-left:auto">+ Add Entry</button>
         </div>
         <div id="op-table" style="overflow-x:auto"></div>
       </div>
@@ -11155,9 +11167,26 @@ function loadOpFromFirestore(){
 // ── Tab switch ──
 function opSwitchTab(tab){
   _opActiveTab = tab;
-  document.querySelectorAll('#op-tab-bar .tab-item').forEach(el=>{
+  document.querySelectorAll('#op-tab-bar .op-tab-btn').forEach(el=>{
     el.classList.toggle('active', el.id==='op-tab-'+tab);
   });
+  // Update active banner
+  const cfg = OP_TYPES[tab]||{};
+  const colors = {
+    health:{bg:'#dcfce7',color:'#15803d',border:'#86efac'},
+    life:  {bg:'#ede9fe',color:'#6d28d9',border:'#c4b5fd'},
+    fd:    {bg:'#fef3c7',color:'#92400e',border:'#fcd34d'},
+    lamf:  {bg:'#dbeafe',color:'#1e40af',border:'#93c5fd'},
+    las:   {bg:'#fce7f3',color:'#9d174d',border:'#f9a8d4'},
+  };
+  const c = colors[tab]||{bg:'#f0f0f0',color:'#333',border:'#ddd'};
+  const banner = document.getElementById('op-active-banner');
+  if(banner){
+    banner.style.background = c.bg;
+    banner.style.color = c.color;
+    banner.style.border = '2px solid '+c.border;
+    banner.textContent = cfg.icon+' '+cfg.label;
+  }
   renderOpTable();
 }
 
@@ -11175,7 +11204,7 @@ function renderOpPage(){
   loadOpFromFirestore();
   populateOpRmFilter();
   populateOpModalRm();
-  renderOpTable();
+  opSwitchTab(_opActiveTab||'health');
   updateOpBadge();
 }
 
@@ -11230,6 +11259,11 @@ function renderOpTable(){
     <th>Actions</th>
   </tr></thead><tbody>`;
 
+  const tabColors = {
+    health:{bg:'#f0fdf4',border:'#bbf7d0'},life:{bg:'#f5f3ff',border:'#ddd6fe'},
+    fd:{bg:'#fffbeb',border:'#fde68a'},lamf:{bg:'#eff6ff',border:'#bfdbfe'},las:{bg:'#fdf2f8',border:'#fbcfe8'}
+  };
+  const tc = tabColors[_opActiveTab]||{};
   data.forEach(e=>{
     const overdue = e.next_call && e.next_call<today();
     const isToday = e.next_call===today();
@@ -11239,7 +11273,7 @@ function renderOpTable(){
       : e.source_seg==='mf'
       ? '<span style="font-size:.68rem;background:var(--teal2,#ccfbf1);color:var(--teal,#0d9488);border-radius:4px;padding:1px 5px">MF</span>'
       : '';
-    h += `<tr class="${overdue?'row-alert':''}">
+    h += `<tr class="${overdue?'row-alert':''}" style="${overdue?'':'background:'+tc.bg}">
       <td><b>${e.client_name||'—'}</b> ${srcBadge}</td>
       <td><a href="tel:${e.mobile}" style="color:var(--navy);text-decoration:none">${e.mobile||'—'}</a></td>
       <td>${e.rm||'—'}</td>
@@ -11288,11 +11322,11 @@ function openAddOpModal(prefillType){
   document.getElementById('op-remarks').value = '';
   populateOpModalRm();
   opTypeChanged();
-  document.getElementById('op-modal').style.display = 'flex';
+  document.getElementById('op-modal').classList.add('open');
 }
 
 function closeOpModal(){
-  document.getElementById('op-modal').style.display = 'none';
+  document.getElementById('op-modal').classList.remove('open');
 }
 
 function opTypeChanged(){
@@ -11370,7 +11404,7 @@ function editOpEntry(id){
   populateOpModalRm();
   document.getElementById('op-rm').value = e.rm||'';
   opTypeChanged();
-  document.getElementById('op-modal').style.display = 'flex';
+  document.getElementById('op-modal').classList.add('open');
 }
 
 // ── View ──
@@ -11417,10 +11451,10 @@ function openOpClientPicker(){
   document.getElementById('op-picker-search').value = '';
   document.getElementById('op-picker-seg').value = '';
   renderOpPicker();
-  document.getElementById('op-picker-modal').style.display = 'flex';
+  document.getElementById('op-picker-modal').classList.add('open');
 }
 function closeOpPicker(){
-  document.getElementById('op-picker-modal').style.display = 'none';
+  document.getElementById('op-picker-modal').classList.remove('open');
 }
 function renderOpPicker(){
   const q = (document.getElementById('op-picker-search')||{value:''}).value.toLowerCase();
@@ -11474,7 +11508,7 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
-  <div class="modal-box" style="max-width:520px;width:95%">
+  <div class="modal" style="max-width:520px;width:95%;border-radius:16px">
     <div class="modal-hdr">
       <span id="op-modal-title">Add Other Product Entry</span>
       <button class="modal-close" onclick="closeOpModal()">✕</button>
@@ -11560,7 +11594,7 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 <!-- ══ CLIENT PICKER MODAL ══ -->
 <div class="modal-overlay" id="op-picker-modal" onclick="if(event.target===this)closeOpPicker()">
-  <div class="modal-box" style="max-width:560px;width:95%">
+  <div class="modal" style="max-width:560px;width:95%;border-radius:16px">
     <div class="modal-hdr">
       <span>Pick Client</span>
       <button class="modal-close" onclick="closeOpPicker()">✕</button>
@@ -11581,4 +11615,3 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 </body>
 </html>
-
