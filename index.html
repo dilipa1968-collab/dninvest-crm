@@ -698,6 +698,11 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         <span class="nav-badge red" id="nb-mftxn-pending" style="display:none">0</span>
       </div>
 
+      <div class="sidebar-section" id="op-nav-section">Other Products</div>
+      <div class="nav-item" onclick="showPage('other-products')" id="nav-other-products">
+        <span class="icon">🎯</span><span>Other Products</span><span class="badge-num" id="badge-op"></span>
+      </div>
+
       <div class="sidebar-section">Reports</div>
       <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
         <span class="icon">📋</span> Reports
@@ -1287,6 +1292,42 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           </div>
         </div>
       </div>
+
+      <!-- ══════ OTHER PRODUCTS PAGE ══════ -->
+      <div class="page" id="page-other-products">
+        <div class="page-hdr">
+          <div class="page-title">🎯 Other Products</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <span id="op-count" style="color:var(--gray);font-size:.85rem"></span>
+          </div>
+        </div>
+        <!-- Tabs -->
+        <div class="tab-bar" id="op-tab-bar">
+          <div class="tab-item active" onclick="opSwitchTab('health')" id="op-tab-health">🏥 Health Insurance</div>
+          <div class="tab-item" onclick="opSwitchTab('life')" id="op-tab-life">🛡️ Life Insurance</div>
+          <div class="tab-item" onclick="opSwitchTab('fd')" id="op-tab-fd">🏦 Corporate FD</div>
+          <div class="tab-item" onclick="opSwitchTab('lamf')" id="op-tab-lamf">📋 LAMF</div>
+          <div class="tab-item" onclick="opSwitchTab('las')" id="op-tab-las">📄 LAS</div>
+        </div>
+        <!-- Filters -->
+        <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
+          <input type="text" class="filter-input" id="op-search" placeholder="🔍 Search client / RM..." oninput="renderOpTable()" style="min-width:180px">
+          <select class="filter-select" id="op-rm-filter" onchange="renderOpTable()"><option value="">All RMs</option></select>
+          <select class="filter-select" id="op-status-filter" onchange="renderOpTable()">
+            <option value="">All Status</option>
+            <option>Active</option><option>Pending</option><option>Closed</option>
+          </select>
+          <select class="filter-select" id="op-fu-filter" onchange="renderOpTable()">
+            <option value="">All Follow-ups</option>
+            <option value="today">Due Today</option>
+            <option value="overdue">Overdue</option>
+            <option value="pending">Pending</option>
+          </select>
+          <button class="btn btn-primary" onclick="openAddOpModal()" style="margin-left:auto">+ Add Entry</button>
+        </div>
+        <div id="op-table" style="overflow-x:auto"></div>
+      </div>
+      <!-- ══════ END OTHER PRODUCTS PAGE ══════ -->
 
       <div class="page" id="page-reports">
         <div class="page-hdr"><div class="page-title">Reports</div></div>
@@ -2835,6 +2876,7 @@ function showPage(id){
   else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
   else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
+  else if(id==='other-products') renderOpPage();
 
   closeSidebar();
 }
@@ -3313,6 +3355,7 @@ function renderEqTable(){
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
         <button class="btn-icon" onclick="addEquityToMf('${c.id}')" title="Add to Mutual Fund" style="color:var(--teal)">🏦</button>
+        <button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','equity')" title="Map to Other Product" style="color:var(--purple,#7c3aed)">🎯</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Active'?'b-active':c.status==='Closed'?'b-closed':'b-inactive'}">${c.status||'—'}</span></td>
@@ -3446,6 +3489,7 @@ function renderMfTable(){
         <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
         <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
+        <button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','mf')" title="Map to Other Product" style="color:#7c3aed">🎯</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
@@ -11057,6 +11101,484 @@ const MFTBULK = {
   });
 })();
 
+// ══════════════════════════════════════════════════════════════
+// OTHER PRODUCTS MODULE
+// Segments: health | life | fd | lamf | las
+// Firestore key: other_products  (array in crm_data)
+// ══════════════════════════════════════════════════════════════
+
+const OP_TYPES = {
+  health: { label:'Health Insurance', icon:'🏥', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company' },
+  life:   { label:'Life Insurance',   icon:'🛡️', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company' },
+  fd:     { label:'Corporate FD',     icon:'🏦', amtLabel:'FD Amount (₹)',       provLabel:'Company / Bank' },
+  lamf:   { label:'LAMF',             icon:'📋', amtLabel:'Loan Amount (₹)',     provLabel:'Lender' },
+  las:    { label:'LAS',              icon:'📄', amtLabel:'Loan Amount (₹)',     provLabel:'Lender' },
+};
+
+let _opActiveTab = 'health';
+
+// ── DB helpers ──
+function getOpEntries(){ return DB.get('other_products') || []; }
+function setOpEntries(arr){
+  DB.set('other_products', arr);
+}
+async function saveOpToFirestore(entry){
+  try{
+    const arr = getOpEntries();
+    const idx = arr.findIndex(x=>x.id===entry.id);
+    if(idx>=0) arr[idx]=entry; else arr.push(entry);
+    setOpEntries(arr);
+    if(window.fdb){
+      await window.fdb.collection('crm_data').doc('other_products').set({data: arr});
+    }
+  }catch(e){ console.error('OP save error',e); }
+}
+async function deleteOpFromFirestore(id){
+  try{
+    const arr = getOpEntries().filter(x=>x.id!==id);
+    setOpEntries(arr);
+    if(window.fdb){
+      await window.fdb.collection('crm_data').doc('other_products').set({data: arr});
+    }
+  }catch(e){ console.error('OP delete error',e); }
+}
+function loadOpFromFirestore(){
+  if(!window.fdb) return;
+  window.fdb.collection('crm_data').doc('other_products').get().then(doc=>{
+    if(doc.exists){
+      const data = doc.data().data || [];
+      setOpEntries(data);
+    }
+  }).catch(()=>{});
+}
+
+// ── Tab switch ──
+function opSwitchTab(tab){
+  _opActiveTab = tab;
+  document.querySelectorAll('#op-tab-bar .tab-item').forEach(el=>{
+    el.classList.toggle('active', el.id==='op-tab-'+tab);
+  });
+  renderOpTable();
+}
+
+// ── Populate RM filter ──
+function populateOpRmFilter(){
+  const sel = document.getElementById('op-rm-filter');
+  if(!sel) return;
+  const rms = [...new Set(getOpEntries().map(e=>e.rm||'').filter(Boolean))].sort();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All RMs</option>' + rms.map(r=>`<option${r===cur?' selected':''}>${r}</option>`).join('');
+}
+
+// ── Main page render ──
+function renderOpPage(){
+  loadOpFromFirestore();
+  populateOpRmFilter();
+  populateOpModalRm();
+  renderOpTable();
+  updateOpBadge();
+}
+
+function renderOpTable(){
+  const wrap = document.getElementById('op-table');
+  if(!wrap) return;
+
+  let data = getOpEntries().filter(e=>e.product_type===_opActiveTab);
+
+  const q = (document.getElementById('op-search')||{value:''}).value.toLowerCase();
+  const rmF = (document.getElementById('op-rm-filter')||{value:''}).value;
+  const stF = (document.getElementById('op-status-filter')||{value:''}).value;
+  const fuF = (document.getElementById('op-fu-filter')||{value:''}).value;
+
+  if(q) data = data.filter(e=>
+    (e.client_name||'').toLowerCase().includes(q) ||
+    (e.mobile||'').includes(q) ||
+    (e.rm||'').toLowerCase().includes(q) ||
+    (e.provider||'').toLowerCase().includes(q)
+  );
+  if(rmF) data = data.filter(e=>e.rm===rmF);
+  if(stF) data = data.filter(e=>e.status===stF);
+  if(fuF==='today') data = data.filter(e=>e.next_call===today());
+  else if(fuF==='overdue') data = data.filter(e=>e.next_call&&e.next_call<today());
+  else if(fuF==='pending') data = data.filter(e=>e.next_call||e.followup_status);
+
+  const cnt = document.getElementById('op-count');
+  if(cnt) cnt.textContent = data.length + ' entries';
+
+  const cfg = OP_TYPES[_opActiveTab];
+
+  if(!data.length){
+    wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray)">
+      No ${cfg.label} entries yet. <a href="#" onclick="openAddOpModal()" style="color:var(--teal)">Add one?</a>
+    </div>`;
+    return;
+  }
+
+  // Sort: overdue first, then by next_call, then by name
+  data.sort((a,b)=>{
+    const ao=a.next_call&&a.next_call<today(), bo=b.next_call&&b.next_call<today();
+    if(ao&&!bo) return -1; if(!ao&&bo) return 1;
+    if(a.next_call&&b.next_call) return a.next_call.localeCompare(b.next_call);
+    return (a.client_name||'').localeCompare(b.client_name||'');
+  });
+
+  let h = `<table><thead><tr>
+    <th>Client</th><th>Mobile</th><th>RM</th>
+    <th>${cfg.amtLabel.replace(' (₹)','')}</th>
+    <th>${cfg.provLabel}</th>
+    <th>Date</th><th>Next Call</th><th>Follow-up</th><th>Status</th><th>Remarks</th>
+    <th>Actions</th>
+  </tr></thead><tbody>`;
+
+  data.forEach(e=>{
+    const overdue = e.next_call && e.next_call<today();
+    const isToday = e.next_call===today();
+    const fuBadge = overdue?'b-pending':isToday?'b-active':'b-na';
+    const srcBadge = e.source_seg==='equity'
+      ? '<span style="font-size:.68rem;background:var(--gold3,#fef3c7);color:var(--orange,#d97706);border-radius:4px;padding:1px 5px">EQ</span>'
+      : e.source_seg==='mf'
+      ? '<span style="font-size:.68rem;background:var(--teal2,#ccfbf1);color:var(--teal,#0d9488);border-radius:4px;padding:1px 5px">MF</span>'
+      : '';
+    h += `<tr class="${overdue?'row-alert':''}">
+      <td><b>${e.client_name||'—'}</b> ${srcBadge}</td>
+      <td><a href="tel:${e.mobile}" style="color:var(--navy);text-decoration:none">${e.mobile||'—'}</a></td>
+      <td>${e.rm||'—'}</td>
+      <td>${e.amount?'₹'+fmtNum(e.amount):'—'}</td>
+      <td style="font-size:.82rem">${e.provider||'—'}</td>
+      <td>${fmtDate(e.date)||'—'}</td>
+      <td>${fmtDate(e.next_call)||'—'}</td>
+      <td><span class="badge ${fuBadge}">${e.followup_status||'—'}</span></td>
+      <td><span class="badge ${e.status==='Active'?'b-active':e.status==='Closed'?'b-closed':'b-na'}">${e.status||'—'}</span></td>
+      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;font-size:.8rem" title="${e.remarks||''}">${e.remarks||'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-icon" onclick="editOpEntry('${e.id}')" title="Edit">✏️</button>
+        <button class="btn-icon" onclick="viewOpEntry('${e.id}')" title="View">👁</button>
+        ${e.mobile?`<a href="https://wa.me/91${e.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
+        <button class="btn-icon" onclick="deleteOpEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  wrap.innerHTML = h;
+}
+
+// ── Badge ──
+function updateOpBadge(){
+  const entries = getOpEntries();
+  const overdue = entries.filter(e=>e.next_call&&e.next_call<today()).length;
+  const badge = document.getElementById('badge-op');
+  if(badge){ badge.textContent=overdue>0?overdue:''; badge.style.display=overdue>0?'':'none'; }
+}
+
+// ── Modal open/close ──
+function openAddOpModal(prefillType){
+  document.getElementById('op-edit-id').value = '';
+  document.getElementById('op-modal-title').textContent = 'Add Other Product Entry';
+  document.getElementById('op-type').value = prefillType || _opActiveTab;
+  document.getElementById('op-client-name').value = '';
+  document.getElementById('op-client-id').value = '';
+  document.getElementById('op-client-seg').value = '';
+  document.getElementById('op-mobile').value = '';
+  document.getElementById('op-amount').value = '';
+  document.getElementById('op-provider').value = '';
+  document.getElementById('op-date').value = today();
+  document.getElementById('op-next-call').value = '';
+  document.getElementById('op-followup-status').value = '';
+  document.getElementById('op-status').value = 'Active';
+  document.getElementById('op-remarks').value = '';
+  populateOpModalRm();
+  opTypeChanged();
+  document.getElementById('op-modal').style.display = 'flex';
+}
+
+function closeOpModal(){
+  document.getElementById('op-modal').style.display = 'none';
+}
+
+function opTypeChanged(){
+  const t = document.getElementById('op-type').value;
+  const cfg = OP_TYPES[t]||OP_TYPES.health;
+  document.getElementById('op-field-amount-label').textContent = cfg.amtLabel;
+  document.getElementById('op-field-provider-label').textContent = cfg.provLabel;
+}
+
+function populateOpModalRm(){
+  const sel = document.getElementById('op-rm');
+  if(!sel) return;
+  const users = DB.get('users')||[];
+  const rms = users.filter(u=>u.role==='rm'||u.role==='admin').map(u=>u.name).sort();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select RM —</option>' + rms.map(r=>`<option${r===cur?' selected':''}>${r}</option>`).join('');
+  // Default to current user's name if RM
+  if(!cur && CU && (CU.role==='rm'||CU.role==='mfdesk')) sel.value = CU.name;
+}
+
+// ── Save ──
+async function saveOpEntry(){
+  const id = document.getElementById('op-edit-id').value;
+  const clientName = document.getElementById('op-client-name').value.trim();
+  const rm = document.getElementById('op-rm').value;
+  const type = document.getElementById('op-type').value;
+  if(!clientName){ toast('Client name required','error'); return; }
+  if(!rm){ toast('RM required','error'); return; }
+
+  const entry = {
+    id: id || uid(),
+    product_type: type,
+    client_name: clientName,
+    client_id: document.getElementById('op-client-id').value,
+    source_seg: document.getElementById('op-client-seg').value,
+    mobile: document.getElementById('op-mobile').value,
+    rm,
+    amount: parseFloat(document.getElementById('op-amount').value)||0,
+    provider: document.getElementById('op-provider').value.trim(),
+    date: document.getElementById('op-date').value,
+    next_call: document.getElementById('op-next-call').value,
+    followup_status: document.getElementById('op-followup-status').value,
+    status: document.getElementById('op-status').value,
+    remarks: document.getElementById('op-remarks').value.trim(),
+    updated: today(),
+    created: id ? (getOpEntries().find(x=>x.id===id)||{}).created||today() : today(),
+  };
+
+  await saveOpToFirestore(entry);
+  closeOpModal();
+  toast(`✅ ${OP_TYPES[type].label} entry ${id?'updated':'saved'}!`, 'success');
+  populateOpRmFilter();
+  renderOpTable();
+  updateOpBadge();
+}
+
+// ── Edit ──
+function editOpEntry(id){
+  const e = getOpEntries().find(x=>x.id===id);
+  if(!e){ toast('Entry not found','error'); return; }
+  document.getElementById('op-edit-id').value = e.id;
+  document.getElementById('op-modal-title').textContent = 'Edit Entry';
+  document.getElementById('op-type').value = e.product_type;
+  document.getElementById('op-client-name').value = e.client_name||'';
+  document.getElementById('op-client-id').value = e.client_id||'';
+  document.getElementById('op-client-seg').value = e.source_seg||'';
+  document.getElementById('op-mobile').value = e.mobile||'';
+  document.getElementById('op-amount').value = e.amount||'';
+  document.getElementById('op-provider').value = e.provider||'';
+  document.getElementById('op-date').value = e.date||'';
+  document.getElementById('op-next-call').value = e.next_call||'';
+  document.getElementById('op-followup-status').value = e.followup_status||'';
+  document.getElementById('op-status').value = e.status||'Active';
+  document.getElementById('op-remarks').value = e.remarks||'';
+  populateOpModalRm();
+  document.getElementById('op-rm').value = e.rm||'';
+  opTypeChanged();
+  document.getElementById('op-modal').style.display = 'flex';
+}
+
+// ── View ──
+function viewOpEntry(id){
+  const e = getOpEntries().find(x=>x.id===id);
+  if(!e) return;
+  const cfg = OP_TYPES[e.product_type]||OP_TYPES.health;
+  alert(`${cfg.icon} ${cfg.label}\n\nClient: ${e.client_name}\nRM: ${e.rm}\nMobile: ${e.mobile||'—'}\nAmount: ${e.amount?'₹'+fmtNum(e.amount):'—'}\nProvider: ${e.provider||'—'}\nDate: ${fmtDate(e.date)||'—'}\nNext Call: ${fmtDate(e.next_call)||'—'}\nFollow-up: ${e.followup_status||'—'}\nStatus: ${e.status||'—'}\nRemarks: ${e.remarks||'—'}`);
+}
+
+// ── Delete ──
+async function deleteOpEntry(id){
+  if(!confirm('Delete this entry?')) return;
+  await deleteOpFromFirestore(id);
+  toast('Deleted','success');
+  renderOpTable();
+  updateOpBadge();
+}
+
+// ── Quick add from client row (🎯 button) ──
+function quickAddOpFromClient(clientId, seg){
+  // Get client data
+  const clients = seg==='equity' ? (DB.get('eq_clients')||[]) : (DB.get('mf_clients')||[]);
+  const client = clients.find(c=>c.id===clientId);
+  if(!client){ toast('Client not found','error'); return; }
+
+  openAddOpModal();
+
+  // Prefill client fields
+  document.getElementById('op-client-name').value = client.name||'';
+  document.getElementById('op-client-id').value = client.id;
+  document.getElementById('op-client-seg').value = seg;
+  document.getElementById('op-mobile').value = client.mobile||'';
+  document.getElementById('op-rm').value = client.rm||'';
+
+  // Navigate to other-products tab context
+  _opActiveTab = _opActiveTab || 'health';
+  document.getElementById('op-type').value = _opActiveTab;
+  opTypeChanged();
+}
+
+// ── Client Picker ──
+function openOpClientPicker(){
+  document.getElementById('op-picker-search').value = '';
+  document.getElementById('op-picker-seg').value = '';
+  renderOpPicker();
+  document.getElementById('op-picker-modal').style.display = 'flex';
+}
+function closeOpPicker(){
+  document.getElementById('op-picker-modal').style.display = 'none';
+}
+function renderOpPicker(){
+  const q = (document.getElementById('op-picker-search')||{value:''}).value.toLowerCase();
+  const seg = (document.getElementById('op-picker-seg')||{value:''}).value;
+  const list = document.getElementById('op-picker-list');
+  if(!list) return;
+
+  let eqClients = seg==='' || seg==='equity' ? (DB.get('eq_clients')||[]).map(c=>({...c,_seg:'equity'})) : [];
+  let mfClients = seg==='' || seg==='mf' ? (DB.get('mf_clients')||[]).map(c=>({...c,_seg:'mf'})) : [];
+  let all = [...eqClients, ...mfClients];
+
+  if(q) all = all.filter(c=>
+    (c.name||'').toLowerCase().includes(q)||
+    (c.mobile||'').includes(q)||
+    (c.pan||'').toLowerCase().includes(q)
+  );
+  all = all.slice(0,80);
+
+  if(!all.length){ list.innerHTML='<div style="padding:20px;text-align:center;color:var(--gray)">No clients found</div>'; return; }
+
+  list.innerHTML = all.map(c=>{
+    const badge = c._seg==='equity'
+      ? '<span style="font-size:.68rem;background:var(--gold3,#fef3c7);color:var(--orange,#d97706);border-radius:4px;padding:1px 6px;margin-left:4px">EQ</span>'
+      : '<span style="font-size:.68rem;background:var(--teal2,#ccfbf1);color:var(--teal,#0d9488);border-radius:4px;padding:1px 6px;margin-left:4px">MF</span>';
+    return `<div onclick="selectOpClient('${c.id}','${c._seg}')"
+      style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <div>
+        <b>${c.name}</b>${badge}
+        <div style="font-size:.78rem;color:var(--gray)">${c.mobile||'—'} &nbsp;•&nbsp; RM: ${c.rm||'—'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function selectOpClient(clientId, seg){
+  const clients = seg==='equity' ? (DB.get('eq_clients')||[]) : (DB.get('mf_clients')||[]);
+  const c = clients.find(x=>x.id===clientId);
+  if(!c) return;
+  document.getElementById('op-client-name').value = c.name||'';
+  document.getElementById('op-client-id').value = c.id;
+  document.getElementById('op-client-seg').value = seg;
+  document.getElementById('op-mobile').value = c.mobile||'';
+  if(!document.getElementById('op-rm').value) document.getElementById('op-rm').value = c.rm||'';
+  closeOpPicker();
+}
+
+// Load on app start
+window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); updateOpBadge(); }, 3000); });
+
 </script>
+
+<!-- ══ OTHER PRODUCTS MODAL ══ -->
+<div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
+  <div class="modal-box" style="max-width:520px;width:95%">
+    <div class="modal-hdr">
+      <span id="op-modal-title">Add Other Product Entry</span>
+      <button class="modal-close" onclick="closeOpModal()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="op-edit-id">
+      <div class="form-row">
+        <label class="form-label">Product Type *</label>
+        <select class="form-control" id="op-type" onchange="opTypeChanged()">
+          <option value="health">🏥 Health Insurance</option>
+          <option value="life">🛡️ Life Insurance</option>
+          <option value="fd">🏦 Corporate FD</option>
+          <option value="lamf">📋 LAMF</option>
+          <option value="las">📄 LAS</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Client (Source) *</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" class="form-control" id="op-client-name" placeholder="Client name" readonly style="flex:1;background:#f8f9fa">
+          <input type="hidden" id="op-client-id">
+          <input type="hidden" id="op-client-seg">
+          <button class="btn btn-outline" onclick="openOpClientPicker()" style="white-space:nowrap;font-size:.8rem">🔍 Pick Client</button>
+        </div>
+        <small style="color:var(--gray);font-size:.72rem">Pick from Equity or MF clients</small>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Mobile</label>
+        <input type="text" class="form-control" id="op-mobile" placeholder="Mobile" readonly style="background:#f8f9fa">
+      </div>
+      <div class="form-row">
+        <label class="form-label">RM *</label>
+        <select class="form-control" id="op-rm"></select>
+      </div>
+      <div class="form-row" id="op-field-amount-wrap">
+        <label class="form-label" id="op-field-amount-label">Amount / Premium (₹)</label>
+        <input type="number" class="form-control" id="op-amount" placeholder="0">
+      </div>
+      <div class="form-row" id="op-field-provider-wrap">
+        <label class="form-label" id="op-field-provider-label">Provider / Company</label>
+        <input type="text" class="form-control" id="op-provider" placeholder="e.g. LIC, HDFC, Bajaj...">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-control" id="op-date">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Follow-up Date</label>
+        <input type="date" class="form-control" id="op-next-call">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Follow-up Status</label>
+        <select class="form-control" id="op-followup-status">
+          <option value="">— Select —</option>
+          <option>INTERESTED</option>
+          <option>CALL LATER</option>
+          <option>CALL NOT RECEIVED</option>
+          <option>CALL NOT CONNECTED</option>
+          <option>NOT INTERESTED</option>
+          <option>POSITIVE</option>
+          <option>DONE</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Status</label>
+        <select class="form-control" id="op-status">
+          <option>Active</option>
+          <option>Pending</option>
+          <option>Closed</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Remarks</label>
+        <textarea class="form-control" id="op-remarks" rows="2" placeholder="Notes..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeOpModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveOpEntry()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CLIENT PICKER MODAL ══ -->
+<div class="modal-overlay" id="op-picker-modal" onclick="if(event.target===this)closeOpPicker()">
+  <div class="modal-box" style="max-width:560px;width:95%">
+    <div class="modal-hdr">
+      <span>Pick Client</span>
+      <button class="modal-close" onclick="closeOpPicker()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" class="form-control" id="op-picker-search" placeholder="🔍 Search name / mobile..." oninput="renderOpPicker()" style="flex:1">
+        <select class="filter-select" id="op-picker-seg" onchange="renderOpPicker()">
+          <option value="">All Segments</option>
+          <option value="equity">Equity</option>
+          <option value="mf">Mutual Fund</option>
+        </select>
+      </div>
+      <div id="op-picker-list" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
+
