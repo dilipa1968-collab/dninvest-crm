@@ -1177,8 +1177,20 @@ function officeWindowStatus(crmUser){
     return {open:true};
   }
   const istHour=getISTHour();
+  const dow=new Date().getDay(); // 0=Sun,6=Sat
+  if(dow===0){
+    return {open:false, reason:'Sunday — office is closed'};
+  }
+  if(dow===6){
+    // Saturday: 9:30 AM – 2:00 PM
+    if(istHour<9.5 || istHour>=14){
+      return {open:false, reason:'Saturday office time: 9:30 AM – 2:00 PM'};
+    }
+    return {open:true};
+  }
+  // Mon–Fri: 8:00 AM – 7:00 PM
   if(istHour<8 || istHour>=19){
-    return {open:false, reason:'Office time: 8:00 AM – 7:00 PM (daily)'};
+    return {open:false, reason:'Office time: 8:00 AM – 7:00 PM (Mon–Fri)'};
   }
   return {open:true};
 }
