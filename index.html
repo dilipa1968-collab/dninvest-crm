@@ -7224,7 +7224,7 @@ async function fixRmCasing(){
 
 // ── Auto Schedule ──
 // Mon-Fri: 8:00 AM – 7:00 PM IST (active window)
-// Saturday: 9:30 AM – 2:00 PM IST (shorter window, same as HR attendance rule)
+// Saturday: 9:00 AM – 3:00 PM IST (shorter window, same as HR attendance rule)
 // Sunday: always inactive (no active window)
 // Stock Exchange holidays (from HR Portal's holiday calendar, hr_data/holidays):
 // treated exactly like Sunday — RMs auto-deactivate on both portals for that day.
@@ -7269,7 +7269,7 @@ function isHolidayToday(){ return _holidaySet.has(getISTDateStr()); }
 // return null (no active window at all).
 function getActiveWindowForDay(dow){
   if(dow===0) return null;           // Sunday — always inactive
-  if(dow===6) return {start:9.5, end:14}; // Saturday — 9:30 AM to 2:00 PM
+  if(dow===6) return {start:9, end:15}; // Saturday — 9:00 AM to 3:00 PM
   return {start:8, end:19};          // Mon-Fri — 8:00 AM to 7:00 PM
 }
 
