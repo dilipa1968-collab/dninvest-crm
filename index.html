@@ -11131,6 +11131,17 @@ let _opActiveTab = 'health';
 
 // ── DB helpers ──
 function getOpEntries(){ return DB.get('other_products') || []; }
+
+// RM-wise filtered entries (same logic as getMyEqClients)
+function getMyOpEntries(){
+  const all = getOpEntries();
+  if(!CU || CU.role==='admin') return all;
+  const dealers = [...new Set([
+    ...(CU.eq_dealers||[CU.name]),
+    ...(CU.mf_dealers||[CU.name])
+  ])].map(d=>d.trim().toUpperCase());
+  return all.filter(e=>dealers.includes((e.rm||'').trim().toUpperCase()));
+}
 function setOpEntries(arr){
   DB.set('other_products', arr);
 }
@@ -11194,7 +11205,7 @@ function opSwitchTab(tab){
 function populateOpRmFilter(){
   const sel = document.getElementById('op-rm-filter');
   if(!sel) return;
-  const rms = [...new Set(getOpEntries().map(e=>e.rm||'').filter(Boolean))].sort();
+  const rms = [...new Set(getMyOpEntries().map(e=>e.rm||'').filter(Boolean))].sort();
   const cur = sel.value;
   sel.innerHTML = '<option value="">All RMs</option>' + rms.map(r=>`<option${r===cur?' selected':''}>${r}</option>`).join('');
 }
@@ -11212,7 +11223,7 @@ function renderOpTable(){
   const wrap = document.getElementById('op-table');
   if(!wrap) return;
 
-  let data = getOpEntries().filter(e=>e.product_type===_opActiveTab);
+  let data = getMyOpEntries().filter(e=>e.product_type===_opActiveTab);
 
   const q = (document.getElementById('op-search')||{value:''}).value.toLowerCase();
   const rmF = (document.getElementById('op-rm-filter')||{value:''}).value;
@@ -11298,7 +11309,7 @@ function renderOpTable(){
 
 // ── Badge ──
 function updateOpBadge(){
-  const entries = getOpEntries();
+  const entries = getMyOpEntries();
   const overdue = entries.filter(e=>e.next_call&&e.next_call<today()).length;
   const badge = document.getElementById('badge-op');
   if(badge){ badge.textContent=overdue>0?overdue:''; badge.style.display=overdue>0?'':'none'; }
@@ -11372,6 +11383,23 @@ async function saveOpEntry(){
   const type = document.getElementById('op-type').value;
   if(!clientName){ toast('Client name required','error'); return; }
   if(!rm){ toast('RM required','error'); return; }
+
+  // ── Duplicate check: same client_id + same product_type (skip on edit) ──
+  if(!id){
+    const clientId = document.getElementById('op-client-id').value;
+    const existing = getOpEntries().find(e=>
+      e.product_type===type &&
+      (
+        (clientId && e.client_id===clientId) ||
+        (!clientId && (e.client_name||'').trim().toUpperCase()===(clientName||'').trim().toUpperCase())
+      )
+    );
+    if(existing){
+      const cfg2 = OP_TYPES[type]||{};
+      toast(`⚠️ "${existing.client_name}" already has a ${cfg2.label} entry! Edit existing instead.`,'error');
+      return;
+    }
+  }
 
   const entry = {
     id: id || uid(),
