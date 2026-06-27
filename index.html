@@ -2332,11 +2332,11 @@ async function recordHrAttendanceOnCrmLogin(user){
     const inDate = new Date(Date.now() - 2*60*1000);
     const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
 
-    // Check holiday calendar (Sunday or Stock Exchange holiday set from HR Portal)
+    // Check holiday calendar (Sunday/Saturday or Stock Exchange holiday set from HR Portal)
     let status = 'Present';
     const dayOfWeek = new Date().getDay();
-    if(dayOfWeek===0){
-      status = 'Holiday';
+    if(dayOfWeek===0 || dayOfWeek===6){
+      status = 'Holiday'; // Sunday + Saturday
     } else {
       try{
         const holDoc = await fdb.collection('hr_data').doc('holidays').get();
@@ -7265,7 +7265,7 @@ function runAutoSchedule(){
 // declared in HR Portal flows here without a CRM reload).
 setInterval(()=>{ refreshHolidaySet().then(runAutoSchedule); }, 60000);
 
-// ── 10 AM Late-Login Auto-Absent ──
+// ── Late-Login Auto-Absent (Mon-Fri: 10:00 AM, Saturday: 10:30 AM) ──
 // On working days (same Mon-Sat window as the auto-schedule, no Sunday/holiday
 // handling needed since CRM is closed for RMs then anyway), if an RM has not
 // logged in by 10:00 AM IST, they are auto-deactivated AND marked "Absent" in
@@ -7278,8 +7278,9 @@ async function runLateAbsentCheck(){
     if(typeof fdb==='undefined') return;
     const istHour = getISTHour();
     const dow = getISTDayOfWeek();
-    if(dow===0) return; // Sunday — RM access is off anyway, skip
-    if(istHour < 10) return; // before 10 AM, nothing to do yet
+    if(dow===0) return; // Sunday — skip
+    const absentCutoff = (dow===6) ? 10.5 : 10; // Saturday=10:30, Mon-Fri=10:00
+    if(istHour < absentCutoff) return; // before cutoff, nothing to do yet
 
     const td = today();
 
