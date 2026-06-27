@@ -2332,11 +2332,11 @@ async function recordHrAttendanceOnCrmLogin(user){
     const inDate = new Date(Date.now() - 2*60*1000);
     const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
 
-    // Check holiday calendar (Sunday/Saturday or Stock Exchange holiday set from HR Portal)
+    // Check holiday calendar (Sunday or Stock Exchange holiday set from HR Portal)
     let status = 'Present';
     const dayOfWeek = new Date().getDay();
-    if(dayOfWeek===0 || dayOfWeek===6){
-      status = 'Holiday'; // Sunday + Saturday
+    if(dayOfWeek===0){
+      status = 'Holiday'; // Sunday only
     } else {
       try{
         const holDoc = await fdb.collection('hr_data').doc('holidays').get();
@@ -7279,8 +7279,8 @@ async function runLateAbsentCheck(){
     const istHour = getISTHour();
     const dow = getISTDayOfWeek();
     if(dow===0) return; // Sunday — skip
-    const absentCutoff = (dow===6) ? 10.5 : 10; // Saturday=10:30, Mon-Fri=10:00
-    if(istHour < absentCutoff) return; // before cutoff, nothing to do yet
+    const absentCutoff = (dow===6) ? 10.5 : 10; // Saturday=10:30 AM, Mon-Fri=10:00 AM
+    if(istHour < absentCutoff) return;
 
     const td = today();
 
