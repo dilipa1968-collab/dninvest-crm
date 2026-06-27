@@ -476,7 +476,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       <div class="grid-flat">
         <div class="card">
           <div class="card-title">Holiday calendar</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Every Sunday is automatically a holiday. Stock Exchange (NSE/BSE) holidays are listed below in addition to that.</p>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Every Sunday &amp; Saturday is automatically a holiday. Stock Exchange (NSE/BSE) holidays are listed below in addition to that.</p>
           <div id="holiday-list"></div>
         </div>
         <div class="card admin-only" style="display:none">
@@ -1096,7 +1096,7 @@ function getAtt(){ return DB.get('attendance', {}) || {}; }
 async function saveAttRecord(name, record){ await DB.setAttendanceRecord(name, record); }
 function getHolidays(){ return DB.get('holidays', []) || []; }
 async function saveHolidays(d){ await DB.set('holidays', d); }
-function isSunday(dateStr){ return new Date(dateStr+'T00:00:00').getDay()===0; }
+function isSunday(dateStr){ const d=new Date(dateStr+'T00:00:00').getDay(); return d===0||d===6; } // 0=Sun, 6=Sat
 function getHolidayName(dateStr){
   if(isSunday(dateStr)) return 'Sunday';
   const h=getHolidays().find(x=>x.date===dateStr);
@@ -1807,7 +1807,7 @@ async function runLateAbsentCheckHr(){
     const istHour=getISTHour();
     const now=new Date();
     const dow=now.getDay(); // local browser day is fine here, matches CRM's IST-based check closely enough since this only matters during 10AM-7PM IST window
-    if(dow===0) return; // Sunday — skip
+    if(dow===0||dow===6) return; // Sunday & Saturday — skip
     if(istHour<10) return;
 
     const td=today();
@@ -2427,11 +2427,11 @@ function renderBulkDateList(){
   while(cur<=end){
     const dStr=cur.toISOString().split('T')[0];
     const dow=cur.getDay(); // 0=Sun
-    const isSunday=dow===0;
+    const isSunday=dow===0||dow===6; // Sun + Sat
     const isHoliday=holidaySet.has(dStr);
     const skip=isSunday||isHoliday;
     const label=dayNames[dow]+', '+cur.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-    const tag=isHoliday?` <span style="color:var(--red);font-size:10px">(Holiday: ${holidayNameMap[dStr]})</span>`:isSunday?' <span style="color:var(--text3);font-size:10px">(Sunday)</span>':'';
+    const tag=isHoliday?` <span style="color:var(--red);font-size:10px">(Holiday: ${holidayNameMap[dStr]})</span>`:isSunday?' <span style="color:var(--text3);font-size:10px">(Weekend)</span>':'';
     html+=`<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:12px;cursor:pointer">
       <input type="checkbox" class="bulk-date-chk" value="${dStr}" ${skip?'':'checked'}>
       <span>${label}${tag}</span>
@@ -2474,7 +2474,7 @@ function renderLeavePage(){
     const upcoming=holidays.filter(h=>h.date>=td);
     const past=holidays.filter(h=>h.date<td);
     let html='<table style="width:100%;font-size:13px">';
-    html+='<tr><td colspan="3" style="padding:4px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Every Sunday</td></tr>';
+    html+='<tr><td colspan="3" style="padding:4px 0;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Every Sunday &amp; Saturday</td></tr>';
     html+='<tr><td colspan="3" style="padding:4px 0;color:var(--text2)">Weekly off — automatically applies</td></tr>';
     if(upcoming.length){
       html+='<tr><td colspan="3" style="padding:8px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Upcoming exchange holidays</td></tr>';
@@ -2513,7 +2513,7 @@ function renderLeavePage(){
     mls.innerHTML=`
       <table style="width:100%;font-size:13px">
         <tr><td style="color:var(--text2);padding:5px 0">Present days</td><td style="text-align:right">${present}</td></tr>
-        <tr><td style="color:var(--text2);padding:5px 0">Sundays this month</td><td style="text-align:right">${sundaysInMonth}</td></tr>
+        <tr><td style="color:var(--text2);padding:5px 0">Sundays + Saturdays this month</td><td style="text-align:right">${sundaysInMonth}</td></tr>
         <tr><td style="color:var(--text2);padding:5px 0">Exchange holidays this month</td><td style="text-align:right">${holidaysInMonth}</td></tr>
       </table>`;
   }
@@ -2524,7 +2524,8 @@ function countSundaysInMonth(yyyyMm){
   const daysInMonth=new Date(y,m,0).getDate();
   let count=0;
   for(let d=1;d<=daysInMonth;d++){
-    if(new Date(y,m-1,d).getDay()===0) count++;
+    const dow=new Date(y,m-1,d).getDay();
+    if(dow===0||dow===6) count++; // Sunday + Saturday
   }
   return count;
 }
