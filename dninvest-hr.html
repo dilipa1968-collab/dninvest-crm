@@ -2594,7 +2594,7 @@ function calcMonthlySalary(name, monthPrefix){
   const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
   const absentDays=recs.filter(r=>r.status==='Absent').length;
   const halfDays=recs.filter(r=>r.status==='Half day').length;
-  const perDay=sal/30;
+  const perDay=sal/26;
   const deduction=perDay*absentDays;
   const earnedWage=Math.max(0,sal-deduction);
   const esi=calcESI(name, sal, earnedWage);
@@ -2683,7 +2683,7 @@ function renderSalaryPage(){
       <p style="font-size:11px;color:var(--text3);margin-bottom:6px">${mLabel}</p>
       <table style="font-size:13px;width:100%">
         <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(r.salary)}</td></tr>
-        <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷30)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
+        <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷26)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
         ${r.halfDays>0?`<tr><td style="color:var(--text2);padding:6px 0">Half days</td><td style="text-align:right;color:var(--amber,#b58a00)">${r.halfDays}</td></tr>`:''}
@@ -2850,7 +2850,7 @@ function calcSalary(){
 
   const absentDays=parseInt(document.getElementById('sal-absent').value)||0;
   const bonus=parseInt(document.getElementById('sal-bonus').value)||0;
-  const perday=b/30;
+  const perday=b/26;
   const deduction=perday*absentDays;
   const month=salMonthEl&&salMonthEl.value?salMonthEl.value:'';
   const advDeducted=month?getAdvanceAdjustedForMonth(name,month):0;
@@ -2862,7 +2862,7 @@ function calcSalary(){
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
       <tr><td style="color:var(--text2);padding:5px 0">Basic</td><td style="text-align:right">${fmt(b)}</td></tr>
-      <tr><td style="color:var(--text2);padding:5px 0">Per day (Salary÷30)</td><td style="text-align:right">${fmt(perday)}</td></tr>
+      <tr><td style="color:var(--text2);padding:5px 0">Per day (Salary÷26)</td><td style="text-align:right">${fmt(perday)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(deduction)}</td></tr>
       ${esi.applicable?`<tr><td style="color:var(--text2);padding:5px 0">ESI (Employee @ ${esi.settings.employeeRate}%)</td><td style="text-align:right;color:var(--red)">− ${fmt(esi.employeeContribution)}</td></tr>`:''}
