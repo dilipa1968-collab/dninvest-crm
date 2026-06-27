@@ -627,6 +627,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <tr><td style="color:var(--text2);padding:5px 0">Demat account opening</td><td style="text-align:right" id="formula-demat-rate">₹600 / account</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">Tier 2 eligibility</td><td style="text-align:right;font-size:11.5px" id="formula-tier2-min">Min 2 Demat + ₹2000 SIP + ₹10000 Lumpsum</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">MF Sale incentive</td><td style="text-align:right" id="formula-mf-rate">—</td></tr>
+              <tr><td style="color:var(--text2);padding:5px 0">MF AUM incentive</td><td style="text-align:right" id="formula-aum-rate">—</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">SIP incentive</td><td style="text-align:right" id="formula-sip-rate">—</td></tr>
             <tr><td style="color:var(--text2);padding:5px 0">Brokerage client count bonus</td><td style="text-align:right" id="formula-bro-client-rate">—</td></tr>
           </table>
@@ -656,6 +657,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:14px 0 6px">MF / SIP incentive rates</p>
           <div class="form-row">
             <div class="field-inline"><label>MF Sale incentive (%)</label><input type="number" step="0.1" id="mf-rate" placeholder="e.g. 0.5"></div>
+            <div class="field-inline"><label>MF AUM incentive (%)</label><input type="number" step="0.01" id="aum-rate" placeholder="e.g. 0.05"></div>
             <div class="field-inline"><label>SIP incentive (%)</label><input type="number" step="0.1" id="sip-rate" placeholder="e.g. 0.5"></div>
           </div>
 
@@ -690,6 +692,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             <div class="field-inline"><label>Total brokerage (₹)</label><input type="number" id="inc-brok" value="0"></div>
             <div class="field-inline"><label>Demat opened</label><input type="number" id="inc-demat" value="0"></div>
             <div class="field-inline"><label>MF Sale amount (₹)</label><input type="number" id="inc-mf" value="0"></div>
+            <div class="field-inline"><label>MF AUM amount (₹)</label><input type="number" id="inc-aum" value="0" oninput="calcIncentive()" placeholder="Total AUM managed"></div>
             <div class="field-inline"><label>SIP amount (₹)</label><input type="number" id="inc-sip" value="0"></div>
             <div class="field-inline"><label>Other / Special (₹)</label><input type="number" id="inc-other" value="0" onchange="calcIncentive()"></div>
             <div class="field-inline"><label>Remark</label><input type="text" id="inc-other-remark" placeholder="e.g. Other Product, special target"></div>
@@ -729,7 +732,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>AUM</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -1326,8 +1329,8 @@ async function setPaidAmount(name, month, field, amount){
 }
 
 function getIncRates(){
-  return DB.get('inc_rates', {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700, tier2MinDemat:2, tier2MinSip:2000, tier2MinLumpsum:10000})
-    || {mfRate:0, sipRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700, tier2MinDemat:2, tier2MinSip:2000, tier2MinLumpsum:10000};
+  return DB.get('inc_rates', {mfRate:0, sipRate:0, aumRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700, tier2MinDemat:2, tier2MinSip:2000, tier2MinLumpsum:10000})
+    || {mfRate:0, sipRate:0, aumRate:0, lowMult:3, highMult:10, tier1Rate:5, tier2Rate:7, dematRate:600, broClientMin:50, broClientThreshold:100, broClientBonus:700, tier2MinDemat:2, tier2MinSip:2000, tier2MinLumpsum:10000};
 }
 async function saveIncRates(d){ await DB.set('inc_rates', d); }
 
@@ -3081,10 +3084,12 @@ function totalIncentive(name, salary, month){
   const br=brokerageIncentive(getIncentiveSalary(name),brok, checkTier2Eligible(demat,sip,mf));
   const dematInc = demat*getDematRate();
   const mfInc = mf*(rates.mfRate||0)/100;
+  const aum = Number(mfsip.aum)||0;
+  const aumInc = aum*(rates.aumRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
-  const total = br.total + dematInc + mfInc + sipInc + other + broClientInc;
+  const total = br.total + dematInc + mfInc + aumInc + sipInc + other + broClientInc;
 
-  return {brok, demat, mf, sip, other, otherRemark, br, dematInc, mfInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, total, tier2Eligible: br.tier2Eligible};
+  return {brok, demat, mf, aum, sip, other, otherRemark, br, dematInc, mfInc, aumInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -3118,6 +3123,7 @@ function renderIncentivePage(){
   if(ft2mEl) ft2mEl.textContent='Min '+(rates.tier2MinDemat||2)+' Demat + ₹'+(rates.tier2MinSip||2000)+' SIP + ₹'+(rates.tier2MinLumpsum||10000)+' Lumpsum';
   const fmfEl=document.getElementById('formula-mf-rate');
   if(fmfEl) fmfEl.textContent = rates.mfRate ? rates.mfRate+'% of MF sale' : 'Not set';
+  const faumEl=document.getElementById('formula-aum-rate'); if(faumEl) faumEl.textContent = rates.aumRate ? rates.aumRate+'% of AUM' : 'Not set';
   const fsipEl=document.getElementById('formula-sip-rate');
   if(fsipEl) fsipEl.textContent = rates.sipRate ? rates.sipRate+'% of SIP amount' : 'Not set';
   const fbrcEl=document.getElementById('formula-bro-client-rate');
@@ -3145,6 +3151,7 @@ function renderIncentivePage(){
         <tr><td colspan="2" style="padding:6px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Other incentives</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Demat opening (${t.demat} × ${fmt(getDematRate())})</td><td style="text-align:right">${fmt(t.dematInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
+        <tr><td style="color:var(--text2);padding:4px 0">MF AUM incentive</td><td style="text-align:right">${fmt(t.aumInc||0)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
@@ -3174,7 +3181,7 @@ function renderIncentivePage(){
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
         // accumulate column totals
         T.incSal+=(sal+perf); T.brok+=tt.brok; T.tier1+=tt.br.base5; T.tier2+=tt.br.extra2;
-        T.demat+=tt.demat; T.mf+=tt.mf; T.sip+=tt.sip; T.broCl+=tt.broClientInc;
+        T.demat+=tt.demat; T.mf+=tt.mf; T.aum=(T.aum||0)+tt.aum; T.sip+=tt.sip; T.broCl+=tt.broClientInc;
         T.other+=tt.other; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
@@ -3184,6 +3191,7 @@ function renderIncentivePage(){
           <td>${fmt(tt.br.extra2)}</td>
           <td>${tt.demat}</td>
           <td>${fmt(tt.mf)}</td>
+          <td style="color:${tt.aum>0?'var(--navy)':'var(--text3)'}">${tt.aum>0?fmt(tt.aum):'—'}</td>
           <td>${fmt(tt.sip)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other)}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
@@ -3201,6 +3209,7 @@ function renderIncentivePage(){
           <td>${fmt(T.tier2)}</td>
           <td>${T.demat}</td>
           <td>${fmt(T.mf)}</td>
+          <td>${fmt(T.aum||0)}</td>
           <td>${fmt(T.sip)}</td>
           <td style="color:${T.broCl>0?'var(--green)':'var(--text3)'}">${T.broCl>0?fmt(T.broCl):'—'}</td>
           <td>${fmt(T.other)}</td>
@@ -3214,6 +3223,7 @@ function renderIncentivePage(){
 
     // rate inputs
     const mfr=document.getElementById('mf-rate'); if(mfr && !mfr.value) mfr.value=rates.mfRate||'';
+  const aumr=document.getElementById('aum-rate'); if(aumr && !aumr.value) aumr.value=rates.aumRate||'';
     const sipr=document.getElementById('sip-rate'); if(sipr && !sipr.value) sipr.value=rates.sipRate||'';
     const blm=document.getElementById('br-low-mult'); if(blm && !blm.value) blm.value=rates.lowMult||'';
     const bhm=document.getElementById('br-high-mult'); if(bhm && !bhm.value) bhm.value=rates.highMult||'';
@@ -3349,6 +3359,7 @@ async function applyMultiMonthPayment(){
 
 async function saveRates(){
   const mfRate=parseFloat(document.getElementById('mf-rate').value)||0;
+  const aumRate=parseFloat(document.getElementById('aum-rate').value)||0;
   const sipRate=parseFloat(document.getElementById('sip-rate').value)||0;
   const lowMult=parseFloat(document.getElementById('br-low-mult').value)||0;
   const highMult=parseFloat(document.getElementById('br-high-mult').value)||0;
@@ -3363,7 +3374,7 @@ async function saveRates(){
   const tier2MinLumpsum=parseInt(document.getElementById('tier2-min-lumpsum').value)||10000;
   if(highMult<lowMult){ alert('Upper multiplier must be greater than or equal to the lower multiplier'); return; }
   if(tier2Rate<tier1Rate){ alert('Tier 2 rate must be greater than or equal to Tier 1 rate'); return; }
-  await saveIncRates({mfRate,sipRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus,tier2MinDemat,tier2MinSip,tier2MinLumpsum});
+  await saveIncRates({mfRate,sipRate,aumRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus,tier2MinDemat,tier2MinSip,tier2MinLumpsum});
   renderIncentivePage();
   alert('Rates & formula saved!\n\nTier 2 needs: ≥'+tier2MinDemat+' Demat + ₹'+tier2MinSip+' SIP + ₹'+tier2MinLumpsum+' Lumpsum\nBro client bonus: ≥'+broClientMin+' clients (≥₹'+broClientThreshold+') → ₹'+broClientBonus);
 }
@@ -3705,6 +3716,7 @@ function loadIncEmp(){
   document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:0;
   document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:0;
   document.getElementById('inc-mf').value = mfsip.mf||0;
+  document.getElementById('inc-aum').value = mfsip.aum||0;
   document.getElementById('inc-sip').value = mfsip.sip||0;
   document.getElementById('inc-other').value = mfsip.other||0;
   document.getElementById('inc-other-remark').value = mfsip.otherRemark||'';
@@ -3718,6 +3730,7 @@ async function saveMfSipData(){
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
+  const aum=parseInt(document.getElementById('inc-aum').value)||0;
   const sip=parseInt(document.getElementById('inc-sip').value)||0;
   const other=parseInt(document.getElementById('inc-other').value)||0;
   const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
@@ -3725,7 +3738,7 @@ async function saveMfSipData(){
   if(!all[month]) all[month]={};
   const prev=all[month][name]||{};
   // Preserve broClientInc if already applied from file upload — manual form save should not erase it
-  all[month][name]={brok,demat,mf,sip,other,otherRemark, broClientInc: prev.broClientInc||0, broClientEligible: prev.broClientEligible||false};
+  all[month][name]={brok,demat,mf,aum,sip,other,otherRemark, broClientInc: prev.broClientInc||0, broClientEligible: prev.broClientEligible||false};
   await saveMfSipByMonth(all);
   loadIncEmp();        // reload fields from saved data — keeps figures visible & editable
   renderIncentivePage();
@@ -3741,6 +3754,7 @@ function calcIncentive(){
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
+  const aum=parseInt(document.getElementById('inc-aum').value)||0;
   const sip=parseInt(document.getElementById('inc-sip').value)||0;
   const other=parseInt(document.getElementById('inc-other').value)||0;
   const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
@@ -3749,8 +3763,9 @@ function calcIncentive(){
   const br=brokerageIncentive(salary,brok, checkTier2Eligible(demat,sip,mf));
   const dematInc=demat*getDematRate();
   const mfInc=mf*(rates.mfRate||0)/100;
+  const aumInc=aum*(rates.aumRate||0)/100;
   const sipInc=sip*(rates.sipRate||0)/100;
-  const total=br.total+dematInc+mfInc+sipInc+other;
+  const total=br.total+dematInc+mfInc+aumInc+sipInc+other;
 
   const t2Elig = br.tier2Eligible;
   const t2MinDemat    = Number(rates.tier2MinDemat)||2;
@@ -3774,7 +3789,8 @@ function calcIncentive(){
       ${t2BlockNote}
       <tr><td style="color:var(--text2);padding:4px 0;font-weight:600">Brokerage incentive total</td><td style="text-align:right;font-weight:600;color:var(--green)">${fmt(br.total)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ${fmt(getDematRate())})</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
-      <tr><td style="color:var(--text2);padding:4px 0">MF incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">MF AUM incentive (${rates.aumRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(aumInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">SIP incentive (${rates.sipRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(sipInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Other / Special${otherRemark?' ('+otherRemark+')':''}</td><td style="text-align:right;color:var(--green)">+ ${fmt(other)}</td></tr>
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(total)}</td></tr>
