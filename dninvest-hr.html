@@ -1935,7 +1935,8 @@ function renderDashboard(){
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
       const mBlue=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
       const mAmber=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
-      const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber}</span>`;
+      const mTotal=mGreen+mBlue+mAmber;
+      const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
       tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT}</div></div></div>${badge}</div>`;
     });
   }
