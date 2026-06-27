@@ -7279,7 +7279,7 @@ async function runLateAbsentCheck(){
     const istHour = getISTHour();
     const dow = getISTDayOfWeek();
     if(dow===0) return; // Sunday — skip
-    const absentCutoff = (dow===6) ? 10.5 : 10; // Saturday=10:30 AM, Mon-Fri=10:00 AM
+    const absentCutoff = (dow===6) ? 10.75 : 10; // Saturday=10:45 AM, Mon-Fri=10:00 AM
     if(istHour < absentCutoff) return;
 
     const td = today();
