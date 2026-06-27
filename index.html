@@ -1309,6 +1309,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         </div>
         <!-- Colored Product Tabs -->
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px" id="op-tab-bar">
+          <button class="op-tab-btn" id="op-tab-all" onclick="opSwitchTab('all')"
+            style="background:#f1f5f9;color:#334155;border:2px solid #94a3b8">📋 All</button>
           <button class="op-tab-btn active" id="op-tab-health" onclick="opSwitchTab('health')"
             style="background:#dcfce7;color:#15803d;border:2px solid #86efac">🏥 Health Insurance</button>
           <button class="op-tab-btn" id="op-tab-life" onclick="opSwitchTab('life')"
@@ -11197,6 +11199,7 @@ function opSwitchTab(tab){
   // Update active banner
   const cfg = OP_TYPES[tab]||{};
   const colors = {
+    all:   {bg:'#f1f5f9',color:'#334155',border:'#94a3b8'},
     health:{bg:'#dcfce7',color:'#15803d',border:'#86efac'},
     life:  {bg:'#ede9fe',color:'#6d28d9',border:'#c4b5fd'},
     fd:    {bg:'#fef3c7',color:'#92400e',border:'#fcd34d'},
@@ -11209,7 +11212,7 @@ function opSwitchTab(tab){
     banner.style.background = c.bg;
     banner.style.color = c.color;
     banner.style.border = '2px solid '+c.border;
-    banner.textContent = cfg.icon+' '+cfg.label;
+    banner.textContent = tab==='all' ? '📋 All Products' : (cfg.icon+' '+cfg.label);
   }
   renderOpTable();
 }
@@ -11242,7 +11245,7 @@ function renderOpTable(){
   const wrap = document.getElementById('op-table');
   if(!wrap) return;
 
-  let data = getMyOpEntries().filter(e=>e.product_type===_opActiveTab);
+  let data = _opActiveTab==='all' ? getMyOpEntries() : getMyOpEntries().filter(e=>e.product_type===_opActiveTab);
 
   const q = (document.getElementById('op-search')||{value:''}).value.toLowerCase();
   const rmF = (document.getElementById('op-rm-filter')||{value:''}).value;
@@ -11267,8 +11270,9 @@ function renderOpTable(){
   const cfg = OP_TYPES[_opActiveTab];
 
   if(!data.length){
+    const lbl = _opActiveTab==='all' ? 'product' : cfg.label;
     wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray)">
-      No ${cfg.label} entries yet. <a href="#" onclick="openAddOpModal()" style="color:var(--teal)">Add one?</a>
+      No ${lbl} entries yet. <a href="#" onclick="openAddOpModal()" style="color:var(--teal)">Add one?</a>
     </div>`;
     return;
   }
@@ -11281,10 +11285,12 @@ function renderOpTable(){
     return (a.client_name||'').localeCompare(b.client_name||'');
   });
 
+  const isAll = _opActiveTab==='all';
   let h = `<table><thead><tr>
     <th>Client</th><th>Mobile</th><th>RM</th>
-    <th>${cfg.amtLabel.replace(' (₹)','')}</th>
-    <th>${cfg.provLabel}</th>
+    ${isAll ? '<th>Product</th>' : ''}
+    <th>${isAll ? 'Amount' : cfg.amtLabel.replace(' (₹)','')}</th>
+    <th>${isAll ? 'Provider' : cfg.provLabel}</th>
     <th>Date</th><th>Next Call</th><th>Follow-up</th><th>Status</th><th>Remarks</th>
     <th>Actions</th>
   </tr></thead><tbody>`;
@@ -11303,10 +11309,15 @@ function renderOpTable(){
       : e.source_seg==='mf'
       ? '<span style="font-size:.68rem;background:var(--teal2,#ccfbf1);color:var(--teal,#0d9488);border-radius:4px;padding:1px 5px">MF</span>'
       : '';
-    h += `<tr class="${overdue?'row-alert':''}" style="${overdue?'':'background:'+tc.bg}">
+    const ptCfg = OP_TYPES[e.product_type]||{};
+    const ptColors = {health:'#dcfce7',life:'#ede9fe',fd:'#fef3c7',lamf:'#dbeafe',las:'#fce7f3'};
+    const ptText   = {health:'#15803d',life:'#6d28d9',fd:'#92400e',lamf:'#1e40af',las:'#9d174d'};
+    const rowBg = isAll ? (ptColors[e.product_type]||'#f9f9f9') : tc.bg;
+    h += `<tr class="${overdue?'row-alert':''}" style="${overdue?'':'background:'+rowBg}">
       <td><b>${e.client_name||'—'}</b> ${srcBadge}</td>
       <td><a href="tel:${e.mobile}" style="color:var(--navy);text-decoration:none">${e.mobile||'—'}</a></td>
       <td>${e.rm||'—'}</td>
+      ${isAll ? `<td><span style="font-size:.75rem;font-weight:700;background:${ptColors[e.product_type]||'#eee'};color:${ptText[e.product_type]||'#333'};border-radius:4px;padding:2px 7px">${ptCfg.icon||''} ${ptCfg.label||e.product_type}</span></td>` : ''}
       <td>${e.amount?'₹'+fmtNum(e.amount):'—'}</td>
       <td style="font-size:.82rem">${e.provider||'—'}</td>
       <td>${fmtDate(e.date)||'—'}</td>
@@ -11733,4 +11744,3 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 </body>
 </html>
-
