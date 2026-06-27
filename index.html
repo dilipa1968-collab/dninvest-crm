@@ -2289,6 +2289,19 @@ async function doLogin(){
   // converts their attendance from "Absent" to "Late" and reactivates them.
   // Any other active===false (manual Admin deactivation, or outside the
   // scheduled working window) still blocks login as before.
+  // Check credentials first (ignore active flag)
+  const userExists = users.find(x=>{
+    if(x.username!==u) return false;
+    if(x.password===p) return true;
+    if(x.role==='rm' && x.pin && x.pin===p) return true;
+    return false;
+  });
+  // If user found but inactive (outside office hours) → show time message
+  if(userExists && userExists.active===false && userExists.lateAbsentMarked!==td){
+    document.getElementById('lerr').textContent='🕐 Login not allowed outside office hours. Please try again during working hours.';
+    document.getElementById('lerr').style.display='block';
+    return;
+  }
   const user = users.find(x=>{
     if(x.username!==u) return false;
     if(x.active===false && x.lateAbsentMarked!==td) return false;
