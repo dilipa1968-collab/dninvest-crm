@@ -412,7 +412,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="card-title">Team attendance — June 2026</div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th>Present</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
+              <thead><tr><th>Employee</th><th>🟢</th><th>🔵</th><th>🟡</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
               <tbody id="team-att-table"></tbody>
             </table>
           </div>
@@ -2070,13 +2070,24 @@ function renderAttendancePage(){
     const tt=document.getElementById('team-att-table');
     if(tt) tt.innerHTML=EMPLOYEES.map(e=>{
       const recs=att[e.name]||[];
-      const p=recs.filter(r=>r.status==='Present').length;
+      const presentRecs=recs.filter(r=>r.status==='Present');
+      const green=presentRecs.filter(r=>presentBadgeClass(r)==='badge-green').length;
+      const blue=presentRecs.filter(r=>presentBadgeClass(r)==='badge-blue').length;
+      const amber=presentRecs.filter(r=>presentBadgeClass(r)==='badge-amber').length;
       const lt=recs.filter(r=>r.status==='Late').length;
       const lv=recs.filter(r=>r.status==='Holiday').length;
-      const ab=total-p-lt-lv;
-      const pc=Math.round((p/total)*100);
+      const totalPresent=green+blue+amber+lt;
+      const ab=Math.max(0,total-totalPresent-lv);
+      const pc=Math.round((totalPresent/total)*100);
       const bc=pc>=85?'badge-green':pc>=70?'badge-amber':'badge-red';
-      return `<tr><td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td><td>${p}</td><td>${lt}</td><td>${lv}</td><td>${Math.max(0,ab)}</td><td><span class="badge ${bc}">${pc}%</span></td></tr>`;
+      return `<tr>
+        <td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div>${e.name}</div></td>
+        <td><span style="color:#16a34a;font-weight:700">${green}</span></td>
+        <td><span style="color:#1e40af;font-weight:700">${blue}</span></td>
+        <td><span style="color:#b45309;font-weight:700">${amber}</span></td>
+        <td>${lt}</td><td>${lv}</td><td>${ab}</td>
+        <td><span class="badge ${bc}">${pc}%</span></td>
+      </tr>`;
     }).join('');
   }
 }
