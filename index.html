@@ -11313,6 +11313,8 @@ function openAddOpModal(prefillType){
   document.getElementById('op-client-id').value = '';
   document.getElementById('op-client-seg').value = '';
   document.getElementById('op-mobile').value = '';
+  const _md=document.getElementById('op-mobile-display'); if(_md) _md.textContent='—';
+  const _sd=document.getElementById('op-seg-display'); if(_sd) _sd.innerHTML='';
   document.getElementById('op-amount').value = '';
   document.getElementById('op-provider').value = '';
   document.getElementById('op-date').value = today();
@@ -11334,6 +11336,21 @@ function opTypeChanged(){
   const cfg = OP_TYPES[t]||OP_TYPES.health;
   document.getElementById('op-field-amount-label').textContent = cfg.amtLabel;
   document.getElementById('op-field-provider-label').textContent = cfg.provLabel;
+  // Update modal header color
+  const hdrColors = {
+    health:{bg:'#15803d',sub:'Health Insurance'},
+    life:  {bg:'#6d28d9',sub:'Life Insurance'},
+    fd:    {bg:'#92400e',sub:'Corporate FD'},
+    lamf:  {bg:'#1e40af',sub:'LAMF — Loan Against MF'},
+    las:   {bg:'#9d174d',sub:'LAS — Loan Against Securities'},
+  };
+  const hc = hdrColors[t]||{bg:'var(--navy)',sub:''};
+  const hdr = document.getElementById('op-modal-hdr');
+  if(hdr) hdr.style.background = hc.bg;
+  const icon = document.getElementById('op-modal-icon');
+  if(icon) icon.textContent = cfg.icon;
+  const sub = document.getElementById('op-modal-subtitle');
+  if(sub) sub.textContent = hc.sub;
 }
 
 function populateOpModalRm(){
@@ -11394,6 +11411,13 @@ function editOpEntry(id){
   document.getElementById('op-client-id').value = e.client_id||'';
   document.getElementById('op-client-seg').value = e.source_seg||'';
   document.getElementById('op-mobile').value = e.mobile||'';
+  const _emd=document.getElementById('op-mobile-display'); if(_emd) _emd.textContent=e.mobile||'—';
+  const _esd=document.getElementById('op-seg-display');
+  if(_esd && e.source_seg){
+    _esd.innerHTML = e.source_seg==='equity'
+      ? '<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 6px;font-weight:700">EQ</span>'
+      : '<span style="background:#ccfbf1;color:#0d9488;border-radius:4px;padding:1px 6px;font-weight:700">MF</span>';
+  }
   document.getElementById('op-amount').value = e.amount||'';
   document.getElementById('op-provider').value = e.provider||'';
   document.getElementById('op-date').value = e.date||'';
@@ -11439,6 +11463,14 @@ function quickAddOpFromClient(clientId, seg){
   document.getElementById('op-client-seg').value = seg;
   document.getElementById('op-mobile').value = client.mobile||'';
   document.getElementById('op-rm').value = client.rm||'';
+  const mobDisp2 = document.getElementById('op-mobile-display');
+  if(mobDisp2) mobDisp2.textContent = client.mobile||'—';
+  const segDisp2 = document.getElementById('op-seg-display');
+  if(segDisp2){
+    segDisp2.innerHTML = seg==='equity'
+      ? '<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 6px;font-weight:700">EQ</span>'
+      : '<span style="background:#ccfbf1;color:#0d9488;border-radius:4px;padding:1px 6px;font-weight:700">MF</span>';
+  }
 
   // Navigate to other-products tab context
   _opActiveTab = _opActiveTab || 'health';
@@ -11497,6 +11529,15 @@ function selectOpClient(clientId, seg){
   document.getElementById('op-client-id').value = c.id;
   document.getElementById('op-client-seg').value = seg;
   document.getElementById('op-mobile').value = c.mobile||'';
+  // Update display fields
+  const mobDisp = document.getElementById('op-mobile-display');
+  if(mobDisp) mobDisp.textContent = c.mobile||'—';
+  const segDisp = document.getElementById('op-seg-display');
+  if(segDisp){
+    segDisp.innerHTML = seg==='equity'
+      ? '<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 6px;font-weight:700">EQ</span>'
+      : '<span style="background:#ccfbf1;color:#0d9488;border-radius:4px;padding:1px 6px;font-weight:700">MF</span>';
+  }
   if(!document.getElementById('op-rm').value) document.getElementById('op-rm').value = c.rm||'';
   closeOpPicker();
 }
@@ -11508,107 +11549,131 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
-  <div class="modal" style="max-width:520px;width:95%;border-radius:16px">
-    <div class="modal-hdr">
-      <span id="op-modal-title">Add Other Product Entry</span>
+  <div class="modal" style="max-width:600px;width:96%;border-radius:16px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
+    <!-- Colored header based on type -->
+    <div class="modal-hdr" id="op-modal-hdr" style="padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="op-modal-icon" style="font-size:1.4rem">🏥</span>
+        <div>
+          <div id="op-modal-title" style="font-size:1rem;font-weight:700">Add Entry</div>
+          <div id="op-modal-subtitle" style="font-size:.72rem;opacity:.8">Other Products</div>
+        </div>
+      </div>
       <button class="modal-close" onclick="closeOpModal()">✕</button>
     </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+    <div class="modal-body" style="overflow-y:auto;padding:16px 20px;flex:1">
       <input type="hidden" id="op-edit-id">
-      <div class="form-row">
-        <label class="form-label">Product Type *</label>
-        <select class="form-control" id="op-type" onchange="opTypeChanged()">
-          <option value="health">🏥 Health Insurance</option>
-          <option value="life">🛡️ Life Insurance</option>
-          <option value="fd">🏦 Corporate FD</option>
-          <option value="lamf">📋 LAMF</option>
-          <option value="las">📄 LAS</option>
-        </select>
+      <!-- Row 1: Type + Client side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Product Type *</label>
+          <select class="form-control" id="op-type" onchange="opTypeChanged()" style="font-size:.82rem;padding:7px 10px">
+            <option value="health">🏥 Health Insurance</option>
+            <option value="life">🛡️ Life Insurance</option>
+            <option value="fd">🏦 Corporate FD</option>
+            <option value="lamf">📋 LAMF</option>
+            <option value="las">📄 LAS</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">RM *</label>
+          <select class="form-control" id="op-rm" style="font-size:.82rem;padding:7px 10px"></select>
+        </div>
       </div>
-      <div class="form-row">
-        <label class="form-label">Client (Source) *</label>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" class="form-control" id="op-client-name" placeholder="Client name" readonly style="flex:1;background:#f8f9fa">
+      <!-- Client picker full width -->
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Client (Source) *</div>
+        <div style="display:flex;gap:8px;align-items:center">
           <input type="hidden" id="op-client-id">
           <input type="hidden" id="op-client-seg">
-          <button class="btn btn-outline" onclick="openOpClientPicker()" style="white-space:nowrap;font-size:.8rem">🔍 Pick Client</button>
+          <div style="flex:1">
+            <input type="text" class="form-control" id="op-client-name" placeholder="Click 'Pick Client' to select..." readonly
+              style="background:#fff;font-size:.85rem;font-weight:600;padding:8px 10px;border-color:#cbd5e1">
+          </div>
+          <button onclick="openOpClientPicker()" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:.8rem;white-space:nowrap;font-weight:600">🔍 Pick</button>
         </div>
-        <small style="color:var(--gray);font-size:.72rem">Pick from Equity or MF clients</small>
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <span style="font-size:.75rem;color:var(--gray)">📱 <span id="op-mobile-display">—</span></span>
+          <span style="font-size:.75rem;color:var(--gray)" id="op-seg-display"></span>
+        </div>
+        <input type="hidden" id="op-mobile">
       </div>
-      <div class="form-row">
-        <label class="form-label">Mobile</label>
-        <input type="text" class="form-control" id="op-mobile" placeholder="Mobile" readonly style="background:#f8f9fa">
+      <!-- Row 2: Amount + Provider -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="form-label" id="op-field-amount-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Premium / Amount (₹)</label>
+          <input type="number" class="form-control" id="op-amount" placeholder="0" style="font-size:.85rem;padding:7px 10px">
+        </div>
+        <div>
+          <label class="form-label" id="op-field-provider-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Provider / Company</label>
+          <input type="text" class="form-control" id="op-provider" placeholder="e.g. LIC, HDFC..." style="font-size:.85rem;padding:7px 10px">
+        </div>
       </div>
-      <div class="form-row">
-        <label class="form-label">RM *</label>
-        <select class="form-control" id="op-rm"></select>
+      <!-- Row 3: Date + Follow-up Date -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Date</label>
+          <input type="date" class="form-control" id="op-date" style="font-size:.82rem;padding:7px 10px">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Follow-up Date</label>
+          <input type="date" class="form-control" id="op-next-call" style="font-size:.82rem;padding:7px 10px">
+        </div>
       </div>
-      <div class="form-row" id="op-field-amount-wrap">
-        <label class="form-label" id="op-field-amount-label">Amount / Premium (₹)</label>
-        <input type="number" class="form-control" id="op-amount" placeholder="0">
+      <!-- Row 4: Follow-up Status + Status -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Follow-up Status</label>
+          <select class="form-control" id="op-followup-status" style="font-size:.82rem;padding:7px 10px">
+            <option value="">— Select —</option>
+            <option>INTERESTED</option>
+            <option>CALL LATER</option>
+            <option>CALL NOT RECEIVED</option>
+            <option>CALL NOT CONNECTED</option>
+            <option>NOT INTERESTED</option>
+            <option>POSITIVE</option>
+            <option>DONE</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Status</label>
+          <select class="form-control" id="op-status" style="font-size:.82rem;padding:7px 10px">
+            <option>Active</option>
+            <option>Pending</option>
+            <option>Closed</option>
+          </select>
+        </div>
       </div>
-      <div class="form-row" id="op-field-provider-wrap">
-        <label class="form-label" id="op-field-provider-label">Provider / Company</label>
-        <input type="text" class="form-control" id="op-provider" placeholder="e.g. LIC, HDFC, Bajaj...">
-      </div>
-      <div class="form-row">
-        <label class="form-label">Date</label>
-        <input type="date" class="form-control" id="op-date">
-      </div>
-      <div class="form-row">
-        <label class="form-label">Follow-up Date</label>
-        <input type="date" class="form-control" id="op-next-call">
-      </div>
-      <div class="form-row">
-        <label class="form-label">Follow-up Status</label>
-        <select class="form-control" id="op-followup-status">
-          <option value="">— Select —</option>
-          <option>INTERESTED</option>
-          <option>CALL LATER</option>
-          <option>CALL NOT RECEIVED</option>
-          <option>CALL NOT CONNECTED</option>
-          <option>NOT INTERESTED</option>
-          <option>POSITIVE</option>
-          <option>DONE</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label class="form-label">Status</label>
-        <select class="form-control" id="op-status">
-          <option>Active</option>
-          <option>Pending</option>
-          <option>Closed</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label class="form-label">Remarks</label>
-        <textarea class="form-control" id="op-remarks" rows="2" placeholder="Notes..."></textarea>
+      <!-- Remarks -->
+      <div>
+        <label class="form-label" style="font-size:.75rem;font-weight:700;margin-bottom:4px;display:block">Remarks</label>
+        <textarea class="form-control" id="op-remarks" rows="2" placeholder="Notes..." style="font-size:.82rem;resize:none"></textarea>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeOpModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveOpEntry()">💾 Save</button>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:#fafafa">
+      <button class="btn btn-outline" onclick="closeOpModal()" style="font-size:.82rem;padding:7px 18px">Cancel</button>
+      <button class="btn btn-primary" onclick="saveOpEntry()" id="op-save-btn" style="font-size:.82rem;padding:7px 20px">💾 Save Entry</button>
     </div>
   </div>
 </div>
 
 <!-- ══ CLIENT PICKER MODAL ══ -->
 <div class="modal-overlay" id="op-picker-modal" onclick="if(event.target===this)closeOpPicker()">
-  <div class="modal" style="max-width:560px;width:95%;border-radius:16px">
-    <div class="modal-hdr">
-      <span>Pick Client</span>
+  <div class="modal" style="max-width:500px;width:95%;border-radius:16px">
+    <div class="modal-hdr" style="padding:14px 20px">
+      <span style="font-weight:700">🔍 Pick Client</span>
       <button class="modal-close" onclick="closeOpPicker()">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" style="padding:14px 16px">
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input type="text" class="form-control" id="op-picker-search" placeholder="🔍 Search name / mobile..." oninput="renderOpPicker()" style="flex:1">
-        <select class="filter-select" id="op-picker-seg" onchange="renderOpPicker()">
-          <option value="">All Segments</option>
-          <option value="equity">Equity</option>
-          <option value="mf">Mutual Fund</option>
+        <input type="text" class="form-control" id="op-picker-search" placeholder="Search name / mobile / PAN..." oninput="renderOpPicker()" style="flex:1;font-size:.85rem">
+        <select class="filter-select" id="op-picker-seg" onchange="renderOpPicker()" style="font-size:.82rem">
+          <option value="">All</option>
+          <option value="equity">📈 Equity</option>
+          <option value="mf">🏦 MF</option>
         </select>
       </div>
-      <div id="op-picker-list" style="max-height:320px;overflow-y:auto"></div>
+      <div id="op-picker-list" style="max-height:340px;overflow-y:auto;border-radius:8px;border:1px solid #e2e8f0"></div>
     </div>
   </div>
 </div>
