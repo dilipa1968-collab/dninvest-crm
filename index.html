@@ -11381,10 +11381,16 @@ function populateOpModalRm(){
   const sel = document.getElementById('op-rm');
   if(!sel) return;
   const users = DB.get('users')||[];
-  const rms = users.filter(u=>u.role==='rm'||u.role==='admin').map(u=>u.name).sort();
   const cur = sel.value;
-  sel.innerHTML = '<option value="">— Select RM —</option>' + rms.map(r=>`<option${r===cur?' selected':''}>${r}</option>`).join('');
-  // Default to current user's name if RM
+  // Admin sees all RMs; RM sees only themselves
+  if(CU && CU.role==='admin'){
+    const rms = users.filter(u=>u.role==='rm'||u.role==='admin').map(u=>u.name).sort();
+    sel.innerHTML = '<option value="">— Select RM —</option>' + rms.map(r=>`<option${r===cur?' selected':''}>${r}</option>`).join('');
+    sel.disabled = false;
+  } else {
+    sel.innerHTML = `<option value="${CU.name}" selected>${CU.name}</option>`;
+    sel.disabled = true;
+  }
   if(!cur && CU && (CU.role==='rm'||CU.role==='mfdesk')) sel.value = CU.name;
 }
 
