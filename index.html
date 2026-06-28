@@ -1323,6 +1323,21 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
             style="background:#dbeafe;color:#1e40af;border:2px solid #93c5fd">📋 LAMF</button>
           <button class="op-tab-btn" id="op-tab-las" onclick="opSwitchTab('las')"
             style="background:#fce7f3;color:#9d174d;border:2px solid #f9a8d4">📄 LAS</button>
+          <span style="color:#94a3b8;font-size:.75rem;align-self:center;padding:0 4px;font-weight:700">General Insurance →</span>
+          <button class="op-tab-btn" id="op-tab-gi_motor" onclick="opSwitchTab('gi_motor')"
+            style="background:#fff7ed;color:#c2410c;border:2px solid #fdba74">🚗 Motor</button>
+          <button class="op-tab-btn" id="op-tab-gi_home" onclick="opSwitchTab('gi_home')"
+            style="background:#f0fdf4;color:#166534;border:2px solid #86efac">🏠 Home</button>
+          <button class="op-tab-btn" id="op-tab-gi_travel" onclick="opSwitchTab('gi_travel')"
+            style="background:#eff6ff;color:#1d4ed8;border:2px solid #93c5fd">✈️ Travel</button>
+          <button class="op-tab-btn" id="op-tab-gi_fire" onclick="opSwitchTab('gi_fire')"
+            style="background:#fef2f2;color:#b91c1c;border:2px solid #fca5a5">🔥 Fire</button>
+          <button class="op-tab-btn" id="op-tab-gi_marine" onclick="opSwitchTab('gi_marine')"
+            style="background:#f0f9ff;color:#0369a1;border:2px solid #7dd3fc">🚢 Marine</button>
+          <button class="op-tab-btn" id="op-tab-gi_cyber" onclick="opSwitchTab('gi_cyber')"
+            style="background:#faf5ff;color:#7e22ce;border:2px solid #d8b4fe">🔒 Cyber</button>
+          <button class="op-tab-btn" id="op-tab-gi_other" onclick="opSwitchTab('gi_other')"
+            style="background:#f8fafc;color:#475569;border:2px solid #94a3b8">📋 Other GI</button>
         </div>
         <!-- Active tab banner -->
         <div id="op-active-banner" style="border-radius:10px;padding:10px 16px;margin-bottom:14px;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px"></div>
@@ -11139,6 +11154,13 @@ const MFTBULK = {
 const OP_TYPES = {
   health: { label:'Health Insurance', icon:'🏥', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company' },
   life:   { label:'Life Insurance',   icon:'🛡️', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company' },
+  gi_motor:  { label:'Motor Insurance',      icon:'🚗', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company', group:'General Insurance' },
+  gi_home:   { label:'Home Insurance',       icon:'🏠', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company', group:'General Insurance' },
+  gi_travel: { label:'Travel Insurance',     icon:'✈️', amtLabel:'Premium (₹)',         provLabel:'Insurance Company', group:'General Insurance' },
+  gi_fire:   { label:'Fire Insurance',       icon:'🔥', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company', group:'General Insurance' },
+  gi_marine: { label:'Marine Insurance',     icon:'🚢', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company', group:'General Insurance' },
+  gi_cyber:  { label:'Cyber Insurance',      icon:'🔒', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company', group:'General Insurance' },
+  gi_other:  { label:'Other Gen. Insurance', icon:'📋', amtLabel:'Annual Premium (₹)', provLabel:'Insurance Company', group:'General Insurance' },
   fd:     { label:'Corporate FD',     icon:'🏦', amtLabel:'FD Amount (₹)',       provLabel:'Company / Bank' },
   lamf:   { label:'LAMF',             icon:'📋', amtLabel:'Loan Amount (₹)',     provLabel:'Lender' },
   las:    { label:'LAS',              icon:'📄', amtLabel:'Loan Amount (₹)',     provLabel:'Lender' },
@@ -11206,7 +11228,14 @@ function opSwitchTab(tab){
     life:  {bg:'#ede9fe',color:'#6d28d9',border:'#c4b5fd'},
     fd:    {bg:'#fef3c7',color:'#92400e',border:'#fcd34d'},
     lamf:  {bg:'#dbeafe',color:'#1e40af',border:'#93c5fd'},
-    las:   {bg:'#fce7f3',color:'#9d174d',border:'#f9a8d4'},
+    las:      {bg:'#fce7f3',color:'#9d174d',border:'#f9a8d4'},
+    gi_motor: {bg:'#fff7ed',color:'#c2410c',border:'#fdba74'},
+    gi_home:  {bg:'#f0fdf4',color:'#166534',border:'#86efac'},
+    gi_travel:{bg:'#eff6ff',color:'#1d4ed8',border:'#93c5fd'},
+    gi_fire:  {bg:'#fef2f2',color:'#b91c1c',border:'#fca5a5'},
+    gi_marine:{bg:'#f0f9ff',color:'#0369a1',border:'#7dd3fc'},
+    gi_cyber: {bg:'#faf5ff',color:'#7e22ce',border:'#d8b4fe'},
+    gi_other: {bg:'#f8fafc',color:'#475569',border:'#94a3b8'},
   };
   const c = colors[tab]||{bg:'#f0f0f0',color:'#333',border:'#ddd'};
   const banner = document.getElementById('op-active-banner');
@@ -11299,7 +11328,11 @@ function renderOpTable(){
 
   const tabColors = {
     health:{bg:'#f0fdf4',border:'#bbf7d0'},life:{bg:'#f5f3ff',border:'#ddd6fe'},
-    fd:{bg:'#fffbeb',border:'#fde68a'},lamf:{bg:'#eff6ff',border:'#bfdbfe'},las:{bg:'#fdf2f8',border:'#fbcfe8'}
+    fd:{bg:'#fffbeb',border:'#fde68a'},lamf:{bg:'#eff6ff',border:'#bfdbfe'},las:{bg:'#fdf2f8',border:'#fbcfe8'},
+    gi_motor:{bg:'#fff7ed',border:'#fed7aa'},gi_home:{bg:'#f0fdf4',border:'#bbf7d0'},
+    gi_travel:{bg:'#eff6ff',border:'#bfdbfe'},gi_fire:{bg:'#fef2f2',border:'#fecaca'},
+    gi_marine:{bg:'#f0f9ff',border:'#bae6fd'},gi_cyber:{bg:'#faf5ff',border:'#e9d5ff'},
+    gi_other:{bg:'#f8fafc',border:'#e2e8f0'}
   };
   const tc = tabColors[_opActiveTab]||{};
   data.forEach(e=>{
@@ -11312,8 +11345,8 @@ function renderOpTable(){
       ? '<span style="font-size:.68rem;background:var(--teal2,#ccfbf1);color:var(--teal,#0d9488);border-radius:4px;padding:1px 5px">MF</span>'
       : '';
     const ptCfg = OP_TYPES[e.product_type]||{};
-    const ptColors = {health:'#dcfce7',life:'#ede9fe',fd:'#fef3c7',lamf:'#dbeafe',las:'#fce7f3'};
-    const ptText   = {health:'#15803d',life:'#6d28d9',fd:'#92400e',lamf:'#1e40af',las:'#9d174d'};
+    const ptColors = {health:'#dcfce7',life:'#ede9fe',fd:'#fef3c7',lamf:'#dbeafe',las:'#fce7f3',gi_motor:'#fff7ed',gi_home:'#dcfce7',gi_travel:'#dbeafe',gi_fire:'#fef2f2',gi_marine:'#e0f2fe',gi_cyber:'#f3e8ff',gi_other:'#f1f5f9'};
+    const ptText   = {health:'#15803d',life:'#6d28d9',fd:'#92400e',lamf:'#1e40af',las:'#9d174d',gi_motor:'#c2410c',gi_home:'#166534',gi_travel:'#1d4ed8',gi_fire:'#b91c1c',gi_marine:'#0369a1',gi_cyber:'#7e22ce',gi_other:'#475569'};
     const rowBg = isAll ? (ptColors[e.product_type]||'#f9f9f9') : tc.bg;
     h += `<tr class="${overdue?'row-alert':''}" style="${overdue?'':'background:'+rowBg}">
       <td><b>${e.client_name||'—'}</b> ${srcBadge}</td>
@@ -11385,7 +11418,14 @@ function opTypeChanged(){
     life:  {bg:'#6d28d9',sub:'Life Insurance'},
     fd:    {bg:'#92400e',sub:'Corporate FD'},
     lamf:  {bg:'#1e40af',sub:'LAMF — Loan Against MF'},
-    las:   {bg:'#9d174d',sub:'LAS — Loan Against Securities'},
+    las:      {bg:'#9d174d',sub:'LAS — Loan Against Securities'},
+    gi_motor: {bg:'#c2410c',sub:'Motor Insurance'},
+    gi_home:  {bg:'#166534',sub:'Home Insurance'},
+    gi_travel:{bg:'#1d4ed8',sub:'Travel Insurance'},
+    gi_fire:  {bg:'#b91c1c',sub:'Fire Insurance'},
+    gi_marine:{bg:'#0369a1',sub:'Marine Insurance'},
+    gi_cyber: {bg:'#7e22ce',sub:'Cyber Insurance'},
+    gi_other: {bg:'#475569',sub:'General Insurance — Other'},
   };
   const hc = hdrColors[t]||{bg:'var(--navy)',sub:''};
   const hdr = document.getElementById('op-modal-hdr');
@@ -11705,6 +11745,15 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
             <option value="fd">🏦 Corporate FD</option>
             <option value="lamf">📋 LAMF</option>
             <option value="las">📄 LAS</option>
+            <optgroup label="── General Insurance ──">
+            <option value="gi_motor">🚗 Motor Insurance</option>
+            <option value="gi_home">🏠 Home Insurance</option>
+            <option value="gi_travel">✈️ Travel Insurance</option>
+            <option value="gi_fire">🔥 Fire Insurance</option>
+            <option value="gi_marine">🚢 Marine Insurance</option>
+            <option value="gi_cyber">🔒 Cyber Insurance</option>
+            <option value="gi_other">📋 Other Gen. Insurance</option>
+            </optgroup>
           </select>
         </div>
         <div>
