@@ -2409,14 +2409,24 @@ async function recordHrAttendanceOnCrmLogin(user){
       const inDate = new Date();
       const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
       const record = {date:td, in:inTime, out:'', status:'Late'};
-      await fdb.runTransaction(async (tx)=>{
-        const doc = await tx.get(docRef);
-        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
-        if(!latest[name]) latest[name]=[];
-        const idx = latest[name].findIndex(r=>r.date===td);
-        if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
-        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
-      });
+      // Retry with exponential backoff (3 attempts)
+      for(let attempt=1; attempt<=3; attempt++){
+        try{
+          await fdb.runTransaction(async (tx)=>{
+            const doc = await tx.get(docRef);
+            let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+            if(!latest[name]) latest[name]=[];
+            const idx = latest[name].findIndex(r=>r.date===td);
+            if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
+            tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          });
+          console.log('[ATT] ✅ Late flip saved (attempt '+attempt+')');
+          break;
+        }catch(e){
+          console.log('[ATT] Late flip attempt '+attempt+' failed:', e.message);
+          if(attempt<3) await new Promise(r=>setTimeout(r, attempt*3000));
+        }
+      }
       // Reactivate the user account that the 10 AM check had deactivated
       const usersList = DB.get('users') || [];
       const uidx = usersList.findIndex(x=>x.id===user.id);
@@ -2452,15 +2462,32 @@ async function recordHrAttendanceOnCrmLogin(user){
     console.log('[ATT] saving record: name='+name+' in='+inTime+' status='+status);
     const record = {date:td, in:inTime, out:'', status};
 
-    await fdb.runTransaction(async (tx)=>{
-      const doc = await tx.get(docRef);
-      let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
-      if(!latest[name]) latest[name]=[];
-      const idx = latest[name].findIndex(r=>r.date===td);
-      if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
-      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
-    });
-    console.log('[ATT] ✅ saved successfully for '+name);
+    // Retry with exponential backoff (3 attempts) — handles network blips
+    const MAX_ATTEMPTS = 3;
+    let saved = false;
+    for(let attempt=1; attempt<=MAX_ATTEMPTS; attempt++){
+      try{
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(docRef);
+          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+          if(!latest[name]) latest[name]=[];
+          const idx = latest[name].findIndex(r=>r.date===td);
+          if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        });
+        console.log('[ATT] ✅ saved successfully for '+name+' (attempt '+attempt+')');
+        saved = true;
+        break;
+      }catch(e){
+        console.log('[ATT] attempt '+attempt+' failed:', e.message);
+        if(attempt < MAX_ATTEMPTS){
+          const delay = attempt * 3000; // 3s, 6s
+          console.log('[ATT] retrying in '+delay+'ms...');
+          await new Promise(r=>setTimeout(r, delay));
+        }
+      }
+    }
+    if(!saved) console.log('[ATT] ❌ all '+MAX_ATTEMPTS+' attempts failed for '+name);
   }catch(e){
     console.log('[ATT] ❌ CRM auto-attendance error:', e);
   }
