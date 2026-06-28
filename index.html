@@ -3413,7 +3413,7 @@ function renderEqTable(){
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
-      <td style="font-weight:600">${c.name}</td>
+      <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:5px;font-size:.7rem;background:#7c3aed;color:#fff;border-radius:6px;padding:1px 5px;font-weight:700;vertical-align:middle">💎 HNI</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
@@ -3545,7 +3545,7 @@ function renderMfTable(){
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
-      <td style="font-weight:600">${c.name}</td>
+      <td style="font-weight:600">${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:5px;font-size:.7rem;background:#0d9488;color:#fff;border-radius:6px;padding:1px 5px;font-weight:700;vertical-align:middle">💎 HNI</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
