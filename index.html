@@ -2438,7 +2438,7 @@ async function recordHrAttendanceOnCrmLogin(user){
 
     // Check holiday calendar (Sunday or Stock Exchange holiday set from HR Portal)
     let status = 'Present';
-    const dayOfWeek = new Date().getDay();
+    const dayOfWeek = getISTDayOfWeek(); // IST-aware — avoids UTC midnight bug
     if(dayOfWeek===0){
       status = 'Holiday'; // Sunday only
     } else {
