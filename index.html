@@ -1217,7 +1217,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           </div>
           <div style="display:flex;align-items:flex-end;gap:8px">
             <button class="btn btn-outline" onclick="document.getElementById('al-seg').value='';document.getElementById('al-rm').value='';document.getElementById('al-type').value='';document.getElementById('al-by').value='';document.getElementById('al-from').value='';document.getElementById('al-to').value='';document.getElementById('al-search').value='';renderActivityLog()">✕ Reset</button>
-            <button class="btn btn-outline" id="al-view-toggle" onclick="toggleAlView()" title="View Toggle">☰ Compact</button>
+            <button class="btn btn-outline" id="al-view-toggle" onclick="toggleAlView()" title="View Toggle">☰ Detailed</button>
           </div>
         </div>
         <div id="al-count" style="font-size:.8rem;color:var(--gray);margin-bottom:8px"></div>
@@ -9257,7 +9257,7 @@ window.checkFollowups = function(){
 // ══════════════════════════════════════════
 // ACTIVITY LOG
 // ══════════════════════════════════════════
-let alViewMode = 'detail'; // 'detail' or 'compact'
+let alViewMode = 'compact'; // 'detail' or 'compact'
 function toggleAlView(){
   alViewMode = alViewMode==='detail' ? 'compact' : 'detail';
   const btn = document.getElementById('al-view-toggle');
