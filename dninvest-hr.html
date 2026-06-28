@@ -2088,15 +2088,21 @@ function renderAttendancePage(){
   if(ms) ms.innerHTML=`
     <div class="grid4" style="margin-bottom:0">
       <div class="metric"><div class="m-lbl">PRESENT</div><div class="m-val" style="color:var(--green)">${present}</div></div>
-      <div class="metric"><div class="m-lbl">LATE</div><div class="m-val" style="color:var(--amber)">${late}</div></div>
+      <div class="metric"><div class="m-lbl">ABSENT</div><div class="m-val" style="color:var(--red)">${absent}</div></div>
       <div class="metric"><div class="m-lbl">WORKING DAYS</div><div class="m-val">${total}</div></div>
-      <div class="metric"><div class="m-lbl">ATTENDANCE %</div><div class="m-val" style="color:${pct>=85?'var(--green)':'var(--amber)'}">${pct}%</div></div>
+      <div class="metric"></div>
     </div>
     <div class="grid4" style="margin-top:10px;margin-bottom:0">
       <div class="metric"><div class="m-lbl">HOLIDAYS</div><div class="m-val" style="color:#e07b00">${declaredHols}</div></div>
       <div class="metric"><div class="m-lbl">SUNDAYS</div><div class="m-val" style="color:#6366f1">${sundayCount}</div></div>
       <div class="metric"><div class="m-lbl">HOL MARKED</div><div class="m-val" style="color:#e07b00">${holidayCount}</div></div>
-      <div class="metric"><div class="m-lbl">ABSENT</div><div class="m-val" style="color:var(--red)">${absent}</div></div>
+      <div class="metric"></div>
+    </div>
+    <div class="grid4" style="margin-top:10px;margin-bottom:0">
+      <div class="metric"><div class="m-lbl">LATE</div><div class="m-val" style="color:var(--amber)">${late}</div></div>
+      <div class="metric"><div class="m-lbl">ATTENDANCE %</div><div class="m-val" style="color:${pct>=85?'var(--green)':'var(--amber)'}">${pct}%</div></div>
+      <div class="metric"></div>
+      <div class="metric"></div>
     </div>
     <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>`;
 
