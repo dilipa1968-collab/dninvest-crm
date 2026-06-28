@@ -2065,6 +2065,7 @@ function renderAttendancePage(){
   const late=myRecs.filter(r=>r.status==='Late').length;
   const holidayRecs=myRecs.filter(r=>r.status==='Holiday');
   const holidayCount=holidayRecs.length;
+  const absent=myRecs.filter(r=>r.status==='Absent').length;
 
   // Month info
   const nowD=new Date();
@@ -2095,7 +2096,7 @@ function renderAttendancePage(){
       <div class="metric"><div class="m-lbl">HOLIDAYS</div><div class="m-val" style="color:#e07b00">${declaredHols}</div></div>
       <div class="metric"><div class="m-lbl">SUNDAYS</div><div class="m-val" style="color:#6366f1">${sundayCount}</div></div>
       <div class="metric"><div class="m-lbl">HOL MARKED</div><div class="m-val" style="color:#e07b00">${holidayCount}</div></div>
-      <div class="metric"></div>
+      <div class="metric"><div class="m-lbl">ABSENT</div><div class="m-val" style="color:var(--red)">${absent}</div></div>
     </div>
     <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>`;
 
