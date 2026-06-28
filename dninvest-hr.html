@@ -1824,8 +1824,9 @@ async function runLateAbsentCheckHr(){
     const istHour=getISTHour();
     const now=new Date();
     const dow=now.getDay(); // local browser day is fine here, matches CRM's IST-based check closely enough since this only matters during 10AM-7PM IST window
-    if(dow===0||dow===6) return; // Sunday & Saturday — skip
-    if(istHour<10) return;
+    if(dow===0) return; // Sunday — skip
+    const absentCutoffHr = (dow===6) ? 10.75 : 10; // Saturday=10:45 AM, Mon-Fri=10:00 AM
+    if(istHour < absentCutoffHr) return;
 
     const td=today();
     if(isHoliday(td)) return; // Sunday or declared holiday — skip entirely
