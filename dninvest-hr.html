@@ -2063,15 +2063,39 @@ function renderAttendancePage(){
   // Summary
   const present=myRecs.filter(r=>r.status==='Present').length;
   const late=myRecs.filter(r=>r.status==='Late').length;
-  const total=26; // working days this month
-  const pct=Math.round((present/total)*100);
+  const holidayRecs=myRecs.filter(r=>r.status==='Holiday');
+  const holidayCount=holidayRecs.length;
+
+  // Count Sundays in current month (from 1st to today or month-end)
+  const nowD=new Date();
+  const yr=nowD.getFullYear(), mo=nowD.getMonth();
+  const lastDay=new Date(yr, mo+1, 0).getDate();
+  const countUpTo=Math.min(nowD.getDate(), lastDay);
+  let sundayCount=0;
+  for(let d=1;d<=countUpTo;d++){
+    if(new Date(yr,mo,d).getDay()===0) sundayCount++;
+  }
+
+  // Working days = total days so far − sundays − holidays (from holidays list, not attendance)
+  const declaredHols=getHolidays().filter(h=>{
+    const hyr=parseInt(h.date.slice(0,4)), hmo=parseInt(h.date.slice(5,7))-1, hd=parseInt(h.date.slice(8,10));
+    return hyr===yr && hmo===mo && hd<=countUpTo && new Date(yr,mo,hd).getDay()!==0;
+  }).length;
+  const total=countUpTo - sundayCount - declaredHols;
+  const pct=total>0?Math.round((present/total)*100):0;
   const ms=document.getElementById('my-att-summary');
   if(ms) ms.innerHTML=`
     <div class="grid4" style="margin-bottom:0">
-      <div class="metric"><div class="m-lbl">Present</div><div class="m-val" style="color:var(--green)">${present}</div></div>
-      <div class="metric"><div class="m-lbl">Late</div><div class="m-val" style="color:var(--amber)">${late}</div></div>
-      <div class="metric"><div class="m-lbl">Working days</div><div class="m-val">${total}</div></div>
-      <div class="metric"><div class="m-lbl">Attendance %</div><div class="m-val" style="color:${pct>=85?'var(--green)':'var(--amber)'}">${pct}%</div></div>
+      <div class="metric"><div class="m-lbl">PRESENT</div><div class="m-val" style="color:var(--green)">${present}</div></div>
+      <div class="metric"><div class="m-lbl">LATE</div><div class="m-val" style="color:var(--amber)">${late}</div></div>
+      <div class="metric"><div class="m-lbl">WORKING DAYS</div><div class="m-val">${total}</div></div>
+      <div class="metric"><div class="m-lbl">ATTENDANCE %</div><div class="m-val" style="color:${pct>=85?'var(--green)':'var(--amber)'}">${pct}%</div></div>
+    </div>
+    <div class="grid4" style="margin-top:10px;margin-bottom:0">
+      <div class="metric"><div class="m-lbl">HOLIDAYS</div><div class="m-val" style="color:#e07b00">${declaredHols}</div></div>
+      <div class="metric"><div class="m-lbl">SUNDAYS</div><div class="m-val" style="color:#6366f1">${sundayCount}</div></div>
+      <div class="metric"><div class="m-lbl">HOL MARKED</div><div class="m-val" style="color:#e07b00">${holidayCount}</div></div>
+      <div class="metric"></div>
     </div>
     <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:${pct}%"></div></div>`;
 
