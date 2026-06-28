@@ -2066,22 +2066,22 @@ function renderAttendancePage(){
   const holidayRecs=myRecs.filter(r=>r.status==='Holiday');
   const holidayCount=holidayRecs.length;
 
-  // Count Sundays in current month (from 1st to today or month-end)
+  // Month info
   const nowD=new Date();
   const yr=nowD.getFullYear(), mo=nowD.getMonth();
   const lastDay=new Date(yr, mo+1, 0).getDate();
-  const countUpTo=Math.min(nowD.getDate(), lastDay);
+  // Count Sundays in full month
   let sundayCount=0;
-  for(let d=1;d<=countUpTo;d++){
+  for(let d=1;d<=lastDay;d++){
     if(new Date(yr,mo,d).getDay()===0) sundayCount++;
   }
-
-  // Working days = total days so far − sundays − holidays (from holidays list, not attendance)
+  // Declared holidays (non-Sunday) in full month
   const declaredHols=getHolidays().filter(h=>{
     const hyr=parseInt(h.date.slice(0,4)), hmo=parseInt(h.date.slice(5,7))-1, hd=parseInt(h.date.slice(8,10));
-    return hyr===yr && hmo===mo && hd<=countUpTo && new Date(yr,mo,hd).getDay()!==0;
+    return hyr===yr && hmo===mo && new Date(yr,mo,hd).getDay()!==0;
   }).length;
-  const total=countUpTo - sundayCount - declaredHols;
+  // Working days = full month days − Sundays − declared holidays
+  const total=lastDay - sundayCount - declaredHols;
   const pct=total>0?Math.round((present/total)*100):0;
   const ms=document.getElementById('my-att-summary');
   if(ms) ms.innerHTML=`
