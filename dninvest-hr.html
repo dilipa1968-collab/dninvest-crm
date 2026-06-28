@@ -1164,6 +1164,12 @@ function getISTHour(){
   const ist = new Date(utc + 5.5*3600000);
   return ist.getHours() + ist.getMinutes()/60;
 }
+function getISTDayOfWeek(){
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset()*60000;
+  const ist = new Date(utc + 5.5*3600000);
+  return ist.getDay();
+}
 function officeWindowStatus(crmUser){
   const access=getAccessControl();
   if(access.hrEnabled===false){
@@ -1179,7 +1185,7 @@ function officeWindowStatus(crmUser){
     return {open:true};
   }
   const istHour=getISTHour();
-  const dow=new Date().getDay(); // 0=Sun,6=Sat
+  const dow=getISTDayOfWeek(); // IST-aware — avoids UTC midnight bug
   if(dow===0){
     return {open:false, reason:'Sunday — office is closed'};
   }
@@ -1823,7 +1829,7 @@ async function runLateAbsentCheckHr(){
     if(typeof fdb==='undefined') return;
     const istHour=getISTHour();
     const now=new Date();
-    const dow=now.getDay(); // local browser day is fine here, matches CRM's IST-based check closely enough since this only matters during 10AM-7PM IST window
+    const dow=getISTDayOfWeek(); // IST-aware day of week
     if(dow===0) return; // Sunday — skip
     const absentCutoffHr = (dow===6) ? 10.75 : 10; // Saturday=10:45 AM, Mon-Fri=10:00 AM
     if(istHour < absentCutoffHr) return;
