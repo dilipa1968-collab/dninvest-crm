@@ -343,8 +343,6 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .b-na{background:var(--bg);color:var(--gray);}
 .b-eq{background:var(--gold3);color:var(--orange);}
 .b-mf{background:var(--teal2);color:var(--teal);}
-.b-lead{background:#ede9fe;color:#5b21b6;}
-.b-op{background:#dcfce7;color:#166534;}
 
 /* ── FORMS / MODAL ── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;
@@ -3034,10 +3032,6 @@ function refreshDash(){
   const totalSIP=mf.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0);
   const pendEq=activeEq.filter(c=>c.next_call&&c.next_call<=today()).length;
   const pendMf=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
-  const leads=getMyLeads();
-  const op=getMyOpEntries();
-  const pendLeads=leads.filter(c=>c.next_call&&c.next_call<=today()).length;
-  const pendOp=op.filter(c=>c.next_call&&c.next_call<=today()).length;
 
   let statsHtml='';
   if(hasEq){
@@ -3050,7 +3044,7 @@ function refreshDash(){
     statsHtml+=sc('₹'+fmtNum(totalSIP),'Monthly SIP','purple','mf');
   }
   if(hasEq||hasMf){
-    statsHtml+=sc(pendEq+pendMf+pendLeads+pendOp,'Follow-ups Due','red','');
+    statsHtml+=sc(pendEq+pendMf,'Follow-ups Due','red','');
   }
   document.getElementById('dashStats').innerHTML=statsHtml;
 
@@ -3119,22 +3113,17 @@ function refreshDash(){
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
 
-  // Today's follow-ups (Equity + MF + Leads + Other Products)
-  const leads = getMyLeads();
-  const op    = getMyOpEntries();
+  // Today's follow-ups
   const allClients=[
-    ...eq.filter(c=>c.next_call===today()).map(c=>({name:c.name,rm:c.rm,seg:'Equity'})),
-    ...mf.filter(c=>c.next_call===today()).map(c=>({name:c.name,rm:c.rm,seg:'MF'})),
-    ...leads.filter(c=>c.next_call===today()).map(c=>({name:c.name,rm:c.rm,seg:'Lead'})),
-    ...op.filter(c=>c.next_call===today()).map(c=>({name:c.client_name||c.name,rm:c.rm,seg:c.product_type||'Other'}))
+    ...eq.filter(c=>c.next_call===today()).map(c=>({...c,seg:'Equity'})),
+    ...mf.filter(c=>c.next_call===today()).map(c=>({...c,seg:'MF'}))
   ];
-  const segBadgeClass = seg => seg==='Equity'?'b-eq':seg==='MF'?'b-mf':seg==='Lead'?'b-lead':'b-op';
   document.getElementById('todayFollowup').innerHTML = allClients.length
     ? allClients.map(c=>`
         <div class="bar-row">
-          <span class="bar-name">${escapeHtml(c.name||'—')}</span>
-          <span class="badge ${segBadgeClass(c.seg)}" style="margin:0 8px">${c.seg}</span>
-          <span style="font-size:.75rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
+          <span class="bar-name">${c.name}</span>
+          <span class="badge ${c.seg==='Equity'?'b-eq':'b-mf'}" style="margin:0 8px">${c.seg}</span>
+          <span style="font-size:.75rem;color:var(--gray)">${c.rm}</span>
         </div>`).join('')
     : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No follow-ups scheduled for today</p>';
 
