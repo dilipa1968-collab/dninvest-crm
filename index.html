@@ -1800,6 +1800,20 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   </div>
 </div>
 
+<!-- Followup Alert Popup (login ke baad RM ko dikhta hai) -->
+<div class="modal-overlay" id="followupAlertPopup">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hdr" style="background:var(--navy)">
+      <h3 style="color:#fff">📋 Pending Follow-ups</h3>
+    </div>
+    <div class="modal-body" id="followupAlertBody" style="padding:0;max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <span id="followupAlertCount" style="font-size:.82rem;color:var(--gray)"></span>
+      <button class="btn btn-primary" onclick="closeFollowupAlert()">OK, Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- Report View -->
 <div class="modal-overlay" id="reportModal" onclick="if(event.target===this)closeModal('reportModal')">
   <div class="modal wide">
@@ -2619,6 +2633,7 @@ function initApp(){
       if(getCurrentPageId()==='eq-clients') renderEqTable();
       if(getCurrentPageId()==='mf-clients') renderMfTable();
       checkAnnouncement();
+      checkFollowupAlert();
       updateMsgBadge();
       checkRmReply();
       refreshHolidaySet().then(runAutoSchedule); // Load holidays, then run auto-schedule on load
@@ -2739,9 +2754,9 @@ function initApp(){
           }
         });
       });
-    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); updateMsgBadge(); checkRmReply(); });
+    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); checkFollowupAlert(); updateMsgBadge(); checkRmReply(); });
   } else {
-    DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement();
+    DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); checkFollowupAlert();
   }
 
   const segs = CU.segments||[];
@@ -7791,6 +7806,65 @@ function closeAnnouncementPopup(){
   if(id && CU){ localStorage.setItem('dninvest_ann_seen_' + CU.username, id); }
   el.classList.remove('open');
 }
+
+// ── Followup Alert Popup ────────────────────────────────────────────────────
+function checkFollowupAlert(){
+  // Only for non-admin RMs
+  if(!CU || CU.role==='admin') return;
+
+  const tdStr = today();
+  const eq    = getActiveEqClients();
+  const mf    = getMyMfClients();
+  const leads = getMyLeads();
+  const op    = getMyOpEntries();
+
+  // Collect today + overdue entries
+  const items = [
+    ...eq.filter(c=>c.next_call && c.next_call<=tdStr)
+        .map(c=>({name:c.name, next_call:c.next_call, seg:'EQ'})),
+    ...mf.filter(c=>c.next_call && c.next_call<=tdStr)
+        .map(c=>({name:c.name, next_call:c.next_call, seg:'MF'})),
+    ...leads.filter(c=>c.next_call && c.next_call<=tdStr)
+        .map(c=>({name:c.name, next_call:c.next_call, seg:'Lead'})),
+    ...op.filter(c=>c.next_call && c.next_call<=tdStr)
+        .map(c=>({name:c.client_name||c.name, next_call:c.next_call, seg:c.product_type||'Other'}))
+  ].sort((a,b)=>a.next_call.localeCompare(b.next_call));
+
+  if(!items.length) return;
+
+  // Build popup rows
+  const rows = items.map(c=>{
+    const isOverdue = c.next_call < tdStr;
+    const segColor = c.seg==='EQ'?'#b45309': c.seg==='MF'?'#0e7490': c.seg==='Lead'?'#5b21b6':'#166534';
+    const segBg    = c.seg==='EQ'?'#fef3c7': c.seg==='MF'?'#e0f2fe': c.seg==='Lead'?'#ede9fe':'#dcfce7';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;
+        padding:9px 14px;border-bottom:1px solid #f1f5f9">
+      <span style="font-size:.87rem;font-weight:500">${escapeHtml(c.name)}</span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:.72rem;background:${segBg};color:${segColor};
+            border-radius:4px;padding:1px 7px;font-weight:600">${escapeHtml(c.seg)}</span>
+        <span style="font-size:.72rem;color:${isOverdue?'#dc2626':'#374151'}">
+          ${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
+      </span>
+    </div>`;
+  }).join('');
+
+  const todayCnt   = items.filter(c=>c.next_call===tdStr).length;
+  const overdueCnt = items.filter(c=>c.next_call<tdStr).length;
+  let summary='';
+  if(overdueCnt) summary+=`<span style="color:#dc2626;font-weight:600">${overdueCnt} overdue</span>`;
+  if(overdueCnt && todayCnt) summary+=' &nbsp;·&nbsp; ';
+  if(todayCnt) summary+=`<span style="color:#059669;font-weight:600">${todayCnt} today</span>`;
+
+  document.getElementById('followupAlertBody').innerHTML = rows;
+  document.getElementById('followupAlertCount').innerHTML = summary;
+  document.getElementById('followupAlertPopup').classList.add('open');
+}
+
+function closeFollowupAlert(){
+  document.getElementById('followupAlertPopup').classList.remove('open');
+}
+// ───────────────────────────────────────────────────────────────────────────
 
 // ══════════════════════════════════════════
 // TWO-WAY RM <-> ADMIN MESSAGING
