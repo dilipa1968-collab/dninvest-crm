@@ -2350,6 +2350,8 @@ function renderDateWiseSheet(){
 
   // Body: one row per date
   const body = document.getElementById('att-date-body');
+  const holidaySet=new Set(getHolidays().map(h=>h.date));
+  const holidayNameMap={}; getHolidays().forEach(h=>holidayNameMap[h.date]=h.name);
   let rows = '';
   for(let d=1; d<=numDays; d++){
     const dateStr = ym+'-'+String(d).padStart(2,'0');
@@ -2357,13 +2359,22 @@ function renderDateWiseSheet(){
     const dow = dt.getDay();
     const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow];
     const isSun = dow===0;
-    const rowBg = isSun ? 'background:var(--red-bg)' : '';
+    const isHol = !isSun && holidaySet.has(dateStr);
+    const rowBg = isSun ? 'background:var(--red-bg)' : isHol ? 'background:#fff8e1' : '';
     let row = `<tr style="${rowBg}">`;
-    row += `<td style="position:sticky;left:0;background:${isSun?'var(--red-bg)':'var(--surface)'};font-weight:500;white-space:nowrap">${String(d).padStart(2,'0')} ${dayName}</td>`;
+    const dateBg = isSun ? 'var(--red-bg)' : isHol ? '#fff8e1' : 'var(--surface)';
+    const holName = isHol ? (holidayNameMap[dateStr]||'Holiday') : '';
+    row += `<td style="position:sticky;left:0;background:${dateBg};font-weight:500;white-space:nowrap">${String(d).padStart(2,'0')} ${dayName}${isHol?'<br><span style=\"font-size:9px;color:#b07d00;font-weight:400\">'+holName+'</span>':''}</td>`;
     emps.forEach(e=>{
       const recs = att[e.name]||[];
       const r = recs.find(x=>x.date===dateStr);
-      if(r){
+      if(isSun){
+        // Sunday — show Off for all
+        row += `<td style="text-align:center;background:var(--red-bg)"><span class="badge badge-gray" style="padding:1px 5px;display:block;margin-bottom:2px">Off</span><span style="font-size:10px;color:var(--text3)">Sunday</span></td>`;
+      } else if(isHol && (!r || r.status==='Holiday')){
+        // Holiday — show Holiday badge
+        row += `<td style="text-align:center;background:#fff8e1"><span class="badge badge-gray" style="padding:1px 5px;display:block;margin-bottom:2px">H</span><span style="font-size:10px;color:#b07d00">${holName}</span></td>`;
+      } else if(r){
         const badge = r.status==='Present'?presentBadgeClass(r):(ATT_STATUS_BADGE[r.status]||'badge-gray');
         const short = ATT_STATUS_SHORT[r.status]||r.status[0];
         const inT = r.in||'—';
@@ -2373,8 +2384,6 @@ function renderDateWiseSheet(){
           <span style="font-size:10px;color:var(--text2);display:block">${inT}</span>
           <span style="font-size:10px;color:var(--text3);display:block">${outT}</span>
         </td>`;
-      } else if(isSun){
-        row += `<td style="text-align:center;color:var(--text3);font-size:11px">Off</td>`;
       } else {
         row += `<td style="text-align:center;color:var(--text3)">·</td>`;
       }
@@ -2414,6 +2423,8 @@ function downloadAttendanceSheet(){
   const att=getAtt();
   const numDays=attDaysInMonth(ym);
   const emps = empFilter ? EMPLOYEES.filter(e=>e.name===empFilter) : EMPLOYEES;
+  const holSet=new Set(getHolidays().map(h=>h.date));
+  const holNameMap={}; getHolidays().forEach(h=>holNameMap[h.date]=h.name);
 
   // Pretty month label e.g. "June 2026"
   const [yStr,mStr]=ym.split('-');
@@ -2422,101 +2433,116 @@ function downloadAttendanceSheet(){
 
   const thin={style:'thin', color:{rgb:'FFD0D0D0'}};
   const border={top:thin,bottom:thin,left:thin,right:thin};
-  const SUM_COLS=['P','L','H','A','Ho']; // summary headers
 
-  // ── Build the 2D cell grid with styles ──
+  // ── Date-as-rows format ──
+  // Columns: Date | RM1 (Status / In / Out) | RM2 ... | RMn
+  // Each RM = 3 sub-columns: Status, In, Out
   const rows=[];
+  const numEmps=emps.length;
+  const totalCols = 1 + numEmps*3;
 
-  // Row 0: Title (merged)
+  // Row 0: Title
   rows.push([{ v:'DN Investment — Attendance  ·  '+monthLabel, s:{
-    font:{bold:true, sz:14, color:{rgb:'FFFFFFFF'}},
+    font:{bold:true, sz:13, color:{rgb:'FFFFFFFF'}},
     fill:{fgColor:{rgb:'FF1F3864'}},
     alignment:{horizontal:'left', vertical:'center'}
   }}]);
 
-  // Row 1: Header
+  // Row 1: RM name headers (merged across 3 cols each)
   const headStyle={
     font:{bold:true, color:{rgb:'FFFFFFFF'}},
     fill:{fgColor:{rgb:'FF2E5A87'}},
     alignment:{horizontal:'center', vertical:'center'},
     border
   };
-  const head=[{v:'Employee', s:{...headStyle, alignment:{horizontal:'left',vertical:'center'}}}];
-  for(let d=1; d<=numDays; d++){
-    const dow=new Date(parseInt(yStr), parseInt(mStr)-1, d).getDay();
-    const isWeekend = dow===0; // Sunday shaded slightly different
-    head.push({v:d, s:{...headStyle, fill:{fgColor:{rgb: isWeekend?'FF8A6D3B':'FF2E5A87'}}}});
-  }
-  SUM_COLS.forEach(h=> head.push({v:h, s:{...headStyle, fill:{fgColor:{rgb:'FF444444'}}}}));
-  rows.push(head);
-
-  // Data rows
+  const head1=[{v:'Date', s:{...headStyle, alignment:{horizontal:'left',vertical:'center'}}}];
   emps.forEach(e=>{
-    const recs=att[e.name]||[];
-    const byDate={};
-    recs.forEach(r=>{ byDate[r.date]=r; });
+    head1.push({v:e.name, s:headStyle});
+    head1.push({v:'', s:headStyle});
+    head1.push({v:'', s:headStyle});
+  });
+  rows.push(head1);
 
-    const nameStyle={
-      font:{bold:true, color:{rgb:'FF1F3864'}},
-      fill:{fgColor:{rgb:'FFF2F4F7'}},
+  // Row 2: Sub-headers: Status | In | Out per RM
+  const subStyle={
+    font:{bold:true, sz:9, color:{rgb:'FFFFFFFF'}},
+    fill:{fgColor:{rgb:'FF3A6EA8'}},
+    alignment:{horizontal:'center', vertical:'center'},
+    border
+  };
+  const head2=[{v:'', s:subStyle}];
+  emps.forEach(()=>{
+    head2.push({v:'Status', s:subStyle});
+    head2.push({v:'In', s:subStyle});
+    head2.push({v:'Out', s:subStyle});
+  });
+  rows.push(head2);
+
+  // Data rows — one per date
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const merges=[
+    {s:{r:0,c:0}, e:{r:0,c:totalCols-1}}, // title merge
+  ];
+  // RM name merges across 3 cols each
+  emps.forEach((e,i)=>{
+    const c=1+i*3;
+    merges.push({s:{r:1,c}, e:{r:1,c:c+2}});
+  });
+
+  for(let d=1; d<=numDays; d++){
+    const dateStr=ym+'-'+String(d).padStart(2,'0');
+    const dt=new Date(parseInt(yStr), parseInt(mStr)-1, d);
+    const dow=dt.getDay();
+    const isSun=dow===0;
+    const isHol=!isSun && holSet.has(dateStr);
+    const holName=isHol?(holNameMap[dateStr]||'Holiday'):'';
+    const dateBg=isSun?'FFFCE4EC':isHol?'FFFFF8E1':'FFF2F4F7';
+    const dateLabel=String(d).padStart(2,'0')+' '+dayNames[dow]+(isHol?' ('+holName+')':''  );
+    const dateStyle={
+      font:{bold:true, sz:10, color:{rgb: isSun?'FF9C0006':isHol?'FF8A6D00':'FF1F3864'}},
+      fill:{fgColor:{rgb:dateBg}},
       alignment:{horizontal:'left', vertical:'center'},
       border
     };
-    const row=[{v:e.name, s:nameStyle}];
-    const tally={P:0,L:0,H:0,A:0,Ho:0};
+    const row=[{v:dateLabel, s:dateStyle}];
 
-    for(let d=1; d<=numDays; d++){
-      const dateStr=ym+'-'+String(d).padStart(2,'0');
-      const r=byDate[dateStr];
-      const short = r ? (ATT_STATUS_SHORT[r.status]||r.status[0]) : '';
-      // tally
-      if(r){
-        if(r.status==='Present') tally.P++;
-        else if(r.status==='Late') tally.L++;
-        else if(r.status==='Half day') tally.H++;
-        else if(r.status==='Absent') tally.A++;
-        else if(r.status==='Holiday') tally.Ho++;
+    emps.forEach(e=>{
+      const recs=att[e.name]||[];
+      const r=recs.find(x=>x.date===dateStr);
+      if(isSun){
+        const offStyle={font:{bold:true,color:{rgb:'FF9C0006'}},fill:{fgColor:{rgb:'FFFCE4EC'}},alignment:{horizontal:'center',vertical:'center'},border};
+        row.push({v:'Off',s:offStyle},{v:'',s:offStyle},{v:'',s:offStyle});
+      } else if(isHol && (!r||r.status==='Holiday')){
+        const holStyle={font:{bold:true,color:{rgb:'FF808080'}},fill:{fgColor:{rgb:'FFE7E7E7'}},alignment:{horizontal:'center',vertical:'center'},border};
+        row.push({v:'H',s:holStyle},{v:'',s:holStyle},{v:'',s:holStyle});
+      } else if(r){
+        const col=attExcelColors(r);
+        const sStyle={font:{bold:true,color:{rgb:col?col.font:'FF333333'}},fill:{fgColor:{rgb:col?col.bg:'FFFFFFFF'}},alignment:{horizontal:'center',vertical:'center'},border};
+        const tStyle={font:{sz:9,color:{rgb:'FF444444'}},fill:{fgColor:{rgb:col?col.bg:'FFFFFFFF'}},alignment:{horizontal:'center',vertical:'center'},border};
+        const short=ATT_STATUS_SHORT[r.status]||r.status[0];
+        row.push({v:short,s:sStyle},{v:r.in||'—',s:tStyle},{v:r.out||'—',s:tStyle});
+      } else {
+        const blankStyle={font:{color:{rgb:'FFBBBBBB'}},fill:{fgColor:{rgb:'FFFFFFFF'}},alignment:{horizontal:'center',vertical:'center'},border};
+        row.push({v:'·',s:blankStyle},{v:'',s:blankStyle},{v:'',s:blankStyle});
       }
-      const col=attExcelColors(r);
-      const cellStyle={
-        alignment:{horizontal:'center', vertical:'center'},
-        border,
-        font:{bold:true, color:{rgb: col?col.font:'FF333333'}},
-        fill:{fgColor:{rgb: col?col.bg:'FFFFFFFF'}}
-      };
-      row.push({v: short==='—'?'H':short, s:cellStyle});
-    }
-
-    // Summary cells
-    const sumVals=[tally.P,tally.L,tally.H,tally.A,tally.Ho];
-    sumVals.forEach(v=> row.push({v, s:{
-      font:{bold:true, color:{rgb:'FF222222'}},
-      fill:{fgColor:{rgb:'FFEFEFEF'}},
-      alignment:{horizontal:'center', vertical:'center'},
-      border
-    }}));
+    });
     rows.push(row);
-  });
+  }
 
   // ── Build worksheet ──
   const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!merges']=merges;
 
-  // Column widths: Employee wide, day cols narrow, summary small
+  // Column widths: Date wide, then Status(5)/In(7)/Out(7) per RM
   const cols=[{wch:18}];
-  for(let d=0; d<numDays; d++) cols.push({wch:4});
-  SUM_COLS.forEach(()=> cols.push({wch:5}));
+  emps.forEach(()=>{ cols.push({wch:6},{wch:7},{wch:7}); });
   ws['!cols']=cols;
 
   // Row heights
-  ws['!rows']=[{hpt:26},{hpt:20}].concat(emps.map(()=>({hpt:20})));
+  ws['!rows']=[{hpt:24},{hpt:18},{hpt:15}].concat(Array(numDays).fill({hpt:18}));
 
-  // Merge title across all columns
-  const lastCol=numDays+SUM_COLS.length; // 0-based last column index
-  ws['!merges']=[{s:{r:0,c:0}, e:{r:0,c:lastCol}}];
-
-  // Freeze top 2 rows + first column
-  ws['!freeze']={xSplit:1, ySplit:2, topLeftCell:'B3', activePane:'bottomRight', state:'frozen'};
-  ws['!autofilter']={ref: XLSX.utils.encode_range({s:{r:1,c:0}, e:{r:1,c:lastCol}})};
+  // Freeze top 3 rows + first column
+  ws['!freeze']={xSplit:1, ySplit:3, topLeftCell:'B4', activePane:'bottomRight', state:'frozen'};
 
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, monthLabel.replace(' ','_').slice(0,31));
