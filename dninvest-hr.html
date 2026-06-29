@@ -869,6 +869,20 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             </div>
           </div>
         </div>
+        <div class="card admin-only" style="display:none;grid-column:1/-1">
+          <div class="card-title">Date-wise attendance — all RMs</div>
+          <div class="form-row">
+            <div class="field-inline"><label>Month</label>
+              <select id="att-date-month" onchange="renderDateWiseSheet()"></select>
+            </div>
+          </div>
+          <div class="tbl-wrap" style="max-height:520px;overflow:auto">
+            <table id="att-date-table" style="font-size:11.5px;min-width:900px">
+              <thead><tr id="att-date-head"></tr></thead>
+              <tbody id="att-date-body"></tbody>
+            </table>
+          </div>
+        </div>
         <div class="card">
           <div class="card-title">Salary report</div>
           <div class="form-row single">
@@ -2317,6 +2331,75 @@ function renderAttendanceSheet(){
   }).join('');
 }
 
+// ── Date-wise sheet: Rows=Date, Columns=Each RM ──────────────────────────────
+function renderDateWiseSheet(){
+  if(!isAdmin) return;
+
+  // Populate month dropdown if empty
+  const monthSel = document.getElementById('att-date-month');
+  if(!monthSel) return;
+  if(!monthSel.options.length){
+    attMonthOptions().forEach(ym=>{
+      const [y,m]=ym.split('-');
+      const lbl=new Date(+y,+m-1,1).toLocaleString('en-IN',{month:'long',year:'numeric'});
+      const opt=document.createElement('option');
+      opt.value=ym; opt.textContent=lbl;
+      monthSel.appendChild(opt);
+    });
+  }
+
+  const ym = monthSel.value || attMonthOptions()[0];
+  if(!ym) return;
+  const [y,m] = ym.split('-').map(Number);
+  const numDays = attDaysInMonth(ym);
+  const att = getAtt();
+  const emps = EMPLOYEES;
+
+  // Header: Date | RM1 | RM2 | ...
+  const head = document.getElementById('att-date-head');
+  let headHtml = '<th style="position:sticky;left:0;background:var(--surface);min-width:80px">Date</th>';
+  emps.forEach(e=>{
+    headHtml += `<th style="text-align:center;min-width:90px;font-weight:500">${e.name}</th>`;
+  });
+  head.innerHTML = headHtml;
+
+  // Body: one row per date
+  const body = document.getElementById('att-date-body');
+  let rows = '';
+  for(let d=1; d<=numDays; d++){
+    const dateStr = ym+'-'+String(d).padStart(2,'0');
+    const dt = new Date(y, m-1, d);
+    const dow = dt.getDay();
+    const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow];
+    const isSun = dow===0;
+    const rowBg = isSun ? 'background:var(--red-bg)' : '';
+    let row = `<tr style="${rowBg}">`;
+    row += `<td style="position:sticky;left:0;background:${isSun?'var(--red-bg)':'var(--surface)'};font-weight:500;white-space:nowrap">${String(d).padStart(2,'0')} ${dayName}</td>`;
+    emps.forEach(e=>{
+      const recs = att[e.name]||[];
+      const r = recs.find(x=>x.date===dateStr);
+      if(r){
+        const badge = r.status==='Present'?presentBadgeClass(r):(ATT_STATUS_BADGE[r.status]||'badge-gray');
+        const short = ATT_STATUS_SHORT[r.status]||r.status[0];
+        const inT = r.in||'—';
+        const outT = r.out||'—';
+        row += `<td style="text-align:center;padding:3px 4px">
+          <span class="badge ${badge}" style="padding:1px 5px;display:block;margin-bottom:2px">${short}</span>
+          <span style="font-size:10px;color:var(--text2);display:block">${inT}</span>
+          <span style="font-size:10px;color:var(--text3);display:block">${outT}</span>
+        </td>`;
+      } else if(isSun){
+        row += `<td style="text-align:center;color:var(--text3);font-size:11px">Off</td>`;
+      } else {
+        row += `<td style="text-align:center;color:var(--text3)">·</td>`;
+      }
+    });
+    row += '</tr>';
+    rows += row;
+  }
+  body.innerHTML = rows;
+}
+
 // Maps an attendance cell to a {bg, font} fill colour (ARGB) for the Excel export.
 // Mirrors the on-screen badge colours, including the in-time based Present shades
 // (early=green, just-late=blue, late=amber) via presentBadgeClass().
@@ -2477,6 +2560,7 @@ async function clearAttendanceWhere(predicate){
   }catch(e){ console.log('clearAttendanceWhere sync error:', e); }
 
   renderAttendanceSheet();
+  renderDateWiseSheet();
   renderAttendancePage();
   return true;
 }
@@ -4065,7 +4149,7 @@ function showPage(id,btn){
   if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
-  if(id==='reports') renderAttendanceSheet();
+  if(id==='reports'){ renderAttendanceSheet(); renderDateWiseSheet(); }
 }
 
 /* ── Generic click-to-sort for every data table (any <table> with a <thead>) ──
