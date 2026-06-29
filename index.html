@@ -342,6 +342,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .b-done{background:#d1fae5;color:#065f46;}
 .b-na{background:var(--bg);color:var(--gray);}
 .b-eq{background:var(--gold3);color:var(--orange);}
+.b-lead{background:#ede9fe;color:#5b21b6;}
+.b-op{background:#dcfce7;color:#166534;}
 .b-mf{background:var(--teal2);color:var(--teal);}
 
 /* ── FORMS / MODAL ── */
@@ -759,7 +761,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
-          <div class="dash-card"><h3>📞 Today's Follow-ups</h3><div id="todayFollowup"></div></div>
+          <div class="dash-card"><h3>📞 Follow-ups — Today &amp; Overdue</h3><div id="todayFollowup"></div></div>
 
           <div class="dash-card collapsible admin-only" id="mfAuditCard" style="display:none">
             <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
@@ -3113,19 +3115,28 @@ function refreshDash(){
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
 
-  // Today's follow-ups
-  const allClients=[
-    ...eq.filter(c=>c.next_call===today()).map(c=>({...c,seg:'Equity'})),
-    ...mf.filter(c=>c.next_call===today()).map(c=>({...c,seg:'MF'}))
-  ];
-  document.getElementById('todayFollowup').innerHTML = allClients.length
-    ? allClients.map(c=>`
-        <div class="bar-row">
-          <span class="bar-name">${c.name}</span>
-          <span class="badge ${c.seg==='Equity'?'b-eq':'b-mf'}" style="margin:0 8px">${c.seg}</span>
-          <span style="font-size:.75rem;color:var(--gray)">${c.rm}</span>
-        </div>`).join('')
-    : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No follow-ups scheduled for today</p>';
+  // Follow-ups — Today + Overdue (Equity + MF + Leads + Other Products)
+  const leads = getMyLeads();
+  const op    = getMyOpEntries();
+  const tdStr = today();
+  const fuAll=[
+    ...eq.filter(c=>c.next_call&&c.next_call<=tdStr).map(c=>({name:c.name,rm:c.rm,next_call:c.next_call,seg:'EQ'})),
+    ...mf.filter(c=>c.next_call&&c.next_call<=tdStr).map(c=>({name:c.name,rm:c.rm,next_call:c.next_call,seg:'MF'})),
+    ...leads.filter(c=>c.next_call&&c.next_call<=tdStr).map(c=>({name:c.name,rm:c.rm,next_call:c.next_call,seg:'Lead'})),
+    ...op.filter(c=>c.next_call&&c.next_call<=tdStr).map(c=>({name:c.client_name||c.name,rm:c.rm,next_call:c.next_call,seg:c.product_type||'Other'}))
+  ].sort((a,b)=>a.next_call.localeCompare(b.next_call));
+  const segCls = s=>s==='EQ'?'b-eq':s==='MF'?'b-mf':s==='Lead'?'b-lead':'b-op';
+  document.getElementById('todayFollowup').innerHTML = fuAll.length
+    ? fuAll.map(c=>{
+        const isOverdue = c.next_call < tdStr;
+        return `<div class="bar-row">
+          <span class="bar-name">${escapeHtml(c.name||'—')}</span>
+          <span class="badge ${segCls(c.seg)}" style="margin:0 6px">${c.seg}</span>
+          <span style="font-size:.72rem;color:${isOverdue?'var(--red)':'var(--gray)'};margin-right:4px">${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
+          <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
+        </div>`;
+      }).join('')
+    : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No pending follow-ups</p>';
 
   // Redemption / SIP Stop audit (Admin side) — last entry date per MF RM,
   // sorted with the most overdue (or never-logged) RM at the top, so Admin
