@@ -1919,12 +1919,6 @@ runLateAbsentCheckHr();
 // auto-fill it. If RM logs out earlier, doLogout() already saves the actual time.
 async function autoOutTimeCheck(){
   try{
-    if(!currentUser || isAdmin) return;
-    const td=today();
-    const att=getAtt();
-    const rec=(att[currentUser]||[]).find(r=>r.date===td);
-    if(!rec || !(rec.status==='Present'||rec.status==='Late') || rec.out) return;
-
     const now=new Date();
     const utc=now.getTime()+now.getTimezoneOffset()*60000;
     const ist=new Date(utc+5.5*3600000);
@@ -1935,7 +1929,30 @@ async function autoOutTimeCheck(){
     if(dow>=1 && dow<=5){ cutoff=18; cutoffStr='18:00'; }      // Mon–Fri 6 PM
     else if(dow===6){ cutoff=14; cutoffStr='14:00'; }           // Saturday 2 PM
 
-    if(cutoff!==null && istH>=cutoff){
+    if(cutoff===null || istH<cutoff) return; // cutoff nahi aaya abhi
+
+    const td=today();
+    const att=getAtt();
+
+    if(isAdmin){
+      // Admin: sabka out time fill karo agar missing ho
+      const emps=Object.keys(att);
+      let changed=false;
+      for(const emp of emps){
+        const rec=(att[emp]||[]).find(r=>r.date===td);
+        if(rec && (rec.status==='Present'||rec.status==='Late') && !rec.out){
+          await saveAttRecord(emp, {...rec, out:cutoffStr});
+          changed=true;
+        }
+      }
+      if(changed){
+        if(typeof renderDashboard==='function') renderDashboard();
+      }
+    } else {
+      // RM: apna out time fill karo
+      if(!currentUser) return;
+      const rec=(att[currentUser]||[]).find(r=>r.date===td);
+      if(!rec || !(rec.status==='Present'||rec.status==='Late') || rec.out) return;
       await saveAttRecord(currentUser, {...rec, out:cutoffStr});
       if(typeof renderAttendancePage==='function') renderAttendancePage();
       if(typeof renderDashboard==='function') renderDashboard();
