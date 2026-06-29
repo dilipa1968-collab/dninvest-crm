@@ -1757,7 +1757,22 @@ function startApp(){
   }catch(e){ console.log('CRM sales listener setup error:',e); }
 }
 
-function doLogout(){
+async function doLogout(){
+  // Save out_time on manual logout
+  if(currentUser && !isAdmin){
+    try{
+      const td=today();
+      const att=getAtt();
+      const rec=(att[currentUser]||[]).find(r=>r.date===td);
+      if(rec && (rec.status==='Present'||rec.status==='Late') && !rec.out){
+        const now=new Date();
+        const utc=now.getTime()+now.getTimezoneOffset()*60000;
+        const ist=new Date(utc+5.5*3600000);
+        const outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
+        await saveAttRecord(currentUser, {...rec, out:outT});
+      }
+    }catch(e){}
+  }
   localStorage.removeItem(KEY_USER);
   currentUser=null;isAdmin=false;
   document.getElementById('app').style.display='none';
@@ -1887,6 +1902,37 @@ async function runLateAbsentCheckHr(){
 }
 setInterval(runLateAbsentCheckHr, 60000);
 runLateAbsentCheckHr();
+
+// ── Auto Out-Time: Mon–Fri 6 PM, Saturday 2 PM ──────────────────────────────
+// Every minute: if current IST time >= cutoff and today's record has no out_time,
+// auto-fill it. If RM logs out earlier, doLogout() already saves the actual time.
+async function autoOutTimeCheck(){
+  try{
+    if(!currentUser || isAdmin) return;
+    const td=today();
+    const att=getAtt();
+    const rec=(att[currentUser]||[]).find(r=>r.date===td);
+    if(!rec || !(rec.status==='Present'||rec.status==='Late') || rec.out) return;
+
+    const now=new Date();
+    const utc=now.getTime()+now.getTimezoneOffset()*60000;
+    const ist=new Date(utc+5.5*3600000);
+    const dow=ist.getDay(); // 0=Sun,6=Sat
+    const istH=ist.getHours()+ist.getMinutes()/60;
+
+    let cutoff=null, cutoffStr='';
+    if(dow>=1 && dow<=5){ cutoff=18; cutoffStr='18:00'; }      // Mon–Fri 6 PM
+    else if(dow===6){ cutoff=14; cutoffStr='14:00'; }           // Saturday 2 PM
+
+    if(cutoff!==null && istH>=cutoff){
+      await saveAttRecord(currentUser, {...rec, out:cutoffStr});
+      if(typeof renderAttendancePage==='function') renderAttendancePage();
+      if(typeof renderDashboard==='function') renderDashboard();
+    }
+  }catch(e){}
+}
+setInterval(autoOutTimeCheck, 60000);
+autoOutTimeCheck();
 
 
 // ─── CLOCK ──────────────────────────────────────────────────────────────────
