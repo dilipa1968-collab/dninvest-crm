@@ -3811,6 +3811,8 @@ async function saveLead(){
     last_call:gv2('l_last_call'), next_call:gv2('l_next_call'), followup_status:gv2('l_followup'), remarks:gv2('l_remarks'),
     created:currentEditLeadId?undefined:today(), updated:today()
   };
+  // Not Interested → RM list se hata do
+  if(rec.followup_status==='Not Interested') rec.rm='';
   if(currentEditLeadId){
     const idx=leads.findIndex(x=>x.id===currentEditLeadId);
     if(idx>=0){ const old=leads[idx]; rec.created=old.created||today(); }
@@ -11629,6 +11631,8 @@ async function saveOpEntry(){
     updated: today(),
     created: id ? (getOpEntries().find(x=>x.id===id)||{}).created||today() : today(),
   };
+  // Closed → RM list se hata do
+  if(entry.status==='Closed') entry.rm='';
 
   await saveOpToFirestore(entry);
   closeOpModal();
