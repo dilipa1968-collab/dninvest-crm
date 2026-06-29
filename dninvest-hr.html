@@ -1759,6 +1759,7 @@ function startApp(){
 
 async function doLogout(){
   // Save out_time on manual logout
+  // Rule: if logout before cutoff → save cutoff time; if after cutoff → save actual time
   if(currentUser && !isAdmin){
     try{
       const td=today();
@@ -1768,7 +1769,17 @@ async function doLogout(){
         const now=new Date();
         const utc=now.getTime()+now.getTimezoneOffset()*60000;
         const ist=new Date(utc+5.5*3600000);
-        const outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
+        const dow=ist.getDay();
+        const istH=ist.getHours()+ist.getMinutes()/60;
+        let cutoff=null, cutoffStr='';
+        if(dow>=1 && dow<=5){ cutoff=18; cutoffStr='18:00'; }   // Mon–Fri 6 PM
+        else if(dow===6){ cutoff=14; cutoffStr='14:00'; }        // Saturday 2 PM
+        let outT;
+        if(cutoff!==null && istH < cutoff){
+          outT=cutoffStr; // logout before cutoff → save cutoff
+        } else {
+          outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
+        }
         await saveAttRecord(currentUser, {...rec, out:outT});
       }
     }catch(e){}
