@@ -528,7 +528,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div id="sal-esi-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
           <div id="sal-extra-box" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px"></div>
           <div id="sal-result"></div>
-          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="alert('Salary slip generated! (Demo)')">Salary slip download</button>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="downloadSalarySlip()">📄 Salary slip — Download / Print PDF</button>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title">Team salary summary <span id="team-sal-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
@@ -3085,6 +3085,123 @@ function calcSalary(){
       ${esi.applicable?`<tr><td colspan="2" style="padding-top:6px;font-size:10.5px;color:var(--text3)">Employer ESI share (company cost, not deducted from salary): ${fmt(esi.employerContribution)}</td></tr>`:''}
     </table>`;
 }
+
+// ─── SALARY SLIP — Admin only, printable/PDF via browser print dialog ───────
+function downloadSalarySlip(){
+  if(!isAdmin){ return; }
+  const sel=document.getElementById('sal-emp');
+  const monthEl=document.getElementById('sal-month');
+  const name=sel?sel.value||'Puja':'Puja';
+  const month=monthEl&&monthEl.value?monthEl.value:today().slice(0,7);
+  const monthLabel=attMonthLabel(month);
+
+  const b=getEmpSalary(name);
+  const absentEl=document.getElementById('sal-absent');
+  const bonusEl=document.getElementById('sal-bonus');
+  const absentDays=absentEl?(parseInt(absentEl.value)||0):0;
+  const bonus=bonusEl?(parseInt(bonusEl.value)||0):0;
+  const perday=b/26;
+  const deduction=perday*absentDays;
+  const advDeducted=getAdvanceAdjustedForMonth(name,month);
+  const earnedWage=Math.max(0,b-deduction);
+  const esi=calcESI(name, b, earnedWage);
+  const extra=getExtraDeductionForMonth(name,month);
+  const net=Math.max(0, earnedWage-esi.employeeContribution+bonus-advDeducted-extra.amount);
+
+  // Attendance summary for the slip
+  const att=getAtt();
+  const recs=(att[name]||[]).filter(r=>r.date.startsWith(month));
+  const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
+  const numDays=attDaysInMonth(month);
+
+  const FIRM_NAME='D N Investment';
+  const FIRM_ADDR='2nd Floor, Bhadani Trade Centre, R Road, Bistupur, Jamshedpur — 831001';
+  const todayStr=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+
+  const rowsHtml=`
+    <tr><td>Basic Salary</td><td class="amt">${fmt(b)}</td></tr>
+    <tr><td>Per-day rate (Salary ÷ 26)</td><td class="amt">${fmt(perday)}</td></tr>
+    <tr><td>Present days</td><td class="amt">${presentDays} / ${numDays}</td></tr>
+    <tr><td>Absent days</td><td class="amt">${absentDays}</td></tr>
+    <tr><td>Deduction (Absent × per-day)</td><td class="amt neg">− ${fmt(deduction)}</td></tr>
+    ${esi.applicable?`<tr><td>ESI (Employee share @ ${esi.settings.employeeRate}%)</td><td class="amt neg">− ${fmt(esi.employeeContribution)}</td></tr>`:''}
+    ${extra.amount>0?`<tr><td>Extra deduction${extra.note?' — '+escapeHtmlSlip(extra.note):''}</td><td class="amt neg">− ${fmt(extra.amount)}</td></tr>`:''}
+    ${bonus>0?`<tr><td>Bonus / Incentive</td><td class="amt pos">+ ${fmt(bonus)}</td></tr>`:''}
+    ${advDeducted>0?`<tr><td>Advance adjusted</td><td class="amt neg">− ${fmt(advDeducted)}</td></tr>`:''}
+  `;
+
+  const html=`<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>Salary Slip — ${name} — ${monthLabel}</title>
+<style>
+  @page{ size:A4; margin:18mm 16mm; }
+  *{ box-sizing:border-box; }
+  body{ font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; margin:0; padding:0; }
+  .sheet{ max-width:720px; margin:0 auto; }
+  .letterhead{ text-align:center; border-bottom:3px solid #14532d; padding-bottom:14px; margin-bottom:22px; }
+  .firm-name{ font-size:26px; font-weight:800; color:#14532d; letter-spacing:.5px; }
+  .firm-addr{ font-size:12px; color:#555; margin-top:4px; }
+  .slip-title{ text-align:center; font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:1px;
+    background:#14532d; color:#fff; padding:8px 0; border-radius:4px; margin-bottom:20px; }
+  .meta{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:18px; padding:0 2px; }
+  .meta div b{ color:#14532d; }
+  table.slip{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  table.slip td{ padding:9px 6px; border-bottom:1px solid #e5e5e5; }
+  table.slip td:first-child{ color:#444; }
+  table.slip .amt{ text-align:right; font-weight:600; }
+  table.slip .neg{ color:#b91c1c; }
+  table.slip .pos{ color:#15803d; }
+  .net-row td{ border-top:2px solid #14532d; border-bottom:2px solid #14532d; font-weight:800; font-size:16px; padding:12px 6px; color:#14532d; }
+  .balance-box{ margin-top:18px; display:flex; justify-content:space-between; background:#f2f4f7; border-radius:6px; padding:12px 16px; font-size:13.5px; }
+  .balance-box b{ color:#14532d; }
+  .footer{ margin-top:40px; display:flex; justify-content:space-between; font-size:12px; color:#666; }
+  .sign-box{ text-align:center; }
+  .sign-line{ margin-top:38px; border-top:1px solid #999; width:160px; padding-top:5px; }
+  .note{ margin-top:24px; font-size:10.5px; color:#999; text-align:center; }
+  @media print{ .no-print{ display:none; } body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  .no-print{ text-align:center; margin:18px 0; }
+  .no-print button{ background:#14532d; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-size:14px; cursor:pointer; }
+</style></head>
+<body>
+  <div class="sheet">
+    <div class="letterhead">
+      <div class="firm-name">${FIRM_NAME}</div>
+      <div class="firm-addr">${FIRM_ADDR}</div>
+    </div>
+    <div class="slip-title">Salary Slip — ${monthLabel}</div>
+    <div class="meta">
+      <div>Employee: <b>${name}</b></div>
+      <div>Generated on: <b>${todayStr}</b></div>
+    </div>
+    <table class="slip">
+      ${rowsHtml}
+      <tr class="net-row"><td>Net Payable</td><td class="amt">${fmt(net)}</td></tr>
+    </table>
+    <div class="balance-box">
+      <div>Status: <b>${net>0?'Payable':'Settled'}</b></div>
+      <div>Amount: <b>${fmt(net)}</b></div>
+    </div>
+    <div class="footer">
+      <div class="sign-box">
+        <div class="sign-line">Employee Signature</div>
+      </div>
+      <div class="sign-box">
+        <div class="sign-line">Authorised Signatory — ${FIRM_NAME}</div>
+      </div>
+    </div>
+    <p class="note">This is a system-generated salary slip from DN Investment HR Portal.</p>
+  </div>
+  <div class="no-print">
+    <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+</body></html>`;
+
+  const win=window.open('', '_blank');
+  if(!win){ alert('Please allow pop-ups to view the salary slip.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+function escapeHtmlSlip(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // ─── ESI UI ──────────────────────────────────────────────────────────────────
 // Compact info box shown next to the salary calculator: tells admin whether the
