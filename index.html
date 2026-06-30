@@ -1700,7 +1700,33 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   </div>
 </div>
 
-<!-- User Modal -->
+<!-- Add to Mutual Fund Modal -->
+<div class="modal-overlay" id="addToMfModal" onclick="if(event.target===this)closeModal('addToMfModal')">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr" style="background:var(--teal)">
+      <h3 style="color:#fff">🏦 Add to Mutual Fund</h3>
+      <button class="modal-close" onclick="closeModal('addToMfModal')" style="color:#fff">×</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div style="font-size:.85rem;color:var(--gray);margin-bottom:14px">
+        Adding <b id="atm-client-name"></b> to Mutual Fund. The Equity record stays unchanged.
+      </div>
+      <div class="form-field" style="margin-bottom:14px">
+        <label>PAN (required)</label>
+        <input type="text" id="atm-pan" maxlength="10" style="text-transform:uppercase" placeholder="ABCDE1234F">
+      </div>
+      <div class="form-field" style="margin-bottom:4px">
+        <label>MF RM</label>
+        <select id="atm-rm"></select>
+      </div>
+      <div style="font-size:.74rem;color:var(--gray);margin-bottom:10px">Defaults to the Equity RM — change if this client should go to a different RM for Mutual Fund.</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('addToMfModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmAddEquityToMf()">✅ Add to Mutual Fund</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeModal('userModal')">
   <div class="modal">
     <div class="modal-hdr">
@@ -3839,17 +3865,38 @@ async function confirmDeleteLead(id,name){
 
 // Adds an existing Equity client into Mutual Fund as an MF Investor.
 // The Equity record stays untouched — the client will exist in BOTH segments.
-async function addEquityToMf(eqId){
+let _atmEqId=null;
+function addEquityToMf(eqId){
   const eqClients=DB.get('eq_clients')||[];
   const eq=eqClients.find(x=>x.id===eqId);
   if(!eq){ toast('Equity client not found','error'); return; }
 
-  // PAN is mandatory for MF — prefill if equity already has one
-  let pan=prompt(`Add "${eq.name}" to Mutual Fund.\n\nEnter PAN (required for MF Investor):`, (eq.pan||'').toUpperCase());
-  if(pan===null) return;
-  pan=pan.trim().toUpperCase();
+  _atmEqId=eqId;
+  document.getElementById('atm-client-name').textContent=eq.name;
+  document.getElementById('atm-pan').value=(eq.pan||'').toUpperCase();
+
+  // RM dropdown: MF RM list, defaulting to the equity RM if they also do MF
+  const mfRMs=getSegRMs('mf');
+  const rmSel=document.getElementById('atm-rm');
+  rmSel.innerHTML=mfRMs.map(r=>`<option ${r===eq.rm?'selected':''}>${escapeHtml(r)}</option>`).join('');
+  if(!mfRMs.includes(eq.rm) && mfRMs.length){ rmSel.value=mfRMs[0]; }
+
+  document.getElementById('addToMfModal').classList.add('open');
+  setTimeout(()=>document.getElementById('atm-pan').focus(),100);
+}
+
+async function confirmAddEquityToMf(){
+  const eqId=_atmEqId;
+  const eqClients=DB.get('eq_clients')||[];
+  const eq=eqClients.find(x=>x.id===eqId);
+  if(!eq){ toast('Equity client not found','error'); closeModal('addToMfModal'); return; }
+
+  let pan=(document.getElementById('atm-pan').value||'').trim().toUpperCase();
   if(!pan){ toast('PAN is required to add as MF Investor','error'); return; }
   if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+
+  const mfRm=document.getElementById('atm-rm').value;
+  if(!mfRm){ toast('Please select an MF RM','error'); return; }
 
   const mfClients=DB.get('mf_clients')||[];
   const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
@@ -3864,7 +3911,7 @@ async function addEquityToMf(eqId){
   while(mfClients.some(x=>x.id===newId)) newId=uid();
   const rec={
     id:newId, name:eq.name, mobile:eq.mobile||'', pan, email:eq.email||'',
-    rm:eq.rm, status:'Prospect',
+    rm:mfRm, status:'Prospect',
     aum:null, sip_amount:null, sip_count:null,
     last_invest_date:'', last_call_date:eq.last_call_date||'',
     next_call:'', followup_status:'', remarks:`Added from Equity${eq.code?' (Code: '+eq.code+')':''}`,
@@ -3873,10 +3920,11 @@ async function addEquityToMf(eqId){
   await DB.setClient('mf_clients', rec);
   DB.addActivityLog({
     id:uid(), type:'add', seg:'mf', client_id:newId,
-    client_name:eq.name, rm:eq.rm, by:CU.name,
+    client_name:eq.name, rm:mfRm, by:CU.name,
     date:new Date().toISOString(), changes:[]
   });
-  toast(`✅ "${eq.name}" added to Mutual Fund! (Equity record kept)`,'success');
+  closeModal('addToMfModal');
+  toast(`✅ "${eq.name}" added to Mutual Fund (RM: ${mfRm})! Equity record kept.`,'success');
   renderMfTable(); refreshDash(); updateBadges();
 }
 
