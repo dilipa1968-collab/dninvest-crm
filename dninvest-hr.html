@@ -999,14 +999,31 @@ function getEmployeeChanges(){
 // Rebuilds EMPLOYEES in-place from EMPLOYEES_BASE + Firestore-synced added/removed lists.
 function applyEmployeeChanges(){
   const changes=getEmployeeChanges();
-  const added=changes.added||[];
   const removed=changes.removed||[];
+  // Guard against duplicates: if an "added" employee has the same name (case-insensitive)
+  // as someone already in EMPLOYEES_BASE, skip it — base wins, no duplicate entry.
+  const baseNames=EMPLOYEES_BASE.map(e=>e.name.trim().toUpperCase());
+  const added=(changes.added||[]).filter(e=>baseNames.indexOf((e.name||'').trim().toUpperCase())===-1);
   const merged=EMPLOYEES_BASE.concat(added).filter(e=>removed.indexOf(e.name)===-1);
   merged.sort((a,b)=>a.name.localeCompare(b.name));
   EMPLOYEES.length=0;
   merged.forEach(e=>EMPLOYEES.push(e));
 }
 applyEmployeeChanges();
+
+// One-time cleanup: if the Firestore "added" list still contains a duplicate
+// of a base employee (e.g. an old duplicate "Dilip"), strip it out and save back.
+(function cleanupDuplicateAddedEmployees(){
+  const changes=getEmployeeChanges();
+  const added=changes.added||[];
+  if(!added.length) return;
+  const baseNames=EMPLOYEES_BASE.map(e=>e.name.trim().toUpperCase());
+  const cleaned=added.filter(e=>baseNames.indexOf((e.name||"").trim().toUpperCase())===-1);
+  if(cleaned.length!==added.length){
+    DB.set("employee_changes", {added:cleaned, removed:changes.removed||[]});
+    applyEmployeeChanges();
+  }
+})();
 
 // Fills every RM dropdown from the (alphabetically sorted) EMPLOYEES list, so the
 // order is always alphabetical and the lists auto-update when employees are added/removed.
