@@ -3876,10 +3876,17 @@ function addEquityToMf(eqId){
   document.getElementById('atm-pan').value=(eq.pan||'').toUpperCase();
 
   // RM dropdown: MF RM list, defaulting to the equity RM if they also do MF
+  // Only Admin can change the MF RM — RMs can only add to their own name.
   const mfRMs=getSegRMs('mf');
   const rmSel=document.getElementById('atm-rm');
-  rmSel.innerHTML=mfRMs.map(r=>`<option ${r===eq.rm?'selected':''}>${escapeHtml(r)}</option>`).join('');
-  if(!mfRMs.includes(eq.rm) && mfRMs.length){ rmSel.value=mfRMs[0]; }
+  if(CU.role==='admin'){
+    rmSel.innerHTML=mfRMs.map(r=>`<option ${r===eq.rm?'selected':''}>${escapeHtml(r)}</option>`).join('');
+    if(!mfRMs.includes(eq.rm) && mfRMs.length){ rmSel.value=mfRMs[0]; }
+    rmSel.disabled=false;
+  } else {
+    rmSel.innerHTML=`<option selected>${escapeHtml(CU.name)}</option>`;
+    rmSel.disabled=true;
+  }
 
   document.getElementById('addToMfModal').classList.add('open');
   setTimeout(()=>document.getElementById('atm-pan').focus(),100);
