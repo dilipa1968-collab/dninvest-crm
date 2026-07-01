@@ -4352,7 +4352,11 @@ function renderSeminarAttendees(){
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
-      <td><span class="badge ${a.type==='equity'?'b-active':a.type==='mf'?'b-investor':'b-pending'}">${a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'}</span></td>
+      <td><select class="att-type" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+        <option value="equity" ${a.type==='equity'?'selected':''}>Equity</option>
+        <option value="mf" ${a.type==='mf'?'selected':''}>MF</option>
+        <option value="guest" ${(!a.type||a.type==='guest')?'selected':''}>Guest</option>
+      </select></td>
       <td><select class="att-rsvp" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
@@ -4531,10 +4535,12 @@ async function saveSeminarAttendeeChanges(){
     const countEl=row.querySelector('.att-count');
     const statusEl=row.querySelector('.att-status');
     const remarksEl=row.querySelector('.att-remarks');
+    const typeEl=row.querySelector('.att-type');
     if(rsvpEl) a.rsvp=rsvpEl.value;
     if(countEl) a.expected_count = countEl.value===''?null:parseInt(countEl.value);
     if(statusEl) a.status=statusEl.value;
     if(remarksEl) a.remarks=remarksEl.value;
+    if(typeEl) a.type=typeEl.value;
   });
   s.updated=today();
   await DB.setClient('seminars',s);
