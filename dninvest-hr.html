@@ -606,6 +606,24 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
             </table>
           </div>
         </div>
+        <div class="card admin-only" style="display:none;grid-column:1/-1">
+          <div class="card-title">Monthly ESI file (for ESIC consultant)</div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Downloads the exact Excel format you send to your ESI consultant every month — Total Days, Excutal Days, Salary, Excutal Salary, ESIDED, Net Amount, Our Contibution &amp; Total ESI Amount, auto-calculated from attendance and salary.</p>
+          <div class="compact-grid3">
+            <div class="field-inline"><label>Month</label><input type="month" id="esi-file-month" onchange="renderEsiFileEmpList()"></div>
+          </div>
+          <div style="margin:10px 0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <label style="font-size:12px;font-weight:600;color:var(--text2)">Select RMs to include</label>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-sm" onclick="esiFileSelectAll(true)">Select all</button>
+                <button class="btn btn-sm" onclick="esiFileSelectAll(false)">Clear</button>
+              </div>
+            </div>
+            <div id="esi-file-emp-list" style="display:flex;flex-wrap:wrap;gap:10px 18px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm)"></div>
+          </div>
+          <button class="btn btn-primary" onclick="downloadEsiFile()">⬇️ Download ESI Excel</button>
+        </div>
       </div>
     </div>
 
@@ -820,7 +838,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>ESI Registered</th><th>Login</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>ESIC No</th><th>ESI Registered</th><th>Login</th><th>Status</th><th></th></tr></thead>
           <tbody id="emp-table"></tbody>
         </table>
       </div>
@@ -960,7 +978,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions'];
+    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions','esic_numbers'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -1461,6 +1479,11 @@ function getEsiRegistered(){ return DB.get('esi_registered', {}) || {}; }
 async function setEsiRegisteredFlag(name, val){ await DB.setMerged('esi_registered', {[name]: val}); }
 function isEsiRegistered(name){ const r=getEsiRegistered(); return r[name]!==false; } // default true (registered)
 
+// Per-employee ESIC number — used to fill the monthly ESI Excel sent to the consultant.
+function getEsicNumbers(){ return DB.get('esic_numbers', {}) || {}; }
+function getEsicNumber(name){ return (getEsicNumbers()[name]) || ''; }
+async function setEsicNumber(name, val){ await DB.setMerged('esic_numbers', {[name]: (val||'').trim()}); }
+
 // grossWage = the wage figure used to (a) check ceiling eligibility and (b) compute
 // the contribution amount. We use the employee's configured basic salary for the
 // ceiling check (matches how wages are declared to ESIC), and the actual earned
@@ -1740,7 +1763,7 @@ function startApp(){
   loadEsiSettingsIntoUI();
   renderEsiBox();
   renderExtraDeductionBox();
-  if(isAdmin) renderEsiOverrideTable();
+  if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); }
 
   // Real-time sync: whenever Admin (or anyone, on any device) changes data in
   // Firestore, this fires and we re-render the relevant pages immediately —
@@ -2889,6 +2912,81 @@ function downloadSalaryReport(){
   const totalRow=['TOTAL',tot.sal,tot.pres,tot.abs,tot.half,tot.ded,tot.adv,tot.esi,tot.extra,tot.net,tot.paid,tot.bal];
 
   dnXlsx('DN_Salary_'+month+'.xlsx', 'DN Investment — Salary Report · '+mLabel, cols, rows, totalRow);
+}
+
+// ─── Monthly ESI file (exact format sent to the ESI consultant every month) ──
+function populateEsiFileMonth(){
+  const el=document.getElementById('esi-file-month');
+  if(el && !el.value) el.value=today().slice(0,7);
+}
+
+function renderEsiFileEmpList(){
+  const cont=document.getElementById('esi-file-emp-list');
+  if(!cont) return;
+  const prevChecked={};
+  cont.querySelectorAll('.esi-file-chk').forEach(c=>{ prevChecked[c.value]=c.checked; });
+  cont.innerHTML = EMPLOYEES.map(e=>{
+    const checked = Object.prototype.hasOwnProperty.call(prevChecked, e.name) ? prevChecked[e.name] : isEsiRegistered(e.name);
+    return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer">
+      <input type="checkbox" class="esi-file-chk" value="${e.name}" ${checked?'checked':''}>
+      ${e.name}
+    </label>`;
+  }).join('');
+}
+
+function esiFileSelectAll(val){
+  document.querySelectorAll('.esi-file-chk').forEach(c=>c.checked=val);
+}
+
+function downloadEsiFile(){
+  if(!isAdmin){ alert('Only admin can download the ESI file.'); return; }
+  if(typeof XLSX==='undefined'){ alert('Excel library not loaded — please check your internet and try again.'); return; }
+  const monthEl=document.getElementById('esi-file-month');
+  const month=(monthEl && monthEl.value) || today().slice(0,7); // YYYY-MM
+  const selected=Array.from(document.querySelectorAll('.esi-file-chk:checked')).map(c=>c.value);
+  if(!selected.length){ alert('Kam se kam ek RM select karein.'); return; }
+
+  const s=getEsiSettings();
+  const empRate=(s.employeeRate||0.75)/100;
+  const emprRate=(s.employerRate||3.25)/100;
+  const round2 = n => Math.round(n*100)/100;
+
+  const dataRows=[];
+  let sl=1;
+  const tot={sal:0,exSal:0,esided:0,net:0,our:0,total:0};
+  selected.forEach(name=>{
+    const r=calcMonthlySalary(name, month);
+    const sal=r.salary;
+    const exctualDays=r.presentDays;
+    const exSal=round2(sal/26*exctualDays);
+    const esided=Math.ceil(exSal*empRate);
+    const net=round2(exSal-esided);
+    const our=Math.ceil(exSal*emprRate);
+    const total=esided+our;
+    tot.sal+=sal; tot.exSal+=exSal; tot.esided+=esided; tot.net+=net; tot.our+=our; tot.total+=total;
+    dataRows.push([sl++, getEsicNumber(name), name.toUpperCase(), 31, exctualDays, sal, exSal, esided, net, our, total]);
+  });
+
+  const monthDate=new Date(month+'-01T00:00:00');
+  const aoa=[[],[],[],[],[]];
+  const r5=[]; r5[3]='D N INVESTMENT'; r5[8]='MONTH '; r5[9]=monthDate;
+  aoa.push(r5);
+  const r6=[]; r6[3]='B1/2, 2ND FLOOR, BHADANI TRADE CENTRE, '; aoa.push(r6);
+  const r7=[]; r7[3]='R ROAD, BISTUPUR, JAMSHEDPUR-831001 '; aoa.push(r7);
+  aoa.push([]);
+  aoa.push(['SL NUM','ESIC ','NAME','TOTAL DAYS','EXCUTAL DAYS','Salary','EXCUTAL SALARY','ESIDED','NET AMOUNT','OUR CONTIBUTION','TOTAL ESI AMOUNT']);
+  dataRows.forEach(r=>aoa.push(r));
+  aoa.push([null,'TOTAL',null,null,null,tot.sal,round2(tot.exSal),tot.esided,round2(tot.net),tot.our,tot.total]);
+
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:8},{wch:12},{wch:22},{wch:11},{wch:13},{wch:10},{wch:14},{wch:9},{wch:12},{wch:15},{wch:16}];
+  const dateCell=ws['J6']; // col index9(J), row index5 -> excel row6
+  if(dateCell) dateCell.z='dd-mm-yyyy';
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const mLabel=monthDate.toLocaleDateString('en-IN',{month:'long',year:'numeric'}).toUpperCase().replace(' ','-');
+  XLSX.writeFile(wb, 'ESI-'+mLabel+'.xlsx');
 }
 
 function renderSalaryPage(){
@@ -4168,6 +4266,12 @@ function renderEmployees(){
         </div>
       </td>
       <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="text" value="${getEsicNumber(e.name)}" id="emp-esic-${e.name}" placeholder="ESIC No." style="width:100px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="saveEsicNo('${e.name}')">Set</button>
+        </div>
+      </td>
+      <td>
         <select onchange="toggleEsiRegistered('${e.name}', this.value==='1')" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px">
           <option value="1" ${isEsiRegistered(e.name)?'selected':''}>Yes</option>
           <option value="0" ${!isEsiRegistered(e.name)?'selected':''}>No</option>
@@ -4274,6 +4378,13 @@ async function toggleEsiRegistered(name, val){
   renderSalaryPage && renderSalaryPage();
 }
 
+async function saveEsicNo(name){
+  const val=document.getElementById('emp-esic-'+name).value;
+  await setEsicNumber(name, val);
+  renderEmployees();
+  alert(name+"'s ESIC number set to: "+(val.trim()||'(blank)'));
+}
+
 async function deleteEmployee(name){
   if(!confirm('Remove '+name+' from the employee list?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed.\n\nThis cannot be undone from here.')) return;
   await persistRemoveEmployee(name);
@@ -4290,7 +4401,7 @@ function showPage(id,btn){
   // refresh on visit
   if(id==='attendance') renderAttendancePage();
   if(id==='leave') renderLeavePage();
-  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin) renderEsiOverrideTable(); }
+  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); } }
   if(id==='incentive') renderIncentivePage();
   if(id==='dashboard') renderDashboard();
   if(id==='employees') renderEmployees();
