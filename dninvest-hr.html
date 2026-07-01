@@ -978,7 +978,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions','esic_numbers'];
+    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions','esic_numbers','heartbeats'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -1792,6 +1792,34 @@ function startApp(){
       }, err=>console.log('CRM sales listener error:',err));
     }
   }catch(e){ console.log('CRM sales listener setup error:',e); }
+
+  startHeartbeat();
+}
+
+// ── Heartbeat: keeps a rough "last seen" time per RM so that if the RM
+// shuts down the computer without clicking Logout, the cutoff auto-out-time
+// check (autoOutTimeCheck) can use this last-seen time instead of blindly
+// stamping the cutoff time. Ping is sent immediately on login, then every
+// 5 minutes while the tab/app stays open. Admin is excluded (no out-time
+// tracked for Admin). Stops on logout via stopHeartbeat().
+let _heartbeatTimer = null;
+async function sendHeartbeatPing(){
+  if(!currentUser || isAdmin) return;
+  try{
+    const now=new Date();
+    const utc=now.getTime()+now.getTimezoneOffset()*60000;
+    const ist=new Date(utc+5.5*3600000);
+    const hhmm=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
+    await DB.setMerged('heartbeats', {[currentUser]: {date:today(), time:hhmm}});
+  }catch(e){ console.log('sendHeartbeatPing error:', e); }
+}
+function startHeartbeat(){
+  if(_heartbeatTimer) return; // already running
+  sendHeartbeatPing(); // immediate first ping
+  _heartbeatTimer = setInterval(sendHeartbeatPing, 5*60000); // every 5 min
+}
+function stopHeartbeat(){
+  if(_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer=null; }
 }
 
 async function doLogout(){
@@ -1809,8 +1837,8 @@ async function doLogout(){
         const dow=ist.getDay();
         const istH=ist.getHours()+ist.getMinutes()/60;
         let cutoff=null, cutoffStr='';
-        if(dow>=1 && dow<=5){ cutoff=18; cutoffStr='18:00'; }   // Mon–Fri 6 PM
-        else if(dow===6){ cutoff=14; cutoffStr='14:00'; }        // Saturday 2 PM
+        if(dow>=1 && dow<=5){ cutoff=18.25; cutoffStr='18:15'; }   // Mon–Fri 6:15 PM
+        else if(dow===6){ cutoff=14.25; cutoffStr='14:15'; }        // Saturday 2:15 PM
         let outT;
         if(cutoff!==null && istH < cutoff){
           outT=cutoffStr; // logout before cutoff → save cutoff
@@ -1822,6 +1850,7 @@ async function doLogout(){
     }catch(e){}
   }
   localStorage.removeItem(KEY_USER);
+  stopHeartbeat();
   currentUser=null;isAdmin=false;
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
@@ -1951,9 +1980,12 @@ async function runLateAbsentCheckHr(){
 setInterval(runLateAbsentCheckHr, 60000);
 runLateAbsentCheckHr();
 
-// ── Auto Out-Time: Mon–Fri 6 PM, Saturday 2 PM ──────────────────────────────
+// ── Auto Out-Time: Mon–Fri 6:15 PM, Saturday 2:15 PM ────────────────────────
 // Every minute: if current IST time >= cutoff and today's record has no out_time,
-// auto-fill it. If RM logs out earlier, doLogout() already saves the actual time.
+// auto-fill it — using the RM's last heartbeat ping (accurate, real shutdown-ish
+// time) if one was received today, else falling back to the cutoff time itself
+// (e.g. RM never opened the app today, or heartbeat write failed).
+// If RM logs out manually, doLogout() already saves the actual time.
 async function autoOutTimeCheck(){
   try{
     const now=new Date();
@@ -1963,13 +1995,21 @@ async function autoOutTimeCheck(){
     const istH=ist.getHours()+ist.getMinutes()/60;
 
     let cutoff=null, cutoffStr='';
-    if(dow>=1 && dow<=5){ cutoff=18; cutoffStr='18:00'; }      // Mon–Fri 6 PM
-    else if(dow===6){ cutoff=14; cutoffStr='14:00'; }           // Saturday 2 PM
+    if(dow>=1 && dow<=5){ cutoff=18.25; cutoffStr='18:15'; }      // Mon–Fri 6:15 PM
+    else if(dow===6){ cutoff=14.25; cutoffStr='14:15'; }           // Saturday 2:15 PM
 
     if(cutoff===null || istH<cutoff) return; // cutoff nahi aaya abhi
 
     const td=today();
     const att=getAtt();
+    const heartbeats=DB.get('heartbeats', {}) || {};
+
+    // Picks the RM's last heartbeat time for today if present, else cutoffStr.
+    function outTimeFor(name){
+      const hb=heartbeats[name];
+      if(hb && hb.date===td && hb.time) return hb.time;
+      return cutoffStr;
+    }
 
     if(isAdmin){
       // Admin: sabka out time fill karo agar missing ho
@@ -1978,7 +2018,7 @@ async function autoOutTimeCheck(){
       for(const emp of emps){
         const rec=(att[emp]||[]).find(r=>r.date===td);
         if(rec && (rec.status==='Present'||rec.status==='Late') && !rec.out){
-          await saveAttRecord(emp, {...rec, out:cutoffStr});
+          await saveAttRecord(emp, {...rec, out:outTimeFor(emp)});
           changed=true;
         }
       }
@@ -1990,7 +2030,7 @@ async function autoOutTimeCheck(){
       if(!currentUser) return;
       const rec=(att[currentUser]||[]).find(r=>r.date===td);
       if(!rec || !(rec.status==='Present'||rec.status==='Late') || rec.out) return;
-      await saveAttRecord(currentUser, {...rec, out:cutoffStr});
+      await saveAttRecord(currentUser, {...rec, out:outTimeFor(currentUser)});
       if(typeof renderAttendancePage==='function') renderAttendancePage();
       if(typeof renderDashboard==='function') renderDashboard();
     }
