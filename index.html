@@ -1049,6 +1049,12 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         <div class="filters">
           <input type="text" placeholder="🔍 Search client / RM / fund..." oninput="renderMfTxnTable()" id="mftxn-search">
           <select onchange="renderMfTxnTable()" id="mftxn-rm-filter"><option value="">All RMs</option></select>
+          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Status se filter karo">
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Declined">Declined</option>
+          </select>
           <select onchange="renderMfTxnTable()" id="mftxn-type-filter">
             <option value="">All Types</option>
             <option value="Lumpsum">Lumpsum</option>
@@ -1064,12 +1070,6 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           </select>
           <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="Month-wise dekho">
             <option value="">All Months</option>
-          </select>
-          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Status se filter karo">
-            <option value="">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Declined">Declined</option>
           </select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
