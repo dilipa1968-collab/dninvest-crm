@@ -4378,7 +4378,7 @@ function renderSeminarAttendees(){
 }
 
 // Attendee "Type" dropdown — Equity/MF selection only allowed if a client
-// record exists in that segment with the SAME mobile, name, AND RM as this
+// record exists in that segment with the SAME mobile AND RM as this
 // attendee. Otherwise revert and tell the user why (avoids mis-tagging a
 // guest as a real client just by picking from the dropdown).
 function onAttTypeChange(sel){
@@ -4391,19 +4391,17 @@ function onAttTypeChange(sel){
   const a=(s?.attendees||[]).find(x=>x.id===sel.dataset.id);
   if(!a){ sel.value=prev; return; }
 
-  const normName=(v)=>(v||'').trim().toLowerCase();
   const normMob=(v)=>(v||'').replace(/\D/g,'');
   const normRmV=(v)=>(v||'').trim().toLowerCase();
 
   const list = newType==='equity' ? (DB.get('eq_clients')||[]) : (DB.get('mf_clients')||[]);
   const match = list.some(c=>
-    normName(c.name)===normName(a.name) &&
     normMob(c.mobile)===normMob(a.mobile) && normMob(a.mobile)!=='' &&
     normRmV(c.rm)===normRmV(a.rm)
   );
 
   if(!match){
-    toast(`Type nahi badal sakte — ${newType==='equity'?'Equity':'MF'} me isi naam, mobile aur RM ka koi client record nahi mila`,'error');
+    toast(`Type nahi badal sakte — ${newType==='equity'?'Equity':'MF'} me isi mobile aur RM ka koi client record nahi mila`,'error');
     sel.value=prev;
     return;
   }
