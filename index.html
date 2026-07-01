@@ -3243,6 +3243,9 @@ function updateSeminarBlink(){
 }
 setInterval(updateSeminarBlink, 5000);
 
+// Auto-refresh the whole CRM every 30 minutes so data always stays up to date.
+setInterval(()=>{ location.reload(); }, 30*60*1000);
+
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
   const activeEq=getActiveEqClients();
