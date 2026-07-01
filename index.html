@@ -240,6 +240,16 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .nav-badge{margin-left:auto;background:var(--blue2);color:var(--navy);font-size:.68rem;
   padding:2px 7px;border-radius:10px;font-weight:700;}
 .nav-badge.red{background:var(--red2);color:var(--red);}
+.nav-item.blink-seminar{animation:navSeminarBlink 1s ease-in-out infinite;}
+@keyframes navSeminarBlink{
+  0%,100%{background:rgba(255,193,7,.08);}
+  50%{background:rgba(255,71,87,.35);}
+}
+.nav-item.blink-seminar .icon{animation:navSeminarIconPulse 1s ease-in-out infinite;}
+@keyframes navSeminarIconPulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.25);}
+}
 
 .content{flex:1;padding:14px 16px;min-width:0;overflow-x:hidden;}
 .page{display:none;}
@@ -3234,6 +3244,11 @@ function updateBadges(){
   const activeEq=getActiveEqClients();
   document.getElementById('nb-leads').textContent=getMyLeads().length;
   document.getElementById('nb-seminars').textContent=getMySeminars().length;
+  { const _semNav=document.getElementById('nav-seminars');
+    const _t=today();
+    const _hasUpcoming=(DB.get('seminars')||[]).some(s=>s.date && s.date>=_t);
+    if(_semNav) _semNav.classList.toggle('blink-seminar', _hasUpcoming);
+  }
   document.getElementById('nb-eq').textContent=eq.length;
   document.getElementById('nb-mf').textContent=mf.length;
   document.getElementById('nb-sip').textContent=mf.filter(c=>c.sip_amount>0).length;
