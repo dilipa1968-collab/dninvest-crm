@@ -240,15 +240,10 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .nav-badge{margin-left:auto;background:var(--blue2);color:var(--navy);font-size:.68rem;
   padding:2px 7px;border-radius:10px;font-weight:700;}
 .nav-badge.red{background:var(--red2);color:var(--red);}
-.nav-item.blink-seminar{animation:navSeminarBlink 1s ease-in-out infinite;}
+.nav-item.blink-seminar{animation:navSeminarBlink 3s ease-in-out infinite;}
 @keyframes navSeminarBlink{
-  0%,100%{background:rgba(34,197,94,.15);color:var(--navy);}
-  50%{background:rgba(34,197,94,.55);color:var(--navy);}
-}
-.nav-item.blink-seminar .icon{animation:navSeminarIconPulse 1s ease-in-out infinite;}
-@keyframes navSeminarIconPulse{
-  0%,100%{transform:scale(1);}
-  50%{transform:scale(1.25);}
+  0%,100%{background:rgba(34,197,94,.10);color:var(--navy);}
+  50%{background:rgba(34,197,94,.40);color:var(--navy);}
 }
 
 .content{flex:1;padding:14px 16px;min-width:0;overflow-x:hidden;}
@@ -3244,9 +3239,7 @@ function updateSeminarBlink(){
   if(!_semNav) return;
   const _t=today();
   const _hasUpcoming=(DB.get('seminars')||[]).some(s=>s.date && s.date>=_t);
-  const _min=new Date().getMinutes();
-  const _shouldBlink=_hasUpcoming && _min<2; // blink only in first 2 min of every hour
-  _semNav.classList.toggle('blink-seminar', _shouldBlink);
+  _semNav.classList.toggle('blink-seminar', _hasUpcoming);
 }
 setInterval(updateSeminarBlink, 5000);
 
