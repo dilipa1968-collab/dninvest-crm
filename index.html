@@ -3239,16 +3239,23 @@ function sc(n,l,cls,seg){
 }
 function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=100000) return (n/100000).toFixed(2)+'L'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return Math.round(n); }
 
+function updateSeminarBlink(){
+  const _semNav=document.getElementById('nav-seminars');
+  if(!_semNav) return;
+  const _t=today();
+  const _hasUpcoming=(DB.get('seminars')||[]).some(s=>s.date && s.date>=_t);
+  const _min=new Date().getMinutes();
+  const _shouldBlink=_hasUpcoming && _min<2; // blink only in first 2 min of every hour
+  _semNav.classList.toggle('blink-seminar', _shouldBlink);
+}
+setInterval(updateSeminarBlink, 5000);
+
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
   const activeEq=getActiveEqClients();
   document.getElementById('nb-leads').textContent=getMyLeads().length;
   document.getElementById('nb-seminars').textContent=getMySeminars().length;
-  { const _semNav=document.getElementById('nav-seminars');
-    const _t=today();
-    const _hasUpcoming=(DB.get('seminars')||[]).some(s=>s.date && s.date>=_t);
-    if(_semNav) _semNav.classList.toggle('blink-seminar', _hasUpcoming);
-  }
+  updateSeminarBlink();
   document.getElementById('nb-eq').textContent=eq.length;
   document.getElementById('nb-mf').textContent=mf.length;
   document.getElementById('nb-sip').textContent=mf.filter(c=>c.sip_amount>0).length;
