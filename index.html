@@ -1065,6 +1065,12 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="Month-wise dekho">
             <option value="">All Months</option>
           </select>
+          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Status se filter karo">
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Declined">Declined</option>
+          </select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">From:
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:6px;font-size:.78rem"></label>
@@ -6029,6 +6035,7 @@ function getFilteredMfTxns(){
   const rmF=document.getElementById('mftxn-rm-filter')?.value||'';
   const typeF=document.getElementById('mftxn-type-filter')?.value||'';
   const monthF=document.getElementById('mftxn-month-filter')?.value||'';
+  const statusF=document.getElementById('mftxn-status-filter')?.value||'';
   const fromD=document.getElementById('mftxn-from-date')?.value||'';
   const toD=document.getElementById('mftxn-to-date')?.value||'';
 
@@ -6036,6 +6043,7 @@ function getFilteredMfTxns(){
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
   if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
   if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
+  if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
 
