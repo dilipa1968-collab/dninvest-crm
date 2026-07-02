@@ -3635,7 +3635,6 @@ function renderMfTable(){
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
-        <button class="btn-icon" onclick="openBusinessModal('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Add Business">💼</button>
         <button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','mf')" title="Map to Other Product" style="color:#7c3aed">🎯</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
