@@ -2160,17 +2160,23 @@ function renderDashboard(){
       const canOpen = isAdmin || e.name===currentUser;
       const clickAttr = canOpen ? `onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"` : '';
       if(isAdmin){
-        // Admin: big full-width row for every RM (same style as the personal strip)
-        tal.innerHTML+=`<div class="att-entry" ${clickAttr}>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:14px;min-width:0">
-              <div class="avatar" style="width:44px;height:44px;font-size:15px;flex-shrink:0">${initials(e.name)}</div>
-              <div style="font-size:18px;font-weight:800;white-space:nowrap">${e.name}</div>
-            </div>
-            <div style="flex:1;text-align:center;font-size:15px;color:#555">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
-            <div style="font-size:15px;color:var(--text2);white-space:nowrap">In: <b style="color:var(--text)">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
-            <span style="transform:scale(1.25);transform-origin:right center;display:inline-block;margin-left:6px">${badge}</span>
+        // Admin: decorated card-style row for every RM
+        let accent='#ef4444', tint='#fef2f2'; // absent default
+        if(todayHoliday){accent='#f59e0b';tint='#fffbeb';}
+        else if(rec&&rec.status==='Present'){
+          const bc=presentBadgeClass(rec);
+          if(bc==='badge-green'){accent='#16a34a';tint='#f0fdf4';}
+          else if(bc==='badge-blue'){accent='#2563eb';tint='#eff6ff';}
+          else{accent='#f59e0b';tint='#fffbeb';}
+        }
+        tal.innerHTML+=`<div ${clickAttr.replace('style="cursor:pointer"','')} style="cursor:pointer;display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:10px 0;padding:12px 16px;background:linear-gradient(90deg,${tint},#fff 45%);border:1px solid var(--border);border-left:5px solid ${accent};border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:box-shadow .15s,transform .15s" onmouseover="this.style.boxShadow='0 4px 14px rgba(0,0,0,.12)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.05)';this.style.transform=''">
+          <div style="display:flex;align-items:center;gap:14px;min-width:0;flex:1.2">
+            <div class="avatar" style="width:44px;height:44px;font-size:15px;flex-shrink:0;border:2px solid ${accent}">${initials(e.name)}</div>
+            <div style="font-size:18px;font-weight:800;white-space:nowrap">${e.name}</div>
           </div>
+          <div style="flex:1;text-align:center;font-size:15px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:4px 12px">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
+          <div style="flex:1;text-align:center;font-size:15px;color:var(--text2);white-space:nowrap;padding:4px 12px;border-right:1px dashed #d5dbe3">In: <b style="color:${accent}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
+          <div style="flex:0 0 auto;padding-left:14px"><span style="transform:scale(1.25);transform-origin:right center;display:inline-block">${badge}</span></div>
         </div>`;
       } else {
         tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
