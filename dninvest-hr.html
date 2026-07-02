@@ -2119,7 +2119,9 @@ function renderDashboard(){
       const mTotal=mGreen+mBlue+mAmber;
       const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
-      tal.innerHTML+=`<div class="att-entry" onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
+      const canOpen = isAdmin || e.name===currentUser;
+      const clickAttr = canOpen ? `onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"` : '';
+      tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
     });
   }
 
@@ -4558,6 +4560,8 @@ function showPage(id,btn){
 let _empModal = { name:null, ym:null }; // ym = 'YYYY-MM'
 
 function openEmpMonthModal(name){
+  // RMs can only view their own month; admin can view anyone
+  if(!isAdmin && name!==currentUser) return;
   _empModal.name = name;
   _empModal.ym = today().slice(0,7);
   document.getElementById('empMonthOverlay').classList.add('open');
