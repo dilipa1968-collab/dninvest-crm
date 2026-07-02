@@ -265,6 +265,28 @@ tr:hover td{background:var(--surface2)}
 .emp-month-table tr.is-today td{background:#eefcf5}
 .emp-month-table tr.is-off td{color:var(--text3)}
 
+/* ADMIN ATTENDANCE CARDS (dashboard) */
+.aac{display:flex;align-items:center;margin:10px 0;padding:12px 16px;border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer;transition:box-shadow .15s,transform .15s}
+.aac-strip{display:flex;align-items:center;cursor:pointer}
+.aac:hover{box-shadow:0 4px 14px rgba(0,0,0,.12);transform:translateY(-1px)}
+.aac-id{display:flex;align-items:center;gap:12px;min-width:0;flex:1.2}
+.aac-name{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aac-cnt{flex:1;text-align:center;font-size:15px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:4px 12px;white-space:nowrap}
+.aac-time{flex:1;text-align:center;font-size:15px;color:var(--text2);white-space:nowrap;padding:4px 12px}
+.aac-badge{flex:0 0 auto;padding-left:12px}
+.aac-badge .badge{font-size:14px;padding:5px 14px}
+@media(max-width:680px){
+  .aac,.aac-strip{flex-wrap:wrap;row-gap:8px}
+  .aac{padding:12px 14px}
+  .aac-id{flex:1;order:1}
+  .aac-badge{order:2;padding-left:0}
+  .aac-cnt{order:3;flex:1 1 100%;border:none;border-top:1px dashed #d5dbe3;padding:8px 0 0;text-align:left;font-size:14px}
+  .aac-time{order:4;flex:1 1 100%;padding:2px 0 0;text-align:left;font-size:14px}
+  .aac-name{font-size:16px}
+  .aac .avatar,.aac-strip .avatar{width:38px !important;height:38px !important;font-size:13px !important}
+  .aac-badge .badge,.aac-strip .badge{font-size:12px;padding:4px 10px}
+}
+
 /* PROGRESS */
 .progress{height:5px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:5px}
 .progress-bar{height:100%;border-radius:3px;background:var(--accent);transition:width 0.4s}
@@ -2123,14 +2145,14 @@ function renderDashboard(){
       const monthBadges=`<span style="font-size:16px;color:#555">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
       strip.style.display='';
-      strip.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;cursor:pointer;flex-wrap:wrap" onclick="openEmpMonthModal('${currentUser.replace(/'/g,"\\'")}')" title="Click to view full month">
-        <div style="display:flex;align-items:center;gap:14px;min-width:0">
+      strip.innerHTML=`<div class="aac-strip" onclick="openEmpMonthModal('${currentUser.replace(/'/g,"\\'")}')" title="Click to view full month">
+        <div class="aac-id">
           <div class="avatar" style="width:48px;height:48px;font-size:17px;flex-shrink:0">${initials(currentUser)}</div>
-          <div style="font-size:20px;font-weight:800;white-space:nowrap">${currentUser}</div>
+          <div class="aac-name" style="font-size:20px">${currentUser}</div>
         </div>
-        <div style="flex:1;text-align:center">${monthBadges}</div>
-        <div style="font-size:16px;color:var(--text2);white-space:nowrap">In: <b style="color:var(--text)">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
-        <span style="transform:scale(1.4);transform-origin:right center;display:inline-block;margin-left:6px">${badge}</span>
+        <div class="aac-cnt" style="font-size:16px">${monthBadges}</div>
+        <div class="aac-time" style="font-size:16px">In: <b style="color:var(--text)">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
+        <div class="aac-badge">${badge}</div>
       </div>`;
     } else {
       strip.style.display='none';
@@ -2160,7 +2182,7 @@ function renderDashboard(){
       const canOpen = isAdmin || e.name===currentUser;
       const clickAttr = canOpen ? `onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"` : '';
       if(isAdmin){
-        // Admin: decorated card-style row for every RM
+        // Admin: decorated card-style row for every RM (mobile-responsive via .aac classes)
         let accent='#ef4444', tint='#fef2f2'; // absent default
         if(todayHoliday){accent='#f59e0b';tint='#fffbeb';}
         else if(rec&&rec.status==='Present'){
@@ -2169,14 +2191,14 @@ function renderDashboard(){
           else if(bc==='badge-blue'){accent='#2563eb';tint='#eff6ff';}
           else{accent='#f59e0b';tint='#fffbeb';}
         }
-        tal.innerHTML+=`<div ${clickAttr.replace('style="cursor:pointer"','')} style="cursor:pointer;display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:10px 0;padding:12px 16px;background:linear-gradient(90deg,${tint},#fff 45%);border:1px solid var(--border);border-left:5px solid ${accent};border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:box-shadow .15s,transform .15s" onmouseover="this.style.boxShadow='0 4px 14px rgba(0,0,0,.12)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.05)';this.style.transform=''">
-          <div style="display:flex;align-items:center;gap:14px;min-width:0;flex:1.2">
+        tal.innerHTML+=`<div class="aac" onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" title="Click to view full month" style="background:linear-gradient(90deg,${tint},#fff 45%);border-left:5px solid ${accent}">
+          <div class="aac-id">
             <div class="avatar" style="width:44px;height:44px;font-size:15px;flex-shrink:0;border:2px solid ${accent}">${initials(e.name)}</div>
-            <div style="font-size:18px;font-weight:800;white-space:nowrap">${e.name}</div>
+            <div class="aac-name">${e.name}</div>
           </div>
-          <div style="flex:1;text-align:center;font-size:15px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:4px 12px">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
-          <div style="flex:1;text-align:center;font-size:15px;color:var(--text2);white-space:nowrap;padding:4px 12px;border-right:1px dashed #d5dbe3">In: <b style="color:${accent}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
-          <div style="flex:0 0 auto;padding-left:14px"><span style="transform:scale(1.25);transform-origin:right center;display:inline-block">${badge}</span></div>
+          <div class="aac-cnt">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
+          <div class="aac-time">In: <b style="color:${accent}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
+          <div class="aac-badge">${badge}</div>
         </div>`;
       } else {
         tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
