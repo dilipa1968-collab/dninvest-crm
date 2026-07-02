@@ -2406,7 +2406,7 @@ async function doLogin(){
     initApp();
     // Silently record HR attendance in the background (same as HR Portal login),
     // so RMs don't need to open the HR Portal separately just to be marked present.
-    if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user); }
+    if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user); startCrmHeartbeat(user); }
   } else {
     document.getElementById('lerr').style.display='block';
   }
@@ -2423,6 +2423,44 @@ async function isCrmBlockedForRm(){
     }
   }catch(e){ console.log('Access control check failed:',e); }
   return false;
+}
+
+// ─── CRM HEARTBEAT → HR PORTAL OUT-TIME ─────────────────────────────────────
+// RMs spend the whole day in the CRM (not the HR Portal), so the CRM must also
+// send heartbeat pings to hr_data/heartbeats every 5 minutes. The HR Portal's
+// 6:15 PM auto-out-time job uses the LAST heartbeat as the out time — without
+// CRM pings, an RM's out time gets stuck at whenever their HR tab last pinged.
+// Same doc structure as HR Portal: {data:{Name:{date,time}}, updated}.
+function hrNameForCrmUser(user){
+  const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+  const rawName = String(user.name || user.username || '').trim();
+  const match = HR_NAMES.find(n =>
+    n.toLowerCase() === rawName.toLowerCase() ||
+    n.toLowerCase() === rawName.split(' ')[0].toLowerCase() ||
+    n.toLowerCase() === String(user.username||'').toLowerCase()
+  );
+  return match || rawName;
+}
+let _crmHbTimer=null, _crmHbName=null;
+async function sendCrmHeartbeat(){
+  try{
+    if(typeof fdb==='undefined' || !_crmHbName) return;
+    const n=new Date();
+    const hhmm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    const docRef=fdb.collection('hr_data').doc('heartbeats');
+    await fdb.runTransaction(async (tx)=>{
+      const doc=await tx.get(docRef);
+      let latest=(doc.exists && doc.data() && doc.data().data)?doc.data().data:{};
+      latest[_crmHbName]={date:today(), time:hhmm};
+      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+    });
+  }catch(e){ console.log('[HB] ping failed:', e); }
+}
+function startCrmHeartbeat(user){
+  if(_crmHbTimer) return; // already running
+  _crmHbName=hrNameForCrmUser(user);
+  sendCrmHeartbeat(); // immediate first ping
+  _crmHbTimer=setInterval(sendCrmHeartbeat, 5*60000); // every 5 min
 }
 
 // Auto-marks HR attendance the moment an RM logs into the CRM — silent,
@@ -2650,6 +2688,8 @@ function tryAutoLogin(){
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').style.display='block';
         initApp();
+        // Restart heartbeat pings after page refresh (session restore skips doLogin)
+        if(user.role!=='admin'){ startCrmHeartbeat(user); }
         return;
       }
     }catch(e){}
