@@ -266,15 +266,15 @@ tr:hover td{background:var(--surface2)}
 .emp-month-table tr.is-off td{color:var(--text3)}
 
 /* ADMIN ATTENDANCE CARDS (dashboard) */
-.aac{display:flex;align-items:center;margin:10px 0;padding:12px 16px;border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer;transition:box-shadow .15s,transform .15s}
+.aac{display:flex;align-items:center;margin:4px 0;padding:5px 12px;border:1px solid var(--border);border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:pointer;transition:box-shadow .15s,transform .15s}
 .aac-strip{display:flex;align-items:center;cursor:pointer}
-.aac:hover{box-shadow:0 4px 14px rgba(0,0,0,.12);transform:translateY(-1px)}
-.aac-id{display:flex;align-items:center;gap:12px;min-width:0;flex:1.2}
-.aac-name{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.aac-cnt{flex:1;text-align:center;font-size:15px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:4px 12px;white-space:nowrap}
-.aac-time{flex:1;text-align:center;font-size:15px;color:var(--text2);white-space:nowrap;padding:4px 12px}
-.aac-badge{flex:0 0 auto;padding-left:12px}
-.aac-badge .badge{font-size:14px;padding:5px 14px}
+.aac:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px)}
+.aac-id{display:flex;align-items:center;gap:9px;min-width:0;flex:1.2}
+.aac-name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aac-cnt{flex:1;text-align:center;font-size:12.5px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:2px 10px;white-space:nowrap}
+.aac-time{flex:1;text-align:center;font-size:12.5px;color:var(--text2);white-space:nowrap;padding:2px 10px}
+.aac-badge{flex:0 0 auto;padding-left:10px}
+.aac-badge .badge{font-size:11px;padding:3px 10px}
 @media(max-width:680px){
   .aac,.aac-strip{flex-wrap:wrap;row-gap:8px}
   .aac{padding:12px 14px}
@@ -2210,9 +2210,9 @@ function renderDashboard(){
           else if(bc==='badge-blue'){accent='#2563eb';tint='#eff6ff';}
           else{accent='#f59e0b';tint='#fffbeb';}
         }
-        tal.innerHTML+=`<div class="aac" onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" title="Click to view full month" style="background:linear-gradient(90deg,${tint},#fff 45%);border-left:5px solid ${accent}">
+        tal.innerHTML+=`<div class="aac" onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" title="Click to view full month" style="background:linear-gradient(90deg,${tint},#fff 45%);border-left:4px solid ${accent}">
           <div class="aac-id">
-            <div class="avatar" style="width:44px;height:44px;font-size:15px;flex-shrink:0;border:2px solid ${accent}">${initials(e.name)}</div>
+            <div class="avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0;border:2px solid ${accent}">${initials(e.name)}</div>
             <div class="aac-name">${e.name}</div>
           </div>
           <div class="aac-cnt">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
@@ -4055,4 +4055,695 @@ function parseBrokerageFile(inputEl){
       }
       const headerRow = rawRows[headerRowIdx].map(c => String(c).trim());
 
-      // Flexible column detection (case-
+      // Flexible column detection (case-insensitive, partial match)
+      const findCol = (...hints) => {
+        for(const hint of hints){
+          const idx = headerRow.findIndex(h => h.toLowerCase().includes(hint.toLowerCase()));
+          if(idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      const idxBro = findCol('brok', 'brokerage');
+      const idxRm  = findCol('rm', 'dealer', 'adviser', 'agent');
+
+      if(idxBro < 0 || idxRm < 0){
+        document.getElementById('bro-upload-result').innerHTML =
+          '<p style="color:var(--red)">Could not find required columns.<br>Headers found: <b>' +
+          headerRow.join(' | ') + '</b><br>Need: a Brokerage column and an RM/Dealer column.</p>';
+        return;
+      }
+
+      // Parse data rows (skip header row)
+      const minClients = parseFloat(document.getElementById('bro-client-min').value)      || 50;
+      const threshold  = parseFloat(document.getElementById('bro-client-threshold').value) || 100;
+      const bonus      = parseFloat(document.getElementById('bro-client-bonus').value)     || 700;
+
+      const idxCode = findCol('client code', 'code', 'client_code');
+      const idxName = findCol('client name', 'name', 'client_name');
+
+      const rmMap = {};
+      let dataRows = 0;
+      for(let i = headerRowIdx + 1; i < rawRows.length; i++){
+        const row = rawRows[i];
+        const rm      = String(row[idxRm]  || '').trim().toUpperCase();
+        const bro     = parseFloat(row[idxBro]) || 0;
+        const code    = idxCode>=0 ? String(row[idxCode]||'').trim() : '';
+        const cliName = idxName>=0 ? String(row[idxName]||'').trim() : '';
+        if(!rm) continue;
+        dataRows++;
+        if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0, clients:[]};
+        rmMap[rm].totalClients++;
+        rmMap[rm].totalBrokerage += bro;
+        if(bro >= threshold) rmMap[rm].eligibleClients++;
+        rmMap[rm].clients.push({code, name:cliName, bro, eligible: bro>=threshold});
+      }
+
+      if(!dataRows){
+        document.getElementById('bro-upload-result').innerHTML =
+          '<p style="color:var(--red)">No data rows found after the header row.</p>';
+        return;
+      }
+
+      // Match RM names from file to HR employee names
+      const employees = EMPLOYEES.filter(emp => emp && !emp.deleted);
+      const results = [];
+      Object.entries(rmMap).forEach(([rmUpper, stats]) => {
+        const empName =
+          employees.find(e => e.name.trim().toUpperCase() === rmUpper)?.name ||
+          employees.find(e => rmUpper.startsWith(e.name.trim().toUpperCase()))?.name ||
+          employees.find(e => e.name.trim().toUpperCase().startsWith(rmUpper))?.name ||
+          null;
+        const eligible = stats.eligibleClients >= minClients;
+        results.push({
+          rm: rmUpper, empName,
+          totalClients: stats.totalClients,
+          eligibleClients: stats.eligibleClients,
+          totalBrokerage: stats.totalBrokerage,
+          clients: stats.clients,
+          eligible,
+          bonus: eligible ? bonus : 0
+        });
+      });
+
+      _broParseResult = {results, minClients, threshold, bonus};
+      renderBroUploadResult(results, minClients, threshold, bonus);
+
+    } catch(err){
+      console.error('Brokerage parse error:', err);
+      document.getElementById('bro-upload-result').innerHTML =
+        '<p style="color:var(--red)">Error reading file: ' + escapeHtml(String(err.message||err)) + '</p>';
+    }
+  };
+  reader.onerror = function(){
+    document.getElementById('bro-upload-result').innerHTML =
+      '<p style="color:var(--red)">Could not read the file. Try again.</p>';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderBroUploadResult(results, minClients, threshold, bonus){
+  // Show results in a full-page overlay so renderIncentivePage() can never wipe it
+  let overlay = document.getElementById('bro-result-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'bro-result-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto';
+    document.body.appendChild(overlay);
+  }
+
+  let html = `<div style="background:var(--surface,#fff);border-radius:12px;padding:24px;width:min(900px,95vw);max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-weight:700;font-size:15px;color:var(--text1)">📊 Brokerage File — Parse Result</div>
+      <button onclick="document.getElementById('bro-result-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:0 4px">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
+      Rule: ≥<b>${minClients}</b> clients with brokerage ≥₹<b>${threshold}</b> → ₹<b>${bonus}</b> flat bonus
+    </p>
+    <div style="overflow-x:auto">
+    <table style="font-size:13px;width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--surface2,#f5f5f5)">
+        <th style="padding:8px 10px;text-align:left">RM (in file)</th>
+        <th style="padding:8px 10px;text-align:left">Matched Employee</th>
+        <th style="padding:8px 10px;text-align:right">Total Clients</th>
+        <th style="padding:8px 10px;text-align:right">Eligible<br><small style="font-weight:400">brokerage ≥₹${threshold}</small></th>
+        <th style="padding:8px 10px;text-align:right">Total Brokerage</th>
+        <th style="padding:8px 10px;text-align:right">Bonus</th>
+      </tr></thead>
+      <tbody>`;
+
+  results.forEach(r => {
+    html += `<tr style="border-bottom:1px solid var(--border,#eee)">
+      <td style="padding:8px 10px;font-weight:600">${escapeHtml(r.rm)}</td>
+      <td style="padding:8px 10px;color:${r.empName ? 'var(--text1)' : 'var(--red)'};font-weight:600">${r.empName ? escapeHtml(r.empName) : '⚠ Not matched'}</td>
+      <td style="padding:8px 10px;text-align:right">${r.totalClients}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:${r.eligible?'var(--green)':'var(--text1)'}">${r.eligibleClients}</td>
+      <td style="padding:8px 10px;text-align:right">₹${Math.round(r.totalBrokerage).toLocaleString('en-IN')}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:${r.eligible?'var(--green)':'var(--text3)'}">${r.eligible ? '₹'+r.bonus : '—'}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>
+    <button class="btn btn-primary" style="margin-top:16px;width:100%;padding:12px" onclick="applyBroClientIncentive()">✅ Apply to Selected Month's Incentive Data</button>
+  </div>`;
+
+  overlay.innerHTML = html;
+  // Also update the inline result div for quick status
+  const inlineDiv = document.getElementById('bro-upload-result');
+  if(inlineDiv){
+    const qualCount = results.filter(r=>r.eligible && r.empName).length;
+    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ File parsed — ${results.length} RMs found, ${qualCount} qualify for bonus. <a href="#" onclick="renderBroUploadResult(window._broParseResult.results,window._broParseResult.minClients,window._broParseResult.threshold,window._broParseResult.bonus);return false" style="color:var(--accent)">View results</a></p>`;
+  }
+  // Store on window so the "View results" link can re-open
+  window._broParseResult = _broParseResult;
+}
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Admin/RM: show client-wise brokerage detail popup
+function showBroClientDetail(empName, month){
+  const monthData = getMfSipForMonth(month);
+  const mfsip = monthData[empName] || {};
+  const rows  = mfsip.broClientRows || [];
+  const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+
+  let overlay = document.getElementById('bro-result-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'bro-result-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto';
+    document.body.appendChild(overlay);
+  }
+
+  const eligibleCount = rows.filter(function(r){return r.eligible;}).length;
+  const totalBro = rows.reduce(function(s,r){return s+r.bro;},0);
+
+  var bodyHtml = '';
+  if(rows.length === 0){
+    bodyHtml = '<p style="color:var(--text3);font-size:13px">No client data. Upload brokerage file and Apply first.</p>';
+  } else {
+    var rowsHtml = '';
+    for(var i=0;i<rows.length;i++){
+      var c = rows[i];
+      rowsHtml += '<tr style="border-bottom:1px solid var(--border,#eee)">'
+        +'<td style="padding:5px 10px;color:var(--text3)">'+(i+1)+'</td>'
+        +'<td style="padding:5px 10px;color:var(--text3);font-size:11.5px">'+escapeHtml(String(c.code||''))+'</td>'
+        +'<td style="padding:5px 10px">'+escapeHtml(c.name||'')+'</td>'
+        +'<td style="padding:5px 10px;text-align:right;font-weight:'+(c.eligible?'600':'400')+'">'+Number(c.bro).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'
+        +'<td style="padding:5px 10px;text-align:center">'+(c.eligible?'<span style="color:var(--green);font-weight:700">✓</span>':'<span style="color:var(--text3)">—</span>')+'</td>'
+        +'</tr>';
+    }
+    bodyHtml = '<div style="overflow-x:auto"><table style="font-size:12.5px;width:100%;border-collapse:collapse">'
+      +'<thead><tr style="background:var(--surface2,#f5f5f5)">'
+      +'<th style="padding:7px 10px;text-align:left">#</th>'
+      +'<th style="padding:7px 10px;text-align:left">Client Code</th>'
+      +'<th style="padding:7px 10px;text-align:left">Client Name</th>'
+      +'<th style="padding:7px 10px;text-align:right">Brokerage (₹)</th>'
+      +'<th style="padding:7px 10px;text-align:center">Eligible</th>'
+      +'</tr></thead><tbody>'
+      +rowsHtml
+      +'<tr style="background:var(--surface2);font-weight:700">'
+      +'<td colspan="3" style="padding:7px 10px">Total</td>'
+      +'<td style="padding:7px 10px;text-align:right">₹'+Math.round(totalBro).toLocaleString('en-IN')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;color:var(--green)">'+eligibleCount+' ✓</td>'
+      +'</tr></tbody></table></div>';
+  }
+
+  overlay.innerHTML = '<div style="background:var(--surface,#fff);border-radius:12px;padding:24px;width:min(800px,95vw);max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    +'<div><div style="font-weight:700;font-size:15px;color:var(--text1)">📋 '+escapeHtml(empName)+' — Client Brokerage</div>'
+    +'<div style="font-size:12px;color:var(--text3);margin-top:2px">'+mLabel+' &nbsp;·&nbsp; '+rows.length+' clients &nbsp;·&nbsp; '+eligibleCount+' eligible &nbsp;·&nbsp; Total ₹'+Math.round(totalBro).toLocaleString('en-IN')+'</div></div>'
+    +'<button onclick="document.getElementById(\'bro-result-overlay\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:0 4px">✕</button>'
+    +'</div>'
+    +bodyHtml
+    +'</div>';
+}
+
+async function applyBroClientIncentive(){
+  if(!_broParseResult){ alert('No file parsed yet.'); return; }
+  const monthEl = document.getElementById('bro-upload-month');
+  const month   = monthEl ? monthEl.value : '';
+  if(!month){ alert('Please select a month first.'); return; }
+
+  const {results} = _broParseResult;
+  const matched   = results.filter(r => r.empName);
+  const unmatched = results.filter(r => !r.empName);
+  if(!matched.length){ alert('No RM names could be matched to employees. Check the file.'); return; }
+
+  const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const summary = matched.map(r => `${r.empName}: ${r.eligible ? '₹'+r.bonus+' bonus ('+r.eligibleClients+' clients)' : 'No bonus ('+r.eligibleClients+'/'+_broParseResult.minClients+' clients)'}`).join('\n');
+  const unmSummary = unmatched.length ? '\n\nUnmatched RMs (skipped): '+unmatched.map(r=>r.rm).join(', ') : '';
+  if(!confirm('Apply brokerage client bonus for '+mLabel+'?\n\n'+summary+unmSummary)) return;
+
+  const all = getMfSipByMonth();
+  if(!all[month]) all[month] = {};
+  matched.forEach(r => {
+    if(!all[month][r.empName]) all[month][r.empName] = {brok:0,demat:0,mf:0,sip:0,other:0,otherRemark:''};
+    // Save total brokerage from file — fills the Brokerage column in team incentive table
+    all[month][r.empName].brok              = Math.round(r.totalBrokerage);
+    all[month][r.empName].broClientInc      = r.eligible ? r.bonus : 0;
+    all[month][r.empName].broClientEligible = r.eligible;
+    all[month][r.empName].broClientCount    = r.eligibleClients;
+    all[month][r.empName].broClientTotal    = r.totalClients;
+    // Save client-wise rows (code, name, brokerage) for RM's own detail view
+    all[month][r.empName].broClientRows     = (r.clients||[]).map(c=>({code:c.code, name:c.name, bro:Math.round(c.bro*100)/100, eligible:c.eligible}));
+  });
+  await saveMfSipByMonth(all);
+
+  // Close the popup overlay
+  const overlay = document.getElementById('bro-result-overlay');
+  if(overlay) overlay.remove();
+
+  // Update inline status
+  const inlineDiv = document.getElementById('bro-upload-result');
+  if(inlineDiv){
+    const qualNames = matched.filter(r=>r.eligible).map(r=>r.empName+' ₹'+r.bonus).join(', ');
+    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ Applied for ${mLabel}${qualNames ? ' — Bonus: '+qualNames : ' — No one qualified'}</p>`;
+  }
+
+  renderIncentivePage();
+  alert('✅ Brokerage client bonus applied for '+mLabel+'!');
+}
+
+function loadIncEmp(){
+  const sel=document.getElementById('inc-emp');
+  if(!sel) return;
+  const name=sel.value;
+  const month=currentIncMonth();
+  const sal=getEmpSalary(name);
+  const perf=getPerfIncentive(name);
+  const monthData=getMfSipForMonth(month);
+  const mfsip=monthData[name]||{};
+  const dispEl=document.getElementById('inc-salary-display');
+  if(dispEl) dispEl.value=fmt(sal+perf)+(perf>0?'  ('+fmt(sal)+' + '+fmt(perf)+' perf.)':'');
+  document.getElementById('inc-brok').value = mfsip.brok!==undefined?mfsip.brok:0;
+  document.getElementById('inc-demat').value = mfsip.demat!==undefined?mfsip.demat:0;
+  document.getElementById('inc-mf').value = mfsip.mf||0;
+  document.getElementById('inc-net-sales').value = mfsip.netSales||0;
+  document.getElementById('inc-sip').value = mfsip.sip||0;
+  document.getElementById('inc-other').value = mfsip.other||0;
+  document.getElementById('inc-other-remark').value = mfsip.otherRemark||'';
+  calcIncentive();
+}
+
+async function saveMfSipData(){
+  const sel=document.getElementById('inc-emp');
+  const name=sel.value;
+  const month=currentIncMonth();
+  const brok=parseInt(document.getElementById('inc-brok').value)||0;
+  const demat=parseInt(document.getElementById('inc-demat').value)||0;
+  const mf=parseInt(document.getElementById('inc-mf').value)||0;
+  const netSales=parseInt(document.getElementById('inc-net-sales').value)||0;
+  const sip=parseInt(document.getElementById('inc-sip').value)||0;
+  const other=parseInt(document.getElementById('inc-other').value)||0;
+  const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
+  const all=getMfSipByMonth();
+  if(!all[month]) all[month]={};
+  const prev=all[month][name]||{};
+  // Preserve broClientInc if already applied from file upload — manual form save should not erase it
+  all[month][name]={brok,demat,mf,netSales,sip,other,otherRemark, broClientInc: prev.broClientInc||0, broClientEligible: prev.broClientEligible||false};
+  await saveMfSipByMonth(all);
+  loadIncEmp();        // reload fields from saved data — keeps figures visible & editable
+  renderIncentivePage();
+  const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  alert(name+'\'s business figures for '+mLabel+' have been saved!');
+}
+
+function calcIncentive(){
+  const sel=document.getElementById('inc-emp');
+  if(!sel) return;
+  const name=sel.value;
+  const salary=getIncentiveSalary(name);
+  const brok=parseInt(document.getElementById('inc-brok').value)||0;
+  const demat=parseInt(document.getElementById('inc-demat').value)||0;
+  const mf=parseInt(document.getElementById('inc-mf').value)||0;
+  const aum=parseInt(document.getElementById('inc-net-sales').value)||0;
+  const sip=parseInt(document.getElementById('inc-sip').value)||0;
+  const other=parseInt(document.getElementById('inc-other').value)||0;
+  const otherRemark=(document.getElementById('inc-other-remark').value||'').trim();
+  const rates=getIncRates();
+
+  const br=brokerageIncentive(salary,brok, checkTier2Eligible(demat,sip,mf));
+  const dematInc=demat*getDematRate();
+  const mfInc=mf*(rates.mfRate||0)/100;
+  const netSalesInc=aum*(rates.netSalesRate||0)/100;
+  const sipInc=sip*(rates.sipRate||0)/100;
+  const total=br.total+dematInc+mfInc+netSalesInc+sipInc+other;
+
+  const t2Elig = br.tier2Eligible;
+  const t2MinDemat    = Number(rates.tier2MinDemat)||2;
+  const t2MinSip      = Number(rates.tier2MinSip)||2000;
+  const t2MinLumpsum  = Number(rates.tier2MinLumpsum)||10000;
+  const t2BlockNote   = t2Elig ? '' :
+    `<tr><td colspan="2" style="font-size:11px;color:var(--red);padding:4px 0">
+      ⚠ Tier 2 blocked — minimum not met:
+      ${demat<t2MinDemat?`Demat ${demat}/${t2MinDemat} `:''}
+      ${sip<t2MinSip?`SIP ₹${sip}/₹${t2MinSip} `:''}
+      ${mf<t2MinLumpsum?`Lumpsum ₹${mf}/₹${t2MinLumpsum}`:''}
+    </td></tr>`;
+
+  const el=document.getElementById('inc-result');
+  if(el) el.innerHTML=`
+    <table style="font-size:13px;width:100%">
+      <tr><td style="color:var(--text2);padding:4px 0">${rates.lowMult||3}× Inc.Salary / ${rates.highMult||10}× Inc.Salary</td><td style="text-align:right">${fmt(br.threshold3)} / ${fmt(br.threshold10)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Excess over ${rates.lowMult||3}×</td><td style="text-align:right">${fmt(br.excess)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Tier 1 incentive (@ ${rates.tier1Rate||5}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(br.base5)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Tier 2 extra incentive (@ ${rates.tier2Rate||7}%, above ${rates.highMult||10}×)${t2Elig?'':'<span style="color:var(--red);margin-left:4px">🚫</span>'}</td><td style="text-align:right;color:${t2Elig?'var(--green)':'var(--text3)'}">+ ${fmt(br.extra2)}</td></tr>
+      ${t2BlockNote}
+      <tr><td style="color:var(--text2);padding:4px 0;font-weight:600">Brokerage incentive total</td><td style="text-align:right;font-weight:600;color:var(--green)">${fmt(br.total)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Demat incentive (${demat} × ${fmt(getDematRate())})</td><td style="text-align:right;color:var(--green)">+ ${fmt(dematInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive (${rates.mfRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(mfInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">MF Net Sales incentive (${rates.netSalesRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(netSalesInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">SIP incentive (${rates.sipRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(sipInc)}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 0">Other / Special${otherRemark?' ('+otherRemark+')':''}</td><td style="text-align:right;color:var(--green)">+ ${fmt(other)}</td></tr>
+      <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(total)}</td></tr>
+    </table>`;
+}
+
+// ─── EMPLOYEES ───────────────────────────────────────────────────────────────
+function renderEmployees(){
+  renderAccessControl();
+  populateEmpDropdowns();
+  const et=document.getElementById('emp-table');
+  if(!et) return;
+  et.innerHTML=EMPLOYEES.map(e=>{
+    const sal=getEmpSalary(e.name);
+    const perf=getPerfIncentive(e.name);
+    return `
+    <tr>
+      <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
+      <td>${e.role}</td><td>${e.joined}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span>₹</span>
+          <input type="number" value="${sal}" id="emp-sal-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')">Set</button>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span>₹</span>
+          <input type="number" value="${perf}" id="emp-perf-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px" title="Performance Incentive — added to salary to form the Incentive Salary base">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpPerfInc('${e.name}')">Set</button>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="text" value="${getEsicNumber(e.name)}" id="emp-esic-${e.name}" placeholder="ESIC No." style="width:100px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="saveEsicNo('${e.name}')">Set</button>
+        </div>
+      </td>
+      <td>
+        <select onchange="toggleEsiRegistered('${e.name}', this.value==='1')" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px">
+          <option value="1" ${isEsiRegistered(e.name)?'selected':''}>Yes</option>
+          <option value="0" ${!isEsiRegistered(e.name)?'selected':''}>No</option>
+        </select>
+      </td>
+      <td><span style="font-size:11px;color:var(--text3)">CRM credentials</span></td>
+      <td><span class="badge badge-green">Active</span></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}'))+'\\nPerf. Inc.: '+fmt(getPerfIncentive('${e.name}'))+'\\nIncentive Salary: '+fmt(getIncentiveSalary('${e.name}')))">View</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.name}')">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── ACCESS CONTROL UI ──────────────────────────────────────────────────────
+async function renderAccessControl(){
+  await fetchAccessControlOnce();
+  const access=getAccessControl();
+  const crmOn=access.crmEnabled!==false;
+  const hrOn=access.hrEnabled!==false;
+
+  const crmToggle=document.getElementById('toggle-crm');
+  const hrToggle=document.getElementById('toggle-hr');
+  if(crmToggle) crmToggle.checked=crmOn;
+  if(hrToggle) hrToggle.checked=hrOn;
+
+  const crmLabel=document.getElementById('crm-status-label');
+  const hrLabel=document.getElementById('hr-status-label');
+  if(crmLabel){ crmLabel.textContent = crmOn ? 'Enabled for RM' : 'Disabled for RM'; crmLabel.style.color = crmOn ? 'var(--green)' : 'var(--red)'; }
+  if(hrLabel){ hrLabel.textContent = hrOn ? 'Enabled for RM' : 'Disabled for RM'; hrLabel.style.color = hrOn ? 'var(--green)' : 'var(--red)'; }
+}
+
+async function toggleCrmAccess(checked){
+  await setAccessControl({crmEnabled:checked});
+  renderAccessControl();
+  alert('CRM has been '+(checked?'enabled':'disabled')+' for this RM.\n\nYour (Admin) access will always remain enabled.');
+}
+
+async function toggleHrAccess(checked){
+  await setAccessControl({hrEnabled:checked});
+  renderAccessControl();
+  updateOfficeStatusBanner();
+  alert('HR Portal has been '+(checked?'enabled':'disabled')+' for this RM.\n\nYour (Admin) access will always remain enabled.');
+}
+
+async function saveEmpSalary(name){
+  const val=document.getElementById('emp-sal-'+name).value;
+  await setEmpSalary(name,val);
+  renderEmployees();
+  renderSalaryPage();
+  renderIncentivePage();
+  alert(name+'\'s salary has been set to: '+fmt(parseInt(val)||0)+'\n\nThis will update instantly on the RM\'s device.');
+}
+
+async function saveEmpPerfInc(name){
+  const val=document.getElementById('emp-perf-'+name).value;
+  await setPerfIncentive(name,val);
+  renderEmployees();
+  renderIncentivePage();
+  const sal=getEmpSalary(name);
+  alert(name+'\'s Performance Incentive set to: '+fmt(parseInt(val)||0)+
+        '\n\nIncentive Salary (Salary + Perf. Inc.) is now '+fmt(sal+(parseInt(val)||0))+
+        '.\nAll brokerage incentive tiers will now be calculated on this base.');
+}
+
+function toggleAddForm(){
+  const f=document.getElementById('add-emp-form');
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+async function addEmployee(){
+  const name=document.getElementById('ne-name').value.trim();
+  if(!name){alert('Please enter a name');return}
+  if(EMPLOYEES.find(e=>e.name.toLowerCase()===name.toLowerCase())){alert('An employee with this name already exists');return}
+  const emp={name,role:document.getElementById('ne-role').value.trim()||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000};
+  try{
+    await persistAddEmployee(emp);
+    const perfVal=parseInt(document.getElementById('ne-perf').value)||0;
+    if(perfVal>0) await setPerfIncentive(name, perfVal);
+  }catch(e){
+    alert('Could not save '+name+'. Please check your internet and try again.');
+    return;
+  }
+  // Refresh everywhere the new name should appear.
+  applyEmployeeChanges();
+  populateEmpDropdowns();
+  renderEmployees();
+  renderSalaryPage && renderSalaryPage();
+  renderIncentivePage && renderIncentivePage();
+  // Clear the form for the next entry.
+  ['ne-name','ne-role','ne-mob','ne-doj','ne-sal','ne-perf'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  toggleAddForm();
+  alert('✅ '+name+' added to HR Portal (salary '+fmt(emp.salary)+').\n\nZaroori: HR me employee add karne se uska CRM login nahi banta. Login ke liye CRM ke Users & Settings me isi naam se user banana hoga — tabhi ye HR me login kar payega aur attendance track hogi.');
+}
+
+async function toggleEsiRegistered(name, val){
+  await setEsiRegisteredFlag(name, val);
+  renderEmployees();
+  renderEsiOverrideTable();
+  renderEsiBox();
+  calcSalary && calcSalary();
+  renderSalaryPage && renderSalaryPage();
+}
+
+async function saveEsicNo(name){
+  const val=document.getElementById('emp-esic-'+name).value;
+  await setEsicNumber(name, val);
+  renderEmployees();
+  alert(name+"'s ESIC number set to: "+(val.trim()||'(blank)'));
+}
+
+async function deleteEmployee(name){
+  if(!confirm('Remove '+name+' from the employee list?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed.\n\nThis cannot be undone from here.')) return;
+  await persistRemoveEmployee(name);
+  renderEmployees();
+  alert(name+' has been removed from the employee list.');
+}
+
+// ─── NAV ─────────────────────────────────────────────────────────────────────
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  // refresh on visit
+  if(id==='attendance') renderAttendancePage();
+  if(id==='leave') renderLeavePage();
+  if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); } }
+  if(id==='incentive') renderIncentivePage();
+  if(id==='dashboard') renderDashboard();
+  if(id==='employees') renderEmployees();
+  if(id==='reports'){ renderAttendanceSheet(); renderDateWiseSheet(); }
+}
+
+/* ── Generic click-to-sort for every data table (any <table> with a <thead>) ──
+   Click a header to sort; click again to flip ascending/descending. Auto-detects
+   numbers (₹/commas/%), dates (dd-mm-yyyy or yyyy-mm-dd) and text. Empty/action
+   columns aren't clickable and TOTAL / footer rows stay pinned at the bottom.
+   View-only convenience; a table re-render resets it. */
+(function(){
+  if(window.__genericSortInit) return; window.__genericSortInit=true;
+  const st=document.createElement('style');
+  st.textContent='table thead th{cursor:pointer;user-select:none}';
+  (document.head||document.documentElement).appendChild(st);
+
+  function parse(s){
+    const n=s.replace(/[₹,%]/g,'').replace(/\s/g,'');
+    if(n!=='' && /[0-9]/.test(n) && !isNaN(n)) return {t:'num', v:parseFloat(n)};
+    let m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+    if(m) return {t:'str', v:m[3]+m[2].padStart(2,'0')+m[1].padStart(2,'0')};
+    m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+    if(m) return {t:'str', v:m[1]+m[2].padStart(2,'0')+m[3].padStart(2,'0')};
+    return {t:'str', v:s.toLowerCase()};
+  }
+
+  document.addEventListener('click', function(e){
+    const th=e.target.closest('th'); if(!th) return;
+    if(!th.closest('thead')) return;
+    const table=th.closest('table'); if(!table) return;
+    if(th.hasAttribute('onclick')) return;
+    const ths=Array.from(th.parentElement.children);
+    const col=ths.indexOf(th); if(col<0) return;
+    if(!th.textContent.replace(/[▲▼⇅]/g,'').trim()) return;
+    const tbody=table.tBodies[0]; if(!tbody) return;
+
+    let dir='asc';
+    if(table.getAttribute('data-gs-col')===String(col))
+      dir=table.getAttribute('data-gs-dir')==='asc'?'desc':'asc';
+    table.setAttribute('data-gs-col',col);
+    table.setAttribute('data-gs-dir',dir);
+    const d=dir==='asc'?1:-1;
+
+    const pinned=[], list=[];
+    Array.from(tbody.rows).forEach(r=>{
+      const f=(r.cells[0]?r.cells[0].textContent:'').trim().toUpperCase();
+      if(r.classList.contains('no-sort')||f.startsWith('TOTAL')||f.startsWith('GRAND')) pinned.push(r);
+      else list.push(r);
+    });
+    list.sort((a,b)=>{
+      const pa=parse((a.cells[col]?a.cells[col].textContent:'').trim());
+      const pb=parse((b.cells[col]?b.cells[col].textContent:'').trim());
+      let c;
+      if(pa.t==='num'&&pb.t==='num') c=pa.v-pb.v;
+      else c=String(pa.v).localeCompare(String(pb.v),undefined,{numeric:true});
+      return c*d;
+    });
+    list.forEach(r=>tbody.appendChild(r));
+    pinned.forEach(r=>tbody.appendChild(r));
+
+    ths.forEach((h,i)=>{
+      const ex=h.querySelector('.gs-arrow'); if(ex) ex.remove();
+      if(h.hasAttribute('onclick')) return;
+      if(!h.textContent.replace(/[▲▼⇅]/g,'').trim()) return;
+      const sp=document.createElement('span');
+      sp.className='gs-arrow';
+      sp.style.cssText='color:#9aa;font-size:.7em;margin-left:3px';
+      sp.textContent = i===col ? (dir==='asc'?'▲':'▼') : '';
+      h.appendChild(sp);
+    });
+  });
+})();
+</script>
+
+<!-- ─── EMPLOYEE MONTH ATTENDANCE MODAL ─────────────────────────────── -->
+<div class="emp-modal-overlay" id="empMonthOverlay" onclick="if(event.target===this)closeEmpMonthModal()">
+  <div class="emp-modal">
+    <div class="emp-modal-head">
+      <div class="emp-modal-title"><span class="avatar" id="empModalAvatar" style="width:30px;height:30px;font-size:11px"></span><span id="empModalName"></span></div>
+      <button class="emp-modal-close" onclick="closeEmpMonthModal()">✕</button>
+    </div>
+    <div class="emp-month-nav">
+      <button onclick="empModalShift(-1)">‹</button>
+      <span class="emp-month-label" id="empModalMonthLabel"></span>
+      <button id="empModalNextBtn" onclick="empModalShift(1)">›</button>
+    </div>
+    <div class="emp-modal-body" id="empModalBody"></div>
+  </div>
+</div>
+
+<script>
+// ─── EMPLOYEE MONTH ATTENDANCE MODAL ──────────────────────────────────
+let _empModal = { name:null, ym:null }; // ym = 'YYYY-MM'
+
+function openEmpMonthModal(name){
+  // RMs can only view their own month; admin can view anyone
+  if(!isAdmin && name!==currentUser) return;
+  _empModal.name = name;
+  _empModal.ym = today().slice(0,7);
+  document.getElementById('empMonthOverlay').classList.add('open');
+  renderEmpMonthModal();
+}
+function closeEmpMonthModal(){
+  document.getElementById('empMonthOverlay').classList.remove('open');
+}
+function empModalShift(delta){
+  const [y,m] = _empModal.ym.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  const ny = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if(ny > today().slice(0,7)) return; // no future months
+  _empModal.ym = ny;
+  renderEmpMonthModal();
+}
+function renderEmpMonthModal(){
+  const name=_empModal.name, ym=_empModal.ym;
+  if(!name||!ym) return;
+  const [y,m]=ym.split('-').map(Number);
+  const monthName=new Date(y,m-1,1).toLocaleString('en-IN',{month:'long',year:'numeric'});
+  document.getElementById('empModalName').textContent = name;
+  document.getElementById('empModalAvatar').textContent = initials(name);
+  document.getElementById('empModalMonthLabel').textContent = monthName;
+  // Disable › if showing current month
+  document.getElementById('empModalNextBtn').disabled = (ym >= today().slice(0,7));
+
+  const att=getAtt();
+  const recs=(att[name]||[]).filter(r=>r.date&&r.date.startsWith(ym));
+  const byDate={}; recs.forEach(r=>{ byDate[r.date]=r; });
+  const daysInMonth=new Date(y,m,0).getDate();
+  const td=today();
+  const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let green=0,blue=0,amber=0,absent=0,half=0,leave=0;
+  let rows='';
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=ym+'-'+String(d).padStart(2,'0');
+    const dow=new Date(y,m-1,d).getDay();
+    const rec=byDate[ds];
+    const holName=getHolidayName(ds); // 'Sunday' or holiday name or null
+    let badge='', inT='—', outT='—', rowCls='';
+    if(ds===td) rowCls='is-today';
+
+    if(rec && rec.status==='Present'){
+      const bc=presentBadgeClass(rec);
+      if(bc==='badge-green')green++; else if(bc==='badge-blue')blue++; else amber++;
+      badge=`<span class="badge ${bc}">Present</span>`;
+      inT=rec.in||'—'; outT=rec.out||'—';
+    } else if(rec && rec.status){
+      const bc=(typeof ATT_STATUS_BADGE!=='undefined'&&ATT_STATUS_BADGE[rec.status])||'badge-gray';
+      if(rec.status==='Absent')absent++;
+      else if(rec.status==='Half day')half++;
+      else if(rec.status==='Leave')leave++;
+      badge=`<span class="badge ${bc}">${rec.status}</span>`;
+      inT=rec.in||'—'; outT=rec.out||'—';
+    } else if(holName){
+      badge=`<span class="badge badge-gray">${holName==='Sunday'?'Off':'Holiday'}</span> <span style="font-size:10px;color:var(--text3)">${holName==='Sunday'?'':holName}</span>`;
+      rowCls+=' is-off';
+    } else if(ds<td){
+      absent++;
+      badge='<span class="badge badge-red">Absent</span>';
+    } else if(ds===td){
+      badge='<span class="badge badge-gray">—</span>';
+    } else {
+      badge=''; rowCls+=' is-off'; // future date
+    }
+    rows+=`<tr class="${rowCls.trim()}"><td style="white-space:nowrap;font-weight:600">${String(d).padStart(2,'0')}-${String(m).padStart(2,'0')}</td><td>${DOW[dow]}</td><td>${badge}</td><td style="font-family:monospace">${inT}</td><td style="font-family:monospace">${outT}</td></tr>`;
+  }
+
+  const totalPresent=green+blue+amber;
+  let summary=`<span>🟢 ${green}</span><span>🔵 ${blue}</span><span>🟡 ${amber}</span><span style="background:var(--green-bg)">Present: ${totalPresent}</span><span style="background:var(--red-bg)">Absent: ${absent}</span>`;
+  if(half) summary+=`<span>Half day: ${half}</span>`;
+  if(leave) summary+=`<span>Leave: ${leave}</span>`;
+
+  document.getElementById('empModalBody').innerHTML=
+    `<div class="emp-modal-summary">${summary}</div>
+     <table class="emp-month-table">
+       <thead><tr><th>Date</th><th>Day</th><th>Status</th><th>In</th><th>Out</th></tr></thead>
+       <tbody>${rows}</tbody>
+     </table>`;
+}
+</script>
+</body>
+</html>
