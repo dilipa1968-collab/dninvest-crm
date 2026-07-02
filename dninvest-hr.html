@@ -2140,6 +2140,9 @@ function renderDashboard(){
   // Today att list
   const tal=document.getElementById('today-att-list');
   if(tal){
+    // Admin: attendance card spans full width so big rows fit on one line
+    const attCard=tal.closest('.card');
+    if(attCard) attCard.style.gridColumn = isAdmin ? '1 / -1' : '';
     tal.innerHTML='';
     EMPLOYEES.forEach(e=>{
       const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
@@ -2156,7 +2159,22 @@ function renderDashboard(){
       const outT=(rec&&rec.out)?rec.out:'—';
       const canOpen = isAdmin || e.name===currentUser;
       const clickAttr = canOpen ? `onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"` : '';
-      tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
+      if(isAdmin){
+        // Admin: big full-width row for every RM (same style as the personal strip)
+        tal.innerHTML+=`<div class="att-entry" ${clickAttr}>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:14px;min-width:0">
+              <div class="avatar" style="width:44px;height:44px;font-size:15px;flex-shrink:0">${initials(e.name)}</div>
+              <div style="font-size:18px;font-weight:800;white-space:nowrap">${e.name}</div>
+            </div>
+            <div style="flex:1;text-align:center;font-size:15px;color:#555">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
+            <div style="font-size:15px;color:var(--text2);white-space:nowrap">In: <b style="color:var(--text)">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
+            <span style="transform:scale(1.25);transform-origin:right center;display:inline-block;margin-left:6px">${badge}</span>
+          </div>
+        </div>`;
+      } else {
+        tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
+      }
     });
   }
 
