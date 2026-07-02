@@ -441,7 +441,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
     <div id="page-attendance" class="page">
       <div class="grid-flat">
         <div class="card">
-          <div class="card-title">My Attendance — June 2026</div>
+          <div class="card-title" id="my-att-title">My Attendance</div>
           <div id="my-att-summary"></div>
         </div>
         <div class="card">
@@ -454,7 +454,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           </div>
         </div>
         <div class="card admin-only" style="display:none">
-          <div class="card-title">Team attendance — June 2026</div>
+          <div class="card-title" id="team-att-title">Team attendance</div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th>🟢</th><th>🔵</th><th>🟡</th><th>Late</th><th>Leave</th><th>Absent</th><th>%</th></tr></thead>
@@ -2339,9 +2339,16 @@ function renderDashboardFinancials(){
 // ─── ATTENDANCE PAGE ─────────────────────────────────────────────────────────
 function renderAttendancePage(){
   const att=getAtt();
-  const myRecs=(att[currentUser]||[]).sort((a,b)=>b.date.localeCompare(a.date));
+  const curYM=today().slice(0,7); // e.g. "2026-07" — current month only
+  const allRecs=(att[currentUser]||[]).sort((a,b)=>b.date.localeCompare(a.date));
+  const myRecs=allRecs.filter(r=>r.date && r.date.startsWith(curYM));
 
-  // Summary
+  // Dynamic card title — "My Attendance — July 2026"
+  const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const titleEl=document.getElementById('my-att-title');
+  if(titleEl) titleEl.textContent='My Attendance — '+monthNames[parseInt(curYM.slice(5,7))-1]+' '+curYM.slice(0,4);
+
+  // Summary (current month only)
   const present=myRecs.filter(r=>r.status==='Present').length;
   const late=myRecs.filter(r=>r.status==='Late').length;
   const holidayRecs=myRecs.filter(r=>r.status==='Holiday');
@@ -2390,19 +2397,21 @@ function renderAttendancePage(){
   // Log
   const al=document.getElementById('my-att-log');
   if(al){
-    if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records</td></tr>'}
-    else al.innerHTML=myRecs.slice(0,20).map(r=>{
+    if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records this month</td></tr>'}
+    else al.innerHTML=myRecs.map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
       const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
       return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td></tr>`;
     }).join('');
   }
 
-  // Team table (admin)
+  // Team table (admin) — current month only
   if(isAdmin){
+    const ttl=document.getElementById('team-att-title');
+    if(ttl) ttl.textContent='Team attendance — '+monthNames[parseInt(curYM.slice(5,7))-1]+' '+curYM.slice(0,4);
     const tt=document.getElementById('team-att-table');
     if(tt) tt.innerHTML=EMPLOYEES.map(e=>{
-      const recs=att[e.name]||[];
+      const recs=(att[e.name]||[]).filter(r=>r.date && r.date.startsWith(curYM));
       const presentRecs=recs.filter(r=>r.status==='Present');
       const green=presentRecs.filter(r=>presentBadgeClass(r)==='badge-green').length;
       const blue=presentRecs.filter(r=>presentBadgeClass(r)==='badge-blue').length;
@@ -2950,9 +2959,9 @@ function renderLeavePage(){
   const mls=document.getElementById('my-leave-summary');
   if(mls){
     const att=getAtt();
-    const myRecs=att[currentUser]||[];
-    const present=myRecs.filter(r=>r.status==='Present'||r.status==='Late').length;
     const month=td.slice(0,7);
+    const myRecs=(att[currentUser]||[]).filter(r=>r.date && r.date.startsWith(month));
+    const present=myRecs.filter(r=>r.status==='Present'||r.status==='Late').length;
     const sundaysInMonth=countSundaysInMonth(month);
     const holidaysInMonth=holidays.filter(h=>h.date.startsWith(month)).length;
     mls.innerHTML=`
