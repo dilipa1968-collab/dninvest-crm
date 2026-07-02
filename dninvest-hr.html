@@ -245,6 +245,26 @@ tr:hover td{background:var(--surface2)}
 .att-entry:last-child{border-bottom:none}
 .time-chip{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 10px;font-size:12px;font-weight:600;color:var(--text);font-family:monospace}
 
+/* EMPLOYEE MONTH MODAL */
+.emp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow-y:auto}
+.emp-modal-overlay.open{display:flex}
+.emp-modal{background:var(--surface,#fff);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.emp-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.emp-modal-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px}
+.emp-modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);line-height:1}
+.emp-month-nav{display:flex;align-items:center;justify-content:center;gap:14px;padding:10px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.emp-month-nav button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:14px;font-weight:700}
+.emp-month-nav button:disabled{opacity:.35;cursor:default}
+.emp-month-label{font-weight:700;font-size:14px;min-width:130px;text-align:center}
+.emp-modal-body{overflow-y:auto;padding:10px 18px 18px}
+.emp-modal-summary{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 12px;font-size:12px}
+.emp-modal-summary span{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-weight:600}
+.emp-month-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.emp-month-table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text3)}
+.emp-month-table td{padding:6px 8px;border-bottom:1px solid var(--border)}
+.emp-month-table tr.is-today td{background:#eefcf5}
+.emp-month-table tr.is-off td{color:var(--text3)}
+
 /* PROGRESS */
 .progress{height:5px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:5px}
 .progress-bar{height:100%;border-radius:3px;background:var(--accent);transition:width 0.4s}
@@ -2099,7 +2119,7 @@ function renderDashboard(){
       const mTotal=mGreen+mBlue+mAmber;
       const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
-      tal.innerHTML+=`<div class="att-entry"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
+      tal.innerHTML+=`<div class="att-entry" onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
     });
   }
 
@@ -4515,6 +4535,111 @@ function showPage(id,btn){
     });
   });
 })();
+</script>
+
+<!-- ─── EMPLOYEE MONTH ATTENDANCE MODAL ─────────────────────────────── -->
+<div class="emp-modal-overlay" id="empMonthOverlay" onclick="if(event.target===this)closeEmpMonthModal()">
+  <div class="emp-modal">
+    <div class="emp-modal-head">
+      <div class="emp-modal-title"><span class="avatar" id="empModalAvatar" style="width:30px;height:30px;font-size:11px"></span><span id="empModalName"></span></div>
+      <button class="emp-modal-close" onclick="closeEmpMonthModal()">✕</button>
+    </div>
+    <div class="emp-month-nav">
+      <button onclick="empModalShift(-1)">‹</button>
+      <span class="emp-month-label" id="empModalMonthLabel"></span>
+      <button id="empModalNextBtn" onclick="empModalShift(1)">›</button>
+    </div>
+    <div class="emp-modal-body" id="empModalBody"></div>
+  </div>
+</div>
+
+<script>
+// ─── EMPLOYEE MONTH ATTENDANCE MODAL ──────────────────────────────────
+let _empModal = { name:null, ym:null }; // ym = 'YYYY-MM'
+
+function openEmpMonthModal(name){
+  _empModal.name = name;
+  _empModal.ym = today().slice(0,7);
+  document.getElementById('empMonthOverlay').classList.add('open');
+  renderEmpMonthModal();
+}
+function closeEmpMonthModal(){
+  document.getElementById('empMonthOverlay').classList.remove('open');
+}
+function empModalShift(delta){
+  const [y,m] = _empModal.ym.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  const ny = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if(ny > today().slice(0,7)) return; // no future months
+  _empModal.ym = ny;
+  renderEmpMonthModal();
+}
+function renderEmpMonthModal(){
+  const name=_empModal.name, ym=_empModal.ym;
+  if(!name||!ym) return;
+  const [y,m]=ym.split('-').map(Number);
+  const monthName=new Date(y,m-1,1).toLocaleString('en-IN',{month:'long',year:'numeric'});
+  document.getElementById('empModalName').textContent = name;
+  document.getElementById('empModalAvatar').textContent = initials(name);
+  document.getElementById('empModalMonthLabel').textContent = monthName;
+  // Disable › if showing current month
+  document.getElementById('empModalNextBtn').disabled = (ym >= today().slice(0,7));
+
+  const att=getAtt();
+  const recs=(att[name]||[]).filter(r=>r.date&&r.date.startsWith(ym));
+  const byDate={}; recs.forEach(r=>{ byDate[r.date]=r; });
+  const daysInMonth=new Date(y,m,0).getDate();
+  const td=today();
+  const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let green=0,blue=0,amber=0,absent=0,half=0,leave=0;
+  let rows='';
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=ym+'-'+String(d).padStart(2,'0');
+    const dow=new Date(y,m-1,d).getDay();
+    const rec=byDate[ds];
+    const holName=getHolidayName(ds); // 'Sunday' or holiday name or null
+    let badge='', inT='—', outT='—', rowCls='';
+    if(ds===td) rowCls='is-today';
+
+    if(rec && rec.status==='Present'){
+      const bc=presentBadgeClass(rec);
+      if(bc==='badge-green')green++; else if(bc==='badge-blue')blue++; else amber++;
+      badge=`<span class="badge ${bc}">Present</span>`;
+      inT=rec.in||'—'; outT=rec.out||'—';
+    } else if(rec && rec.status){
+      const bc=(typeof ATT_STATUS_BADGE!=='undefined'&&ATT_STATUS_BADGE[rec.status])||'badge-gray';
+      if(rec.status==='Absent')absent++;
+      else if(rec.status==='Half day')half++;
+      else if(rec.status==='Leave')leave++;
+      badge=`<span class="badge ${bc}">${rec.status}</span>`;
+      inT=rec.in||'—'; outT=rec.out||'—';
+    } else if(holName){
+      badge=`<span class="badge badge-gray">${holName==='Sunday'?'Off':'Holiday'}</span> <span style="font-size:10px;color:var(--text3)">${holName==='Sunday'?'':holName}</span>`;
+      rowCls+=' is-off';
+    } else if(ds<td){
+      absent++;
+      badge='<span class="badge badge-red">Absent</span>';
+    } else if(ds===td){
+      badge='<span class="badge badge-gray">—</span>';
+    } else {
+      badge=''; rowCls+=' is-off'; // future date
+    }
+    rows+=`<tr class="${rowCls.trim()}"><td style="white-space:nowrap;font-weight:600">${String(d).padStart(2,'0')}-${String(m).padStart(2,'0')}</td><td>${DOW[dow]}</td><td>${badge}</td><td style="font-family:monospace">${inT}</td><td style="font-family:monospace">${outT}</td></tr>`;
+  }
+
+  const totalPresent=green+blue+amber;
+  let summary=`<span>🟢 ${green}</span><span>🔵 ${blue}</span><span>🟡 ${amber}</span><span style="background:var(--green-bg)">Present: ${totalPresent}</span><span style="background:var(--red-bg)">Absent: ${absent}</span>`;
+  if(half) summary+=`<span>Half day: ${half}</span>`;
+  if(leave) summary+=`<span>Leave: ${leave}</span>`;
+
+  document.getElementById('empModalBody').innerHTML=
+    `<div class="emp-modal-summary">${summary}</div>
+     <table class="emp-month-table">
+       <thead><tr><th>Date</th><th>Day</th><th>Status</th><th>In</th><th>Out</th></tr></thead>
+       <tbody>${rows}</tbody>
+     </table>`;
+}
 </script>
 </body>
 </html>
