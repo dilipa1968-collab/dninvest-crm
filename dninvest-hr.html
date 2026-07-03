@@ -2112,13 +2112,13 @@ autoOutTimeCheck();
 async function migrateHalfDayFromJuly1(){
   try{
     if(!isAdmin) return;
-    if(localStorage.getItem('hd_migration_jul2026_v1')) return;
+    if(localStorage.getItem('hd_migration_jul2026_v2')) return;
     const td=today();
     const att=getAtt();
     let fixed=0;
     for(const emp of Object.keys(att)){
       for(const rec of (att[emp]||[])){
-        if(rec.date>='2026-07-01' && rec.date<td && (rec.status==='Present'||rec.status==='Late') && rec.out){
+        if(rec.date>='2026-07-01' && rec.date<=td && (rec.status==='Present'||rec.status==='Late') && rec.out){
           const m=/^(\d{1,2}):(\d{2})$/.exec(rec.out);
           if(m && (Number(m[1])+Number(m[2])/60)<13.5){
             await saveAttRecord(emp, {...rec, status:'Half day'});
@@ -2127,7 +2127,7 @@ async function migrateHalfDayFromJuly1(){
         }
       }
     }
-    localStorage.setItem('hd_migration_jul2026_v1','done');
+    localStorage.setItem('hd_migration_jul2026_v2','done');
     if(fixed>0){
       if(typeof toast==='function') toast(fixed+' record(s) ko Half day mark kiya gaya (July 1 se retro rule)','success');
       if(typeof renderDashboard==='function') renderDashboard();
