@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D N Investment — Seminar Feedback</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
+  authDomain: "dninvest-crm.firebaseapp.com",
+  projectId: "dninvest-crm",
+  storageBucket: "dninvest-crm.firebasestorage.app",
+  messagingSenderId: "331999342266",
+  appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
+};
+try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
+</script>
+<style>
+:root{
+  --purple:#673ab7; --purple-dark:#5e35b1; --purple-light:#f0ebf8;
+  --red:#d93025; --text:#202124; --text2:#5f6368; --border:#dadce0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Roboto',Arial,sans-serif;background:var(--purple-light);color:var(--text);padding:12px 0 80px}
+.wrap{max-width:640px;margin:0 auto;padding:0 12px}
+.card{background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;padding:22px 24px;position:relative}
+.card.head{border-top:10px solid var(--purple);padding-top:20px}
+.card.focus-ring:focus-within{border-left:6px solid var(--purple);padding-left:19px}
+.form-title{font-size:28px;font-weight:400;margin-bottom:8px}
+.form-sub{font-size:13px;color:var(--text2);line-height:1.5}
+.req-note{font-size:13px;color:var(--red);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.q-label{font-size:15px;font-weight:500;margin-bottom:14px;line-height:1.45}
+.q-label .star{color:var(--red);margin-left:3px}
+input[type=text],input[type=tel],select,textarea{
+  width:100%;border:none;border-bottom:1px solid var(--border);font-size:14px;font-family:inherit;
+  padding:6px 0;background:transparent;outline:none;color:var(--text);transition:border-color .2s;
+}
+input[type=text]:focus,input[type=tel]:focus,textarea:focus{border-bottom:2px solid var(--purple)}
+select{border:1px solid var(--border);border-radius:4px;padding:10px;background:#fff;cursor:pointer}
+textarea{resize:vertical;min-height:26px;border-bottom:1px solid var(--border)}
+input[type=text],input[type=tel]{max-width:420px}
+.radio-row{display:flex;align-items:center;gap:12px;padding:9px 0;cursor:pointer}
+.radio-row input{width:20px;height:20px;accent-color:var(--purple);cursor:pointer;flex-shrink:0}
+.radio-row span{font-size:14px}
+.scale{display:flex;align-items:flex-end;justify-content:space-between;max-width:420px;margin-top:6px}
+.scale .cell{display:flex;flex-direction:column;align-items:center;gap:10px;flex:1}
+.scale .num{font-size:13px;color:var(--text2)}
+.scale input{width:20px;height:20px;accent-color:var(--purple);cursor:pointer}
+.scale-ends{display:flex;justify-content:space-between;max-width:420px;font-size:12px;color:var(--text2);margin-top:8px}
+.err{display:none;color:var(--red);font-size:12px;margin-top:10px;align-items:center;gap:6px}
+.card.error{border:1px solid var(--red)}
+.card.error .err{display:flex}
+.footer-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.btn-submit{background:var(--purple);color:#fff;border:none;border-radius:4px;padding:10px 26px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+.btn-submit:hover{background:var(--purple-dark);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed}
+.btn-clear{background:none;border:none;color:var(--purple);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;padding:10px}
+.brand{font-size:11px;color:var(--text2);text-align:center;margin-top:20px}
+.brand b{color:var(--purple)}
+/* Confirmation */
+#done{display:none}
+#done .card{padding:28px 24px}
+#done h2{font-size:22px;font-weight:400;margin-bottom:10px}
+#done p{font-size:14px;color:var(--text2);line-height:1.6}
+#done a{color:var(--purple);font-size:14px;display:inline-block;margin-top:16px;text-decoration:none}
+#done a:hover{text-decoration:underline}
+/* Responses (admin) view */
+.resp-table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
+.resp-table th{background:var(--purple);color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0}
+.resp-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.chip{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500}
+.chip.yes{background:#e6f4ea;color:#137333}.chip.maybe{background:#fef7e0;color:#b06000}.chip.no{background:#fce8e6;color:#c5221f}
+@media(max-width:480px){.card{padding:18px 16px}.form-title{font-size:23px}}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="formWrap">
+  <div class="card head">
+    <div class="form-title">Seminar Feedback</div>
+    <div class="form-sub"><b>D N Investment</b>, Jamshedpur &middot; Aapki raay hamare liye bahut zaroori hai. Kripya 1 minute nikaal kar ye form bharein.</div>
+    <div class="req-note">* Required</div>
+  </div>
+
+  <div class="card focus-ring" id="q-name">
+    <div class="q-label">Aapka Naam<span class="star">*</span></div>
+    <input type="text" id="f-name" placeholder="Your answer" maxlength="80">
+    <div class="err">⚠ Ye field zaroori hai</div>
+  </div>
+
+  <div class="card focus-ring" id="q-mobile">
+    <div class="q-label">Mobile Number<span class="star">*</span></div>
+    <input type="tel" id="f-mobile" placeholder="10 digit number" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
+    <div class="err">⚠ 10 digit ka valid mobile number daalein</div>
+  </div>
+
+  <div class="card focus-ring" id="q-seminar">
+    <div class="q-label">Aapne kaunsa seminar attend kiya?<span class="star">*</span></div>
+    <select id="f-seminar"><option value="">Loading...</option></select>
+    <div class="err">⚠ Seminar select karein</div>
+  </div>
+
+  <div class="card" id="q-rating">
+    <div class="q-label">Seminar ka overall experience kaisa raha?<span class="star">*</span></div>
+    <div class="scale" id="scale-rating"></div>
+    <div class="scale-ends"><span>Theek-thaak</span><span>Bahut accha</span></div>
+    <div class="err">⚠ Ek option chunein</div>
+  </div>
+
+  <div class="card" id="q-content">
+    <div class="q-label">Di gayi jaankari (content) kitni useful lagi?<span class="star">*</span></div>
+    <div class="scale" id="scale-content"></div>
+    <div class="scale-ends"><span>Kam useful</span><span>Bahut useful</span></div>
+    <div class="err">⚠ Ek option chunein</div>
+  </div>
+
+  <div class="card" id="q-interest">
+    <div class="q-label">Kya aap investment shuru / badhane me interested hain?<span class="star">*</span></div>
+    <label class="radio-row"><input type="radio" name="f-interest" value="Haan"><span>Haan, mujhse sampark karein</span></label>
+    <label class="radio-row"><input type="radio" name="f-interest" value="Shayad"><span>Shayad, sochkar bataunga/bataungi</span></label>
+    <label class="radio-row"><input type="radio" name="f-interest" value="Nahi"><span>Abhi nahi</span></label>
+    <div class="err">⚠ Ek option chunein</div>
+  </div>
+
+  <div class="card focus-ring" id="q-comments">
+    <div class="q-label">Koi sujhaav ya comment? Agla seminar kis topic par ho?</div>
+    <textarea id="f-comments" placeholder="Your answer" rows="1" maxlength="500"></textarea>
+  </div>
+
+  <div class="footer-row">
+    <button class="btn-submit" id="btnSubmit" onclick="submitForm()">Submit</button>
+    <button class="btn-clear" onclick="clearForm()">Clear form</button>
+  </div>
+  <div class="brand">Ye form <b>D N Investment</b> (ARN-67217) dwara banaya gaya hai &middot; Aapki jaankari surakshit hai</div>
+</div>
+
+<div class="wrap" id="done">
+  <div class="card head">
+    <h2>Dhanyavaad! 🙏</h2>
+    <p>Aapka response record ho gaya hai. Seminar me aane ke liye D N Investment ki taraf se bahut-bahut shukriya.</p>
+    <p style="margin-top:8px">Investment se judi kisi bhi jaankari ke liye humein sampark karein.</p>
+    <a href="javascript:location.reload()">Ek aur response submit karein</a>
+  </div>
+  <div class="brand">D N Investment (ARN-67217), Jamshedpur</div>
+</div>
+
+<div class="wrap" id="respWrap" style="display:none;max-width:960px">
+  <div class="card head">
+    <div class="form-title" style="font-size:22px">Feedback Responses</div>
+    <div class="form-sub" id="respCount">Loading...</div>
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <select id="respFilter" onchange="renderResponses()" style="max-width:280px"><option value="">All seminars</option></select>
+      <button class="btn-submit" onclick="exportCSV()" style="padding:8px 16px">⬇ Export CSV</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:auto;max-height:70vh">
+    <table class="resp-table" id="respTable"></table>
+  </div>
+</div>
+
+<script>
+// ── Build 1-5 scales ─────────────────────────────────────────────
+['rating','content'].forEach(k=>{
+  const el=document.getElementById('scale-'+k);
+  let h='';
+  for(let i=1;i<=5;i++){
+    h+=`<div class="cell"><span class="num">${i}</span><input type="radio" name="f-${k}" value="${i}"></div>`;
+  }
+  el.innerHTML=h;
+});
+
+// ── Load seminars from CRM Firestore (crm_data/seminars) ─────────
+let SEMINARS=[];
+async function loadSeminars(){
+  const sel=document.getElementById('f-seminar');
+  try{
+    const doc=await fdb.collection('crm_data').doc('seminars').get();
+    SEMINARS=(doc.exists && Array.isArray(doc.data().data))?doc.data().data:[];
+    // Latest date first
+    SEMINARS.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const fmtD=d=>{ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); };
+    sel.innerHTML='<option value="">-- Select seminar --</option>'+
+      SEMINARS.map(s=>`<option value="${s.id}">${(s.name||'Seminar')} — ${fmtD(s.date)}</option>`).join('')+
+      '<option value="__other">Other / yaad nahi</option>';
+    // ?s=<id> se preselect
+    const pre=new URLSearchParams(location.search).get('s');
+    if(pre && SEMINARS.some(x=>String(x.id)===pre)) sel.value=pre;
+  }catch(e){
+    sel.outerHTML='<input type="text" id="f-seminar" placeholder="Seminar ka naam / date likhein" maxlength="100">';
+  }
+}
+
+// ── Validation + submit ──────────────────────────────────────────
+function markErr(id,bad){ document.getElementById(id).classList.toggle('error',bad); return bad; }
+async function submitForm(){
+  const name=document.getElementById('f-name').value.trim();
+  const mobile=document.getElementById('f-mobile').value.trim();
+  const semEl=document.getElementById('f-seminar');
+  const semVal=(semEl.value||'').trim();
+  const rating=(document.querySelector('input[name=f-rating]:checked')||{}).value||'';
+  const content=(document.querySelector('input[name=f-content]:checked')||{}).value||'';
+  const interest=(document.querySelector('input[name=f-interest]:checked')||{}).value||'';
+  const comments=document.getElementById('f-comments').value.trim();
+
+  let bad=false;
+  bad=markErr('q-name',!name)||bad;
+  bad=markErr('q-mobile',!(mobile.length===10))||bad;
+  bad=markErr('q-seminar',!semVal)||bad;
+  bad=markErr('q-rating',!rating)||bad;
+  bad=markErr('q-content',!content)||bad;
+  bad=markErr('q-interest',!interest)||bad;
+  if(bad){ document.querySelector('.card.error').scrollIntoView({behavior:'smooth',block:'center'}); return; }
+
+  const sem=SEMINARS.find(x=>String(x.id)===semVal);
+  const rec={
+    name, mobile,
+    seminarId: sem?sem.id:'',
+    seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
+    rating:Number(rating), contentRating:Number(content),
+    interested:interest, comments,
+    ts:new Date().toISOString()
+  };
+
+  const btn=document.getElementById('btnSubmit');
+  btn.disabled=true; btn.textContent='Submitting...';
+  try{
+    await fdb.collection('seminar_feedback').add(rec);
+    document.getElementById('formWrap').style.display='none';
+    document.getElementById('done').style.display='block';
+    window.scrollTo(0,0);
+  }catch(e){
+    alert('Submit nahi ho paya — internet check karke dobara try karein.');
+    btn.disabled=false; btn.textContent='Submit';
+  }
+}
+function clearForm(){
+  if(!confirm('Form clear karein?')) return;
+  document.getElementById('f-name').value='';
+  document.getElementById('f-mobile').value='';
+  const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
+  document.getElementById('f-comments').value='';
+  document.querySelectorAll('input[type=radio]').forEach(r=>r.checked=false);
+  document.querySelectorAll('.card.error').forEach(c=>c.classList.remove('error'));
+}
+
+// ── Admin responses view (?view=responses) ───────────────────────
+let RESP=[];
+async function loadResponses(){
+  document.getElementById('formWrap').style.display='none';
+  document.getElementById('respWrap').style.display='block';
+  document.title='Feedback Responses — D N Investment';
+  try{
+    const snap=await fdb.collection('seminar_feedback').orderBy('ts','desc').get();
+    RESP=snap.docs.map(d=>d.data());
+  }catch(e){
+    try{ const snap=await fdb.collection('seminar_feedback').get();
+      RESP=snap.docs.map(d=>d.data()).sort((a,b)=>(b.ts||'').localeCompare(a.ts||'')); }catch(e2){ RESP=[]; }
+  }
+  const sems=[...new Set(RESP.map(r=>r.seminarName).filter(Boolean))];
+  document.getElementById('respFilter').innerHTML='<option value="">All seminars</option>'+sems.map(s=>`<option>${s}</option>`).join('');
+  renderResponses();
+}
+function renderResponses(){
+  const f=document.getElementById('respFilter').value;
+  const list=f?RESP.filter(r=>r.seminarName===f):RESP;
+  const esc=t=>String(t||'').replace(/</g,'&lt;');
+  const chip=v=>v==='Haan'?'<span class="chip yes">Haan ✓</span>':(v==='Shayad'?'<span class="chip maybe">Shayad</span>':'<span class="chip no">Nahi</span>');
+  const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
+  document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
+  document.getElementById('respTable').innerHTML=
+    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Comments</th></tr>'+
+    (list.map(r=>`<tr>
+      <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
+      <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
+      <td style="color:#f59e0b;white-space:nowrap">${stars(r.rating)}</td>
+      <td style="color:#f59e0b;white-space:nowrap">${stars(r.contentRating)}</td>
+      <td>${chip(r.interested)}</td><td>${esc(r.comments)}</td>
+    </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:24px;color:#999">Abhi koi response nahi aaya</td></tr>');
+}
+function exportCSV(){
+  const f=document.getElementById('respFilter').value;
+  const list=f?RESP.filter(r=>r.seminarName===f):RESP;
+  const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
+  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Comments']]
+    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,r.comments]));
+  const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='seminar-feedback.csv'; a.click();
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+if(new URLSearchParams(location.search).get('view')==='responses'){ loadResponses(); }
+else{ loadSeminars(); }
+</script>
+</body>
+</html>
