@@ -1901,7 +1901,10 @@ async function doLogout(){
         const utc=now.getTime()+now.getTimezoneOffset()*60000;
         const ist=new Date(utc+5.5*3600000);
         const outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
-        await saveAttRecord(currentUser, {...rec, out:outT});
+        // 1:30 PM se pehle nikla → Half day (in/out times same rehte hain)
+        const outH=ist.getHours()+ist.getMinutes()/60;
+        const newStatus=(outH<13.5)?'Half day':rec.status;
+        await saveAttRecord(currentUser, {...rec, out:outT, status:newStatus});
       }
     }catch(e){}
   }
@@ -2066,6 +2069,12 @@ async function autoOutTimeCheck(){
       if(hb && hb.date===td && hb.time) return hb.time;
       return cutoffStr;
     }
+    // Out-time 1:30 PM se pehle ka hai → status Half day ban jata hai
+    function statusFor(outT, curStatus){
+      const m=/^(\d{1,2}):(\d{2})$/.exec(outT||'');
+      if(m && (Number(m[1])+Number(m[2])/60) < 13.5) return 'Half day';
+      return curStatus;
+    }
 
     if(isAdmin){
       // Admin: sabka out time fill karo agar missing ho
@@ -2074,7 +2083,8 @@ async function autoOutTimeCheck(){
       for(const emp of emps){
         const rec=(att[emp]||[]).find(r=>r.date===td);
         if(rec && (rec.status==='Present'||rec.status==='Late') && !rec.out){
-          await saveAttRecord(emp, {...rec, out:outTimeFor(emp)});
+          const oT=outTimeFor(emp);
+          await saveAttRecord(emp, {...rec, out:oT, status:statusFor(oT, rec.status)});
           changed=true;
         }
       }
@@ -2086,7 +2096,8 @@ async function autoOutTimeCheck(){
       if(!currentUser) return;
       const rec=(att[currentUser]||[]).find(r=>r.date===td);
       if(!rec || !(rec.status==='Present'||rec.status==='Late') || rec.out) return;
-      await saveAttRecord(currentUser, {...rec, out:outTimeFor(currentUser)});
+      const oT=outTimeFor(currentUser);
+      await saveAttRecord(currentUser, {...rec, out:oT, status:statusFor(oT, rec.status)});
       if(typeof renderAttendancePage==='function') renderAttendancePage();
       if(typeof renderDashboard==='function') renderDashboard();
     }
