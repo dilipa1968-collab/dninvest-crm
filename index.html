@@ -1549,7 +1549,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 
 <!-- Seminar Detail Modal -->
 <div class="modal-overlay" id="seminarDetailModal" onclick="if(event.target===this)closeModal('seminarDetailModal')">
-  <div class="modal wide">
+  <div class="modal wide" style="width:min(1240px,96vw);max-width:96vw">
     <div class="modal-hdr">
       <h3 id="seminarDetailTitle">Seminar</h3>
       <button class="modal-close" onclick="closeModal('seminarDetailModal')">×</button>
@@ -4413,11 +4413,13 @@ function renderSeminarAttendees(){
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
-      <td><select class="att-type" data-id="${a.id}" data-prev="${a.type||'guest'}" ${dis} onchange="onAttTypeChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td>${a.source_id
+        ? `<span class="att-type-locked" data-id="${a.id}" data-type="${a.type}" title="Client record se linked — type locked" style="display:inline-block;padding:4px 10px;font-size:.72rem;font-weight:600;border-radius:6px;background:${a.type==='equity'?'#E6F1FB':'#EAF3DE'};color:${a.type==='equity'?'#185FA5':'#3B6D11'}">${a.type==='equity'?'Equity':'MF'} 🔒</span>`
+        : `<select class="att-type" data-id="${a.id}" data-prev="${a.type||'guest'}" ${dis} onchange="onAttTypeChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="equity" ${a.type==='equity'?'selected':''}>Equity</option>
         <option value="mf" ${a.type==='mf'?'selected':''}>MF</option>
         <option value="guest" ${(!a.type||a.type==='guest')?'selected':''}>Guest</option>
-      </select></td>
+      </select>`}</td>
       <td><select class="att-rsvp" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
@@ -4430,7 +4432,7 @@ function renderSeminarAttendees(){
         <option value="Attended" ${a.status==='Attended'?'selected':''}>Attended</option>
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
-      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:130px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
+      <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:170px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
       <td>${isMyAttendee?`<button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
