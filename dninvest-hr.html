@@ -4230,7 +4230,11 @@ function showBroClientDetail(empName, month){
 
   const eligRows   = rows.filter(r=>r.eligible);
   const totalBro   = rows.reduce((s,r)=>s+Number(r.bro||0),0);
-  const totalElig  = eligRows.reduce((s,r)=>s+Number(r.bro||0),0);
+  const rates      = getIncRates();
+  const bcMin      = Number(rates.broClientMin)||50;
+  const bcBonus    = Number(rates.broClientBonus)||700;
+  const bcThresh   = Number(rates.broClientThreshold)||100;
+  const bonusOk    = eligRows.length >= bcMin;
 
   let sortBy = 'bro';      // 'bro' | 'name'
   let eligOnly = false;
@@ -4239,12 +4243,15 @@ function showBroClientDetail(empName, month){
   if(rows.length === 0){
     bodyHtml = '<p style="color:var(--text3);font-size:13px;padding:20px 0;text-align:center">No client data. Upload brokerage file and Apply first.</p>';
   } else {
+    const bonusCard = bonusOk
+      ? '<div style="background:var(--green-bg);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--green-text);text-transform:uppercase;letter-spacing:.03em">\u20B9'+bcBonus+' Bonus</div><div style="font-size:16px;font-weight:700;color:var(--green-text);margin-top:2px">Eligible \u2713</div><div style="font-size:10px;color:var(--green-text);margin-top:1px">'+eligRows.length+' / '+bcMin+' clients</div></div>'
+      : '<div style="background:var(--amber-bg);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--amber-text);text-transform:uppercase;letter-spacing:.03em">\u20B9'+bcBonus+' Bonus</div><div style="font-size:16px;font-weight:700;color:var(--amber-text);margin-top:2px">Not eligible</div><div style="font-size:10px;color:var(--amber-text);margin-top:1px">'+eligRows.length+' / '+bcMin+' \u2014 '+(bcMin-eligRows.length)+' short</div></div>';
     bodyHtml =
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:12px">'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.03em">Clients</div><div style="font-size:19px;font-weight:700;color:var(--text);margin-top:2px">'+rows.length+'</div></div>'
-      +'<div style="background:var(--green-bg);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--green-text);text-transform:uppercase;letter-spacing:.03em">Eligible</div><div style="font-size:19px;font-weight:700;color:var(--green-text);margin-top:2px">'+eligRows.length+'</div></div>'
-      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.03em">Total</div><div style="font-size:19px;font-weight:700;color:var(--text);margin-top:2px">'+inr(totalBro)+'</div></div>'
-      +'<div style="background:var(--green-bg);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--green-text);text-transform:uppercase;letter-spacing:.03em">Eligible Amt</div><div style="font-size:19px;font-weight:700;color:var(--green-text);margin-top:2px">'+inr(totalElig)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.03em">Total Brokerage</div><div style="font-size:19px;font-weight:700;color:var(--text);margin-top:2px">'+inr(totalBro)+'</div><div style="font-size:10px;color:var(--text3);margin-top:1px">Full amount counts for incentive</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.03em">Eligible (\u2265\u20B9'+bcThresh+')</div><div style="font-size:19px;font-weight:700;color:'+(bonusOk?'var(--green-text)':'var(--text)')+';margin-top:2px">'+eligRows.length+'</div><div style="font-size:10px;color:var(--text3);margin-top:1px">For \u20B9'+bcBonus+' bonus only</div></div>'
+      +bonusCard
       +'</div>'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:var(--text2)">'
       +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none"><input type="checkbox" id="bro-elig-only"> Eligible only</label>'
