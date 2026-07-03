@@ -81,52 +81,60 @@ input[type=text],input[type=tel]{max-width:420px}
 <div class="wrap" id="formWrap">
   <div class="card head">
     <div class="form-title">Seminar Feedback</div>
-    <div class="form-sub"><b>D N Investment</b>, Jamshedpur &middot; Aapki raay hamare liye bahut zaroori hai. Kripya 1 minute nikaal kar ye form bharein.</div>
+    <div class="form-sub"><b>D N Investment</b>, Jamshedpur &middot; Your feedback is very important to us. Please take a minute to fill this form.</div>
     <div class="req-note">* Required</div>
   </div>
 
   <div class="card focus-ring" id="q-name">
-    <div class="q-label">Aapka Naam<span class="star">*</span></div>
+    <div class="q-label">Your Name<span class="star">*</span></div>
     <input type="text" id="f-name" placeholder="Your answer" maxlength="80">
-    <div class="err">⚠ Ye field zaroori hai</div>
+    <div class="err">⚠ This field is required</div>
   </div>
 
   <div class="card focus-ring" id="q-mobile">
     <div class="q-label">Mobile Number<span class="star">*</span></div>
     <input type="tel" id="f-mobile" placeholder="10 digit number" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
-    <div class="err">⚠ 10 digit ka valid mobile number daalein</div>
+    <div class="err">⚠ Please enter a valid 10-digit mobile number</div>
   </div>
 
   <div class="card focus-ring" id="q-seminar">
-    <div class="q-label">Aapne kaunsa seminar attend kiya?<span class="star">*</span></div>
+    <div class="q-label">Which seminar did you attend?<span class="star">*</span></div>
     <select id="f-seminar"><option value="">Loading...</option></select>
-    <div class="err">⚠ Seminar select karein</div>
+    <div class="err">⚠ Please select a seminar</div>
   </div>
 
   <div class="card" id="q-rating">
-    <div class="q-label">Seminar ka overall experience kaisa raha?<span class="star">*</span></div>
+    <div class="q-label">How was your overall seminar experience?<span class="star">*</span></div>
     <div class="scale" id="scale-rating"></div>
-    <div class="scale-ends"><span>Theek-thaak</span><span>Bahut accha</span></div>
-    <div class="err">⚠ Ek option chunein</div>
+    <div class="scale-ends"><span>Average</span><span>Excellent</span></div>
+    <div class="err">⚠ Please select an option</div>
   </div>
 
   <div class="card" id="q-content">
-    <div class="q-label">Di gayi jaankari (content) kitni useful lagi?<span class="star">*</span></div>
+    <div class="q-label">How useful was the information shared?<span class="star">*</span></div>
     <div class="scale" id="scale-content"></div>
-    <div class="scale-ends"><span>Kam useful</span><span>Bahut useful</span></div>
-    <div class="err">⚠ Ek option chunein</div>
+    <div class="scale-ends"><span>Not very useful</span><span>Very useful</span></div>
+    <div class="err">⚠ Please select an option</div>
   </div>
 
   <div class="card" id="q-interest">
-    <div class="q-label">Kya aap investment shuru / badhane me interested hain?<span class="star">*</span></div>
-    <label class="radio-row"><input type="radio" name="f-interest" value="Haan"><span>Haan, mujhse sampark karein</span></label>
-    <label class="radio-row"><input type="radio" name="f-interest" value="Shayad"><span>Shayad, sochkar bataunga/bataungi</span></label>
-    <label class="radio-row"><input type="radio" name="f-interest" value="Nahi"><span>Abhi nahi</span></label>
-    <div class="err">⚠ Ek option chunein</div>
+    <div class="q-label">Are you interested in starting / increasing your investments?<span class="star">*</span></div>
+    <label class="radio-row"><input type="radio" name="f-interest" value="Haan"><span>Yes, please contact me</span></label>
+    <label class="radio-row"><input type="radio" name="f-interest" value="Shayad"><span>Maybe, I will think about it</span></label>
+    <label class="radio-row"><input type="radio" name="f-interest" value="Nahi"><span>Not right now</span></label>
+    <div class="err">⚠ Please select an option</div>
+  </div>
+
+  <div class="card" id="q-products">
+    <div class="q-label">Which products are you interested in? <span style="font-weight:400;font-size:12px;color:var(--text2)">(you can select multiple)</span></div>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="SIP"><span>SIP (Systematic Investment Plan)</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="Lumpsum"><span>Lumpsum (Mutual Fund one-time investment)</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="Equity Trading"><span>Equity Trading (Share Market)</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="Insurance"><span>Insurance (Health / Life)</span></label>
   </div>
 
   <div class="card focus-ring" id="q-comments">
-    <div class="q-label">Koi sujhaav ya comment? Agla seminar kis topic par ho?</div>
+    <div class="q-label">Any suggestions or comments? What topic should our next seminar cover?</div>
     <textarea id="f-comments" placeholder="Your answer" rows="1" maxlength="500"></textarea>
   </div>
 
@@ -134,15 +142,15 @@ input[type=text],input[type=tel]{max-width:420px}
     <button class="btn-submit" id="btnSubmit" onclick="submitForm()">Submit</button>
     <button class="btn-clear" onclick="clearForm()">Clear form</button>
   </div>
-  <div class="brand">Ye form <b>D N Investment</b> (ARN-67217) dwara banaya gaya hai &middot; Aapki jaankari surakshit hai</div>
+  <div class="brand">This form is created by <b>D N Investment</b> (ARN-67217) &middot; Your information is safe with us</div>
 </div>
 
 <div class="wrap" id="done">
   <div class="card head">
-    <h2>Dhanyavaad! 🙏</h2>
-    <p>Aapka response record ho gaya hai. Seminar me aane ke liye D N Investment ki taraf se bahut-bahut shukriya.</p>
-    <p style="margin-top:8px">Investment se judi kisi bhi jaankari ke liye humein sampark karein.</p>
-    <a href="javascript:location.reload()">Ek aur response submit karein</a>
+    <h2>Thank you! 🙏</h2>
+    <p>Your response has been recorded. Thank you very much for attending our seminar.</p>
+    <p style="margin-top:8px">For any investment-related information, feel free to contact us.</p>
+    <a href="javascript:location.reload()">Submit another response</a>
   </div>
   <div class="brand">D N Investment (ARN-67217), Jamshedpur</div>
 </div>
@@ -184,12 +192,12 @@ async function loadSeminars(){
     const fmtD=d=>{ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); };
     sel.innerHTML='<option value="">-- Select seminar --</option>'+
       SEMINARS.map(s=>`<option value="${s.id}">${(s.name||'Seminar')} — ${fmtD(s.date)}</option>`).join('')+
-      '<option value="__other">Other / yaad nahi</option>';
+      '<option value="__other">Other / don\'t remember</option>';
     // ?s=<id> se preselect
     const pre=new URLSearchParams(location.search).get('s');
     if(pre && SEMINARS.some(x=>String(x.id)===pre)) sel.value=pre;
   }catch(e){
-    sel.outerHTML='<input type="text" id="f-seminar" placeholder="Seminar ka naam / date likhein" maxlength="100">';
+    sel.outerHTML='<input type="text" id="f-seminar" placeholder="Enter seminar name / date" maxlength="100">';
   }
 }
 
@@ -203,6 +211,7 @@ async function submitForm(){
   const rating=(document.querySelector('input[name=f-rating]:checked')||{}).value||'';
   const content=(document.querySelector('input[name=f-content]:checked')||{}).value||'';
   const interest=(document.querySelector('input[name=f-interest]:checked')||{}).value||'';
+  const products=[...document.querySelectorAll('input[name=f-products]:checked')].map(c=>c.value);
   const comments=document.getElementById('f-comments').value.trim();
 
   let bad=false;
@@ -220,7 +229,7 @@ async function submitForm(){
     seminarId: sem?sem.id:'',
     seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
     rating:Number(rating), contentRating:Number(content),
-    interested:interest, comments,
+    interested:interest, products, comments,
     ts:new Date().toISOString()
   };
 
@@ -232,17 +241,17 @@ async function submitForm(){
     document.getElementById('done').style.display='block';
     window.scrollTo(0,0);
   }catch(e){
-    alert('Submit nahi ho paya — internet check karke dobara try karein.');
+    alert('Could not submit — please check your internet and try again.');
     btn.disabled=false; btn.textContent='Submit';
   }
 }
 function clearForm(){
-  if(!confirm('Form clear karein?')) return;
+  if(!confirm('Clear the form?')) return;
   document.getElementById('f-name').value='';
   document.getElementById('f-mobile').value='';
   const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
   document.getElementById('f-comments').value='';
-  document.querySelectorAll('input[type=radio]').forEach(r=>r.checked=false);
+  document.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(r=>r.checked=false);
   document.querySelectorAll('.card.error').forEach(c=>c.classList.remove('error'));
 }
 
@@ -267,25 +276,27 @@ function renderResponses(){
   const f=document.getElementById('respFilter').value;
   const list=f?RESP.filter(r=>r.seminarName===f):RESP;
   const esc=t=>String(t||'').replace(/</g,'&lt;');
-  const chip=v=>v==='Haan'?'<span class="chip yes">Haan ✓</span>':(v==='Shayad'?'<span class="chip maybe">Shayad</span>':'<span class="chip no">Nahi</span>');
+  const chip=v=>v==='Haan'?'<span class="chip yes">Yes ✓</span>':(v==='Shayad'?'<span class="chip maybe">Maybe</span>':'<span class="chip no">No</span>');
   const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
   document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
   document.getElementById('respTable').innerHTML=
-    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Comments</th></tr>'+
+    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>Comments</th></tr>'+
     (list.map(r=>`<tr>
       <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
       <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
       <td style="color:#f59e0b;white-space:nowrap">${stars(r.rating)}</td>
       <td style="color:#f59e0b;white-space:nowrap">${stars(r.contentRating)}</td>
-      <td>${chip(r.interested)}</td><td>${esc(r.comments)}</td>
-    </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:24px;color:#999">Abhi koi response nahi aaya</td></tr>');
+      <td>${chip(r.interested)}</td>
+      <td style="font-size:11.5px">${(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
+      <td>${esc(r.comments)}</td>
+    </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
 }
 function exportCSV(){
   const f=document.getElementById('respFilter').value;
   const list=f?RESP.filter(r=>r.seminarName===f):RESP;
   const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Comments']]
-    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,r.comments]));
+  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','Comments']]
+    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),r.comments]));
   const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
