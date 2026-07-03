@@ -1558,6 +1558,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
         <span id="seminarDetailSub" style="color:var(--gray);font-size:.85rem"></span>
         <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="shareFeedbackLink()" style="color:#25D366;border-color:#25D366">💬 Feedback Link</button>
           <button class="btn btn-outline" onclick="exportSeminarAttendees()">⬇️ Export Excel</button>
           <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
         </div>
@@ -4511,7 +4512,7 @@ function renderSeminarAttendees(){
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
       <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:170px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td style="white-space:nowrap">${isMyAttendee?`<button class="btn-icon" onclick="openEditAttendee('${a.id}')" title="Edit name / mobile / RM">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
+      <td style="white-space:nowrap">${a.mobile?`<button class="btn-icon" onclick="sendFeedbackWA('${a.id}')" title="WhatsApp par feedback link bhejein" style="color:#25D366">💬</button>`:''}${isMyAttendee?`<button class="btn-icon" onclick="openEditAttendee('${a.id}')" title="Edit name / mobile / RM">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -4776,6 +4777,35 @@ function exportSeminarAttendees(){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('Export done!','success');
+}
+
+// ── Feedback link share (WhatsApp) ──────────────────────────────
+function feedbackLinkFor(seminarId){
+  return location.origin + '/dninvest-feedback.html' + (seminarId ? ('?s='+encodeURIComponent(seminarId)) : '');
+}
+function shareFeedbackLink(){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const link=feedbackLinkFor(s.id);
+  const msg='Namaste! 🙏\n\n*D N Investment* ke seminar "'+(s.name||'')+'" me aane ke liye dhanyavaad!\n\nKripya 1 minute nikaal kar apna feedback dein:\n'+link+'\n\n- D N Investment, Jamshedpur';
+  // Copy link
+  try{ navigator.clipboard.writeText(link); }catch(e){}
+  toast('Link copy ho gaya!','success');
+  // WhatsApp share (group/broadcast me paste karne ke liye chat picker khulega)
+  if(confirm('Link copy ho gaya hai.\n\nWhatsApp par share karein? (message ready milega, bas group/contact chunna hai)')){
+    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  }
+}
+function sendFeedbackWA(attendeeId){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
+  if(!a || !a.mobile){ toast('Is attendee ka mobile number nahi hai','error'); return; }
+  const link=feedbackLinkFor(s.id);
+  const msg='Namaste '+(a.name||'')+' ji! 🙏\n\n*D N Investment* ke seminar me aane ke liye dhanyavaad!\n\nKripya 1 minute nikaal kar apna feedback dein:\n'+link+'\n\n- D N Investment, Jamshedpur';
+  window.open('https://wa.me/91'+a.mobile+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 let _editAttId=null;
