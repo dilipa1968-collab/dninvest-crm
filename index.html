@@ -4413,7 +4413,7 @@ function renderSeminarAttendees(){
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
       <td>${a.rm||'—'}</td>
-      <td>${a.source_id
+      <td>${(a.source_id && CU.role!=='admin')
         ? `<span class="att-type-locked" data-id="${a.id}" data-type="${a.type}" title="Client record se linked — type locked" style="display:inline-block;padding:4px 10px;font-size:.72rem;font-weight:600;border-radius:6px;background:${a.type==='equity'?'#E6F1FB':'#EAF3DE'};color:${a.type==='equity'?'#185FA5':'#3B6D11'}">${a.type==='equity'?'Equity':'MF'} 🔒</span>`
         : `<select class="att-type" data-id="${a.id}" data-prev="${a.type||'guest'}" ${dis} onchange="onAttTypeChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="equity" ${a.type==='equity'?'selected':''}>Equity</option>
@@ -4733,8 +4733,11 @@ function searchAttendees(){
   const s=seminars.find(x=>x.id===currentSeminarId);
   const existingIds=new Set((s?.attendees||[]).map(a=>a.source_id+'_'+a.type));
 
-  const eq=(DB.get('eq_clients')||[]).filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
-  const mf=(DB.get('mf_clients')||[]).filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
+  // RM can only pick from clients mapped to them; admin sees all
+  const myRm=(CU.name||'').trim().toLowerCase();
+  const rmFilter = c => CU.role==='admin' || (c.rm||'').trim().toLowerCase()===myRm;
+  const eq=(DB.get('eq_clients')||[]).filter(c=>rmFilter(c) && ((c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)));
+  const mf=(DB.get('mf_clients')||[]).filter(c=>rmFilter(c) && ((c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)));
 
   const results=[
     ...eq.slice(0,20).map(c=>({...c,type:'equity'})),
@@ -4742,7 +4745,7 @@ function searchAttendees(){
   ];
 
   if(!results.length){
-    cont.innerHTML='<div style="text-align:center;padding:20px;color:#bbb">No matching clients/investors found</div>';
+    cont.innerHTML='<div style="text-align:center;padding:20px;color:#bbb">No matching clients/investors found'+(CU.role!=='admin'?' <br><small>(sirf aapke mapped clients hi search me aate hain)</small>':'')+'</div>';
     return;
   }
   let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Action</th></tr></thead><tbody>`;
