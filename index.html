@@ -4773,6 +4773,12 @@ async function addAttendee(sourceId,type){
   const src=type==='equity'?(DB.get('eq_clients')||[]).find(c=>c.id===sourceId):(DB.get('mf_clients')||[]).find(c=>c.id===sourceId);
   if(!src) return;
 
+  // Hard rule: RM sirf apne mapped client hi add kar sakta hai (kisi bhi segment me)
+  if(CU.role!=='admin' && (src.rm||'').trim().toLowerCase()!==(CU.name||'').trim().toLowerCase()){
+    toast('Ye client '+(src.rm||'kisi aur RM')+' ke naam par mapped hai — aap sirf apne mapped clients hi seminar me add kar sakte hain','error');
+    return;
+  }
+
   s.attendees = s.attendees||[];
   if(s.attendees.some(a=>a.source_id===sourceId && a.type===type)) return; // already added
 
