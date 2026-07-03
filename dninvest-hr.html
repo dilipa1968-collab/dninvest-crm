@@ -3058,12 +3058,13 @@ function calcMonthlySalary(name, monthPrefix){
   const absentDays=recs.filter(r=>r.status==='Absent').length;
   const halfDays=recs.filter(r=>r.status==='Half day').length;
   const perDay=sal/26;
-  const deduction=perDay*absentDays;
+  const halfDeduction=(perDay/2)*halfDays; // Half day = aadhe din ka auto-deduction
+  const deduction=perDay*absentDays + halfDeduction;
   const earnedWage=Math.max(0,sal-deduction);
   const esi=calcESI(name, sal, earnedWage);
   const extra=monthPrefix?getExtraDeductionForMonth(name, monthPrefix):{amount:0, note:''};
   const net=Math.max(0, earnedWage-esi.employeeContribution-extra.amount);
-  return {salary:sal, perDay, presentDays, absentDays, halfDays, deduction, esi, extra, net};
+  return {salary:sal, perDay, presentDays, absentDays, halfDays, deduction, halfDeduction, esi, extra, net};
 }
 
 function viewSalMonth(){
@@ -3224,8 +3225,8 @@ function renderSalaryPage(){
         <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷26)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
-        ${r.halfDays>0?`<tr><td style="color:var(--text2);padding:6px 0">Half days</td><td style="text-align:right;color:var(--amber,#b58a00)">${r.halfDays}</td></tr>`:''}
-        <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent × per-day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
+        ${r.halfDays>0?`<tr><td style="color:var(--text2);padding:6px 0">Half days (½ day each)</td><td style="text-align:right;color:var(--amber,#b58a00)">${r.halfDays} (− ${fmt(r.halfDeduction)})</td></tr>`:''}
+        <tr><td style="color:var(--text2);padding:6px 0">Deduction (Absent + Half day)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.deduction)}</td></tr>
         ${r.esi.applicable?`<tr><td style="color:var(--text2);padding:6px 0">ESI (Employee share @ ${r.esi.settings.employeeRate}%)</td><td style="text-align:right;color:var(--red)">− ${fmt(r.esi.employeeContribution)}</td></tr>`:''}
         ${r.extra.amount>0?`<tr><td style="color:var(--text2);padding:6px 0">Extra deduction${r.extra.note?' ('+r.extra.note.replace(/</g,'&lt;')+')':''}</td><td style="text-align:right;color:var(--red)">− ${fmt(r.extra.amount)}</td></tr>`:''}
         ${advDeducted>0?`<tr><td style="color:var(--text2);padding:6px 0">Advance adjusted</td><td style="text-align:right;color:var(--red)">− ${fmt(advDeducted)}</td></tr>`:''}
@@ -3577,7 +3578,7 @@ function renderExtraDeductionBox(){
 
   box.innerHTML=`
     <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:6px">Extra deduction — ${name}</p>
-    ${halfDays>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">${halfDays} Half day record(s) found this month — if you want to deduct for them, add the amount here manually.</p>`:''}
+    ${halfDays>0?`<p style="font-size:11px;color:var(--text3);margin-bottom:8px">${halfDays} Half day record(s) this month — inka aadhe din ka deduction salary me AUTO kat chuka hai, yahan dobara mat daalein.</p>`:''}
     <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
       <div class="field-inline" style="margin-bottom:0;max-width:140px"><label>Amount (₹)</label>
         <input type="number" id="extra-ded-amount" min="0" value="${existing.amount||''}" placeholder="0">
