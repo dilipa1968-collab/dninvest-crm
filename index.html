@@ -1562,6 +1562,21 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
           <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
         </div>
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:10px;background:var(--light,#f4f6fa);border-radius:8px">
+        <input type="text" id="semF-q" placeholder="🔍 Name / Mobile" oninput="onSemFilterChange()" style="flex:1;min-width:150px;padding:6px 10px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">
+        <select id="semF-rm" onchange="onSemFilterChange()" style="padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px"><option value="">All RMs</option></select>
+        <select id="semF-type" onchange="onSemFilterChange()" style="padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">
+          <option value="">All Types</option><option value="equity">Equity</option><option value="mf">MF</option><option value="guest">Guest</option>
+        </select>
+        <select id="semF-rsvp" onchange="onSemFilterChange()" style="padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">
+          <option value="">All Response</option><option value="Yes">Yes</option><option value="No">No</option><option value="Wait">Wait</option><option value="__none">— (blank)</option>
+        </select>
+        <select id="semF-status" onchange="onSemFilterChange()" style="padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">
+          <option value="">All Status</option><option value="Pending">Pending</option><option value="Attended">Attended</option><option value="Not Attended">Not Attended</option>
+        </select>
+        <button class="btn btn-outline" onclick="clearSemFilters()" style="padding:6px 12px;font-size:.75rem">✕ Clear</button>
+        <span id="semF-count" style="font-size:.75rem;color:var(--gray);white-space:nowrap"></span>
+      </div>
       <div class="tbl-wrap"><div class="tbl-scroll" id="seminar-attendees-table"></div></div>
     </div>
     <div class="modal-footer">
@@ -4360,6 +4375,28 @@ async function confirmDeleteSeminar(id,name){
   renderSeminarsTable();
 }
 
+let semAttFilter = {q:'', rm:'', type:'', rsvp:'', status:''};
+function onSemFilterChange(){
+  semAttFilter.q      = (document.getElementById('semF-q').value||'').trim().toLowerCase();
+  semAttFilter.rm     = document.getElementById('semF-rm').value;
+  semAttFilter.type   = document.getElementById('semF-type').value;
+  semAttFilter.rsvp   = document.getElementById('semF-rsvp').value;
+  semAttFilter.status = document.getElementById('semF-status').value;
+  renderSeminarAttendees();
+}
+function clearSemFilters(){
+  semAttFilter = {q:'', rm:'', type:'', rsvp:'', status:''};
+  ['semF-q','semF-rm','semF-type','semF-rsvp','semF-status'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  renderSeminarAttendees();
+}
+function rebuildSemRmOptions(attendees){
+  const sel=document.getElementById('semF-rm');
+  if(!sel) return;
+  const cur=sel.value;
+  const rms=[...new Set(attendees.map(a=>(a.rm||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML='<option value="">All RMs</option>'+rms.map(r=>`<option value="${r.replace(/"/g,'&quot;')}">${r}</option>`).join('');
+  if(rms.some(r=>r===cur)) sel.value=cur;
+}
 function openSeminarDetail(id){
   currentSeminarId=id;
   const seminars=DB.get('seminars')||[];
@@ -4367,7 +4404,7 @@ function openSeminarDetail(id){
   if(!s) return;
   document.getElementById('seminarDetailTitle').textContent=s.name;
   document.getElementById('seminarDetailSub').textContent=`Date: ${fmtDate(s.date)}${s.notes?' · '+s.notes:''}`;
-  renderSeminarAttendees();
+  clearSemFilters();
   document.getElementById('seminarDetailModal').classList.add('open');
 }
 
@@ -4385,14 +4422,30 @@ function renderSeminarAttendees(){
   const cont=document.getElementById('seminar-attendees-table');
   if(!s){ cont.innerHTML=''; return; }
   const {col,dir}=seminarAttSort;
-  const attendees=(s.attendees||[]).slice().sort((a,b)=>{
+  const allAtt=(s.attendees||[]);
+  rebuildSemRmOptions(allAtt);
+  const f=semAttFilter;
+  const attendees=allAtt.filter(a=>{
+    if(f.q && !((a.name||'').toLowerCase().includes(f.q) || (a.mobile||'').includes(f.q))) return false;
+    if(f.rm && (a.rm||'').trim()!==f.rm) return false;
+    if(f.type && (a.type||'guest')!==f.type) return false;
+    if(f.rsvp){ if(f.rsvp==='__none'){ if(a.rsvp) return false; } else if(a.rsvp!==f.rsvp) return false; }
+    if(f.status && (a.status||'Pending')!==f.status) return false;
+    return true;
+  }).sort((a,b)=>{
     let av,bv;
     if(col==='rm'){ av=(a.rm||'').toLowerCase(); bv=(b.rm||'').toLowerCase(); }
     else { av=(a.name||'').toLowerCase(); bv=(b.name||'').toLowerCase(); }
     return av.localeCompare(bv)*dir;
   });
-  if(!attendees.length){
+  const cntEl=document.getElementById('semF-count');
+  if(cntEl) cntEl.textContent = attendees.length===allAtt.length ? allAtt.length+' attendees' : attendees.length+' of '+allAtt.length+' shown';
+  if(!allAtt.length){
     cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees added yet. Click "+ Add Attendee" to add from Equity Clients / MF Investors.</div>`;
+    return;
+  }
+  if(!attendees.length){
+    cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">Koi attendee filter se match nahi hua — filters clear karke dekhein.</div>`;
     return;
   }
   const arrow=(c)=> col===c ? (dir===1?' ▲':' ▼') : '';
