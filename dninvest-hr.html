@@ -2106,6 +2106,36 @@ async function autoOutTimeCheck(){
 setInterval(autoOutTimeCheck, 60000);
 autoOutTimeCheck();
 
+// ── One-time retro fix (July 1, 2026 se): purane records jinka out 1:30 PM se
+// pehle ka hai unhe Half day mark karo. Sirf Admin device par, sirf ek baar
+// (localStorage flag). Aaj ka din live rule handle karta hai.
+async function migrateHalfDayFromJuly1(){
+  try{
+    if(!isAdmin) return;
+    if(localStorage.getItem('hd_migration_jul2026_v1')) return;
+    const td=today();
+    const att=getAtt();
+    let fixed=0;
+    for(const emp of Object.keys(att)){
+      for(const rec of (att[emp]||[])){
+        if(rec.date>='2026-07-01' && rec.date<td && (rec.status==='Present'||rec.status==='Late') && rec.out){
+          const m=/^(\d{1,2}):(\d{2})$/.exec(rec.out);
+          if(m && (Number(m[1])+Number(m[2])/60)<13.5){
+            await saveAttRecord(emp, {...rec, status:'Half day'});
+            fixed++;
+          }
+        }
+      }
+    }
+    localStorage.setItem('hd_migration_jul2026_v1','done');
+    if(fixed>0){
+      if(typeof toast==='function') toast(fixed+' record(s) ko Half day mark kiya gaya (July 1 se retro rule)','success');
+      if(typeof renderDashboard==='function') renderDashboard();
+    }
+  }catch(e){ console.log('HD migration error:', e); }
+}
+setTimeout(migrateHalfDayFromJuly1, 8000); // DB load hone ke baad chale
+
 
 // ─── CLOCK ──────────────────────────────────────────────────────────────────
 function startClock(){
@@ -2130,14 +2160,16 @@ function renderDashboard(){
   const todayHoliday=getHolidayName(td);
   let present=0,absent=0,onleave=0;
 
+  let halfToday=0;
   EMPLOYEES.forEach(e=>{
     const rec=att[e.name]&&att[e.name].find(r=>r.date===td);
     if(todayHoliday) onleave++;
     else if(rec&&rec.status==='Present') present++;
+    else if(rec&&rec.status==='Half day'){ present++; halfToday++; }
     else absent++;
   });
 
-  const dp=document.getElementById('d-present'); if(dp) dp.textContent=present;
+  const dp=document.getElementById('d-present'); if(dp) dp.textContent=present+(halfToday>0?' ('+halfToday+' half)':'');
   const da=document.getElementById('d-absent'); if(da) da.textContent=absent;
   const dl=document.getElementById('d-leave'); if(dl) dl.textContent=onleave;
 
@@ -2158,13 +2190,15 @@ function renderDashboard(){
       let badge='',inT='—';
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
+      else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-blue">Half day</span>';inT=rec.in||'—'}
       else{badge='<span class="badge badge-red">Absent</span>'}
       const monthRecs=(att[currentUser]||[]).filter(r=>r.date&&r.date.startsWith(td.slice(0,7)));
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
       const mBlue=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
       const mAmber=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
-      const mTotal=mGreen+mBlue+mAmber;
-      const monthBadges=`<span style="font-size:16px;color:#555">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></span>`;
+      const mHalf=monthRecs.filter(r=>r.status==='Half day').length;
+      const mTotal=mGreen+mBlue+mAmber+mHalf;
+      const monthBadges=`<span style="font-size:16px;color:#555">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber}${mHalf>0?' &nbsp;🟠H'+mHalf:''} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
       strip.style.display='';
       strip.innerHTML=`<div class="aac-strip" onclick="openEmpMonthModal('${currentUser.replace(/'/g,"\\'")}')" title="Click to view full month">
@@ -2193,13 +2227,15 @@ function renderDashboard(){
       let badge='',inT='—';
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
+      else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-blue">Half day</span>';inT=rec.in||'—'}
       else{badge='<span class="badge badge-red">Absent</span>'}
       const monthRecs=(att[e.name]||[]).filter(r=>r.date&&r.date.startsWith(td.slice(0,7)));
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
       const mBlue=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-blue').length;
       const mAmber=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
-      const mTotal=mGreen+mBlue+mAmber;
-      const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
+      const mHalf=monthRecs.filter(r=>r.status==='Half day').length;
+      const mTotal=mGreen+mBlue+mAmber+mHalf;
+      const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber}${mHalf>0?' 🟠H'+mHalf:''} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
       const canOpen = isAdmin || e.name===currentUser;
       const clickAttr = canOpen ? `onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"` : '';
@@ -2207,6 +2243,7 @@ function renderDashboard(){
         // Admin: decorated card-style row for every RM (mobile-responsive via .aac classes)
         let accent='#ef4444', tint='#fef2f2'; // absent default
         if(todayHoliday){accent='#f59e0b';tint='#fffbeb';}
+        else if(rec&&rec.status==='Half day'){accent='#f97316';tint='#fff7ed';}
         else if(rec&&rec.status==='Present'){
           const bc=presentBadgeClass(rec);
           if(bc==='badge-green'){accent='#16a34a';tint='#f0fdf4';}
@@ -2218,7 +2255,7 @@ function renderDashboard(){
             <div class="avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0;border:2px solid ${accent}">${initials(e.name)}</div>
             <div class="aac-name">${e.name}</div>
           </div>
-          <div class="aac-cnt">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
+          <div class="aac-cnt">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber}${mHalf>0?' &nbsp;🟠H'+mHalf:''} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
           <div class="aac-time">In: <b style="color:${accent}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
           <div class="aac-badge">${badge}</div>
         </div>`;
