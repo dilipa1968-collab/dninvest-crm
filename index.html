@@ -4486,7 +4486,7 @@ function renderSeminarAttendees(){
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
       <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:170px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td>${isMyAttendee?`<button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
+      <td style="white-space:nowrap">${isMyAttendee?`<button class="btn-icon" onclick="editAttendeeMobile('${a.id}')" title="Edit mobile number">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -4751,6 +4751,43 @@ function exportSeminarAttendees(){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('Export done!','success');
+}
+
+async function editAttendeeMobile(attendeeId){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
+  if(!a) return;
+
+  // Permission: admin, ya apna hi attendee
+  const isMine = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+  if(!isMine){ toast('Ye attendee aapka nahi hai','error'); return; }
+
+  let input=prompt('Mobile number for '+a.name+':', a.mobile||'');
+  if(input===null) return; // cancelled
+  input=input.replace(/\D/g,'');
+  if(input!=='' && input.length!==10){ toast('10 digit ka valid mobile number daalein (ya khali chhod dein)','error'); return; }
+
+  a.mobile=input;
+  s.updated=today();
+  await DB.setClient('seminars',s);
+
+  // Client-linked attendee: option to update the master client record too
+  if(a.source_id && input!==''){
+    const coll = a.type==='equity' ? 'eq_clients' : (a.type==='mf' ? 'mf_clients' : null);
+    if(coll){
+      const list=DB.get(coll)||[];
+      const c=list.find(x=>x.id===a.source_id);
+      if(c && (c.mobile||'')!==input && confirm('Client master ('+(a.type==='equity'?'Equity':'MF')+' record) me bhi mobile update karein?\n\n'+a.name+': '+(c.mobile||'blank')+' \u2192 '+input)){
+        c.mobile=input;
+        await DB.setClient(coll,c);
+      }
+    }
+  }
+
+  renderSeminarAttendees();
+  toast('Mobile updated!','success');
 }
 
 async function removeAttendee(attendeeId){
