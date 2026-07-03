@@ -1587,6 +1587,31 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   </div>
 </div>
 
+<!-- Edit Attendee Modal -->
+<div class="modal-overlay" id="editAttendeeModal" onclick="if(event.target===this)closeModal('editAttendeeModal')">
+  <div class="modal" style="width:420px;max-width:94vw">
+    <div class="modal-hdr">
+      <h3>Edit Attendee</h3>
+      <button class="modal-close" onclick="closeModal('editAttendeeModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field"><label>Name</label><input type="text" id="editAtt_name"></div>
+      <div class="form-field"><label>Mobile</label><input type="text" id="editAtt_mobile" maxlength="10" placeholder="10 digit number" oninput="this.value=this.value.replace(/\D/g,'')"></div>
+      <div class="form-field"><label>RM</label><select id="editAtt_rm"></select></div>
+      <div id="editAtt_syncwrap" style="display:none;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;cursor:pointer">
+          <input type="checkbox" id="editAtt_sync" checked> Client master record me bhi Name/Mobile update karein
+        </label>
+      </div>
+      <p id="editAtt_note" style="font-size:.72rem;color:var(--gray);margin-top:8px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editAttendeeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAttendeeEdit()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Attendee Modal -->
 <div class="modal-overlay" id="addAttendeeModal" onclick="if(event.target===this)closeModal('addAttendeeModal')">
   <div class="modal">
@@ -4486,7 +4511,7 @@ function renderSeminarAttendees(){
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
       <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:170px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td style="white-space:nowrap">${isMyAttendee?`<button class="btn-icon" onclick="editAttendeeMobile('${a.id}')" title="Edit mobile number">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
+      <td style="white-space:nowrap">${isMyAttendee?`<button class="btn-icon" onclick="openEditAttendee('${a.id}')" title="Edit name / mobile / RM">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -4753,41 +4778,80 @@ function exportSeminarAttendees(){
   toast('Export done!','success');
 }
 
-async function editAttendeeMobile(attendeeId){
+let _editAttId=null;
+function openEditAttendee(attendeeId){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
   if(!s) return;
   const a=(s.attendees||[]).find(x=>x.id===attendeeId);
   if(!a) return;
 
-  // Permission: admin, ya apna hi attendee
   const isMine = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
   if(!isMine){ toast('Ye attendee aapka nahi hai','error'); return; }
 
-  let input=prompt('Mobile number for '+a.name+':', a.mobile||'');
-  if(input===null) return; // cancelled
-  input=input.replace(/\D/g,'');
-  if(input!=='' && input.length!==10){ toast('10 digit ka valid mobile number daalein (ya khali chhod dein)','error'); return; }
+  _editAttId=attendeeId;
+  document.getElementById('editAtt_name').value=a.name||'';
+  document.getElementById('editAtt_mobile').value=a.mobile||'';
 
-  a.mobile=input;
+  // RM dropdown: admin ke liye editable, RM ke liye locked (apna hi naam)
+  const rmSel=document.getElementById('editAtt_rm');
+  const allRMs=[...new Set([...getSegRMs('equity'),...getSegRMs('mf'),(a.rm||'').trim()])].filter(Boolean).sort((x,y)=>x.localeCompare(y));
+  rmSel.innerHTML=allRMs.map(r=>`<option ${r.trim().toLowerCase()===(a.rm||'').trim().toLowerCase()?'selected':''}>${r}</option>`).join('');
+  rmSel.disabled = CU.role!=='admin';
+
+  // Client-linked: sync option dikhao
+  const syncWrap=document.getElementById('editAtt_syncwrap');
+  const note=document.getElementById('editAtt_note');
+  if(a.source_id && (a.type==='equity'||a.type==='mf')){
+    syncWrap.style.display='block';
+    document.getElementById('editAtt_sync').checked=true;
+    note.textContent='Ye attendee '+(a.type==='equity'?'Equity':'MF')+' client record se linked hai.'+(CU.role!=='admin'?' RM change sirf Admin kar sakta hai.':'');
+  } else {
+    syncWrap.style.display='none';
+    note.textContent=(CU.role!=='admin'?'RM change sirf Admin kar sakta hai.':'');
+  }
+
+  document.getElementById('editAttendeeModal').classList.add('open');
+}
+
+async function saveAttendeeEdit(){
+  if(!_editAttId) return;
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s) return;
+  const a=(s.attendees||[]).find(x=>x.id===_editAttId);
+  if(!a) return;
+
+  const name=document.getElementById('editAtt_name').value.trim();
+  const mobile=document.getElementById('editAtt_mobile').value.replace(/\D/g,'');
+  const rmSel=document.getElementById('editAtt_rm');
+  const rm = CU.role==='admin' ? normRm(rmSel.value) : a.rm;
+
+  if(!name){ toast('Name khali nahi ho sakta','error'); return; }
+  if(mobile!=='' && mobile.length!==10){ toast('10 digit ka valid mobile daalein (ya khali chhod dein)','error'); return; }
+
+  a.name=name; a.mobile=mobile; a.rm=rm;
   s.updated=today();
   await DB.setClient('seminars',s);
 
-  // Client-linked attendee: option to update the master client record too
-  if(a.source_id && input!==''){
-    const coll = a.type==='equity' ? 'eq_clients' : (a.type==='mf' ? 'mf_clients' : null);
-    if(coll){
-      const list=DB.get(coll)||[];
-      const c=list.find(x=>x.id===a.source_id);
-      if(c && (c.mobile||'')!==input && confirm('Client master ('+(a.type==='equity'?'Equity':'MF')+' record) me bhi mobile update karein?\n\n'+a.name+': '+(c.mobile||'blank')+' \u2192 '+input)){
-        c.mobile=input;
-        await DB.setClient(coll,c);
-      }
+  // Client master sync (name + mobile)
+  if(a.source_id && (a.type==='equity'||a.type==='mf') && document.getElementById('editAtt_sync').checked){
+    const coll = a.type==='equity' ? 'eq_clients' : 'mf_clients';
+    const list=DB.get(coll)||[];
+    const c=list.find(x=>x.id===a.source_id);
+    if(c){
+      let changed=false;
+      if((c.name||'')!==name){ c.name=name; changed=true; }
+      if((c.mobile||'')!==mobile && mobile!==''){ c.mobile=mobile; changed=true; }
+      if(changed) await DB.setClient(coll,c);
     }
   }
 
+  closeModal('editAttendeeModal');
+  _editAttId=null;
   renderSeminarAttendees();
-  toast('Mobile updated!','success');
+  renderSeminarsTable();
+  toast('Attendee updated!','success');
 }
 
 async function removeAttendee(attendeeId){
