@@ -2441,10 +2441,19 @@ function hrNameForCrmUser(user){
   );
   return match || rawName;
 }
-let _crmHbTimer=null, _crmHbName=null;
+let _crmHbTimer=null, _crmHbName=null, _crmHbBlocked=false;
+function _crmHbCutoffH(){
+  const dow=new Date().getDay(); // 0=Sun,6=Sat (device time = IST)
+  if(dow>=1 && dow<=5) return 18.25; // Mon–Fri 6:15 PM
+  if(dow===6) return 14.25;          // Saturday 2:15 PM
+  return null;                        // Sunday — no cutoff
+}
 async function sendCrmHeartbeat(){
   try{
     if(typeof fdb==='undefined' || !_crmHbName) return;
+    // Session jo cutoff ke baad start hua — heartbeat mat bhejo, warna
+    // late-night fresh login ka time out-time ban jata hai (HR portal jaisa hi fix)
+    if(_crmHbBlocked) return;
     const n=new Date();
     const hhmm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
     const docRef=fdb.collection('hr_data').doc('heartbeats');
@@ -2459,7 +2468,9 @@ async function sendCrmHeartbeat(){
 function startCrmHeartbeat(user){
   if(_crmHbTimer) return; // already running
   _crmHbName=hrNameForCrmUser(user);
-  sendCrmHeartbeat(); // immediate first ping
+  const n=new Date(), cutoff=_crmHbCutoffH();
+  _crmHbBlocked = (cutoff!==null && (n.getHours()+n.getMinutes()/60)>=cutoff);
+  sendCrmHeartbeat(); // immediate first ping (blocked session me khud skip hoga)
   _crmHbTimer=setInterval(sendCrmHeartbeat, 5*60000); // every 5 min
 }
 
@@ -2676,7 +2687,18 @@ function tryAutoLogin(){
     try{
       const {username, password} = JSON.parse(saved);
       const users = DB.get('users') || DEFAULT_USERS;
-      const user = users.find(x=>x.username===username && x.password===password && x.active!==false);
+      const td = today();
+      // Same credential + active rules as doLogin():
+      // - RM can match via password OR 4-digit PIN (session stores whatever was typed)
+      // - active===false allowed only if lateAbsentMarked===today (late-login reactivation)
+      // Without this, PIN-login RMs were force-logged-out on every 30-min auto reload.
+      const user = users.find(x=>{
+        if(x.username!==username) return false;
+        const credOk = (x.password===password) || (x.role==='rm' && x.pin && x.pin===password);
+        if(!credOk) return false;
+        if(x.active===false && x.lateAbsentMarked!==td) return false;
+        return true;
+      });
       if(user){
         // Don't auto-login RMs on mobile — force them back to the login
         // screen so the desktop-only restriction in doLogin() applies.
