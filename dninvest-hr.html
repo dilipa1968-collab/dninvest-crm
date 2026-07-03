@@ -1888,7 +1888,9 @@ function stopHeartbeat(){
 
 async function doLogout(){
   // Save out_time on manual logout
-  // Rule: if logout before cutoff → save cutoff time; if after cutoff → save actual time
+  // Rule (Option A): manual logout par HAMESHA actual time save hota hai —
+  // 6:00 par logout → 18:00, 2:00 par logout → 14:00. Sachchi picture.
+  // Jo logout nahi karte unka out-time autoOutTimeCheck (last heartbeat) se aata hai.
   if(currentUser && !isAdmin){
     try{
       const td=today();
@@ -1898,17 +1900,7 @@ async function doLogout(){
         const now=new Date();
         const utc=now.getTime()+now.getTimezoneOffset()*60000;
         const ist=new Date(utc+5.5*3600000);
-        const dow=ist.getDay();
-        const istH=ist.getHours()+ist.getMinutes()/60;
-        let cutoff=null, cutoffStr='';
-        if(dow>=1 && dow<=5){ cutoff=18.25; cutoffStr='18:15'; }   // Mon–Fri 6:15 PM
-        else if(dow===6){ cutoff=14.25; cutoffStr='14:15'; }        // Saturday 2:15 PM
-        let outT;
-        if(cutoff!==null && istH < cutoff){
-          outT=cutoffStr; // logout before cutoff → save cutoff
-        } else {
-          outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
-        }
+        const outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
         await saveAttRecord(currentUser, {...rec, out:outT});
       }
     }catch(e){}
