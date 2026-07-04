@@ -4820,6 +4820,7 @@ async function openSeminarFeedback(){
     :'<span style="background:#fce8e6;color:#c5221f;padding:2px 10px;border-radius:12px;font-size:11px">No</span>');};
   const prodChips=r=>(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10px">'+esc(p)+'</span>').join('');
   const topicChips=r=>(r.topics||[]).map(p=>'<span style="display:inline-block;background:#e8f0fe;color:#1967d2;padding:1px 8px;border-radius:10px;margin:1px;font-size:10px">'+esc(p)+'</span>').join('');
+  const refChips=(r,i)=>(r.references||[]).map((rf,j)=>'<span style="display:inline-block;background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8;padding:1px 6px;border-radius:10px;margin:1px;font-size:10px">'+esc(rf.name)+(rf.mobile?' \u00b7 '+esc(rf.mobile):'')+' <a href="javascript:void(0)" onclick="fbRefToLead('+i+','+j+')" title="Add this reference as Lead" style="text-decoration:none;font-weight:700;color:#be185d">\u2795</a></span>').join('')||'<span style="color:#ccc;font-size:.72rem">\u2014</span>';
   const esc=t=>String(t||'').replace(/</g,'&lt;');
 
   const cards='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:12px">'
@@ -4827,6 +4828,7 @@ async function openSeminarFeedback(){
     +'<div style="background:#fff7ed;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#b45309;text-transform:uppercase">Avg Experience</div><div style="font-size:20px;font-weight:700;color:#b45309">'+avg('rating')+' / 5</div></div>'
     +'<div style="background:#fff7ed;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#b45309;text-transform:uppercase">Avg Content</div><div style="font-size:20px;font-weight:700;color:#b45309">'+avg('contentRating')+' / 5</div></div>'
     +'<div style="background:#e6f4ea;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#137333;text-transform:uppercase">Interested (Yes)</div><div style="font-size:20px;font-weight:700;color:#137333">'+haan.length+'</div></div>'
+    +'<div style="background:#fdf2f8;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#be185d;text-transform:uppercase">References</div><div style="font-size:20px;font-weight:700;color:#be185d">'+resp.reduce((t,r)=>t+((r.references||[]).length),0)+'</div></div>'
     +'</div>';
 
   const rows=resp.map((r,i)=>'<tr style="border-bottom:1px solid #eee'+(fbIntLabel(r.interested)==='Yes'?';background:#f4fbf6':'')+'">'
@@ -4839,6 +4841,7 @@ async function openSeminarFeedback(){
     +'<td style="padding:7px 8px;max-width:140px">'+prodChips(r)+'</td>'
     +'<td style="padding:7px 8px;max-width:140px">'+topicChips(r)+'</td>'
     +'<td style="padding:7px 8px;font-size:11.5px;color:#555;max-width:180px">'+esc(r.comments)+'</td>'
+    +'<td style="padding:7px 8px;max-width:170px">'+refChips(r,i)+'</td>'
     +'<td style="padding:7px 8px;white-space:nowrap"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="fbToLead('+i+')">➕ Lead</button> <button class="btn-icon" style="color:var(--red)" title="Delete response" onclick="fbDelete('+i+')">🗑️</button></td>'
     +'</tr>').join('');
 
@@ -4855,7 +4858,7 @@ async function openSeminarFeedback(){
     +(haan.length?'<div style="margin-bottom:10px"><button class="btn btn-teal" style="font-size:.78rem" onclick="fbAllHaanToLeads()">➕ Add all \''+'Yes'+'\' responses to Leads ('+haan.length+')</button></div>':'')
     +(resp.length
       ?'<div style="border:1px solid #eee;border-radius:8px;overflow:auto;max-height:48vh"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#f7f5fb">'
-        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NEXT TOPIC</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">COMMENTS</th><th style="padding:8px;font-size:11px;color:#673ab7">ACTION</th>'
+        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NEXT TOPIC</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">COMMENTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;font-size:11px;color:#673ab7">ACTION</th>'
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       :'<div style="text-align:center;padding:30px;color:#999">No feedback received for this seminar yet.<br><small>💬 Use the Feedback Link button to send the link to attendees.</small></div>')
     +'</div></div>';
@@ -4905,6 +4908,8 @@ function fbExportExcel(){
     ['Interested — Maybe', shayad],
     ['Interested — No', nahi]
   ];
+  const totalRefs=list.reduce((t,r)=>t+((r.references||[]).length),0);
+  if(totalRefs) summaryRows.push(['References Received', totalRefs]);
   prodCounts.forEach(([p,c])=>summaryRows.push(['Product Interest: '+p, c]));
   topicCounts.forEach(([p,c])=>summaryRows.push(['Next Topic Vote: '+p, c]));
 
@@ -4915,7 +4920,8 @@ function fbExportExcel(){
     fbIntLabel(r.interested),
     (r.products||[]).join(', '),
     (r.topics||[]).join(', '),
-    r.comments||''
+    r.comments||'',
+    (r.references||[]).map(rf=>rf.name+(rf.mobile?' \u2014 '+rf.mobile:'')).join('; ')
   ]);
 
   const fname='Feedback_'+String(sem.name||'Seminar').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40)+'_'+today()+'.xlsx';
@@ -4941,7 +4947,8 @@ function fbExportExcel(){
         {header:'INTERESTED', width:13, align:'center', color:intColor},
         {header:'PRODUCTS', width:34},
         {header:'NEXT TOPIC', width:30},
-        {header:'COMMENTS', width:42}
+        {header:'COMMENTS', width:38},
+        {header:'REFERENCES', width:34, color:v=>v?{bg:'FFFCE7F3',font:'FF9D174D'}:null}
       ],
       rows:respRows
     }
@@ -4987,6 +4994,36 @@ async function fbToLead(idx, silent){
   await DB.setClient('leads', rec);
   if(!silent){ toast(r.name+' added to Leads!','success'); renderLeadsTable(); updateBadges(); }
   return true;
+}
+
+async function fbRefToLead(idx, refIdx){
+  const r=(window._semFbList||[])[idx];
+  const rf=r&&(r.references||[])[refIdx];
+  if(!rf||!rf.name) return;
+  const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
+  const mob=cleanMob(rf.mobile);
+  const leads=DB.get('leads')||[];
+  if(mob){
+    if(leads.find(l=>cleanMob(l.mobile)===mob)){ toast(rf.name+' — already in Leads','error'); return; }
+    if((DB.get('eq_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ toast(rf.name+' — already an Equity Client','error'); return; }
+    if((DB.get('mf_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ toast(rf.name+' — already an MF Investor','error'); return; }
+  }
+  // RM: same logic as respondent — attendee match by respondent mobile, else current user
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  const respMob=cleanMob(r.mobile);
+  const attMatch=s?(s.attendees||[]).find(a=>cleanMob(a.mobile)===respMob && respMob):null;
+  const rm=normRm((attMatch&&attMatch.rm)||CU.name||'');
+  const rec={
+    id:uid(), name:rf.name||'', mobile:rf.mobile||'', rm,
+    last_call:'', next_call:'', followup_status:'Pending',
+    remarks:'Reference from seminar feedback — referred by '+(r.name||'')+(r.mobile?' ('+r.mobile+')':'')+(s&&s.name?' | Seminar: '+s.name:''),
+    created:today(), updated:today()
+  };
+  DB.setClient('leads', rec).then(()=>{
+    toast(rf.name+' added to Leads (reference)!','success');
+    renderLeadsTable(); updateBadges();
+  });
 }
 
 async function fbAllHaanToLeads(){
