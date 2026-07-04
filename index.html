@@ -134,7 +134,7 @@ window.dnXlsxBook = function(filename, sheets){
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols']   = cols.map(c=>({wch: c.width || Math.max(10, String(c.header||'').length + 2)}));
     ws['!merges'] = [{s:{r:0,c:0}, e:{r:0, c:Math.max(0,ncol-1)}}];
-    ws['!rows']   = [{hpt:26},{hpt:22}];
+    ws['!rows']   = [{hpt:26},{hpt: sh.headerHeight||22}];
     ws['!freeze'] = {xSplit:0, ySplit:2, topLeftCell:'A3', activePane:'bottomRight', state:'frozen'};
     if(ncol>0) ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:1,c:0}, e:{r:1,c:ncol-1}})};
     XLSX.utils.book_append_sheet(wb, ws, String(sh.name||'Sheet').replace(/[\\/?*\[\]:]/g,' ').slice(0,31) || 'Sheet');
@@ -4929,13 +4929,14 @@ function fbExportExcel(){
       rows:summaryRows
     },
     { name:'Responses',
+      headerHeight:34,
       title:'Feedback Responses — '+(sem.name||'')+' | Total: '+list.length,
       columns:[
         {header:'DATE', width:13},
         {header:'NAME', width:22},
         {header:'MOBILE', width:13},
-        {header:'EXPERIENCE', width:14, align:'center', color:ratingColor},
-        {header:'CONTENT', width:14, align:'center', color:ratingColor},
+        {header:'OVERALL EXPERIENCE\nSeminar kaisa laga? (1\u20135 \u2605)', width:24, align:'center', color:ratingColor},
+        {header:'CONTENT QUALITY\nContent kitna useful laga? (1\u20135 \u2605)', width:26, align:'center', color:ratingColor},
         {header:'INTERESTED', width:13, align:'center', color:intColor},
         {header:'PRODUCTS', width:34},
         {header:'NEXT TOPIC', width:30},
