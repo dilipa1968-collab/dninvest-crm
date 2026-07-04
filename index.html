@@ -4809,6 +4809,7 @@ async function openSeminarFeedback(){
   const resp=all.filter(r=>String(r.seminarId||'')===String(s.id) || (r.seminarName||'').startsWith(s.name||'~~'))
                 .sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
   window._semFbList=resp;
+  window._semFbSeminar={name:s.name||'', date:s.date||'', location:s.location||''};
 
   const avg=k=>resp.length?(resp.reduce((t,r)=>t+Number(r[k]||0),0)/resp.length).toFixed(1):'—';
   const haan=resp.filter(r=>r.interested==='Haan');
@@ -4844,7 +4845,9 @@ async function openSeminarFeedback(){
     +'<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#673ab7">'
     +'<div><div style="font-weight:700;font-size:15px;color:#fff">📋 Feedback — '+esc(s.name)+'</div>'
     +'<div style="font-size:12px;color:#d9cdf2">'+(s.date?fmtDate(s.date):'')+'</div></div>'
-    +'<button onclick="document.getElementById(\'sem-fb-overlay\').remove()" style="background:rgba(255,255,255,.15);border:none;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;color:#fff">\u2715</button>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +(resp.length?'<button onclick="fbExportExcel()" title="Colorful Excel report download karein" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px">\uD83D\uDCE5 Excel Report</button>':'')
+    +'<button onclick="document.getElementById(\'sem-fb-overlay\').remove()" style="background:rgba(255,255,255,.15);border:none;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;color:#fff">\u2715</button></div>'
     +'</div>'
     +'<div style="padding:16px 20px;overflow-y:auto">'
     +cards
@@ -4855,6 +4858,92 @@ async function openSeminarFeedback(){
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       :'<div style="text-align:center;padding:30px;color:#999">Is seminar ka abhi koi feedback nahi aaya.<br><small>💬 Feedback Link button se attendees ko link bhejein.</small></div>')
     +'</div></div>';
+}
+
+// ── Feedback → colorful Excel report (xlsx-js-style via dnXlsxBook) ──
+function fbExportExcel(){
+  const list=window._semFbList||[];
+  if(!list.length){ toast('Koi feedback response nahi hai export ke liye','error'); return; }
+  const sem=window._semFbSeminar||{};
+
+  const haan=list.filter(r=>r.interested==='Haan').length;
+  const shayad=list.filter(r=>r.interested==='Shayad').length;
+  const nahi=list.filter(r=>r.interested && r.interested!=='Haan' && r.interested!=='Shayad').length;
+  const avg=k=>list.length?Math.round(list.reduce((t,r)=>t+Number(r[k]||0),0)/list.length*10)/10:0;
+
+  // Product & topic interest counts
+  const countMap=key=>{
+    const m={};
+    list.forEach(r=>(r[key]||[]).forEach(p=>{ m[p]=(m[p]||0)+1; }));
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+  };
+  const prodCounts=countMap('products');
+  const topicCounts=countMap('topics');
+
+  // Colour helpers
+  const GREEN={bg:'FFC6EFCE',font:'FF006100'}, AMBER={bg:'FFFFEB9C',font:'FF9C6500'}, RED={bg:'FFFFC7CE',font:'FF9C0006'};
+  const ratingColor=v=>{ const n=Number(v)||0; return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
+  const intColor=v=>v==='Haan'?GREEN:(v==='Shayad'?AMBER:(v?RED:null));
+  const summaryColor=(v,row)=>{
+    const m=String(row[0]||'');
+    if(/Haan/.test(m)) return GREEN;
+    if(/Shayad/.test(m)) return AMBER;
+    if(/Nahi/.test(m)) return RED;
+    if(/Avg/.test(m)) return ratingColor(v);
+    return null;
+  };
+
+  const summaryRows=[
+    ['Seminar', sem.name||''],
+    ['Date', sem.date?fmtDate(sem.date):''],
+    ['Total Responses', list.length],
+    ['Avg Experience Rating (/5)', avg('rating')],
+    ['Avg Content Rating (/5)', avg('contentRating')],
+    ['Interested — Haan ✓', haan],
+    ['Interested — Shayad', shayad],
+    ['Interested — Nahi', nahi]
+  ];
+  prodCounts.forEach(([p,c])=>summaryRows.push(['Product Interest: '+p, c]));
+  topicCounts.forEach(([p,c])=>summaryRows.push(['Next Topic Vote: '+p, c]));
+
+  const respRows=list.map(r=>[
+    r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
+    r.name||'', r.mobile||'',
+    Number(r.rating)||'', Number(r.contentRating)||'',
+    r.interested||'',
+    (r.products||[]).join(', '),
+    (r.topics||[]).join(', '),
+    r.comments||''
+  ]);
+
+  const fname='Feedback_'+String(sem.name||'Seminar').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40)+'_'+today()+'.xlsx';
+
+  dnXlsxBook(fname,[
+    { name:'Summary',
+      title:'D N Investment — Seminar Feedback Summary: '+(sem.name||'')+(sem.date?' ('+fmtDate(sem.date)+')':''),
+      columns:[
+        {header:'METRIC', width:36},
+        {header:'VALUE', width:22, align:'center', color:summaryColor}
+      ],
+      rows:summaryRows
+    },
+    { name:'Responses',
+      title:'Feedback Responses — '+(sem.name||'')+' | Total: '+list.length,
+      columns:[
+        {header:'DATE', width:13},
+        {header:'NAME', width:22},
+        {header:'MOBILE', width:13},
+        {header:'EXPERIENCE (/5)', width:15, num:true, align:'center', color:ratingColor},
+        {header:'CONTENT (/5)', width:14, num:true, align:'center', color:ratingColor},
+        {header:'INTERESTED', width:13, align:'center', color:intColor},
+        {header:'PRODUCTS', width:34},
+        {header:'NEXT TOPIC', width:30},
+        {header:'COMMENTS', width:42}
+      ],
+      rows:respRows
+    }
+  ]);
+  toast('Excel report download ho gaya!','success');
 }
 
 async function fbDelete(idx){
@@ -12488,3 +12577,5 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 </body>
 </html>
+
+        
