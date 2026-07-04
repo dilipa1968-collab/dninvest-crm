@@ -35,26 +35,36 @@ body{font-family:'Roboto',Arial,sans-serif;background:var(--purple-light);color:
 .q-label{font-size:15px;font-weight:500;margin-bottom:14px;line-height:1.45}
 .q-label .star{color:var(--red);margin-left:3px}
 input[type=text],input[type=tel],select,textarea{
-  width:100%;border:none;border-bottom:1px solid var(--border);font-size:14px;font-family:inherit;
-  padding:6px 0;background:transparent;outline:none;color:var(--text);transition:border-color .2s;
+  width:100%;border:none;border-bottom:1px solid var(--border);font-size:16px;font-family:inherit;
+  padding:10px 0;background:transparent;outline:none;color:var(--text);transition:border-color .2s;
 }
 input[type=text]:focus,input[type=tel]:focus,textarea:focus{border-bottom:2px solid var(--purple)}
-select{border:1px solid var(--border);border-radius:4px;padding:10px;background:#fff;cursor:pointer}
+select{border:1.5px solid var(--border);border-radius:8px;padding:13px 10px;background:#fff;cursor:pointer;font-size:15px}
 textarea{resize:vertical;min-height:26px;border-bottom:1px solid var(--border)}
 input[type=text],input[type=tel]{max-width:420px}
-.radio-row{display:flex;align-items:center;gap:12px;padding:9px 0;cursor:pointer}
+@media(max-width:480px){input[type=text],input[type=tel]{max-width:100%}}
+.radio-row{display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.radio-row:active{transform:scale(.985)}
+.radio-row.sel{border-color:var(--purple);background:var(--purple-light);box-shadow:0 0 0 1px var(--purple) inset}
 .radio-row input{width:20px;height:20px;accent-color:var(--purple);cursor:pointer;flex-shrink:0}
-.radio-row span{font-size:14px}
-.scale{display:flex;align-items:flex-end;justify-content:space-between;max-width:420px;margin-top:6px}
-.scale .cell{display:flex;flex-direction:column;align-items:center;gap:10px;flex:1}
-.scale .num{font-size:13px;color:var(--text2)}
-.scale input{width:20px;height:20px;accent-color:var(--purple);cursor:pointer}
+.radio-row span{font-size:15px;line-height:1.4}
+.scale{display:flex;justify-content:space-between;gap:8px;max-width:420px;margin-top:6px}
+.scale .cell{flex:1}
+.scale .num{
+  display:flex;align-items:center;justify-content:center;width:100%;height:52px;
+  border:1.5px solid var(--border);border-radius:10px;font-size:17px;font-weight:500;color:var(--text2);
+  cursor:pointer;transition:all .15s;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+.scale .num:active{transform:scale(.94)}
+.scale input{display:none}
+.scale input:checked + .num{background:var(--purple);border-color:var(--purple);color:#fff;font-weight:700}
 .scale-ends{display:flex;justify-content:space-between;max-width:420px;font-size:12px;color:var(--text2);margin-top:8px}
 .err{display:none;color:var(--red);font-size:12px;margin-top:10px;align-items:center;gap:6px}
 .card.error{border:1px solid var(--red)}
 .card.error .err{display:flex}
 .footer-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
-.btn-submit{background:var(--purple);color:#fff;border:none;border-radius:4px;padding:10px 26px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+.btn-submit{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:14px 32px;font-size:16px;font-weight:500;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+@media(max-width:480px){.footer-row{flex-direction:column;gap:4px}.btn-submit{width:100%;padding:16px}}
 .btn-submit:hover{background:var(--purple-dark);box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .btn-submit:disabled{opacity:.6;cursor:not-allowed}
 .btn-clear{background:none;border:none;color:var(--purple);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;padding:10px}
@@ -175,9 +185,20 @@ input[type=text],input[type=tel]{max-width:420px}
   const el=document.getElementById('scale-'+k);
   let h='';
   for(let i=1;i<=5;i++){
-    h+=`<div class="cell"><span class="num">${i}</span><input type="radio" name="f-${k}" value="${i}"></div>`;
+    h+=`<label class="cell"><input type="radio" name="f-${k}" value="${i}"><span class="num">${i}</span></label>`;
   }
   el.innerHTML=h;
+});
+
+// Radio/checkbox option cards: select hone par purple highlight
+document.addEventListener('change',e=>{
+  const inp=e.target;
+  if(!inp.matches('.radio-row input')) return;
+  if(inp.type==='radio'){
+    document.querySelectorAll(`input[name="${inp.name}"]`).forEach(r=>r.closest('.radio-row').classList.toggle('sel', r.checked));
+  } else {
+    inp.closest('.radio-row').classList.toggle('sel', inp.checked);
+  }
 });
 
 // ── Load seminars from CRM Firestore (crm_data/seminars) ─────────
@@ -252,6 +273,7 @@ function clearForm(){
   const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
   document.getElementById('f-comments').value='';
   document.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(r=>r.checked=false);
+  document.querySelectorAll('.radio-row.sel').forEach(r=>r.classList.remove('sel'));
   document.querySelectorAll('.card.error').forEach(c=>c.classList.remove('error'));
 }
 
