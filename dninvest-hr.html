@@ -1896,7 +1896,10 @@ async function doLogout(){
       const td=today();
       const att=getAtt();
       const rec=(att[currentUser]||[]).find(r=>r.date===td);
-      if(rec && (rec.status==='Present'||rec.status==='Late') && !rec.out){
+      // NOTE: '!rec.out' condition hata di — pehle isse dusra logout out-time
+      // update nahi karta tha (12:45 pe logout → wapas login → 2:00 pe final
+      // logout, lekin out 12:45 hi dikhta tha). Ab LATEST logout hi final out hai.
+      if(rec && (rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')){
         const now=new Date();
         const utc=now.getTime()+now.getTimezoneOffset()*60000;
         const ist=new Date(utc+5.5*3600000);
@@ -1905,7 +1908,16 @@ async function doLogout(){
         // Saturday exempt: Saturday office khud hi half day hai (2:15 PM cutoff)
         const outH=ist.getHours()+ist.getMinutes()/60;
         const isSatToday=(ist.getDay()===6);
-        const newStatus=(!isSatToday && outH<13.5)?'Half day':rec.status;
+        let newStatus=rec.status;
+        if(!isSatToday && outH<13.5){
+          newStatus='Half day';
+        } else if(rec.status==='Half day'){
+          // Pehle 1:30 se pehle nikla tha (Half day laga), ab wapas aake der tak
+          // kaam kiya → status revert. In-time se decide: cutoff ke baad → Late.
+          const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
+          const lateCut=isSatToday?10.75:10; // Sat 10:45, Mon-Fri 10:00
+          newStatus=(m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
+        }
         await saveAttRecord(currentUser, {...rec, out:outT, status:newStatus});
       }
     }catch(e){}
@@ -2071,13 +2083,32 @@ async function autoOutTimeCheck(){
       if(hb && hb.date===td && hb.time) return hb.time;
       return cutoffStr;
     }
+    // Aaj ka heartbeat existing out se LATER hai? (mid-day logout ke baad wapas
+    // aake kaam kiya case) — sirf real heartbeat se overwrite, cutoff fallback se nahi.
+    function laterHeartbeat(name, rec){
+      const hb=heartbeats[name];
+      if(hb && hb.date===td && hb.time && rec.out && hb.time>rec.out) return hb.time;
+      return null;
+    }
     // Out-time 1:30 PM se pehle ka hai → status Half day ban jata hai
     // Saturday exempt: Saturday khud hi half day office hai
-    function statusFor(outT, curStatus){
-      if(dow===6) return curStatus;
+    // Aur agar Half day laga tha lekin naya out 1:30 ke BAAD ka hai → revert.
+    function statusFor(outT, rec){
+      const curStatus=rec.status;
+      if(dow===6) return curStatus==='Half day'?revertedStatus(rec):curStatus;
       const m=/^(\d{1,2}):(\d{2})$/.exec(outT||'');
-      if(m && (Number(m[1])+Number(m[2])/60) < 13.5) return 'Half day';
+      if(m){
+        const oH=Number(m[1])+Number(m[2])/60;
+        if(oH<13.5) return 'Half day';
+        if(curStatus==='Half day') return revertedStatus(rec);
+      }
       return curStatus;
+    }
+    // Half day se wapas Present/Late — in-time se decide (Sat 10:45, Mon-Fri 10:00)
+    function revertedStatus(rec){
+      const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
+      const lateCut=(dow===6)?10.75:10;
+      return (m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
     }
 
     if(isAdmin){
@@ -2086,10 +2117,19 @@ async function autoOutTimeCheck(){
       let changed=false;
       for(const emp of emps){
         const rec=(att[emp]||[]).find(r=>r.date===td);
-        if(rec && (rec.status==='Present'||rec.status==='Late') && !rec.out){
-          const oT=outTimeFor(emp);
-          await saveAttRecord(emp, {...rec, out:oT, status:statusFor(oT, rec.status)});
-          changed=true;
+        if(!rec) continue;
+        if((rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')){
+          if(!rec.out){
+            const oT=outTimeFor(emp);
+            await saveAttRecord(emp, {...rec, out:oT, status:statusFor(oT, rec)});
+            changed=true;
+          } else {
+            const lh=laterHeartbeat(emp, rec);
+            if(lh){
+              await saveAttRecord(emp, {...rec, out:lh, status:statusFor(lh, rec)});
+              changed=true;
+            }
+          }
         }
       }
       if(changed){
@@ -2099,9 +2139,12 @@ async function autoOutTimeCheck(){
       // RM: apna out time fill karo
       if(!currentUser) return;
       const rec=(att[currentUser]||[]).find(r=>r.date===td);
-      if(!rec || !(rec.status==='Present'||rec.status==='Late') || rec.out) return;
-      const oT=outTimeFor(currentUser);
-      await saveAttRecord(currentUser, {...rec, out:oT, status:statusFor(oT, rec.status)});
+      if(!rec || !(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) return;
+      let oT=null;
+      if(!rec.out) oT=outTimeFor(currentUser);
+      else oT=laterHeartbeat(currentUser, rec); // out set hai, sirf later heartbeat se update
+      if(!oT) return;
+      await saveAttRecord(currentUser, {...rec, out:oT, status:statusFor(oT, rec)});
       if(typeof renderAttendancePage==='function') renderAttendancePage();
       if(typeof renderDashboard==='function') renderDashboard();
     }
@@ -2181,6 +2224,38 @@ async function migrateSaturdayHalfDayRevert(){
   }catch(e){ console.log('Sat HD revert error:', e); }
 }
 setTimeout(migrateSaturdayHalfDayRevert, 10000); // pehli migration ke baad chale
+
+// ── One-time OUT-TIME REPAIR (sirf 2026-07-04 ke liye): purane bug me dusra
+// logout out-time overwrite nahi karta tha ('!rec.out' condition), isliye
+// 12:4x ka pehla logout hi save reh gaya. Aaj ke last heartbeat se repair —
+// heartbeat time out se later hai to out = heartbeat time. Sirf Admin device.
+// (Agar ye code baad me deploy hua aur heartbeat date match nahi karti, to
+// kuch nahi hoga — bilkul safe.)
+async function repairOutTimes20260704(){
+  try{
+    if(!isAdmin) return;
+    if(localStorage.getItem('out_fix_2026_07_04')) return;
+    const targetDate='2026-07-04';
+    const att=getAtt();
+    const heartbeats=DB.get('heartbeats', {}) || {};
+    let fixed=0;
+    for(const emp of Object.keys(att)){
+      const rec=(att[emp]||[]).find(r=>r.date===targetDate);
+      if(!rec || !rec.out) continue;
+      const hb=heartbeats[emp];
+      if(hb && hb.date===targetDate && hb.time && hb.time>rec.out){
+        await saveAttRecord(emp, {...rec, out:hb.time});
+        fixed++;
+      }
+    }
+    localStorage.setItem('out_fix_2026_07_04','done');
+    if(fixed>0){
+      if(typeof toast==='function') toast(fixed+' record(s) ka out-time last heartbeat se repair kiya gaya','success');
+      if(typeof renderDashboard==='function') renderDashboard();
+    }
+  }catch(e){ console.log('Out-time repair error:', e); }
+}
+setTimeout(repairOutTimes20260704, 12000);
 
 
 // ─── CLOCK ──────────────────────────────────────────────────────────────────
