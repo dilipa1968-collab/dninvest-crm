@@ -4882,7 +4882,8 @@ function fbExportExcel(){
 
   // Colour helpers
   const GREEN={bg:'FFC6EFCE',font:'FF006100'}, AMBER={bg:'FFFFEB9C',font:'FF9C6500'}, RED={bg:'FFFFC7CE',font:'FF9C0006'};
-  const ratingColor=v=>{ const n=Number(v)||0; return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
+  const starTxt=n=>{ n=Number(n)||0; return n?('\u2605'.repeat(n)+'\u2606'.repeat(5-n)):''; };
+  const ratingColor=v=>{ const n=(String(v||'').match(/\u2605/g)||[]).length || (Number(v)||0); return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
   const intLabel=v=>v==='Haan'?'Yes':(v==='Shayad'?'Maybe':(v==='Nahi'?'No':(v||'')));
   const intColor=v=>v==='Yes'?GREEN:(v==='Maybe'?AMBER:(v?RED:null));
   const summaryColor=(v,row)=>{
@@ -4910,7 +4911,7 @@ function fbExportExcel(){
   const respRows=list.map(r=>[
     r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
     r.name||'', r.mobile||'',
-    Number(r.rating)||'', Number(r.contentRating)||'',
+    starTxt(r.rating), starTxt(r.contentRating),
     intLabel(r.interested),
     (r.products||[]).join(', '),
     (r.topics||[]).join(', '),
@@ -4934,8 +4935,8 @@ function fbExportExcel(){
         {header:'DATE', width:13},
         {header:'NAME', width:22},
         {header:'MOBILE', width:13},
-        {header:'EXPERIENCE (/5)', width:15, num:true, align:'center', color:ratingColor},
-        {header:'CONTENT (/5)', width:14, num:true, align:'center', color:ratingColor},
+        {header:'EXPERIENCE', width:14, align:'center', color:ratingColor},
+        {header:'CONTENT', width:14, align:'center', color:ratingColor},
         {header:'INTERESTED', width:13, align:'center', color:intColor},
         {header:'PRODUCTS', width:34},
         {header:'NEXT TOPIC', width:30},
