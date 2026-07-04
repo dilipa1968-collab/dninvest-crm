@@ -211,12 +211,22 @@ async function loadSeminars(){
     // Latest date first
     SEMINARS.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const fmtD=d=>{ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); };
-    sel.innerHTML='<option value="">-- Select seminar --</option>'+
-      SEMINARS.map(s=>`<option value="${s.id}">${(s.name||'Seminar')} — ${fmtD(s.date)}</option>`).join('')+
-      '<option value="__other">Other / don\'t remember</option>';
-    // ?s=<id> se preselect
     const pre=new URLSearchParams(location.search).get('s');
-    if(pre && SEMINARS.some(x=>String(x.id)===pre)) sel.value=pre;
+    const linked=pre?SEMINARS.find(x=>String(x.id)===pre):null;
+
+    if(linked){
+      // Link ek specific seminar ka hai → sirf wahi dikhe, locked
+      sel.innerHTML=`<option value="${linked.id}" selected>${(linked.name||'Seminar')} — ${fmtD(linked.date)}</option>`;
+      sel.value=linked.id;
+      sel.disabled=true;
+      sel.style.background='#f3f4f6';
+      sel.style.cursor='not-allowed';
+    } else {
+      // General link → saare seminars chunne ka option
+      sel.innerHTML='<option value="">-- Select seminar --</option>'+
+        SEMINARS.map(s=>`<option value="${s.id}">${(s.name||'Seminar')} — ${fmtD(s.date)}</option>`).join('')+
+        '<option value="__other">Other / don\'t remember</option>';
+    }
   }catch(e){
     sel.outerHTML='<input type="text" id="f-seminar" placeholder="Enter seminar name / date" maxlength="100">';
   }
