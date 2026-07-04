@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,6 +70,11 @@ input[type=text],input[type=tel]{max-width:420px}
 .btn-clear{background:none;border:none;color:var(--purple);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;padding:10px}
 .brand{font-size:11px;color:var(--text2);text-align:center;margin-top:20px}
 .brand b{color:var(--purple)}
+.ref-row{display:flex;gap:10px;margin-bottom:10px}
+.ref-row input{flex:1;max-width:none}
+.btn-addref{background:none;border:1.5px dashed var(--purple);color:var(--purple);border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit;margin-top:4px;-webkit-tap-highlight-color:transparent}
+.btn-addref:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:480px){.ref-row{flex-direction:column;gap:4px;border-bottom:1px dashed var(--border);padding-bottom:8px}}
 /* Confirmation */
 #done{display:none}
 #done .card{padding:28px 24px}
@@ -162,6 +167,18 @@ input[type=text],input[type=tel]{max-width:420px}
     <textarea id="f-comments" placeholder="Your answer" rows="1" maxlength="500"></textarea>
   </div>
 
+  <div class="card" id="q-refs">
+    <div class="q-label">Would you like to refer a friend or family member who may benefit from our services? <span style="font-weight:400;font-size:12px;color:var(--text2)">(optional — you can add up to 3)</span></div>
+    <div id="refRows">
+      <div class="ref-row">
+        <input type="text" class="ref-name" placeholder="Reference name" maxlength="80">
+        <input type="tel" class="ref-mobile" placeholder="Mobile number (10 digits)" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
+      </div>
+    </div>
+    <button type="button" class="btn-addref" id="btnAddRef" onclick="addRefRow()">＋ Add another reference</button>
+    <div class="err">⚠ Please enter a valid 10-digit mobile number for each reference (or leave it blank)</div>
+  </div>
+
   <div class="footer-row">
     <button class="btn-submit" id="btnSubmit" onclick="submitForm()">Submit</button>
     <button class="btn-clear" onclick="clearForm()">Clear form</button>
@@ -246,6 +263,19 @@ async function loadSeminars(){
   }
 }
 
+// ── Reference rows (max 3) ───────────────────────────────────────
+function addRefRow(){
+  const box=document.getElementById('refRows');
+  if(box.querySelectorAll('.ref-row').length>=3) return;
+  const div=document.createElement('div');
+  div.className='ref-row';
+  div.innerHTML='<input type="text" class="ref-name" placeholder="Reference name" maxlength="80">'
+    +'<input type="tel" class="ref-mobile" placeholder="Mobile number (10 digits)" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\\D/g,\'\')">';
+  box.appendChild(div);
+  if(box.querySelectorAll('.ref-row').length>=3) document.getElementById('btnAddRef').disabled=true;
+  div.querySelector('.ref-name').focus();
+}
+
 // ── Validation + submit ──────────────────────────────────────────
 function markErr(id,bad){ document.getElementById(id).classList.toggle('error',bad); return bad; }
 async function submitForm(){
@@ -262,7 +292,18 @@ async function submitForm(){
   if(topics.includes('__other')){ topics=topics.filter(t=>t!=='__other'); if(otherTopic) topics.push('Other: '+otherTopic); }
   const comments=document.getElementById('f-comments').value.trim();
 
+  // References (optional): keep rows that have a name; mobile must be 10 digits if provided
+  const references=[]; let refBad=false;
+  document.querySelectorAll('#refRows .ref-row').forEach(row=>{
+    const rn=row.querySelector('.ref-name').value.trim();
+    const rmb=row.querySelector('.ref-mobile').value.trim();
+    if(!rn && !rmb) return;
+    if(rmb && rmb.length!==10){ refBad=true; return; }
+    if(rn) references.push({name:rn, mobile:rmb});
+  });
+
   let bad=false;
+  bad=markErr('q-refs',refBad)||bad;
   bad=markErr('q-name',!name)||bad;
   bad=markErr('q-mobile',!(mobile.length===10))||bad;
   bad=markErr('q-seminar',!semVal)||bad;
@@ -278,6 +319,7 @@ async function submitForm(){
     seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
     rating:Number(rating), contentRating:Number(content),
     interested:interest, products, topics, comments,
+    references,
     ts:new Date().toISOString()
   };
 
@@ -301,6 +343,8 @@ function clearForm(){
   document.getElementById('f-comments').value='';
   const tob=document.getElementById('f-topic-other'); if(tob) tob.value='';
   const tobx=document.getElementById('topic-other-box'); if(tobx) tobx.style.display='none';
+  document.querySelectorAll('#refRows .ref-row').forEach((row,i)=>{ if(i===0){ row.querySelectorAll('input').forEach(inp=>inp.value=''); } else row.remove(); });
+  const bar=document.getElementById('btnAddRef'); if(bar) bar.disabled=false;
   document.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(r=>r.checked=false);
   document.querySelectorAll('.radio-row.sel').forEach(r=>r.classList.remove('sel'));
   document.querySelectorAll('.card.error').forEach(c=>c.classList.remove('error'));
@@ -331,7 +375,7 @@ function renderResponses(){
   const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
   document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
   document.getElementById('respTable').innerHTML=
-    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>Next Topic</th><th>Comments</th></tr>'+
+    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>Next Topic</th><th>Comments</th><th>References</th></tr>'+
     (list.map(r=>`<tr>
       <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
       <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
@@ -341,14 +385,15 @@ function renderResponses(){
       <td style="font-size:11.5px">${(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
       <td style="font-size:11.5px">${(r.topics||[]).map(p=>'<span style="display:inline-block;background:#e8f0fe;color:#1967d2;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
       <td>${esc(r.comments)}</td>
-    </tr>`).join('')||'<tr><td colspan="10" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
+      <td style="font-size:11.5px">${(r.references||[]).map(rf=>'<span style="display:inline-block;background:#fdf2f8;color:#be185d;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(rf.name)+(rf.mobile?' · '+esc(rf.mobile):'')+'</span>').join('')||''}</td>
+    </tr>`).join('')||'<tr><td colspan="11" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
 }
 function exportCSV(){
   const f=document.getElementById('respFilter').value;
   const list=f?RESP.filter(r=>r.seminarName===f):RESP;
   const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','Next Topic','Comments']]
-    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.topics||[]).join(', '),r.comments]));
+  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','Next Topic','Comments','References']]
+    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.topics||[]).join(', '),r.comments,(r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')]));
   const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
