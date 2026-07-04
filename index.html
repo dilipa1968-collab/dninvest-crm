@@ -750,7 +750,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         <div class="page-hdr">
           <div class="page-title">Dashboard <span id="dash-date"></span></div>
           <div class="hdr-actions">
-            <button class="btn btn-outline" onclick="hardRefresh()" title="Hard Refresh — Cache clear karke reload">🔄 Refresh</button>
+            <button class="btn btn-outline" onclick="hardRefresh()" title="Hard Refresh — clear cache and reload">🔄 Refresh</button>
           </div>
         </div>
         <div class="stats-row" id="dashStats"></div>
@@ -1049,7 +1049,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         <div class="filters">
           <input type="text" placeholder="🔍 Search client / RM / fund..." oninput="renderMfTxnTable()" id="mftxn-search">
           <select onchange="renderMfTxnTable()" id="mftxn-rm-filter"><option value="">All RMs</option></select>
-          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Status se filter karo">
+          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Filter by status">
             <option value="">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Approved">Approved</option>
@@ -1068,7 +1068,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
             <option value="SIP Bounce Buy">SIP Bounce Buy</option>
             <option value="SIP Pause">SIP Pause</option>
           </select>
-          <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="Month-wise dekho">
+          <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="View month-wise">
             <option value="">All Months</option>
           </select>
           <div class="filter-sep"></div>
@@ -1144,7 +1144,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
             <option value="Approved">Approved</option>
             <option value="Declined">Declined</option>
           </select>
-          <select onchange="onEqDematMonthChange()" id="eqdemat-month-filter" title="Month-wise dekho">
+          <select onchange="onEqDematMonthChange()" id="eqdemat-month-filter" title="View month-wise">
             <option value="">All Months</option>
           </select>
           <div class="filter-sep"></div>
@@ -1405,14 +1405,14 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 
         <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
           <h3 style="margin:0 0 6px">💾 Data Backup &amp; Restore</h3>
-          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Poora data (CRM + HR Portal + access settings) ek JSON file me. Hafte/mahine me ek baar le lena. Restore se Firebase me wapas chadh jata hai.</p>
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Complete data (CRM + HR Portal + access settings) in a single JSON file. Take a backup once every week/month. Restore uploads it back to Firebase.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
             <button class="btn btn-primary" onclick="BK.backup()">⬇️ Download Full Backup</button>
             <button class="btn btn-outline" onclick="document.getElementById('bk-restore-file').click()">⬆️ Restore from File</button>
             <input type="file" id="bk-restore-file" accept="application/json,.json" style="display:none" onchange="BK.restore(this)">
             <span id="bk-status" style="font-size:.8rem;color:var(--gray)"></span>
           </div>
-          <p style="color:#b91c1c;font-size:.75rem;margin:12px 0 0">⚠️ Restore current data ko backup file ke data se replace kar deta hai — sambhaal ke use karna.</p>
+          <p style="color:#b91c1c;font-size:.75rem;margin:12px 0 0">⚠️ Restore replaces the current data with the backup file data — use with caution.</p>
         </div>
       </div>
 
@@ -1602,7 +1602,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
       <div class="form-field"><label>RM</label><select id="editAtt_rm"></select></div>
       <div id="editAtt_syncwrap" style="display:none;margin-top:6px">
         <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;cursor:pointer">
-          <input type="checkbox" id="editAtt_sync" checked> Client master record me bhi Name/Mobile update karein
+          <input type="checkbox" id="editAtt_sync" checked> Also update Name/Mobile in the client master record
         </label>
       </div>
       <p id="editAtt_note" style="font-size:.72rem;color:var(--gray);margin-top:8px"></p>
@@ -4375,7 +4375,7 @@ async function saveSeminar(){
   const name=document.getElementById('sem_name').value.trim();
   const date=document.getElementById('sem_date').value;
   const notes=document.getElementById('sem_notes').value.trim();
-  if(!name||!date){ toast('Seminar name aur date required hain','error'); return; }
+  if(!name||!date){ toast('Seminar name and date are required','error'); return; }
 
   const seminars=DB.get('seminars')||[];
   let rec;
@@ -4472,7 +4472,7 @@ function renderSeminarAttendees(){
     return;
   }
   if(!attendees.length){
-    cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">Koi attendee filter se match nahi hua — filters clear karke dekhein.</div>`;
+    cont.innerHTML=`<div style="text-align:center;padding:36px;color:#bbb">No attendees match the filters — try clearing the filters.</div>`;
     return;
   }
   const arrow=(c)=> col===c ? (dir===1?' ▲':' ▼') : '';
@@ -4513,7 +4513,7 @@ function renderSeminarAttendees(){
         <option value="Not Attended" ${a.status==='Not Attended'?'selected':''}>Not Attended</option>
       </select></td>
       <td><input class="att-remarks" type="text" value="${(a.remarks||'').replace(/"/g,'&quot;')}" placeholder="Remarks" ${dis} style="width:170px;padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)"></td>
-      <td style="white-space:nowrap">${a.mobile?`<button class="btn-icon" onclick="sendFeedbackWA('${a.id}')" title="WhatsApp par feedback link bhejein" style="color:#25D366">💬</button>`:''}${isMyAttendee?`<button class="btn-icon" onclick="openEditAttendee('${a.id}')" title="Edit name / mobile / RM">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
+      <td style="white-space:nowrap">${a.mobile?`<button class="btn-icon" onclick="sendFeedbackWA('${a.id}')" title="Send feedback link on WhatsApp" style="color:#25D366">💬</button>`:''}${isMyAttendee?`<button class="btn-icon" onclick="openEditAttendee('${a.id}')" title="Edit name / mobile / RM">✏️</button><button class="btn-icon" onclick="removeAttendee('${a.id}')" title="Remove" style="color:var(--red)">🗑️</button>`:'<span style="color:#ccc;font-size:.75rem">—</span>'}</td>
       </tr>`;
   });
   h+='</tbody></table>';
@@ -4544,7 +4544,7 @@ function onAttTypeChange(sel){
   );
 
   if(!match){
-    toast(`Type nahi badal sakte — ${newType==='equity'?'Equity':'MF'} me isi mobile aur RM ka koi client record nahi mila`,'error');
+    toast(`Cannot change type — no ${newType==='equity'?'Equity':'MF'} client record found with the same mobile and RM`,'error');
     sel.value=prev;
     return;
   }
@@ -4575,7 +4575,7 @@ function onSemChkChange(){
 
 async function addSeminarAttendeesToLeads(){
   const checked=[...document.querySelectorAll('.sem-chk:checked')].map(c=>c.dataset.id);
-  if(!checked.length){ toast('Koi attendee select nahi hai','error'); return; }
+  if(!checked.length){ toast('No attendee selected','error'); return; }
 
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
@@ -4634,7 +4634,7 @@ async function addSeminarAttendeesToLeads(){
   document.getElementById('semAddLeadBtn').style.display='none';
 
   // Summary toast
-  let msg=`${added} lead${added!==1?'s':''} add ho gaye!`;
+  let msg=`${added} lead${added!==1?'s':''} added!`;
   if(skippedDup.length) msg+=` | ${skippedDup.length} already exist (skip).`;
   if(skippedGuest.length) msg+=` | ${skippedGuest.length} guest skip.`;
   toast(msg, added>0?'success':'error');
@@ -4794,14 +4794,14 @@ async function openSeminarFeedback(){
     document.body.appendChild(ov);
   }
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
-  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(900px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()"><div style="padding:40px;text-align:center;color:#888">Feedback load ho raha hai...</div></div>';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(900px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()"><div style="padding:40px;text-align:center;color:#888">Loading feedback...</div></div>';
 
   let all=[];
   try{
     const snap=await fdb.collection('seminar_feedback').get();
     all=snap.docs.map(d=>({...d.data(), _docId:d.id}));
   }catch(e){
-    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:30px" onclick="event.stopPropagation()">Feedback load nahi ho paya — internet check karein.<br><br><button class="btn btn-outline" onclick="document.getElementById(\'sem-fb-overlay\').remove()">Close</button></div>';
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:30px" onclick="event.stopPropagation()">Could not load feedback — please check your internet.<br><br><button class="btn btn-outline" onclick="document.getElementById(\'sem-fb-overlay\').remove()">Close</button></div>';
     return;
   }
 
@@ -4825,7 +4825,7 @@ async function openSeminarFeedback(){
     +'<div style="background:#f0ebf8;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#673ab7;text-transform:uppercase">Responses</div><div style="font-size:20px;font-weight:700;color:#673ab7">'+resp.length+'</div></div>'
     +'<div style="background:#fff7ed;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#b45309;text-transform:uppercase">Avg Experience</div><div style="font-size:20px;font-weight:700;color:#b45309">'+avg('rating')+' / 5</div></div>'
     +'<div style="background:#fff7ed;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#b45309;text-transform:uppercase">Avg Content</div><div style="font-size:20px;font-weight:700;color:#b45309">'+avg('contentRating')+' / 5</div></div>'
-    +'<div style="background:#e6f4ea;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#137333;text-transform:uppercase">Interested (Haan)</div><div style="font-size:20px;font-weight:700;color:#137333">'+haan.length+'</div></div>'
+    +'<div style="background:#e6f4ea;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#137333;text-transform:uppercase">Interested (Yes)</div><div style="font-size:20px;font-weight:700;color:#137333">'+haan.length+'</div></div>'
     +'</div>';
 
   const rows=resp.map((r,i)=>'<tr style="border-bottom:1px solid #eee'+(r.interested==='Haan'?';background:#f4fbf6':'')+'">'
@@ -4846,24 +4846,24 @@ async function openSeminarFeedback(){
     +'<div><div style="font-weight:700;font-size:15px;color:#fff">📋 Feedback — '+esc(s.name)+'</div>'
     +'<div style="font-size:12px;color:#d9cdf2">'+(s.date?fmtDate(s.date):'')+'</div></div>'
     +'<div style="display:flex;align-items:center;gap:8px">'
-    +(resp.length?'<button onclick="fbExportExcel()" title="Colorful Excel report download karein" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px">\uD83D\uDCE5 Excel Report</button>':'')
+    +(resp.length?'<button onclick="fbExportExcel()" title="Download colorful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px">\uD83D\uDCE5 Excel Report</button>':'')
     +'<button onclick="document.getElementById(\'sem-fb-overlay\').remove()" style="background:rgba(255,255,255,.15);border:none;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;color:#fff">\u2715</button></div>'
     +'</div>'
     +'<div style="padding:16px 20px;overflow-y:auto">'
     +cards
-    +(haan.length?'<div style="margin-bottom:10px"><button class="btn btn-teal" style="font-size:.78rem" onclick="fbAllHaanToLeads()">➕ Sab \''+'Haan'+'\' walo ko Leads me daalo ('+haan.length+')</button></div>':'')
+    +(haan.length?'<div style="margin-bottom:10px"><button class="btn btn-teal" style="font-size:.78rem" onclick="fbAllHaanToLeads()">➕ Add all \''+'Yes'+'\' responses to Leads ('+haan.length+')</button></div>':'')
     +(resp.length
       ?'<div style="border:1px solid #eee;border-radius:8px;overflow:auto;max-height:48vh"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#f7f5fb">'
         +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NEXT TOPIC</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">COMMENTS</th><th style="padding:8px;font-size:11px;color:#673ab7">ACTION</th>'
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
-      :'<div style="text-align:center;padding:30px;color:#999">Is seminar ka abhi koi feedback nahi aaya.<br><small>💬 Feedback Link button se attendees ko link bhejein.</small></div>')
+      :'<div style="text-align:center;padding:30px;color:#999">No feedback received for this seminar yet.<br><small>💬 Use the Feedback Link button to send the link to attendees.</small></div>')
     +'</div></div>';
 }
 
 // ── Feedback → colorful Excel report (xlsx-js-style via dnXlsxBook) ──
 function fbExportExcel(){
   const list=window._semFbList||[];
-  if(!list.length){ toast('Koi feedback response nahi hai export ke liye','error'); return; }
+  if(!list.length){ toast('No feedback responses to export','error'); return; }
   const sem=window._semFbSeminar||{};
 
   const haan=list.filter(r=>r.interested==='Haan').length;
@@ -4883,12 +4883,13 @@ function fbExportExcel(){
   // Colour helpers
   const GREEN={bg:'FFC6EFCE',font:'FF006100'}, AMBER={bg:'FFFFEB9C',font:'FF9C6500'}, RED={bg:'FFFFC7CE',font:'FF9C0006'};
   const ratingColor=v=>{ const n=Number(v)||0; return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
-  const intColor=v=>v==='Haan'?GREEN:(v==='Shayad'?AMBER:(v?RED:null));
+  const intLabel=v=>v==='Haan'?'Yes':(v==='Shayad'?'Maybe':(v==='Nahi'?'No':(v||'')));
+  const intColor=v=>v==='Yes'?GREEN:(v==='Maybe'?AMBER:(v?RED:null));
   const summaryColor=(v,row)=>{
     const m=String(row[0]||'');
-    if(/Haan/.test(m)) return GREEN;
-    if(/Shayad/.test(m)) return AMBER;
-    if(/Nahi/.test(m)) return RED;
+    if(/— Yes/.test(m)) return GREEN;
+    if(/— Maybe/.test(m)) return AMBER;
+    if(/— No/.test(m)) return RED;
     if(/Avg/.test(m)) return ratingColor(v);
     return null;
   };
@@ -4899,9 +4900,9 @@ function fbExportExcel(){
     ['Total Responses', list.length],
     ['Avg Experience Rating (/5)', avg('rating')],
     ['Avg Content Rating (/5)', avg('contentRating')],
-    ['Interested — Haan ✓', haan],
-    ['Interested — Shayad', shayad],
-    ['Interested — Nahi', nahi]
+    ['Interested — Yes ✓', haan],
+    ['Interested — Maybe', shayad],
+    ['Interested — No', nahi]
   ];
   prodCounts.forEach(([p,c])=>summaryRows.push(['Product Interest: '+p, c]));
   topicCounts.forEach(([p,c])=>summaryRows.push(['Next Topic Vote: '+p, c]));
@@ -4910,7 +4911,7 @@ function fbExportExcel(){
     r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
     r.name||'', r.mobile||'',
     Number(r.rating)||'', Number(r.contentRating)||'',
-    r.interested||'',
+    intLabel(r.interested),
     (r.products||[]).join(', '),
     (r.topics||[]).join(', '),
     r.comments||''
@@ -4943,20 +4944,20 @@ function fbExportExcel(){
       rows:respRows
     }
   ]);
-  toast('Excel report download ho gaya!','success');
+  toast('Excel report downloaded!','success');
 }
 
 async function fbDelete(idx){
   const r=(window._semFbList||[])[idx];
   if(!r) return;
-  if(CU.role!=='admin'){ toast('Sirf Admin feedback delete kar sakta hai','error'); return; }
-  if(!confirm('"'+(r.name||'')+'" ka feedback response permanently delete karein?')) return;
+  if(CU.role!=='admin'){ toast('Only Admin can delete feedback','error'); return; }
+  if(!confirm('Permanently delete feedback response from "'+(r.name||'')+'"?')) return;
   try{
     if(r._docId){ await fdb.collection('seminar_feedback').doc(r._docId).delete(); }
     (window._semFbList||[]).splice(idx,1);
-    toast('Response delete ho gaya','success');
+    toast('Response deleted','success');
     openSeminarFeedback(); // refresh modal
-  }catch(e){ toast('Delete nahi ho paya — internet check karein','error'); }
+  }catch(e){ toast('Could not delete — please check your internet','error'); }
 }
 
 async function fbToLead(idx, silent){
@@ -4978,11 +4979,11 @@ async function fbToLead(idx, silent){
   const rec={
     id:uid(), name:r.name||'', mobile:r.mobile||'', rm,
     last_call:'', next_call:'', followup_status:'Pending',
-    remarks:'Seminar feedback: Interested='+(r.interested||'')+((r.products&&r.products.length)?' | Products: '+r.products.join(', '):'')+((r.topics&&r.topics.length)?' | Topic: '+r.topics.join(', '):'')+(r.comments?' | '+String(r.comments).slice(0,90):''),
+    remarks:'Seminar feedback: Interested='+(r.interested==='Haan'?'Yes':r.interested==='Shayad'?'Maybe':r.interested==='Nahi'?'No':(r.interested||''))+((r.products&&r.products.length)?' | Products: '+r.products.join(', '):'')+((r.topics&&r.topics.length)?' | Topic: '+r.topics.join(', '):'')+(r.comments?' | '+String(r.comments).slice(0,90):''),
     created:today(), updated:today()
   };
   await DB.setClient('leads', rec);
-  if(!silent){ toast(r.name+' lead me add ho gaya!','success'); renderLeadsTable(); updateBadges(); }
+  if(!silent){ toast(r.name+' added to Leads!','success'); renderLeadsTable(); updateBadges(); }
   return true;
 }
 
@@ -4994,7 +4995,7 @@ async function fbAllHaanToLeads(){
     const ok=await fbToLead(i, true);
     if(ok) added++; else skipped++;
   }
-  toast(added+' lead(s) add ho gaye!'+(skipped?' | '+skipped+' already exist (skip).':''), added>0?'success':'error');
+  toast(added+' lead(s) added!'+(skipped?' | '+skipped+' already exist (skip).':''), added>0?'success':'error');
   renderLeadsTable(); updateBadges();
 }
 
@@ -5036,7 +5037,7 @@ function openEditAttendee(attendeeId){
   if(!a) return;
 
   const isMine = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
-  if(!isMine){ toast('Ye attendee aapka nahi hai','error'); return; }
+  if(!isMine){ toast('This attendee is not mapped to you','error'); return; }
 
   _editAttId=attendeeId;
   document.getElementById('editAtt_name').value=a.name||'';
@@ -5054,10 +5055,10 @@ function openEditAttendee(attendeeId){
   if(a.source_id && (a.type==='equity'||a.type==='mf')){
     syncWrap.style.display='block';
     document.getElementById('editAtt_sync').checked=true;
-    note.textContent='Ye attendee '+(a.type==='equity'?'Equity':'MF')+' client record se linked hai.'+(CU.role!=='admin'?' RM change sirf Admin kar sakta hai.':'');
+    note.textContent='This attendee is linked to an '+(a.type==='equity'?'Equity':'MF')+' client record.'+(CU.role!=='admin'?' Only Admin can change the RM.':'');
   } else {
     syncWrap.style.display='none';
-    note.textContent=(CU.role!=='admin'?'RM change sirf Admin kar sakta hai.':'');
+    note.textContent=(CU.role!=='admin'?'Only Admin can change the RM.':'');
   }
 
   document.getElementById('editAttendeeModal').classList.add('open');
@@ -5076,8 +5077,8 @@ async function saveAttendeeEdit(){
   const rmSel=document.getElementById('editAtt_rm');
   const rm = CU.role==='admin' ? normRm(rmSel.value) : a.rm;
 
-  if(!name){ toast('Name khali nahi ho sakta','error'); return; }
-  if(mobile!=='' && mobile.length!==10){ toast('10 digit ka valid mobile daalein (ya khali chhod dein)','error'); return; }
+  if(!name){ toast('Name cannot be empty','error'); return; }
+  if(mobile!=='' && mobile.length!==10){ toast('Enter a valid 10-digit mobile (or leave blank)','error'); return; }
 
   a.name=name; a.mobile=mobile; a.rm=rm;
   s.updated=today();
@@ -5148,7 +5149,7 @@ function searchAttendees(){
   ];
 
   if(!results.length){
-    cont.innerHTML='<div style="text-align:center;padding:20px;color:#bbb">No matching clients/investors found'+(CU.role!=='admin'?' <br><small>(sirf aapke mapped clients hi search me aate hain)</small>':'')+'</div>';
+    cont.innerHTML='<div style="text-align:center;padding:20px;color:#bbb">No matching clients/investors found'+(CU.role!=='admin'?' <br><small>(only your mapped clients appear in search)</small>':'')+'</div>';
     return;
   }
   let h=`<table><thead><tr><th>Name</th><th>Mobile</th><th>RM</th><th>Type</th><th>Action</th></tr></thead><tbody>`;
@@ -5178,7 +5179,7 @@ async function addAttendee(sourceId,type){
 
   // Hard rule: RM sirf apne mapped client hi add kar sakta hai (kisi bhi segment me)
   if(CU.role!=='admin' && (src.rm||'').trim().toLowerCase()!==(CU.name||'').trim().toLowerCase()){
-    toast('Ye client '+(src.rm||'kisi aur RM')+' ke naam par mapped hai — aap sirf apne mapped clients hi seminar me add kar sakte hain','error');
+    toast('This client is mapped to '+(src.rm||'another RM')+' — you can only add your own mapped clients to a seminar','error');
     return;
   }
 
@@ -10464,7 +10465,7 @@ function brkHandleFile(input, key, kind){
   brkParseFile(file,(err,rows)=>{
     const statusEl=document.getElementById('brk-'+key+'-status');
     if(err){ if(statusEl) statusEl.textContent='Error: '+err.message; return; }
-    if(!rows.length){ if(statusEl) statusEl.textContent='File khali hai.'; return; }
+    if(!rows.length){ if(statusEl) statusEl.textContent='File is empty.'; return; }
     const headers=rows[0].map(h=>String(h));
     const dataRows=rows.slice(1).filter(r=>r.some(c=>String(c).trim()!==''));
     const mapping=brkGuessMapping(headers, kind);
@@ -10802,7 +10803,7 @@ const INC = {
       ? ` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="INC.openOverride('${kind}','${e.id}')" title="Set incentive override">✏️</span>` : '';
     if(!approved){
       // Commission calculates only AFTER approval — show as not-yet-counted
-      return `<td style="text-align:right;white-space:nowrap;color:var(--gray)" title="Approve hone par hi count hoga">${this.fmt(r.amt)} <span style="font-size:.62rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">pending</span>${edit}</td>`;
+      return `<td style="text-align:right;white-space:nowrap;color:var(--gray)" title="Counts only after Approve">${this.fmt(r.amt)} <span style="font-size:.62rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">pending</span>${edit}</td>`;
     }
     const tag = r.over
       ? `<span style="font-size:.62rem;background:#fde68a;color:#92400e;border-radius:6px;padding:0 5px;margin-left:4px" title="Manual override">${r.label}</span>`
@@ -10880,7 +10881,7 @@ const INC = {
     const kind=this._editKind, id=this._editId;
     const mode=document.getElementById('incOvMode').value;
     const val=Number(document.getElementById('incOvVal').value)||0;
-    if(mode && val<0){ toast('Value galat hai','error'); return; }
+    if(mode && val<0){ toast('Invalid value','error'); return; }
     if(kind==='mf'){
       const entries=getMfBizEntries(); const e=entries.find(x=>x.id===id); if(!e) return;
       if(mode){ e.inc_mode=mode; e.inc_value=val; } else { delete e.inc_mode; delete e.inc_value; }
@@ -10909,9 +10910,9 @@ const INC = {
           <div class="form-field" style="max-width:240px"><label>Demat — fixed ₹ per account</label>
             <input type="number" id="incSetDemat" step="1" placeholder="e.g. 100"></div>
           <div style="margin-top:16px"><label style="font-weight:600;font-size:.85rem">MF Business — % per type</label>
-            <div style="font-size:.74rem;color:var(--gray);margin:2px 0 8px">Har type ka alag rate. 0 ya blank = us type pe incentive nahi.</div>
+            <div style="font-size:.74rem;color:var(--gray);margin:2px 0 8px">Separate rate for each type. 0 or blank = no incentive for that type.</div>
             <div id="incSetRates" style="display:grid;grid-template-columns:1fr 86px 1fr 86px;gap:8px 12px;align-items:center"></div></div>
-          <div style="margin-top:12px;font-size:.78rem;color:var(--gray)">Individual entries ko ✏️ se override kar sakte ho.</div>
+          <div style="margin-top:12px;font-size:.78rem;color:var(--gray)">Individual entries can be overridden using ✏️.</div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="closeModal('incSettingsModal')">Cancel</button>
@@ -11003,7 +11004,7 @@ const RMSUM = {
           </div>
           <div id="rmSumStatus" style="font-size:.78rem;color:var(--gray);margin-bottom:8px"></div>
           <div class="tbl-wrap"><div id="rmSumTable" style="overflow:auto"></div></div>
-          <div style="font-size:.72rem;color:var(--gray);margin-top:8px">MF Sales = Lumpsum + Additional Buy + Switch + STP + SIP Bounce Buy. SIP = New SIP. <b>Sirf Approved entries count hoti hain.</b></div>
+          <div style="font-size:.72rem;color:var(--gray);margin-top:8px">MF Sales = Lumpsum + Additional Buy + Switch + STP + SIP Bounce Buy. SIP = New SIP. <b>Only Approved entries are counted.</b></div>
         </div>
       </div>`;
       document.body.appendChild(m);
@@ -11048,7 +11049,7 @@ const RMSUM = {
     if(hr && Array.isArray(hr.rows) && hr.rows.length){
       s.innerHTML=`✅ HR Portal me pushed: <b>${escapeHtml(hr.month||'all')}</b> · ${hr.rows.length} RMs · ${hr.generated_at?new Date(hr.generated_at).toLocaleString('en-IN'):''} by ${escapeHtml(hr.by||'')}`;
     } else {
-      s.innerHTML='HR Portal me abhi kuch push nahi kiya.';
+      s.innerHTML='Nothing pushed to HR Portal yet.';
     }
   },
   pushHR(){
@@ -11065,16 +11066,16 @@ const RMSUM = {
         const i=incMap[r.rm]||{mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0,total_inc:0};
         return {rm:r.rm,mf_sales:Math.round(i.mf_sales),sip_amount:Math.round(i.sip_amount),demat_count:i.demat_count,mf_incentive:Math.round(i.mf_inc),demat_incentive:Math.round(i.demat_inc),total_incentive:Math.round(i.total_inc)};
       });
-    if(!rows.length){ toast('Is period me koi RM activity nahi','error'); return; }
+    if(!rows.length){ toast('No RM activity in this period','error'); return; }
     DB.set('rm_sales_summary', {month:month||'all', rows, generated_at:new Date().toISOString(), by:CU.name});
-    toast('HR Portal ke liye push ho gaya','success');
+    toast('Pushed to HR Portal','success');
     this._showStatus();
   },
   removeHR(){
     if(!(CU&&CU.role==='admin')) return;
-    if(!confirm('HR Portal se ye summary remove karein?')) return;
+    if(!confirm('Remove this summary from HR Portal?')) return;
     DB.set('rm_sales_summary', {month:'', rows:[], cleared_at:new Date().toISOString(), by:CU.name});
-    toast('HR se remove ho gaya','success');
+    toast('Removed from HR Portal','success');
     this._showStatus();
   },
   exportXlsx(){
@@ -11122,14 +11123,14 @@ const MFUP = {
     const file=input&&input.files&&input.files[0]; if(input) input.value='';
     if(!file) return;
     readExcel(file,(err,rows)=>{
-      if(err||!rows||!rows.length){ toast('File padh nahi paya','error'); return; }
+      if(err||!rows||!rows.length){ toast('Could not read file','error'); return; }
       const spec={date:['date'],type:['type','txntype','transactiontype'],client_name:['clientname','name','client'],mobile:['mobile','mobileno','phone','contact'],pan:['pan','pancard','panno'],fund_name:['fundname','fund','scheme','schemename'],amount:['amount','amt'],rm:['rm','dealer','relationshipmanager','dealername'],remarks:['remark','remarks','note']};
       let hdrIdx=-1, colMap={};
       for(let i=0;i<Math.min(rows.length,15);i++){
         const map=this.buildColMap(rows[i],spec);
         if(map.client_name!==undefined && (map.date!==undefined||map.amount!==undefined)){ hdrIdx=i; colMap=map; break; }
       }
-      if(hdrIdx<0){ toast('Header row nahi mila — Template ke columns use karo','error'); return; }
+      if(hdrIdx<0){ toast('Header row not found — use the Template columns','error'); return; }
       const mf=DB.get('mf_clients')||[];
       const findClient=(name,pan,mob)=>{
         pan=(pan||'').trim().toUpperCase(); mob=(mob||'').replace(/\D/g,'').slice(-10); name=(name||'').trim().toLowerCase();
@@ -11160,7 +11161,7 @@ const MFUP = {
           status:'Approved', decline_reason:'', cross_remark:'', cross_remark_by:'', cross_remark_at:''
         });
       }
-      if(!newEntries.length){ toast('Koi valid row nahi mili','error'); return; }
+      if(!newEntries.length){ toast('No valid rows found','error'); return; }
       if(!confirm(newEntries.length+' MF business entries upload hongi (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skip'):'')+'.\nConfirm?')) return;
       const biz=DB.get('mf_business');
       const entries=(Array.isArray(biz)?biz:(biz?.entries||[])).concat(newEntries);
@@ -11168,7 +11169,7 @@ const MFUP = {
       DB.set('mf_business',{entries,eq_entries:eqEntries});
       if(typeof renderMfTxnTable==='function') renderMfTxnTable();
       refreshDash&&refreshDash();
-      toast(newEntries.length+' MF entries upload ho gayi','success');
+      toast(newEntries.length+' MF entries uploaded','success');
     });
   },
 
@@ -11187,14 +11188,14 @@ const MFUP = {
     const file=input&&input.files&&input.files[0]; if(input) input.value='';
     if(!file) return;
     readExcel(file,(err,rows)=>{
-      if(err||!rows||!rows.length){ toast('File padh nahi paya','error'); return; }
+      if(err||!rows||!rows.length){ toast('Could not read file','error'); return; }
       const spec={date:['date'],client_name:['clientname','name','client'],client_code:['clientcode','code','ucc','clientcodeucc'],mobile:['mobile','mobileno','phone','contact'],rm:['rm','tradingrm','dealer','relationshipmanager'],opening_rm:['openingrm','openrm','openingrelationshipmanager','openingdealer'],remarks:['remark','remarks','note']};
       let hdrIdx=-1, colMap={};
       for(let i=0;i<Math.min(rows.length,15);i++){
         const map=this.buildColMap(rows[i],spec);
         if(map.client_name!==undefined && (map.date!==undefined||map.client_code!==undefined)){ hdrIdx=i; colMap=map; break; }
       }
-      if(hdrIdx<0){ toast('Header row nahi mila — Template ke columns use karo','error'); return; }
+      if(hdrIdx<0){ toast('Header row not found — use the Template columns','error'); return; }
       const eq=DB.get('eq_clients')||[];
       const findClient=(name,code,mob)=>{
         code=(code||'').trim().toUpperCase(); mob=(mob||'').replace(/\D/g,'').slice(-10); name=(name||'').trim().toLowerCase();
@@ -11221,12 +11222,12 @@ const MFUP = {
           status:'Approved', decline_reason:''
         });
       }
-      if(!newEntries.length){ toast('Koi valid row nahi mili','error'); return; }
+      if(!newEntries.length){ toast('No valid rows found','error'); return; }
       if(!confirm(newEntries.length+' Demat entries upload hongi (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skip'):'')+'.\nConfirm?')) return;
       setEqDematEntries(getEqDematEntries().concat(newEntries));
       if(typeof renderEqDematTable==='function') renderEqDematTable();
       refreshDash&&refreshDash();
-      toast(newEntries.length+' Demat entries upload ho gayi','success');
+      toast(newEntries.length+' Demat entries uploaded','success');
     });
   }
 };
@@ -11240,8 +11241,8 @@ const BK = {
   setStatus(msg){ const el=document.getElementById('bk-status'); if(el) el.textContent=msg||''; },
   async backup(){
     if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); return; }
-    if(typeof fdb==='undefined'){ toast('Firebase connect nahi hai','error'); return; }
-    this.setStatus('Backup ban raha hai…');
+    if(typeof fdb==='undefined'){ toast('Firebase is not connected','error'); return; }
+    this.setStatus('Creating backup…');
     try{
       const out={app:'DNInvest', type:'full_backup', version:1, created:new Date().toISOString(), by:CU.name, data:{}};
       let docCount=0;
@@ -11257,7 +11258,7 @@ const BK = {
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(()=>URL.revokeObjectURL(url), 4000);
       this.setStatus('✅ Backup downloaded — '+docCount+' records · '+new Date().toLocaleString('en-IN'));
-      toast('Backup download ho gaya','success');
+      toast('Backup downloaded','success');
     }catch(e){
       this.setStatus('❌ Backup error');
       toast('Backup error: '+(e.message||e),'error');
@@ -11267,16 +11268,16 @@ const BK = {
     if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); if(input) input.value=''; return; }
     const file=input && input.files && input.files[0]; if(input) input.value='';
     if(!file) return;
-    if(typeof fdb==='undefined'){ toast('Firebase connect nahi hai','error'); return; }
+    if(typeof fdb==='undefined'){ toast('Firebase is not connected','error'); return; }
     let parsed;
-    try{ parsed=JSON.parse(await file.text()); }catch(e){ toast('File padh nahi paya (galat JSON)','error'); return; }
-    if(!parsed || parsed.type!=='full_backup' || !parsed.data){ toast('Ye valid DNInvest backup file nahi hai','error'); return; }
+    try{ parsed=JSON.parse(await file.text()); }catch(e){ toast('Could not read file (invalid JSON)','error'); return; }
+    if(!parsed || parsed.type!=='full_backup' || !parsed.data){ toast('This is not a valid DNInvest backup file','error'); return; }
     let n=0; Object.keys(parsed.data).forEach(c=>{ n+=Object.keys(parsed.data[c]||{}).length; });
     const when = parsed.created ? new Date(parsed.created).toLocaleString('en-IN') : 'unknown';
-    if(!confirm('RESTORE karein?\n\nBackup date: '+when+' (by '+(parsed.by||'?')+')\nRecords: '+n+'\n\nYe CURRENT data ko is file ke data se REPLACE kar dega.\nPehle abhi ka backup le lena behtar hai.')) return;
-    const typed = prompt('Confirm karne ke liye "RESTORE" type karo:');
+    if(!confirm('RESTORE?\n\nBackup date: '+when+' (by '+(parsed.by||'?')+')\nRecords: '+n+'\n\nThis will REPLACE the CURRENT data with the data in this file.\nIt is better to take a fresh backup first.')) return;
+    const typed = prompt('Type "RESTORE" to confirm:');
     if((typed||'').trim().toUpperCase()!=='RESTORE'){ toast('Restore cancel','error'); return; }
-    this.setStatus('Restore ho raha hai… (page band/refresh mat karo)');
+    this.setStatus('Restoring… (do not close/refresh the page)');
     try{
       let done=0;
       for(const col of Object.keys(parsed.data)){
@@ -11444,12 +11445,12 @@ const BULK = {
   setRm(){
     const seg=this.ensureBar().dataset.seg;
     const newRm=normRm((document.getElementById('bb-rm')||{value:''}).value.trim());
-    if(!newRm){ toast('Pehle RM choose karo','error'); return; }
+    if(!newRm){ toast('Choose an RM first','error'); return; }
     const recs=this._selRecords(seg);
     const change=recs.filter(c=>(c.rm||'').trim().toLowerCase()!==newRm.toLowerCase());
     if(!change.length){ toast('In sabhi ka RM already '+newRm+' hai','error'); return; }
     this.confirm('Bulk RM Change',
-      `<b>${change.length}</b> ${this.LBL[seg]} client(s) ka RM <b>${this._esc(newRm)}</b> set hoga.`
+      `<b>${change.length}</b> ${this.LBL[seg]} client(s) will get RM <b>${this._esc(newRm)}</b>.`
       + (recs.length-change.length?`<br><span style="color:var(--gray)">${recs.length-change.length} already ${this._esc(newRm)} — skip.</span>`:''),
       '✔ Confirm','', async()=>{
         const key=this.KEY[seg], logs=[];
@@ -11457,7 +11458,7 @@ const BULK = {
           logs.push({id:uid(),type:'bulk_rm_update',seg,client_id:c.id,client_name:c.name,rm:newRm,by:CU.name,date:new Date().toISOString(),changes:[{field:'rm',old,new:newRm}]}); });
         await DB.setClientsBulk(key,change);
         if(logs.length) await DB.addActivityLog(logs);
-        this._done(seg,`✅ ${change.length} client(s) ka RM ${newRm} set ho gaya`);
+        this._done(seg,`✅ ${change.length} client(s) — RM set to ${newRm}`);
       });
   },
 
@@ -11465,16 +11466,16 @@ const BULK = {
   unmap(){
     const seg=this.ensureBar().dataset.seg;
     const recs=this._selRecords(seg).filter(c=>(c.rm||'').trim()!=='');
-    if(!recs.length){ toast('Inme se kisi ka RM mapped nahi hai','error'); return; }
+    if(!recs.length){ toast('None of these have an RM mapped','error'); return; }
     this.confirm('Bulk Unmap RM',
-      `<b>${recs.length}</b> ${this.LBL[seg]} client(s) se RM hata diya jayega (unassigned).`,
+      `<b>${recs.length}</b> ${this.LBL[seg]} client(s) will have their RM removed (unassigned).`,
       '⊘ Unmap','btn-danger', async()=>{
         const key=this.KEY[seg], logs=[];
         recs.forEach(c=>{ const old=c.rm||'—'; c.rm=''; c.updated=today();
           logs.push({id:uid(),type:'bulk_rm_update',seg,client_id:c.id,client_name:c.name,rm:'',by:CU.name,date:new Date().toISOString(),changes:[{field:'rm',old,new:'(unmapped)'}]}); });
         await DB.setClientsBulk(key,recs);
         if(logs.length) await DB.addActivityLog(logs);
-        this._done(seg,`✅ ${recs.length} client(s) unmap ho gaye`);
+        this._done(seg,`✅ ${recs.length} client(s) unmapped`);
       });
   },
 
@@ -11497,11 +11498,11 @@ const BULK = {
         if(panSet.has(pan) || mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
         panSet.add(pan); create.push(c);
       });
-      if(!create.length){ toast(`Koi shift nahi hua — ${noPan} bina PAN, ${dup} pehle se MF me`,'error'); return; }
+      if(!create.length){ toast(`Nothing shifted — ${noPan} without PAN, ${dup} already in MF`,'error'); return; }
       this.confirm('Shift Equity → MF',
-        `<b>${create.length}</b> Equity client MF me add honge <i>(Equity record bana rahega — copy)</i>.`
-        + (noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} ko valid PAN nahi — skip (PAN ke bina MF nahi banta).</span>`:'')
-        + (dup?`<br><span style="color:var(--gray)">${dup} pehle se MF me — skip.</span>`:''),
+        `<b>${create.length}</b> Equity client(s) will be added to MF <i>(Equity record remains — copy)</i>.`
+        + (noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} without a valid PAN — skipped (MF cannot be created without PAN).</span>`:'')
+        + (dup?`<br><span style="color:var(--gray)">${dup} already in MF — skipped.</span>`:''),
         '🏦 Shift','', async()=>{
           const recsNew=[], logs=[];
           create.forEach(c=>{ let id=uid(); while(mf.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
@@ -11509,7 +11510,7 @@ const BULK = {
             logs.push({id:uid(),type:'add',seg:'mf',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
           await DB.setClientsBulk('mf_clients',recsNew);
           if(logs.length) await DB.addActivityLog(logs);
-          this._done('eq',`✅ ${recsNew.length} client MF me add ho gaye (Equity intact)`); renderMfTable();
+          this._done('eq',`✅ ${recsNew.length} client(s) added to MF (Equity intact)`); renderMfTable();
         });
 
     } else if(seg==='mf'){ // MF → Equity (copy, keep MF). Code blank allowed.
@@ -11521,11 +11522,11 @@ const BULK = {
         if(mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
         nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
       });
-      if(!create.length){ toast(`Koi shift nahi hua — ${dup} pehle se Equity me`,'error'); return; }
+      if(!create.length){ toast(`Nothing shifted — ${dup} already in Equity`,'error'); return; }
       this.confirm('Shift MF → Equity',
-        `<b>${create.length}</b> MF client Equity me add honge <i>(MF record bana rahega — copy)</i>.<br>`
-        + `<span style="color:var(--gray)">Client Code blank rahega — baad me edit karke daal dena.</span>`
-        + (dup?`<br><span style="color:var(--gray)">${dup} pehle se Equity me — skip.</span>`:''),
+        `<b>${create.length}</b> MF client(s) will be added to Equity <i>(MF record remains — copy)</i>.<br>`
+        + `<span style="color:var(--gray)">Client Code will stay blank — add it later via edit.</span>`
+        + (dup?`<br><span style="color:var(--gray)">${dup} already in Equity — skipped.</span>`:''),
         '📈 Shift','', async()=>{
           const recsNew=[], logs=[];
           create.forEach(c=>{ let id=uid(); while(eq.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
@@ -11533,7 +11534,7 @@ const BULK = {
             logs.push({id:uid(),type:'add',seg:'equity',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
           await DB.setClientsBulk('eq_clients',recsNew);
           if(logs.length) await DB.addActivityLog(logs);
-          this._done('mf',`✅ ${recsNew.length} client Equity me add ho gaye (MF intact)`); renderEqTable();
+          this._done('mf',`✅ ${recsNew.length} client(s) added to Equity (MF intact)`); renderEqTable();
         });
 
     } else { // Leads → Equity / MF (MOVE — lead delete after convert, like single convertLead)
@@ -11551,11 +11552,11 @@ const BULK = {
         if(mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
         nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
       });
-      if(!create.length){ toast(`Koi convert nahi hua — ${toMf?noPan+' bina PAN, ':''}${dup} duplicate`,'error'); return; }
+      if(!create.length){ toast(`Nothing converted — ${toMf?noPan+' without PAN, ':''}${dup} duplicate`,'error'); return; }
       this.confirm(`Convert Lead → ${toMf?'MF':'Equity'}`,
-        `<b>${create.length}</b> lead ${toMf?'MF Investor':'Equity Client'} ban jayenge <i>(lead list se hat jayenge — move)</i>.`
-        + (toMf&&noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} lead me valid PAN nahi — skip.</span>`:'')
-        + (dup?`<br><span style="color:var(--gray)">${dup} duplicate — skip.</span>`:''),
+        `<b>${create.length}</b> lead(s) will become ${toMf?'MF Investor':'Equity Client'}s <i>(removed from the lead list — move)</i>.`
+        + (toMf&&noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} lead(s) without a valid PAN — skipped.</span>`:'')
+        + (dup?`<br><span style="color:var(--gray)">${dup} duplicate — skipped.</span>`:''),
         toMf?'🏦 Convert':'📈 Convert','', async()=>{
           const recsNew=[], logs=[], movedIds=[];
           create.forEach(c=>{ let id=uid(); while(existing.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
@@ -11567,7 +11568,7 @@ const BULK = {
           await DB.setClientsBulk(key,recsNew);
           await this._bulkDelete('leads',movedIds);
           if(logs.length) await DB.addActivityLog(logs);
-          this._done('leads',`✅ ${recsNew.length} lead ${toMf?'MF':'Equity'} me convert ho gaye`);
+          this._done('leads',`✅ ${recsNew.length} lead(s) converted to ${toMf?'MF':'Equity'}`);
           if(toMf) renderMfTable(); else renderEqTable();
         });
     }
@@ -11579,13 +11580,13 @@ const BULK = {
     const recs=this._selRecords(seg);
     if(!recs.length) return;
     this.confirm('Bulk Delete',
-      `<b style="color:var(--red)">${recs.length}</b> ${this.LBL[seg]} record(s) <b>permanently delete</b> ho jayenge. Ye undo nahi hoga.`,
+      `<b style="color:var(--red)">${recs.length}</b> ${this.LBL[seg]} record(s) will be <b>permanently deleted</b>. This cannot be undone.`,
       '🗑️ Delete','btn-danger', async()=>{
         const ids=recs.map(c=>c.id), logs=[];
         recs.forEach(c=>logs.push({id:uid(),type:'delete',seg:seg==='eq'?'equity':seg,client_id:c.id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}));
         await this._bulkDelete(this.KEY[seg],ids);
         if(logs.length) await DB.addActivityLog(logs);
-        this._done(seg,`✅ ${ids.length} record delete ho gaye`);
+        this._done(seg,`✅ ${ids.length} record(s) deleted`);
       });
   },
 
@@ -11709,53 +11710,53 @@ const MFTBULK = {
   approve(){
     const recs=this._selEntries(); if(!recs.length) return;
     const todo=recs.filter(e=>(e.status||'Pending')!=='Approved');
-    if(!todo.length){ toast('Ye sab pehle se Approved hain','error'); return; }
+    if(!todo.length){ toast('All of these are already Approved','error'); return; }
     BULK.confirm('Bulk Approve',
-      `<b>${todo.length}</b> transaction Approve honge.`
+      `<b>${todo.length}</b> transaction(s) will be Approved.`
       + (recs.length-todo.length?`<br><span style="color:var(--gray)">${recs.length-todo.length} already Approved — skip.</span>`:''),
-      '✅ Approve','', async()=>{ this._apply(e=>{ if((e.status||'Pending')==='Approved') return false; e.status='Approved'; e.decline_reason=''; }, '✅ {n} transaction approve ho gaye'); });
+      '✅ Approve','', async()=>{ this._apply(e=>{ if((e.status||'Pending')==='Approved') return false; e.status='Approved'; e.decline_reason=''; }, '✅ {n} transaction(s) approved'); });
   },
   decline(){
     const recs=this._selEntries(); if(!recs.length) return;
     const todo=recs.filter(e=>(e.status||'Pending')!=='Declined');
-    if(!todo.length){ toast('Ye sab pehle se Declined hain','error'); return; }
-    const reason=(prompt('Decline reason (sabke liye same — optional):','')||'').trim();
+    if(!todo.length){ toast('All of these are already Declined','error'); return; }
+    const reason=(prompt('Decline reason (same for all — optional):','')||'').trim();
     BULK.confirm('Bulk Decline',
-      `<b>${todo.length}</b> transaction Decline honge.`
+      `<b>${todo.length}</b> transaction(s) will be Declined.`
       + (reason?`<br>Reason: <i>${this._esc(reason)}</i>`:'')
       + (recs.length-todo.length?`<br><span style="color:var(--gray)">${recs.length-todo.length} already Declined — skip.</span>`:''),
-      '❌ Decline','btn-danger', async()=>{ this._apply(e=>{ if((e.status||'Pending')==='Declined') return false; e.status='Declined'; e.decline_reason=reason; }, '✅ {n} transaction decline ho gaye'); });
+      '❌ Decline','btn-danger', async()=>{ this._apply(e=>{ if((e.status||'Pending')==='Declined') return false; e.status='Declined'; e.decline_reason=reason; }, '✅ {n} transaction(s) declined'); });
   },
   pending(){
     const recs=this._selEntries(); if(!recs.length) return;
     const todo=recs.filter(e=>(e.status||'Pending')!=='Pending');
-    if(!todo.length){ toast('Ye sab pehle se Pending hain','error'); return; }
+    if(!todo.length){ toast('All of these are already Pending','error'); return; }
     BULK.confirm('Bulk Mark Pending',
-      `<b>${todo.length}</b> transaction wapas Pending kiye jayenge.`,
-      '↩️ Pending','', async()=>{ this._apply(e=>{ if((e.status||'Pending')==='Pending') return false; e.status='Pending'; e.decline_reason=''; }, '✅ {n} transaction Pending ho gaye'); });
+      `<b>${todo.length}</b> transaction(s) will be moved back to Pending.`,
+      '↩️ Pending','', async()=>{ this._apply(e=>{ if((e.status||'Pending')==='Pending') return false; e.status='Pending'; e.decline_reason=''; }, '✅ {n} transaction(s) set to Pending'); });
   },
   setRm(){
     const recs=this._selEntries(); if(!recs.length) return;
     const newRm=normRm((document.getElementById('mft-bb-rm')||{value:''}).value.trim());
-    if(!newRm){ toast('Pehle RM choose karo','error'); return; }
+    if(!newRm){ toast('Choose an RM first','error'); return; }
     const change=recs.filter(e=>(e.rm||'').trim().toLowerCase()!==newRm.toLowerCase());
     if(!change.length){ toast('In sabka RM already '+newRm+' hai','error'); return; }
     BULK.confirm('Bulk RM Re-attribute',
-      `<b>${change.length}</b> transaction ka RM <b>${this._esc(newRm)}</b> set hoga.`
-      + `<br><span style="color:var(--gray)">Sirf in transactions ka attribution badlega — client ka actual RM same rahega.</span>`
+      `<b>${change.length}</b> transaction(s) will get RM <b>${this._esc(newRm)}</b>.`
+      + `<br><span style="color:var(--gray)">Only the attribution of these transactions will change — the client&#39;s actual RM stays the same.</span>`
       + (recs.length-change.length?`<br><span style="color:var(--gray)">${recs.length-change.length} already ${this._esc(newRm)} — skip.</span>`:''),
-      '⇅ Set RM','', async()=>{ this._apply(e=>{ if((e.rm||'').trim().toLowerCase()===newRm.toLowerCase()) return false; e.rm=newRm; }, '✅ {n} transaction ka RM '+newRm+' set ho gaya'); });
+      '⇅ Set RM','', async()=>{ this._apply(e=>{ if((e.rm||'').trim().toLowerCase()===newRm.toLowerCase()) return false; e.rm=newRm; }, '✅ {n} transaction(s) — RM set to '+newRm); });
   },
   del(){
     const recs=this._selEntries(); if(!recs.length) return;
     BULK.confirm('Bulk Delete',
-      `<b style="color:var(--red)">${recs.length}</b> transaction <b>permanently delete</b> honge. Ye undo nahi hoga.`,
+      `<b style="color:var(--red)">${recs.length}</b> transaction(s) will be <b>permanently deleted</b>. This cannot be undone.`,
       '🗑️ Delete','btn-danger', async()=>{
         const idSet=new Set([...this.sel]);
         const entries=getMfBizEntries().filter(e=>!idSet.has(e.id));
         setMfBizEntries(entries);
         if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
-        this._done('✅ '+idSet.size+' transaction delete ho gaye');
+        this._done('✅ '+idSet.size+' transaction(s) deleted');
       });
   },
 
@@ -11822,9 +11823,9 @@ const MFTBULK = {
     const bar=document.createElement('div');
     bar.id='dnZoomBar';
     bar.innerHTML =
-      '<button id="dnZoomOut" title="Chota karo (Ctrl -)">−</button>'+
+      '<button id="dnZoomOut" title="Zoom out (Ctrl -)">−</button>'+
       '<span id="dnZoomVal" title="Reset 100%">100%</span>'+
-      '<button id="dnZoomIn" title="Bada karo (Ctrl +)">+</button>';
+      '<button id="dnZoomIn" title="Zoom in (Ctrl +)">+</button>';
     const s=document.createElement('style');
     s.textContent=
       '#dnZoomBar{display:inline-flex;align-items:center;gap:3px;background:#1e3a6b;'+
@@ -12577,5 +12578,3 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 
 </body>
 </html>
-
-        
