@@ -4780,7 +4780,8 @@ function exportSeminarAttendees(){
   toast('Export done!','success');
 }
 
-// ── Seminar Feedback responses (CRM ke andar) ───────────────────
+// ── Seminar Feedback responses (inside CRM) ───────────────────
+function fbIntLabel(v){ return (v==='Haan'||v==='Yes')?'Yes':((v==='Shayad'||v==='Maybe')?'Maybe':((v==='Nahi'||v==='No')?'No':(v||''))); }
 async function openSeminarFeedback(){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
@@ -4812,11 +4813,11 @@ async function openSeminarFeedback(){
   window._semFbSeminar={name:s.name||'', date:s.date||'', location:s.location||''};
 
   const avg=k=>resp.length?(resp.reduce((t,r)=>t+Number(r[k]||0),0)/resp.length).toFixed(1):'—';
-  const haan=resp.filter(r=>r.interested==='Haan');
+  const haan=resp.filter(r=>fbIntLabel(r.interested)==='Yes');
   const stars=n=>'<span style="color:#f59e0b">'+('★'.repeat(n||0))+('☆'.repeat(5-(n||0)))+'</span>';
-  const chip=v=>v==='Haan'?'<span style="background:#e6f4ea;color:#137333;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600">Yes ✓</span>'
-    :(v==='Shayad'?'<span style="background:#fef7e0;color:#b06000;padding:2px 10px;border-radius:12px;font-size:11px">Maybe</span>'
-    :'<span style="background:#fce8e6;color:#c5221f;padding:2px 10px;border-radius:12px;font-size:11px">No</span>');
+  const chip=iv=>{const v=fbIntLabel(iv);return v==='Yes'?'<span style="background:#e6f4ea;color:#137333;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600">Yes ✓</span>'
+    :(v==='Maybe'?'<span style="background:#fef7e0;color:#b06000;padding:2px 10px;border-radius:12px;font-size:11px">Maybe</span>'
+    :'<span style="background:#fce8e6;color:#c5221f;padding:2px 10px;border-radius:12px;font-size:11px">No</span>');};
   const prodChips=r=>(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10px">'+esc(p)+'</span>').join('');
   const topicChips=r=>(r.topics||[]).map(p=>'<span style="display:inline-block;background:#e8f0fe;color:#1967d2;padding:1px 8px;border-radius:10px;margin:1px;font-size:10px">'+esc(p)+'</span>').join('');
   const esc=t=>String(t||'').replace(/</g,'&lt;');
@@ -4828,7 +4829,7 @@ async function openSeminarFeedback(){
     +'<div style="background:#e6f4ea;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#137333;text-transform:uppercase">Interested (Yes)</div><div style="font-size:20px;font-weight:700;color:#137333">'+haan.length+'</div></div>'
     +'</div>';
 
-  const rows=resp.map((r,i)=>'<tr style="border-bottom:1px solid #eee'+(r.interested==='Haan'?';background:#f4fbf6':'')+'">'
+  const rows=resp.map((r,i)=>'<tr style="border-bottom:1px solid #eee'+(fbIntLabel(r.interested)==='Yes'?';background:#f4fbf6':'')+'">'
     +'<td style="padding:7px 8px;white-space:nowrap;color:#888">'+(r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'')+'</td>'
     +'<td style="padding:7px 8px;font-weight:600">'+esc(r.name)+'</td>'
     +'<td style="padding:7px 8px">'+esc(r.mobile)+'</td>'
@@ -4866,9 +4867,9 @@ function fbExportExcel(){
   if(!list.length){ toast('No feedback responses to export','error'); return; }
   const sem=window._semFbSeminar||{};
 
-  const haan=list.filter(r=>r.interested==='Haan').length;
-  const shayad=list.filter(r=>r.interested==='Shayad').length;
-  const nahi=list.filter(r=>r.interested && r.interested!=='Haan' && r.interested!=='Shayad').length;
+  const haan=list.filter(r=>fbIntLabel(r.interested)==='Yes').length;
+  const shayad=list.filter(r=>fbIntLabel(r.interested)==='Maybe').length;
+  const nahi=list.filter(r=>r.interested && fbIntLabel(r.interested)!=='Yes' && fbIntLabel(r.interested)!=='Maybe').length;
   const avg=k=>list.length?Math.round(list.reduce((t,r)=>t+Number(r[k]||0),0)/list.length*10)/10:0;
 
   // Product & topic interest counts
@@ -4884,7 +4885,7 @@ function fbExportExcel(){
   const GREEN={bg:'FFC6EFCE',font:'FF006100'}, AMBER={bg:'FFFFEB9C',font:'FF9C6500'}, RED={bg:'FFFFC7CE',font:'FF9C0006'};
   const starTxt=n=>{ n=Number(n)||0; return n?('\u2605'.repeat(n)+'\u2606'.repeat(5-n)):''; };
   const ratingColor=v=>{ const n=(String(v||'').match(/\u2605/g)||[]).length || (Number(v)||0); return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
-  const intColor=v=>v==='Haan'?GREEN:(v==='Shayad'?AMBER:(v?RED:null));
+  const intColor=v=>v==='Yes'?GREEN:(v==='Maybe'?AMBER:(v?RED:null));
   const summaryColor=(v,row)=>{
     const m=String(row[0]||'');
     if(/— Yes/.test(m)) return GREEN;
@@ -4911,7 +4912,7 @@ function fbExportExcel(){
     r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
     r.name||'', r.mobile||'',
     starTxt(r.rating), starTxt(r.contentRating),
-    r.interested||'',
+    fbIntLabel(r.interested),
     (r.products||[]).join(', '),
     (r.topics||[]).join(', '),
     r.comments||''
@@ -4980,7 +4981,7 @@ async function fbToLead(idx, silent){
   const rec={
     id:uid(), name:r.name||'', mobile:r.mobile||'', rm,
     last_call:'', next_call:'', followup_status:'Pending',
-    remarks:'Seminar feedback: Interested='+(r.interested==='Haan'?'Yes':r.interested==='Shayad'?'Maybe':r.interested==='Nahi'?'No':(r.interested||''))+((r.products&&r.products.length)?' | Products: '+r.products.join(', '):'')+((r.topics&&r.topics.length)?' | Topic: '+r.topics.join(', '):'')+(r.comments?' | '+String(r.comments).slice(0,90):''),
+    remarks:'Seminar feedback: Interested='+fbIntLabel(r.interested)+((r.products&&r.products.length)?' | Products: '+r.products.join(', '):'')+((r.topics&&r.topics.length)?' | Topic: '+r.topics.join(', '):'')+(r.comments?' | '+String(r.comments).slice(0,90):''),
     created:today(), updated:today()
   };
   await DB.setClient('leads', rec);
@@ -4992,7 +4993,7 @@ async function fbAllHaanToLeads(){
   const list=window._semFbList||[];
   let added=0, skipped=0;
   for(let i=0;i<list.length;i++){
-    if(list[i].interested!=='Haan') continue;
+    if(fbIntLabel(list[i].interested)!=='Yes') continue;
     const ok=await fbToLead(i, true);
     if(ok) added++; else skipped++;
   }
