@@ -216,6 +216,7 @@ tr:hover td{background:var(--surface2)}
 .badge-red{background:var(--red-bg);color:var(--red-text)}
 .badge-amber{background:var(--amber-bg);color:var(--amber-text)}
 .badge-blue{background:var(--blue-bg);color:var(--blue-text)}
+.badge-orange{background:#ffedd5;color:#c2410c}
 .badge-gray{background:var(--surface2);color:var(--text2)}
 
 /* FORMS */
@@ -2311,7 +2312,7 @@ function renderDashboard(){
       let badge='',inT='—';
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
-      else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-blue">Half day</span>';inT=rec.in||'—'}
+      else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-orange">Half day</span>';inT=rec.in||'—'}
       else{badge='<span class="badge badge-red">Absent</span>'}
       const monthRecs=(att[currentUser]||[]).filter(r=>r.date&&r.date.startsWith(td.slice(0,7)));
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
@@ -2348,7 +2349,7 @@ function renderDashboard(){
       let badge='',inT='—';
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
-      else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-blue">Half day</span>';inT=rec.in||'—'}
+      else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-orange">Half day</span>';inT=rec.in||'—'}
       else{badge='<span class="badge badge-red">Absent</span>'}
       const monthRecs=(att[e.name]||[]).filter(r=>r.date&&r.date.startsWith(td.slice(0,7)));
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
@@ -2561,7 +2562,7 @@ function renderAttendancePage(){
     if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records this month</td></tr>'}
     else al.innerHTML=myRecs.map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
-      const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-blue':'badge-red';
+      const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-orange':'badge-red';
       return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td></tr>`;
     }).join('');
   }
@@ -2606,7 +2607,7 @@ function calcHrs(inT,outT){
 
 // ─── REPORTS: RM-wise date-wise attendance sheet (admin) ─────────────────────
 const ATT_STATUS_SHORT = {Present:'P', Late:'L', 'Half day':'H', Absent:'A', Holiday:'—'};
-const ATT_STATUS_BADGE = {Present:'badge-green', Late:'badge-amber', 'Half day':'badge-blue', Absent:'badge-red', Holiday:'badge-gray'};
+const ATT_STATUS_BADGE = {Present:'badge-green', Late:'badge-amber', 'Half day':'badge-orange', Absent:'badge-red', Holiday:'badge-gray'};
 
 // Builds "June 2026" style month list: current month + previous 5 months
 function attMonthOptions(){
@@ -2776,7 +2777,8 @@ function attExcelColors(r){
   else cls=(ATT_STATUS_BADGE[r.status]||'badge-gray');
   switch(cls){
     case 'badge-green': return {bg:'FFC6EFCE', font:'FF006100'}; // Present (on time)
-    case 'badge-blue' : return {bg:'FFBDD7EE', font:'FF1F4E78'}; // Present (slightly late) / Half day
+    case 'badge-blue' : return {bg:'FFBDD7EE', font:'FF1F4E78'}; // Present (slightly late)
+    case 'badge-orange': return {bg:'FFFFE0C7', font:'FFC2410C'}; // Half day
     case 'badge-amber': return {bg:'FFFFEB9C', font:'FF9C6500'}; // Late
     case 'badge-red'  : return {bg:'FFFFC7CE', font:'FF9C0006'}; // Absent
     case 'badge-gray' : return {bg:'FFE7E7E7', font:'FF808080'}; // Holiday
