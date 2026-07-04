@@ -140,11 +140,25 @@ input[type=text],input[type=tel]{max-width:420px}
     <label class="radio-row"><input type="checkbox" name="f-products" value="SIP"><span>SIP (Systematic Investment Plan)</span></label>
     <label class="radio-row"><input type="checkbox" name="f-products" value="Lumpsum"><span>Lumpsum (Mutual Fund one-time investment)</span></label>
     <label class="radio-row"><input type="checkbox" name="f-products" value="Equity Trading"><span>Equity Trading (Share Market)</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="Insurance"><span>Insurance (Health / Life)</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="Loan against Equity/MF"><span>Loan against Equity / Mutual Fund</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="Life Insurance"><span>Life Insurance</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-products" value="Health Insurance"><span>Health Insurance</span></label>
+  </div>
+
+  <div class="card" id="q-topics">
+    <div class="q-label">What topic should our next seminar cover? <span style="font-weight:400;font-size:12px;color:var(--text2)">(you can select multiple)</span></div>
+    <label class="radio-row"><input type="checkbox" name="f-topics" value="Beginner Guide to Mutual Funds"><span>Beginner Guide to Mutual Funds</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-topics" value="SIP vs Lump Sum Investment"><span>SIP vs Lump Sum Investment</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-topics" value="Stock Market Basics"><span>Stock Market Basics</span></label>
+    <label class="radio-row"><input type="checkbox" name="f-topics" value="Retirement Planning"><span>Retirement Planning</span></label>
+    <label class="radio-row" id="topic-other-row"><input type="checkbox" name="f-topics" value="__other" onchange="document.getElementById('topic-other-box').style.display=this.checked?'block':'none';if(this.checked)document.getElementById('f-topic-other').focus()"><span>Other (please specify)</span></label>
+    <div id="topic-other-box" style="display:none;margin-top:4px;padding-left:4px">
+      <input type="text" id="f-topic-other" placeholder="Your topic suggestion" maxlength="120">
+    </div>
   </div>
 
   <div class="card focus-ring" id="q-comments">
-    <div class="q-label">Any suggestions or comments? What topic should our next seminar cover?</div>
+    <div class="q-label">Any other comments or suggestions?</div>
     <textarea id="f-comments" placeholder="Your answer" rows="1" maxlength="500"></textarea>
   </div>
 
@@ -243,6 +257,9 @@ async function submitForm(){
   const content=(document.querySelector('input[name=f-content]:checked')||{}).value||'';
   const interest=(document.querySelector('input[name=f-interest]:checked')||{}).value||'';
   const products=[...document.querySelectorAll('input[name=f-products]:checked')].map(c=>c.value);
+  let topics=[...document.querySelectorAll('input[name=f-topics]:checked')].map(c=>c.value);
+  const otherTopic=document.getElementById('f-topic-other').value.trim();
+  if(topics.includes('__other')){ topics=topics.filter(t=>t!=='__other'); if(otherTopic) topics.push('Other: '+otherTopic); }
   const comments=document.getElementById('f-comments').value.trim();
 
   let bad=false;
@@ -260,7 +277,7 @@ async function submitForm(){
     seminarId: sem?sem.id:'',
     seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
     rating:Number(rating), contentRating:Number(content),
-    interested:interest, products, comments,
+    interested:interest, products, topics, comments,
     ts:new Date().toISOString()
   };
 
@@ -282,6 +299,8 @@ function clearForm(){
   document.getElementById('f-mobile').value='';
   const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
   document.getElementById('f-comments').value='';
+  const tob=document.getElementById('f-topic-other'); if(tob) tob.value='';
+  const tobx=document.getElementById('topic-other-box'); if(tobx) tobx.style.display='none';
   document.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(r=>r.checked=false);
   document.querySelectorAll('.radio-row.sel').forEach(r=>r.classList.remove('sel'));
   document.querySelectorAll('.card.error').forEach(c=>c.classList.remove('error'));
@@ -312,7 +331,7 @@ function renderResponses(){
   const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
   document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
   document.getElementById('respTable').innerHTML=
-    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>Comments</th></tr>'+
+    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>Next Topic</th><th>Comments</th></tr>'+
     (list.map(r=>`<tr>
       <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
       <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
@@ -320,15 +339,16 @@ function renderResponses(){
       <td style="color:#f59e0b;white-space:nowrap">${stars(r.contentRating)}</td>
       <td>${chip(r.interested)}</td>
       <td style="font-size:11.5px">${(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
+      <td style="font-size:11.5px">${(r.topics||[]).map(p=>'<span style="display:inline-block;background:#e8f0fe;color:#1967d2;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
       <td>${esc(r.comments)}</td>
-    </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
+    </tr>`).join('')||'<tr><td colspan="10" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
 }
 function exportCSV(){
   const f=document.getElementById('respFilter').value;
   const list=f?RESP.filter(r=>r.seminarName===f):RESP;
   const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','Comments']]
-    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),r.comments]));
+  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','Next Topic','Comments']]
+    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.topics||[]).join(', '),r.comments]));
   const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
