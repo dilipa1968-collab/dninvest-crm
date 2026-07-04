@@ -4884,8 +4884,7 @@ function fbExportExcel(){
   const GREEN={bg:'FFC6EFCE',font:'FF006100'}, AMBER={bg:'FFFFEB9C',font:'FF9C6500'}, RED={bg:'FFFFC7CE',font:'FF9C0006'};
   const starTxt=n=>{ n=Number(n)||0; return n?('\u2605'.repeat(n)+'\u2606'.repeat(5-n)):''; };
   const ratingColor=v=>{ const n=(String(v||'').match(/\u2605/g)||[]).length || (Number(v)||0); return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
-  const intLabel=v=>v==='Haan'?'Yes':(v==='Shayad'?'Maybe':(v==='Nahi'?'No':(v||'')));
-  const intColor=v=>v==='Yes'?GREEN:(v==='Maybe'?AMBER:(v?RED:null));
+  const intColor=v=>v==='Haan'?GREEN:(v==='Shayad'?AMBER:(v?RED:null));
   const summaryColor=(v,row)=>{
     const m=String(row[0]||'');
     if(/— Yes/.test(m)) return GREEN;
@@ -4912,7 +4911,7 @@ function fbExportExcel(){
     r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
     r.name||'', r.mobile||'',
     starTxt(r.rating), starTxt(r.contentRating),
-    intLabel(r.interested),
+    r.interested||'',
     (r.products||[]).join(', '),
     (r.topics||[]).join(', '),
     r.comments||''
