@@ -4916,12 +4916,12 @@ function shareFeedbackLink(){
   const s=seminars.find(x=>x.id===currentSeminarId);
   if(!s) return;
   const link=feedbackLinkFor(s.id);
-  const msg='Namaste! 🙏\n\n*D N Investment* ke seminar "'+(s.name||'')+'" me aane ke liye dhanyavaad!\n\nKripya 1 minute nikaal kar apna feedback dein:\n'+link+'\n\n- D N Investment, Jamshedpur';
+  const msg='Hello! \uD83D\uDE4F\n\nThank you for attending the *D N Investment* seminar "'+(s.name||'')+'".\n\nPlease take a minute to share your feedback:\n'+link+'\n\n- D N Investment, Jamshedpur';
   // Copy link
   try{ navigator.clipboard.writeText(link); }catch(e){}
-  toast('Link copy ho gaya!','success');
+  toast('Link copied!','success');
   // WhatsApp share (group/broadcast me paste karne ke liye chat picker khulega)
-  if(confirm('Link copy ho gaya hai.\n\nWhatsApp par share karein? (message ready milega, bas group/contact chunna hai)')){
+  if(confirm('Link copied!\n\nShare on WhatsApp? (a ready message will open — just pick a group/contact)')){
     window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
   }
 }
@@ -4930,9 +4930,9 @@ function sendFeedbackWA(attendeeId){
   const s=seminars.find(x=>x.id===currentSeminarId);
   if(!s) return;
   const a=(s.attendees||[]).find(x=>x.id===attendeeId);
-  if(!a || !a.mobile){ toast('Is attendee ka mobile number nahi hai','error'); return; }
+  if(!a || !a.mobile){ toast('This attendee has no mobile number','error'); return; }
   const link=feedbackLinkFor(s.id);
-  const msg='Namaste '+(a.name||'')+' ji! 🙏\n\n*D N Investment* ke seminar me aane ke liye dhanyavaad!\n\nKripya 1 minute nikaal kar apna feedback dein:\n'+link+'\n\n- D N Investment, Jamshedpur';
+  const msg='Hello '+(a.name||'')+'! \uD83D\uDE4F\n\nThank you for attending the *D N Investment* seminar.\n\nPlease take a minute to share your feedback:\n'+link+'\n\n- D N Investment, Jamshedpur';
   window.open('https://wa.me/91'+a.mobile+'?text='+encodeURIComponent(msg),'_blank');
 }
 
