@@ -1902,8 +1902,10 @@ async function doLogout(){
         const ist=new Date(utc+5.5*3600000);
         const outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
         // 1:30 PM se pehle nikla → Half day (in/out times same rehte hain)
+        // Saturday exempt: Saturday office khud hi half day hai (2:15 PM cutoff)
         const outH=ist.getHours()+ist.getMinutes()/60;
-        const newStatus=(outH<13.5)?'Half day':rec.status;
+        const isSatToday=(ist.getDay()===6);
+        const newStatus=(!isSatToday && outH<13.5)?'Half day':rec.status;
         await saveAttRecord(currentUser, {...rec, out:outT, status:newStatus});
       }
     }catch(e){}
@@ -2070,7 +2072,9 @@ async function autoOutTimeCheck(){
       return cutoffStr;
     }
     // Out-time 1:30 PM se pehle ka hai → status Half day ban jata hai
+    // Saturday exempt: Saturday khud hi half day office hai
     function statusFor(outT, curStatus){
+      if(dow===6) return curStatus;
       const m=/^(\d{1,2}):(\d{2})$/.exec(outT||'');
       if(m && (Number(m[1])+Number(m[2])/60) < 13.5) return 'Half day';
       return curStatus;
@@ -2119,6 +2123,7 @@ async function migrateHalfDayFromJuly1(){
     for(const emp of Object.keys(att)){
       for(const rec of (att[emp]||[])){
         if(rec.date>='2026-07-01' && rec.date<=td && (rec.status==='Present'||rec.status==='Late') && rec.out){
+          if(dateIsSaturday(rec.date)) continue; // Saturday exempt — khud hi half day office
           const m=/^(\d{1,2}):(\d{2})$/.exec(rec.out);
           if(m && (Number(m[1])+Number(m[2])/60)<13.5){
             await saveAttRecord(emp, {...rec, status:'Half day'});
@@ -2135,6 +2140,47 @@ async function migrateHalfDayFromJuly1(){
   }catch(e){ console.log('HD migration error:', e); }
 }
 setTimeout(migrateHalfDayFromJuly1, 8000); // DB load hone ke baad chale
+
+// Date string (YYYY-MM-DD, IST-based) Saturday hai ya nahi — UTC parse se
+// deterministic, device timezone se koi farak nahi padta.
+function dateIsSaturday(dateStr){
+  const d=new Date(dateStr+'T00:00:00Z');
+  return d.getUTCDay()===6;
+}
+
+// ── One-time SATURDAY REVERT FIX (July 2026): half-day rule galti se Saturday
+// pe bhi chal gaya tha, jabki Saturday khud hi half day office hai. July 1 se
+// aaj tak ke Saturday 'Half day' records ko wapas Present/Late karo.
+// Revert logic: in-time < 10:45 (Saturday absent-cutoff) → Present, warna Late.
+// Isse 0.5-day salary deduction bhi apne aap hat jayega (salary calc status se
+// count karta hai). Sirf Admin device, sirf ek baar.
+async function migrateSaturdayHalfDayRevert(){
+  try{
+    if(!isAdmin) return;
+    if(localStorage.getItem('hd_sat_fix_jul2026')) return;
+    const td=today();
+    const att=getAtt();
+    let fixed=0;
+    for(const emp of Object.keys(att)){
+      for(const rec of (att[emp]||[])){
+        if(rec.date>='2026-07-01' && rec.date<=td && rec.status==='Half day' && dateIsSaturday(rec.date)){
+          let newStatus='Present';
+          const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
+          if(m && (Number(m[1])+Number(m[2])/60)>=10.75) newStatus='Late'; // 10:45 ke baad login
+          await saveAttRecord(emp, {...rec, status:newStatus});
+          fixed++;
+        }
+      }
+    }
+    localStorage.setItem('hd_sat_fix_jul2026','done');
+    if(fixed>0){
+      if(typeof toast==='function') toast(fixed+' Saturday record(s) Half day se revert kiye gaye (Saturday exempt)','success');
+      if(typeof renderDashboard==='function') renderDashboard();
+      if(typeof renderAttendancePage==='function') renderAttendancePage();
+    }
+  }catch(e){ console.log('Sat HD revert error:', e); }
+}
+setTimeout(migrateSaturdayHalfDayRevert, 10000); // pehli migration ke baad chale
 
 
 // ─── CLOCK ──────────────────────────────────────────────────────────────────
