@@ -4913,27 +4913,43 @@ async function fbAllHaanToLeads(){
 function feedbackLinkFor(seminarId){
   return location.origin + '/dninvest-feedback.html' + (seminarId ? ('?s='+encodeURIComponent(seminarId)) : '');
 }
-function shareFeedbackLink(){
+// Shortens a link via is.gd (free, no key). Falls back to the original link if it fails.
+async function shortenLink(longUrl){
+  try{
+    const r=await fetch('https://is.gd/create.php?format=simple&url='+encodeURIComponent(longUrl));
+    if(!r.ok) return longUrl;
+    const t=(await r.text()).trim();
+    return t.startsWith('http')?t:longUrl;
+  }catch(e){ return longUrl; }
+}
+
+async function shareFeedbackLink(){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
   if(!s) return;
-  const link=feedbackLinkFor(s.id);
+  const btn=event&&event.target; const oldTxt=btn?btn.textContent:null;
+  if(btn){ btn.textContent='Shortening link...'; btn.disabled=true; }
+  const longLink=feedbackLinkFor(s.id);
+  const link=await shortenLink(longLink);
+  if(btn){ btn.textContent=oldTxt; btn.disabled=false; }
   const msg='Hello! \uD83D\uDE4F\n\nThank you for attending the *D N Investment* seminar "'+(s.name||'')+'".\n\nPlease take a minute to share your feedback:\n'+link+'\n\n- D N Investment, Jamshedpur';
-  // Copy link
   try{ navigator.clipboard.writeText(link); }catch(e){}
   toast('Link copied!','success');
-  // WhatsApp share (group/broadcast me paste karne ke liye chat picker khulega)
   if(confirm('Link copied!\n\nShare on WhatsApp? (a ready message will open — just pick a group/contact)')){
     window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
   }
 }
-function sendFeedbackWA(attendeeId){
+async function sendFeedbackWA(attendeeId){
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
   if(!s) return;
   const a=(s.attendees||[]).find(x=>x.id===attendeeId);
   if(!a || !a.mobile){ toast('This attendee has no mobile number','error'); return; }
-  const link=feedbackLinkFor(s.id);
+  const btn=event&&event.target; const oldTxt=btn?btn.textContent:null;
+  if(btn){ btn.textContent='...'; btn.disabled=true; }
+  const longLink=feedbackLinkFor(s.id);
+  const link=await shortenLink(longLink);
+  if(btn){ btn.textContent=oldTxt; btn.disabled=false; }
   const msg='Hello '+(a.name||'')+'! \uD83D\uDE4F\n\nThank you for attending the *D N Investment* seminar.\n\nPlease take a minute to share your feedback:\n'+link+'\n\n- D N Investment, Jamshedpur';
   window.open('https://wa.me/91'+a.mobile+'?text='+encodeURIComponent(msg),'_blank');
 }
