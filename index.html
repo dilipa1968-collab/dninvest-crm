@@ -4799,7 +4799,7 @@ async function openSeminarFeedback(){
   let all=[];
   try{
     const snap=await fdb.collection('seminar_feedback').get();
-    all=snap.docs.map(d=>d.data());
+    all=snap.docs.map(d=>({...d.data(), _docId:d.id}));
   }catch(e){
     ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:30px" onclick="event.stopPropagation()">Feedback load nahi ho paya — internet check karein.<br><br><button class="btn btn-outline" onclick="document.getElementById(\'sem-fb-overlay\').remove()">Close</button></div>';
     return;
@@ -4835,7 +4835,7 @@ async function openSeminarFeedback(){
     +'<td style="padding:7px 8px">'+chip(r.interested)+'</td>'
     +'<td style="padding:7px 8px;max-width:150px">'+prodChips(r)+'</td>'
     +'<td style="padding:7px 8px;font-size:11.5px;color:#555;max-width:200px">'+esc(r.comments)+'</td>'
-    +'<td style="padding:7px 8px;white-space:nowrap"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="fbToLead('+i+')">➕ Lead</button></td>'
+    +'<td style="padding:7px 8px;white-space:nowrap"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="fbToLead('+i+')">➕ Lead</button> <button class="btn-icon" style="color:var(--red)" title="Delete response" onclick="fbDelete('+i+')">🗑️</button></td>'
     +'</tr>').join('');
 
   ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(900px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()">'
@@ -4853,6 +4853,19 @@ async function openSeminarFeedback(){
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       :'<div style="text-align:center;padding:30px;color:#999">Is seminar ka abhi koi feedback nahi aaya.<br><small>💬 Feedback Link button se attendees ko link bhejein.</small></div>')
     +'</div></div>';
+}
+
+async function fbDelete(idx){
+  const r=(window._semFbList||[])[idx];
+  if(!r) return;
+  if(CU.role!=='admin'){ toast('Sirf Admin feedback delete kar sakta hai','error'); return; }
+  if(!confirm('"'+(r.name||'')+'" ka feedback response permanently delete karein?')) return;
+  try{
+    if(r._docId){ await fdb.collection('seminar_feedback').doc(r._docId).delete(); }
+    (window._semFbList||[]).splice(idx,1);
+    toast('Response delete ho gaya','success');
+    openSeminarFeedback(); // refresh modal
+  }catch(e){ toast('Delete nahi ho paya — internet check karein','error'); }
 }
 
 async function fbToLead(idx, silent){
