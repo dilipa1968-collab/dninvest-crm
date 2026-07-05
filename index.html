@@ -11710,10 +11710,11 @@ const BULK = {
 
   // ── RM option list ──
   rmList(seg){
-    const users=(DB.get('users')||DEFAULT_USERS).filter(u=>u.active!==false && u.role!=='admin' && u.role!=='mf_desk');
+    // Admin is included so clients can be mapped directly to Admin too
+    const users=(DB.get('users')||DEFAULT_USERS).filter(u=>u.active!==false && u.role!=='mf_desk');
     let pool;
-    if(seg==='eq') pool=users.filter(u=>(u.segments||[]).includes('equity'));
-    else if(seg==='mf') pool=users.filter(u=>(u.segments||[]).includes('mf'));
+    if(seg==='eq') pool=users.filter(u=>u.role==='admin' || (u.segments||[]).includes('equity'));
+    else if(seg==='mf') pool=users.filter(u=>u.role==='admin' || (u.segments||[]).includes('mf'));
     else pool=users; // leads: any RM
     return [...new Set(pool.map(u=>u.name))].sort((a,b)=>a.localeCompare(b));
   },
