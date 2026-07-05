@@ -8638,9 +8638,12 @@ function renderOffersAdmin(){
     list.slice().reverse().map(o=>{
       const th=OFFER_THEMES[o.theme]||OFFER_THEMES.festival;
       const live=offerIsLive(o);
-      const badge=live?'<span style="font-size:.62rem;color:#fff;background:var(--green,#059669);border-radius:10px;padding:1px 8px;margin-left:4px">LIVE</span>'
-        :(o.active?'<span style="font-size:.62rem;color:#9C6500;background:#FFEB9C;border-radius:10px;padding:1px 8px;margin-left:4px">SCHEDULED/EXPIRED</span>'
-        :'<span style="font-size:.62rem;color:var(--text3);background:var(--border,#ddd);border-radius:10px;padding:1px 8px;margin-left:4px">PAUSED</span>');
+      const d=today();
+      let badge;
+      if(live) badge='<span style="font-size:.62rem;color:#fff;background:var(--green,#059669);border-radius:10px;padding:1px 8px;margin-left:4px">LIVE — RMs will see popup</span>';
+      else if(!o.active) badge='<span style="font-size:.62rem;color:var(--text3);background:var(--border,#ddd);border-radius:10px;padding:1px 8px;margin-left:4px">PAUSED</span>';
+      else if(o.from && d<o.from) badge='<span style="font-size:.62rem;color:#9C6500;background:#FFEB9C;border-radius:10px;padding:1px 8px;margin-left:4px">⏳ STARTS '+o.from+' — no popup yet</span>';
+      else badge='<span style="font-size:.62rem;color:#9C0006;background:#FFC7CE;border-radius:10px;padding:1px 8px;margin-left:4px">EXPIRED</span>';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border,#e3e8ef);border-radius:10px;margin-bottom:6px">
         <span style="font-size:20px">${th.emoji}</span>
         <div style="flex:1;min-width:0">
