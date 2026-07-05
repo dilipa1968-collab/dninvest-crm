@@ -583,6 +583,84 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 }
 
 </style>
+<style id="premium-skin">
+/* ═══ PREMIUM SKIN — pure CSS polish layer, no functionality touched ═══ */
+
+/* Base & background — soft depth instead of flat grey */
+body{
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(201,148,42,.07), transparent 60%),
+    radial-gradient(900px 420px at -10% 110%, rgba(26,86,219,.06), transparent 60%),
+    var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Slim premium scrollbars everywhere */
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#c3cde2;border-radius:20px;border:2px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:#9fb0d0;border:2px solid transparent;background-clip:content-box}
+
+/* Topbar — subtle gold accent line */
+.topbar{box-shadow:0 1px 0 rgba(201,148,42,.35), 0 6px 24px rgba(10,20,50,.18)}
+
+/* Sidebar — cleaner, breathing room, gold active accent */
+.sidebar{border-right:1px solid #e6ebf6;box-shadow:2px 0 14px rgba(10,20,50,.03)}
+.sidebar .nav-item, .sidebar a{border-radius:9px}
+.sidebar .nav-item.active, .sidebar .active{box-shadow:inset 3px 0 0 var(--gold)}
+
+/* Cards, filters, tables — softer borders, layered shadows, rounder */
+.filters, .tbl-wrap, .stat-card, .ann-card, .modal{
+  border:1px solid #e4e9f5;
+  box-shadow:0 1px 2px rgba(16,30,60,.04), 0 10px 30px rgba(16,30,60,.06);
+}
+.filters{border-radius:14px;padding:10px 14px;gap:8px}
+.tbl-wrap{border-radius:14px}
+.stat-card{border-radius:14px;transition:transform .18s, box-shadow .18s}
+.stat-card:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(16,30,60,.08), 0 18px 44px rgba(16,30,60,.12)}
+
+/* MORE SCREEN, LESS SCROLL — table stretches to viewport height */
+.tbl-scroll{max-height:calc(100vh - 235px)}
+@media (max-width:768px){ .tbl-scroll{max-height:calc(100vh - 200px)} }
+
+/* Table refinement — calm header, airy rows, soft zebra */
+thead th{
+  background:var(--navy);
+  font-size:.64rem;letter-spacing:.7px;font-weight:600;
+  padding:9px 8px;border-bottom:2px solid rgba(201,148,42,.55);
+}
+thead th.sorted{background:#1b3260;box-shadow:inset 0 -2px 0 var(--gold)}
+tbody td{padding:6px 8px;font-size:.68rem}
+tbody tr{border-bottom:1px solid #eef2fa}
+tbody tr:nth-child(even){background:#fafbfe}
+tbody tr:hover{background:#eef4ff!important;box-shadow:inset 3px 0 0 var(--blue)}
+
+/* Inputs & selects — clean focus ring, comfortable height */
+input, select, textarea{border-radius:9px!important;transition:border-color .15s, box-shadow .15s}
+input:focus, select:focus, textarea:focus{
+  border-color:var(--gold)!important;
+  box-shadow:0 0 0 3px rgba(201,148,42,.16)!important;outline:none;
+}
+
+/* Buttons — subtle depth + lift on hover */
+.btn{border-radius:10px;box-shadow:0 1px 2px rgba(16,30,60,.12);transition:transform .12s, box-shadow .12s, filter .12s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(16,30,60,.16);filter:brightness(1.04)}
+.btn:active{transform:translateY(0)}
+
+/* Badges — pill polish */
+.badge{border-radius:20px;padding:3px 10px;letter-spacing:.4px}
+
+/* Modals — rounder + backdrop blur = premium feel */
+.modal{border-radius:18px}
+.modal-overlay, #announcementPopup{backdrop-filter:blur(3px)}
+
+/* Stat numbers slightly bolder for glanceability */
+.stat-card .stat-num, .stat-card b, .stat-card strong{letter-spacing:-.4px}
+
+/* Page title — gold tick accent */
+.page-title{position:relative;padding-left:12px}
+.page-title::before{content:'';position:absolute;left:0;top:52%;transform:translateY(-50%);width:4px;height:70%;border-radius:4px;background:linear-gradient(180deg,var(--gold),var(--gold2))}
+</style>
 </head>
 <body>
 
