@@ -8587,6 +8587,7 @@ function toggleOffer(id){
   o.active=!o.active;
   saveSpecialOffersList(list);
   renderOffersAdmin();
+  toast(o.active?'▶ Offer resumed — popup will show again':'⏸ Offer paused — popup stopped for RMs');
 }
 
 function deleteOffer(id){
@@ -8651,9 +8652,11 @@ function renderOffersAdmin(){
           <div style="font-size:.74rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.msg}</div>
           <div style="font-size:.68rem;color:var(--text3)">🎯 ${offerTargetLabel(o)} · 📅 ${o.from||'—'} → ${o.to||'no end'}</div>
         </div>
-        <button class="btn btn-sm" onclick="editOffer('${o.id}')">✏️ Edit</button>
-        <button class="btn btn-sm" onclick="toggleOffer('${o.id}')">${o.active?'Pause':'Resume'}</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteOffer('${o.id}')">Delete</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <button onclick="editOffer('${o.id}')" style="background:#2563EB;color:#fff;border:none;font-size:.72rem;font-weight:600;padding:6px 10px;border-radius:8px;cursor:pointer;white-space:nowrap">✏️ Edit</button>
+          <button onclick="toggleOffer('${o.id}')" style="background:${o.active?'#D97706':'#059669'};color:#fff;border:none;font-size:.72rem;font-weight:600;padding:6px 10px;border-radius:8px;cursor:pointer;white-space:nowrap">${o.active?'⏸ Pause':'▶ Resume'}</button>
+          <button onclick="deleteOffer('${o.id}')" style="background:#DC2626;color:#fff;border:none;font-size:.72rem;font-weight:600;padding:6px 10px;border-radius:8px;cursor:pointer;white-space:nowrap">🗑 Delete</button>
+        </div>
       </div>`;
     }).join('');
 }
