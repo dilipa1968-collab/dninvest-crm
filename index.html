@@ -1458,7 +1458,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
         <div style="max-width:700px;margin:0 auto">
           <div class="ann-card" id="offer-admin-card">
             <h3>🎁 Special Offer / Contest</h3>
-            <p style="font-size:.78rem;color:var(--text3);margin:4px 0 10px">RMs ke liye special offer ya contest banayein (Monsoon Dhamaka, Diwali Offer, Demat Opening Contest, SIP/Lumpsum Contest). Active offer har RM ko login/refresh par festive popup me dikhega — aur publish karte hi live bhi pop hoga.</p>
+            <p style="font-size:.78rem;color:var(--text3);margin:4px 0 10px">Create a special offer or contest for RMs (Monsoon Dhamaka, Diwali Offer, Demat Opening Contest, SIP/Lumpsum Contest). An active offer appears to every RM as a festive popup on each login/refresh — and pops up live the moment you publish.</p>
             <div class="form-field">
               <label>Offer Title</label>
               <input type="text" id="offer-title" placeholder="e.g. Monsoon Dhamaka — SIP Contest 🌧️">
@@ -1494,10 +1494,11 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
             </div>
             <div class="form-field" style="margin-top:10px">
               <label>Offer Details / Message</label>
-              <textarea id="offer-msg" placeholder="e.g. Is month 5 Demat account kholne par ₹2,000 extra bonus! Top SIP collector ko ₹5,000 cash prize 🏆" style="min-height:80px"></textarea>
+              <textarea id="offer-msg" placeholder="e.g. Open 5 Demat accounts this month and earn ₹2,000 extra bonus! Top SIP collector wins a ₹5,000 cash prize 🏆" style="min-height:80px"></textarea>
             </div>
             <div style="display:flex;gap:10px;margin-top:14px">
-              <button class="btn btn-gold" onclick="saveSpecialOffer()">🎉 Publish Offer</button>
+              <button class="btn btn-gold" id="offer-publish-btn" onclick="saveSpecialOffer()">🎉 Publish Offer</button>
+              <button class="btn" id="offer-cancel-btn" style="display:none" onclick="cancelOfferEdit()">✖ Cancel Edit</button>
             </div>
             <div id="offers-admin-list" style="margin-top:14px"></div>
           </div>
@@ -8513,21 +8514,71 @@ function saveSpecialOffer(){
   else if(targetVal==='seg-mf') target={type:'segment', segment:'mf'};
   else if(targetVal==='users'){
     const usernames=Array.from(document.querySelectorAll('.offer-user-chk:checked')).map(c=>c.value);
-    if(!usernames.length){ toast('Kam se kam ek RM select karein','error'); return; }
+    if(!usernames.length){ toast('Please select at least one RM','error'); return; }
     target={type:'users', usernames};
   }
   const from=document.getElementById('offer-from').value||today();
   const to=document.getElementById('offer-to').value||'';
-  if(!title){ toast('Offer title likhein','error'); return; }
-  if(!msg){ toast('Offer details / message likhein','error'); return; }
-  if(to && to<from){ toast('Valid To, Valid From se pehle nahi ho sakta','error'); return; }
+  if(!title){ toast('Please enter the offer title','error'); return; }
+  if(!msg){ toast('Please enter the offer details / message','error'); return; }
+  if(to && to<from){ toast('Valid To cannot be earlier than Valid From','error'); return; }
   const list=getSpecialOffers();
+  if(editingOfferId){
+    const o=list.find(x=>x.id===editingOfferId);
+    if(o){ Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name}); }
+    saveSpecialOffersList(list);
+    cancelOfferEdit();
+    renderOffersAdmin();
+    toast('💾 Offer updated! RMs will see the new version');
+    return;
+  }
   list.push({id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name});
   saveSpecialOffersList(list);
   document.getElementById('offer-title').value='';
   document.getElementById('offer-msg').value='';
   renderOffersAdmin();
-  toast('🎉 Offer publish ho gaya! Sabhi RMs ko popup dikhega');
+  toast('🎉 Offer published! All targeted RMs will see the popup');
+}
+
+let editingOfferId=null;
+function editOffer(id){
+  const o=getSpecialOffers().find(x=>x.id===id);
+  if(!o) return;
+  editingOfferId=id;
+  document.getElementById('offer-title').value=o.title||'';
+  document.getElementById('offer-msg').value=o.msg||'';
+  document.getElementById('offer-theme').value=o.theme||'festival';
+  document.getElementById('offer-from').value=o.from||'';
+  document.getElementById('offer-to').value=o.to||'';
+  // Target: map stored target back to the select + checkboxes
+  const t=o.target;
+  let tv='ALL';
+  if(t && typeof t==='object'){
+    if(t.type==='segment') tv='seg-'+t.segment;
+    else if(t.type==='users') tv='users';
+  } else if(typeof t==='string' && t!=='ALL'){ tv='users'; }
+  document.getElementById('offer-target').value=tv;
+  populateOfferTarget();
+  if(tv==='users'){
+    const usernames=(t && t.usernames) ? t.usernames : [];
+    document.querySelectorAll('.offer-user-chk').forEach(c=>{ c.checked=usernames.includes(c.value); });
+  }
+  onOfferTargetChange();
+  const pb=document.getElementById('offer-publish-btn'); if(pb) pb.innerHTML='💾 Update Offer';
+  const cb=document.getElementById('offer-cancel-btn'); if(cb) cb.style.display='';
+  const card=document.getElementById('offer-admin-card'); if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('offer-title').focus();
+}
+
+function cancelOfferEdit(){
+  editingOfferId=null;
+  document.getElementById('offer-title').value='';
+  document.getElementById('offer-msg').value='';
+  document.getElementById('offer-to').value='';
+  document.getElementById('offer-target').value='ALL';
+  onOfferTargetChange();
+  const pb=document.getElementById('offer-publish-btn'); if(pb) pb.innerHTML='🎉 Publish Offer';
+  const cb=document.getElementById('offer-cancel-btn'); if(cb) cb.style.display='none';
 }
 
 function toggleOffer(id){
@@ -8539,8 +8590,9 @@ function toggleOffer(id){
 }
 
 function deleteOffer(id){
-  if(!confirm('Is offer ko delete karein?')) return;
+  if(!confirm('Delete this offer?')) return;
   saveSpecialOffersList(getSpecialOffers().filter(x=>x.id!==id));
+  if(editingOfferId===id) cancelOfferEdit();
   renderOffersAdmin();
 }
 
@@ -8581,7 +8633,7 @@ function renderOffersAdmin(){
   const box=document.getElementById('offers-admin-list');
   if(!box) return;
   const list=getSpecialOffers();
-  if(!list.length){ box.innerHTML='<p style="font-size:.78rem;color:var(--text3)">Abhi koi offer nahi hai.</p>'; return; }
+  if(!list.length){ box.innerHTML='<p style="font-size:.78rem;color:var(--text3)">No offers yet.</p>'; return; }
   box.innerHTML='<div style="font-size:.72rem;font-weight:600;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Published offers</div>'+
     list.slice().reverse().map(o=>{
       const th=OFFER_THEMES[o.theme]||OFFER_THEMES.festival;
@@ -8596,6 +8648,7 @@ function renderOffersAdmin(){
           <div style="font-size:.74rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.msg}</div>
           <div style="font-size:.68rem;color:var(--text3)">🎯 ${offerTargetLabel(o)} · 📅 ${o.from||'—'} → ${o.to||'no end'}</div>
         </div>
+        <button class="btn btn-sm" onclick="editOffer('${o.id}')">✏️ Edit</button>
         <button class="btn btn-sm" onclick="toggleOffer('${o.id}')">${o.active?'Pause':'Resume'}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteOffer('${o.id}')">Delete</button>
       </div>`;
@@ -8605,7 +8658,7 @@ function renderOffersAdmin(){
 // ── Festive popup for RMs — shows on every login/refresh while offer is live ──
 let offerPopupShownIds=null;
 function showOfferPopupIfAny(force){
-  if(!CU || CU.role==='admin') return; // popup sirf RMs ke liye
+  if(!CU || CU.role==='admin') return; // popup is for RMs only
   const live=getSpecialOffers().filter(o=>offerIsLive(o) && offerAppliesToMe(o));
   if(!live.length) return;
   const ids=live.map(o=>o.id).join(',');
@@ -8620,7 +8673,7 @@ function showOfferPopupIfAny(force){
     return `<div style="background:rgba(255,255,255,.14);backdrop-filter:blur(3px);border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:14px 16px;margin-top:12px;text-align:left">
       <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:.3px">${t.emoji} ${esc(o.title)}</div>
       <div style="font-size:13.5px;color:rgba(255,255,255,.95);margin-top:6px;line-height:1.5;white-space:pre-wrap">${esc(o.msg)}</div>
-      <div style="font-size:11px;color:${th.ribbon};margin-top:8px;font-weight:600">⏳ Valid: ${o.from||'aaj'} se ${o.to?o.to+' tak':'agli suchna tak'}</div>
+      <div style="font-size:11px;color:${th.ribbon};margin-top:8px;font-weight:600">⏳ Valid: ${o.from||'today'}${o.to?' to '+o.to:' — until further notice'}</div>
     </div>`;
   }).join('');
   const el=document.createElement('div');
@@ -8632,7 +8685,7 @@ function showOfferPopupIfAny(force){
         <div class="offer-big-emoji">${th.emoji}</div>
         <div style="font-size:12px;letter-spacing:3px;color:${th.ribbon};font-weight:700;text-transform:uppercase">✦ Special Offer ✦</div>
         ${cards}
-        <button onclick="document.getElementById('offer-popup-overlay').remove()" class="offer-close-btn">Samajh Gaya! 🎉</button>
+        <button onclick="document.getElementById('offer-popup-overlay').remove()" class="offer-close-btn">Got it! 🎉</button>
       </div>
     </div>`;
   document.body.appendChild(el);
