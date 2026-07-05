@@ -1476,8 +1476,17 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
               </div>
               <div class="form-field" style="flex:1;min-width:140px">
                 <label>Target</label>
-                <select id="offer-target"><option value="ALL">All RMs</option></select>
+                <select id="offer-target" onchange="onOfferTargetChange()">
+                  <option value="ALL">All RMs</option>
+                  <option value="seg-equity">Equity Team</option>
+                  <option value="seg-mf">Mutual Fund Team</option>
+                  <option value="users">Specific RM(s)</option>
+                </select>
               </div>
+            </div>
+            <div class="form-field" id="offer-users-wrap" style="display:none;margin-top:10px">
+              <label>Select RM(s)</label>
+              <div id="offer-users-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px"></div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
               <div class="form-field" style="flex:1;min-width:140px"><label>Valid From</label><input type="date" id="offer-from"></div>
@@ -8477,12 +8486,20 @@ const OFFER_THEMES = {
 };
 
 function populateOfferTarget(){
-  const sel=document.getElementById('offer-target');
-  if(!sel) return;
-  const cur=sel.value;
-  const rms=[...new Set([...getSegRMs('equity'),...getSegRMs('mf')])].sort();
-  sel.innerHTML='<option value="ALL">All RMs</option>'+rms.map(r=>`<option value="${r}">${r}</option>`).join('');
-  if(cur) sel.value=cur;
+  const listEl=document.getElementById('offer-users-list');
+  if(!listEl) return;
+  const prev={};
+  listEl.querySelectorAll('.offer-user-chk').forEach(c=>{ prev[c.value]=c.checked; });
+  const users=(DB.get('users')||[]).filter(u=>u.active!==false && u.role!=='admin');
+  listEl.innerHTML = users.map(u=>`
+    <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;font-weight:400;text-transform:none;letter-spacing:0">
+      <input type="checkbox" class="offer-user-chk" value="${u.username}" ${prev[u.username]?'checked':''}> ${u.name}
+    </label>`).join('');
+}
+
+function onOfferTargetChange(){
+  const v=document.getElementById('offer-target').value;
+  document.getElementById('offer-users-wrap').style.display = (v==='users')?'':'none';
 }
 
 function saveSpecialOffer(){
@@ -8490,7 +8507,15 @@ function saveSpecialOffer(){
   const title=(document.getElementById('offer-title').value||'').trim();
   const msg=(document.getElementById('offer-msg').value||'').trim();
   const theme=document.getElementById('offer-theme').value||'festival';
-  const target=document.getElementById('offer-target').value||'ALL';
+  const targetVal=document.getElementById('offer-target').value||'ALL';
+  let target={type:'all'};
+  if(targetVal==='seg-equity') target={type:'segment', segment:'equity'};
+  else if(targetVal==='seg-mf') target={type:'segment', segment:'mf'};
+  else if(targetVal==='users'){
+    const usernames=Array.from(document.querySelectorAll('.offer-user-chk:checked')).map(c=>c.value);
+    if(!usernames.length){ toast('Kam se kam ek RM select karein','error'); return; }
+    target={type:'users', usernames};
+  }
   const from=document.getElementById('offer-from').value||today();
   const to=document.getElementById('offer-to').value||'';
   if(!title){ toast('Offer title likhein','error'); return; }
@@ -8527,6 +8552,31 @@ function offerIsLive(o){
   return true;
 }
 
+// Target check — same style as announcements. Also supports legacy string
+// targets ('ALL' or an RM name) from older offers.
+function offerAppliesToMe(o){
+  const t=o.target;
+  if(!t || t==='ALL') return true;
+  if(typeof t==='string') return t===CU.name;
+  if(t.type==='all') return true;
+  if(t.type==='segment') return (CU.segments||[]).includes(t.segment);
+  if(t.type==='users') return (t.usernames||[]).includes(CU.username);
+  return true;
+}
+
+function offerTargetLabel(o){
+  const t=o.target;
+  if(!t || t==='ALL') return 'All RMs';
+  if(typeof t==='string') return t;
+  if(t.type==='all') return 'All RMs';
+  if(t.type==='segment') return t.segment==='equity'?'Equity Team':'Mutual Fund Team';
+  if(t.type==='users'){
+    const users=DB.get('users')||[];
+    return (t.usernames||[]).map(un=>{const u=users.find(x=>x.username===un); return u?u.name:un;}).join(', ')||'—';
+  }
+  return 'All RMs';
+}
+
 function renderOffersAdmin(){
   const box=document.getElementById('offers-admin-list');
   if(!box) return;
@@ -8544,7 +8594,7 @@ function renderOffersAdmin(){
         <div style="flex:1;min-width:0">
           <div style="font-size:.85rem;font-weight:600">${o.title} ${badge}</div>
           <div style="font-size:.74rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.msg}</div>
-          <div style="font-size:.68rem;color:var(--text3)">🎯 ${o.target==='ALL'?'All RMs':o.target} · 📅 ${o.from||'—'} → ${o.to||'no end'}</div>
+          <div style="font-size:.68rem;color:var(--text3)">🎯 ${offerTargetLabel(o)} · 📅 ${o.from||'—'} → ${o.to||'no end'}</div>
         </div>
         <button class="btn btn-sm" onclick="toggleOffer('${o.id}')">${o.active?'Pause':'Resume'}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteOffer('${o.id}')">Delete</button>
@@ -8556,7 +8606,7 @@ function renderOffersAdmin(){
 let offerPopupShownIds=null;
 function showOfferPopupIfAny(force){
   if(!CU || CU.role==='admin') return; // popup sirf RMs ke liye
-  const live=getSpecialOffers().filter(o=>offerIsLive(o) && (o.target==='ALL'||o.target===CU.name));
+  const live=getSpecialOffers().filter(o=>offerIsLive(o) && offerAppliesToMe(o));
   if(!live.length) return;
   const ids=live.map(o=>o.id).join(',');
   if(!force && offerPopupShownIds===ids) return;
