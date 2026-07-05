@@ -793,7 +793,7 @@ input:checked + #crm-toggle-slider:before, input:checked + #hr-toggle-slider:bef
           <div class="tbl-wrap"><div id="crm-sales-table"></div></div>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
-          <div class="card-title">Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></div>
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
@@ -4056,6 +4056,86 @@ function monthsInRange(from, to){
     m++; if(m>12){m=1;y++;}
   }
   return months;
+}
+
+// ─── Team incentive → colourful Excel report (admin) ────────────────────────
+function downloadTeamIncentiveReport(){
+  if(!isAdmin){ alert('Only admin can download the team incentive report.'); return; }
+  const month=viewIncMonth();
+  const mLabel=new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const payments=getPaymentsForMonth(month);
+  const rates=getIncRates();
+
+  const balColor=v=>{ const n=Number(String(v).replace(/[₹,\s]/g,''))||0; return n>0?{bg:'FFFFC7CE',font:'FF9C0006'}:{bg:'FFC6EFCE',font:'FF006100'}; };
+  const posGreen=v=>{ const n=Number(String(v).replace(/[₹,\s]/g,''))||0; return n>0?{bg:'FFC6EFCE',font:'FF006100'}:null; };
+
+  const cols=[
+    {header:'EMPLOYEE', width:16},
+    {header:'INC.SALARY\n(Salary + Perf.)', width:15, money:true},
+    {header:'BROKERAGE', width:13, money:true},
+    {header:'TIER 1 INC.\n(@ '+(rates.tier1Rate||5)+'%)', width:12, money:true, color:posGreen},
+    {header:'TIER 2 EXTRA\n(@ '+(rates.tier2Rate||7)+'%)', width:13, money:true, color:posGreen},
+    {header:'DEMAT', width:8, num:true, align:'center'},
+    {header:'DEMAT INC.', width:11, money:true},
+    {header:'MF SALE', width:12, money:true},
+    {header:'MF INC.', width:10, money:true},
+    {header:'NET SALES', width:12, money:true},
+    {header:'NET SALES INC.', width:13, money:true},
+    {header:'SIP', width:10, money:true},
+    {header:'SIP INC.', width:10, money:true},
+    {header:'BRO.CL.BONUS', width:13, money:true, color:posGreen},
+    {header:'PERF. INC.\n(attendance-adj ÷26)', width:15, money:true, color:posGreen},
+    {header:'OTHER', width:10, money:true},
+    {header:'TOTAL INCENTIVE', width:15, money:true, color:posGreen},
+    {header:'PAID', width:11, money:true},
+    {header:'BALANCE', width:12, money:true, color:balColor}
+  ];
+
+  const T={incSal:0,brok:0,t1:0,t2:0,demat:0,dInc:0,mf:0,mfInc:0,ns:0,nsInc:0,sip:0,sipInc:0,broCl:0,perf:0,other:0,total:0,paid:0,bal:0};
+  const rows=EMPLOYEES.map(e=>{
+    const sal=getEmpSalary(e.name), perf=getPerfIncentive(e.name);
+    const tt=totalIncentive(e.name,sal,month);
+    const paid=(payments[e.name]&&payments[e.name].incPaid)||0;
+    const bal=Math.max(0, tt.total-paid);
+    T.incSal+=(sal+perf); T.brok+=tt.brok; T.t1+=tt.br.base5; T.t2+=tt.br.extra2;
+    T.demat+=tt.demat; T.dInc+=tt.dematInc; T.mf+=tt.mf; T.mfInc+=tt.mfInc;
+    T.ns+=tt.netSales; T.nsInc+=(tt.netSalesInc||0); T.sip+=tt.sip; T.sipInc+=tt.sipInc;
+    T.broCl+=tt.broClientInc; T.perf+=tt.perfPay; T.other+=tt.other; T.total+=tt.total; T.paid+=paid; T.bal+=bal;
+    return [e.name, sal+perf, tt.brok, tt.br.base5, tt.br.extra2, tt.demat, tt.dematInc,
+            tt.mf, tt.mfInc, tt.netSales, tt.netSalesInc||0, tt.sip, tt.sipInc,
+            tt.broClientInc, tt.perfPay, tt.other, tt.total, paid, bal];
+  });
+  const totalRow=['TOTAL',T.incSal,T.brok,T.t1,T.t2,T.demat,T.dInc,T.mf,T.mfInc,T.ns,T.nsInc,T.sip,T.sipInc,T.broCl,T.perf,T.other,T.total,T.paid,T.bal];
+
+  // Summary sheet
+  const summaryRows=[
+    ['Month', mLabel],
+    ['Employees', EMPLOYEES.length],
+    ['Total Brokerage', T.brok],
+    ['Tier 1 Incentive', T.t1],
+    ['Tier 2 Extra Incentive', T.t2],
+    ['Demat Accounts / Incentive', T.demat+' / ₹'+Math.round(T.dInc)],
+    ['MF Sale / Incentive', '₹'+T.mf.toLocaleString('en-IN')+' / ₹'+Math.round(T.mfInc)],
+    ['Net Sales / Incentive', '₹'+T.ns.toLocaleString('en-IN')+' / ₹'+Math.round(T.nsInc)],
+    ['SIP / Incentive', '₹'+T.sip.toLocaleString('en-IN')+' / ₹'+Math.round(T.sipInc)],
+    ['Brokerage Client Bonus', T.broCl],
+    ['Performance Incentive (attendance-adj)', T.perf],
+    ['Other / Special', T.other],
+    ['TOTAL INCENTIVE', T.total],
+    ['Paid', T.paid],
+    ['Balance Payable', T.bal]
+  ];
+
+  dnXlsxBook('DN_Team_Incentive_'+month+'.xlsx', [
+    { name:'Team Incentive',
+      title:'D N Investment — Team Incentive Report · '+mLabel,
+      columns:cols, rows, totalRow },
+    { name:'Summary',
+      title:'Team Incentive Summary · '+mLabel,
+      columns:[ {header:'METRIC', width:36}, {header:'VALUE', width:24, align:'right',
+        color:(v,row)=>{ const m=String(row[0]||''); if(/Balance/.test(m)) return balColor(v); if(/TOTAL INCENTIVE|Paid/.test(m)) return posGreen(v); return null; } } ],
+      rows:summaryRows }
+  ]);
 }
 
 function getMonthIncentiveInfo(name, month){
