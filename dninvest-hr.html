@@ -1311,6 +1311,21 @@ async function setPerfIncentive(name,val){
 function getIncentiveSalary(name){
   return (Number(getEmpSalary(name))||0) + (Number(getPerfIncentive(name))||0);
 }
+// Performance Incentive PAYOUT — paid every month under "Other incentives" in the
+// incentive sheet, prorated by attendance with the same ÷26 logic as salary:
+// Absent day = 1 full per-day cut (perf/26), Half day = half per-day cut.
+function perfIncentivePayout(name, month){
+  const perf=Number(getPerfIncentive(name))||0;
+  if(!perf) return {perf:0, pay:0, absent:0, half:0, cut:0};
+  const att=getAtt();
+  const recs=(att[name]||[]).filter(r=>!month || r.date.startsWith(month));
+  const absent=recs.filter(r=>r.status==='Absent').length;
+  const half=recs.filter(r=>r.status==='Half day').length;
+  const perDay=perf/26;
+  const cut=Math.round(perDay*absent + (perDay/2)*half);
+  const pay=Math.max(0, perf-cut);
+  return {perf, pay, absent, half, cut};
+}
 function getMfSip(){ return DB.get('mfsip', {}) || {}; }
 async function saveMfSip(d){ await DB.set('mfsip', d); }
 
@@ -3863,9 +3878,10 @@ function totalIncentive(name, salary, month){
   const netSales = Number(mfsip.netSales)||0;
   const netSalesInc = netSales*(rates.netSalesRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
-  const total = br.total + dematInc + mfInc + netSalesInc + sipInc + other + broClientInc;
+  const pp=perfIncentivePayout(name, month);
+  const total = br.total + dematInc + mfInc + netSalesInc + sipInc + other + broClientInc + pp.pay;
 
-  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, total, tier2Eligible: br.tier2Eligible};
+  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -3929,6 +3945,7 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">MF Sale incentive</td><td style="text-align:right">${fmt(t.mfInc)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">MF Net Sales incentive</td><td style="text-align:right">${fmt(t.netSalesInc||0)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">SIP incentive</td><td style="text-align:right">${fmt(t.sipInc)}</td></tr>
+        ${t.perfBase>0?`<tr><td style="color:var(--text2);padding:4px 0">Performance Incentive <span style="color:var(--text3);font-size:11px">(${fmt(t.perfBase)}${t.perfCut>0?' − '+fmt(t.perfCut)+' attendance cut ÷26':''})</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.perfPay)}</td></tr>`:''}
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
         ${t.broClientRows&&t.broClientRows.length>0?'<tr><td colspan="2" style="padding:4px 0"><button onclick="showBroClientDetail(\''+currentUser+'\',\''+selMonth+'\')" style="font-size:11.5px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer">📋 Client-wise brokerage detail ('+t.broClientTotal+' clients, '+t.broClientCount+' eligible)</button></td></tr>':''}
@@ -3958,7 +3975,7 @@ function renderIncentivePage(){
         // accumulate column totals
         T.incSal+=(sal+perf); T.brok+=tt.brok; T.tier1+=tt.br.base5; T.tier2+=tt.br.extra2;
         T.demat+=tt.demat; T.mf+=tt.mf; T.netSales=(T.netSales||0)+tt.netSales; T.sip+=tt.sip; T.broCl+=tt.broClientInc;
-        T.other+=tt.other; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
+        T.other+=(tt.other+tt.perfPay); T.total+=tt.total; T.paid+=paid; T.balance+=balance;
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
           <td title="Salary ${fmt(sal)}${perf>0?' + Perf. Inc. '+fmt(perf):''}">${fmt(sal+perf)}${perf>0?'<br><small style="font-weight:400;color:var(--text3)">('+fmt(sal)+'+'+fmt(perf)+')</small>':''}</td>
@@ -3970,7 +3987,7 @@ function renderIncentivePage(){
           <td style="color:${tt.netSales>0?'var(--navy)':'var(--text3)'}">${tt.netSales>0?fmt(tt.netSales):'—'}</td>
           <td>${fmt(tt.sip)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
-          <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other)}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
+          <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(incl. perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
           <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
@@ -4604,7 +4621,8 @@ function calcIncentive(){
   const mfInc=mf*(rates.mfRate||0)/100;
   const netSalesInc=aum*(rates.netSalesRate||0)/100;
   const sipInc=sip*(rates.sipRate||0)/100;
-  const total=br.total+dematInc+mfInc+netSalesInc+sipInc+other;
+  const pp=perfIncentivePayout(name, currentIncMonth());
+  const total=br.total+dematInc+mfInc+netSalesInc+sipInc+other+pp.pay;
 
   const t2Elig = br.tier2Eligible;
   const t2MinDemat    = Number(rates.tier2MinDemat)||2;
@@ -4632,6 +4650,7 @@ function calcIncentive(){
       <tr><td style="color:var(--text2);padding:4px 0">MF Net Sales incentive (${rates.netSalesRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(netSalesInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">SIP incentive (${rates.sipRate||0}%)</td><td style="text-align:right;color:var(--green)">+ ${fmt(sipInc)}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 0">Other / Special${otherRemark?' ('+otherRemark+')':''}</td><td style="text-align:right;color:var(--green)">+ ${fmt(other)}</td></tr>
+      ${pp.perf>0?`<tr><td style="color:var(--text2);padding:4px 0">Performance Incentive <span style="color:var(--text3);font-size:11px">(${fmt(pp.perf)}${pp.cut>0?' − '+fmt(pp.cut)+' cut: '+pp.absent+' absent'+(pp.half?', '+pp.half+' half':'')+' ÷26':''})</span></td><td style="text-align:right;color:var(--green)">+ ${fmt(pp.pay)}</td></tr>`:''}
       <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(total)}</td></tr>
     </table>`;
 }
