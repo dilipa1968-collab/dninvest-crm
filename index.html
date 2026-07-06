@@ -661,6 +661,58 @@ input:focus, select:focus, textarea:focus{
 .page-title{position:relative;padding-left:12px}
 .page-title::before{content:'';position:absolute;left:0;top:52%;transform:translateY(-50%);width:4px;height:70%;border-radius:4px;background:linear-gradient(180deg,var(--gold),var(--gold2))}
 </style>
+<style id="mobile-boost">
+/* ═══ MOBILE BOOST — full admin control from phone. CSS-only + bottom nav ═══ */
+
+/* Bottom quick-nav (mobile only) */
+.mnav{display:none;}
+@media(max-width:800px){
+  /* 1) iOS auto-zoom fix: inputs must be ≥16px, and comfy touch height */
+  input[type=text],input[type=search],input[type=number],input[type=date],input[type=email],input[type=tel],input[type=password],select,textarea{
+    font-size:16px!important;min-height:42px;
+  }
+  textarea{min-height:80px;}
+  input[type=checkbox],input[type=radio]{width:18px;height:18px;}
+
+  /* 2) Comfortable touch targets */
+  .btn{min-height:40px;}
+  .btn-sm{min-height:34px;}
+  tbody td .btn, tbody td button{min-height:30px;min-width:30px;}
+  .nav-item{padding-top:11px;padding-bottom:11px;}
+  .hamburger-btn{padding:8px 12px;font-size:1.45rem;}
+
+  /* 3) Readable tables + smooth thumb swipe (overrides earlier .65rem) */
+  table{font-size:.74rem;}
+  thead th{font-size:.62rem;padding:7px 6px;}
+  tbody td{padding:6px 5px;}
+  .tbl-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
+
+  /* 4) Modal — safe-area padding (notch phones), scrollable body */
+  .modal-body{padding-bottom:calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch;}
+
+  /* 5) Bottom quick-nav bar */
+  .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:150;
+    background:linear-gradient(180deg,var(--navy2,#1d3160) 0%,var(--navy,#152442) 100%);
+    border-top:1px solid rgba(201,148,42,.4);
+    box-shadow:0 -4px 18px rgba(10,20,50,.35);
+    padding-bottom:env(safe-area-inset-bottom);}
+  .mnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:7px 2px 6px;color:#aebadb;font-size:.6rem;font-weight:600;cursor:pointer;
+    border:none;background:none;-webkit-tap-highlight-color:transparent;position:relative;}
+  .mnav-item .mi{font-size:1.15rem;line-height:1;}
+  .mnav-item.active{color:var(--gold,#C9942A);}
+  .mnav-item.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:3px;border-radius:0 0 4px 4px;background:var(--gold,#C9942A);}
+  .mnav-badge{position:absolute;top:3px;right:calc(50% - 20px);background:var(--red,#DC2626);color:#fff;
+    font-size:.55rem;font-weight:700;border-radius:9px;padding:0 5px;min-width:15px;text-align:center;line-height:1.5;}
+
+  /* Content & floating bars must not hide behind bottom nav */
+  .content{padding-bottom:calc(70px + env(safe-area-inset-bottom));}
+  .sidebar{padding-bottom:calc(70px + env(safe-area-inset-bottom));}
+  .bulk-bar{bottom:calc(64px + env(safe-area-inset-bottom))!important;}
+  .tbl-scroll{max-height:calc(100vh - 255px);}
+}
+@media print{.mnav{display:none!important;}}
+</style>
 </head>
 <body>
 
@@ -730,6 +782,15 @@ input:focus, select:focus, textarea:focus{
   </div>
 
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <!-- MOBILE BOTTOM QUICK-NAV (visible only ≤800px) -->
+  <nav class="mnav" id="mnav">
+    <button class="mnav-item active" id="mnav-dashboard" onclick="showPage('dashboard')"><span class="mi">🏠</span>Home</button>
+    <button class="mnav-item" id="mnav-eq" onclick="showPage('eq-clients')"><span class="mi">📈</span>Equity</button>
+    <button class="mnav-item" id="mnav-fu" onclick="showPage('eq-followup')"><span class="mi">📞</span>Follow-up<span class="mnav-badge" id="mnav-fu-badge" style="display:none">0</span></button>
+    <button class="mnav-item" id="mnav-mf" onclick="showPage('mf-clients')"><span class="mi">🏦</span>MF</button>
+    <button class="mnav-item" id="mnav-menu" onclick="toggleSidebar()"><span class="mi">☰</span>Menu</button>
+  </nav>
 
   <div class="app-body">
     <!-- SIDEBAR -->
@@ -3259,6 +3320,7 @@ function showPage(id){
   document.getElementById('page-'+id).classList.add('active');
   const ni=document.getElementById('nav-'+id);
   if(ni) ni.classList.add('active');
+  updateMobileNav(id);
 
   if(id==='eq-clients') renderEqTable();
   else if(id==='mf-clients') renderMfTable();
@@ -3287,6 +3349,19 @@ function showPage(id){
 function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+// Mobile bottom-nav active state — maps current page to the right tab
+function updateMobileNav(id){
+  const map={
+    'dashboard':'mnav-dashboard',
+    'eq-clients':'mnav-eq','eq-notrade':'mnav-eq','eq-nocall':'mnav-eq','eq-demat':'mnav-eq',
+    'eq-followup':'mnav-fu','mf-followup':'mnav-fu',
+    'mf-clients':'mnav-mf','mf-sip':'mnav-mf','mf-nocall':'mnav-mf','mf-txns':'mnav-mf'
+  };
+  document.querySelectorAll('.mnav-item').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById(map[id]||'');
+  if(el) el.classList.add('active');
 }
 function toggleDashCard(id){
   const el=document.getElementById(id);
@@ -3543,6 +3618,9 @@ function updateBadges(){
   const mff=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
   document.getElementById('nb-eqf').textContent=eqf;
   document.getElementById('nb-mff').textContent=mff;
+  // Mobile bottom-nav follow-up badge (Equity + MF due today combined)
+  const mnb=document.getElementById('mnav-fu-badge');
+  if(mnb){ const t=eqf+mff; mnb.textContent=t>99?'99+':t; mnb.style.display=t>0?'':'none'; }
   document.getElementById('nb-eqnt').textContent=activeEq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
   document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
   document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
