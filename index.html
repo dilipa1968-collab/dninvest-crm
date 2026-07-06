@@ -1582,6 +1582,25 @@ input:focus, select:focus, textarea:focus{
           </div>
         </div>
 
+        <!-- History: every announcement & offer sent (admin) -->
+        <div style="max-width:700px;margin:0 auto">
+          <div class="ann-card" id="comm-history-card" style="display:none">
+            <h3>📜 History — Announcements &amp; Offers</h3>
+            <p style="font-size:.78rem;color:var(--text3);margin:4px 0 10px">A permanent record of every announcement and offer sent to RMs. Deleting an offer above does not remove it from here — select entries below and use Delete Selected to remove them from history.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+              <select id="ch-kind" onchange="renderCommHistory()" style="min-width:150px">
+                <option value="">All Types</option>
+                <option value="announcement">📢 Announcements</option>
+                <option value="offer">🎁 Offers / Contests</option>
+              </select>
+              <input type="text" id="ch-search" placeholder="Search text / RM..." oninput="renderCommHistory()" style="flex:1;min-width:160px">
+              <button class="btn btn-outline" onclick="exportCommHistory()">⬇️ Excel</button>
+              <button class="btn btn-danger" id="ch-del-btn" onclick="deleteSelectedHistory()" style="display:none">🗑 Delete Selected (<span id="ch-del-count">0</span>)</button>
+            </div>
+            <div id="comm-history-list"></div>
+          </div>
+        </div>
+
         <!-- RM Messages Inbox -->
         <div style="max-width:700px;margin:0 auto">
           <div class="ann-card" id="admin-inbox-card" style="display:none">
@@ -2398,7 +2417,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -2938,6 +2957,18 @@ function initApp(){
         }
       });
 
+      // Real-time listener for comm_history (📜 announcement/offer history)
+      fdb.collection('crm_data').doc('comm_history').onSnapshot(doc=>{
+        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+          const newData = doc.data().data;
+          const existing = DB.get('comm_history');
+          if(JSON.stringify(newData) !== JSON.stringify(existing)){
+            DB.setLocal('comm_history', newData);
+            if(CU && CU.role==='admin' && getCurrentPageId()==='announcements'){ try{ renderCommHistory(); }catch(e){} }
+          }
+        }
+      });
+
       // Real-time listener for rm_messages (two-way messaging)
       fdb.collection('crm_data').doc('rm_messages').onSnapshot(doc=>{
         if(doc.exists && doc.data() && doc.data().data){
@@ -3245,7 +3276,7 @@ function showPage(id){
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
   else if(id==='admin') renderAdmin();
-  else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); populateOfferTarget(); renderOffersAdmin(); const of=document.getElementById('offer-from'); if(of && !of.value) of.value=today(); }
+  else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); populateOfferTarget(); renderOffersAdmin(); renderCommHistory(); const of=document.getElementById('offer-from'); if(of && !of.value) of.value=today(); }
   else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
   else if(id==='other-products') renderOpPage();
@@ -8414,6 +8445,13 @@ function sendAnnouncement(){
     target
   };
   DB.set('announcement', ann);
+  // Permanent history record (image not stored in history — Firestore doc size safety)
+  addCommHistory({
+    id:'H'+Date.now()+Math.random().toString(36).slice(2,6),
+    kind:'announcement', refId:ann.id,
+    title:'', text:ann.text||'', hasImage:!!ann.image,
+    target:tgtLabel, by:CU.name, date:ann.date
+  });
   toast('Announcement sent to: '+tgtLabel,'success');
   // Browser notification for admin preview (self-test)
   sendBrowserNotif('📢 DN Investment', ann.text ? ann.text.substring(0,80) : 'New Announcement');
@@ -8605,13 +8643,28 @@ function saveSpecialOffer(){
     const o=list.find(x=>x.id===editingOfferId);
     if(o){ Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name}); }
     saveSpecialOffersList(list);
+    // Keep the history record in sync with the edited offer
+    if(o){
+      const hl=getCommHistory();
+      const h=hl.find(x=>x.kind==='offer' && x.refId===o.id);
+      if(h){ Object.assign(h,{title:o.title,text:o.msg,theme:o.theme,from:o.from,to:o.to,target:offerTargetLabel(o),edited:new Date().toISOString()}); saveCommHistory(hl); }
+      else addCommHistory({id:'H'+Date.now()+Math.random().toString(36).slice(2,6),kind:'offer',refId:o.id,title:o.title,text:o.msg,theme:o.theme,from:o.from,to:o.to,target:offerTargetLabel(o),by:CU.name,date:o.created||new Date().toISOString(),edited:new Date().toISOString()});
+    }
     cancelOfferEdit();
     renderOffersAdmin();
     toast('💾 Offer updated! RMs will see the new version');
     return;
   }
-  list.push({id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name});
+  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name};
+  list.push(newOffer);
   saveSpecialOffersList(list);
+  // Permanent history record
+  addCommHistory({
+    id:'H'+Date.now()+Math.random().toString(36).slice(2,6),
+    kind:'offer', refId:newOffer.id,
+    title, text:msg, theme, from, to,
+    target:offerTargetLabel(newOffer), by:CU.name, date:newOffer.created
+  });
   document.getElementById('offer-title').value='';
   document.getElementById('offer-msg').value='';
   renderOffersAdmin();
@@ -8669,10 +8722,15 @@ function toggleOffer(id){
 }
 
 function deleteOffer(id){
-  if(!confirm('Delete this offer?')) return;
+  if(!confirm('Delete this offer?\n\n(Its record will remain safely in 📜 History below.)')) return;
   saveSpecialOffersList(getSpecialOffers().filter(x=>x.id!==id));
+  // Mark the history record as deleted (record stays in history)
+  const hl=getCommHistory();
+  const h=hl.find(x=>x.kind==='offer' && x.refId===id);
+  if(h){ h.deletedOn=new Date().toISOString(); h.deletedBy=CU.name; saveCommHistory(hl); }
   if(editingOfferId===id) cancelOfferEdit();
   renderOffersAdmin();
+  renderCommHistory();
 }
 
 function offerIsLive(o){
@@ -8737,6 +8795,126 @@ function renderOffersAdmin(){
         </div>
       </div>`;
     }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// COMMUNICATION HISTORY (📜) — permanent record of every announcement
+// & offer sent to RMs. Stored in crm_data/comm_history (admin-written).
+// Images are NOT stored here (Firestore 1MB doc limit) — only a 📷 flag.
+// ══════════════════════════════════════════════════════════════════
+function getCommHistory(){ return DB.get('comm_history')||[]; }
+function saveCommHistory(list){
+  list.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  DB.set('comm_history', list.slice(0,400)); // keep newest 400
+}
+function addCommHistory(entry){
+  const l=getCommHistory(); l.push(entry); saveCommHistory(l);
+  renderCommHistory();
+}
+
+function chEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function chFiltered(){
+  const kindF=(document.getElementById('ch-kind')||{value:''}).value;
+  const q=((document.getElementById('ch-search')||{value:''}).value||'').toLowerCase().trim();
+  let list=getCommHistory();
+  if(kindF) list=list.filter(h=>h.kind===kindF);
+  if(q) list=list.filter(h=>((h.title||'')+' '+(h.text||'')+' '+(h.target||'')+' '+(h.by||'')).toLowerCase().includes(q));
+  return list;
+}
+
+function renderCommHistory(){
+  const card=document.getElementById('comm-history-card');
+  if(!card) return;
+  if(!CU || CU.role!=='admin'){ card.style.display='none'; return; }
+  card.style.display='';
+  const box=document.getElementById('comm-history-list');
+  if(!box) return;
+  const list=chFiltered();
+  if(!list.length){
+    box.innerHTML='<p style="font-size:.78rem;color:var(--text3)">No history yet. New announcements and offers will be recorded here automatically.</p>';
+    updateChDelBtn();
+    return;
+  }
+  const rows=list.map(h=>{
+    const isOffer=h.kind==='offer';
+    const th=isOffer ? (OFFER_THEMES[h.theme]||OFFER_THEMES.festival) : null;
+    const icon=isOffer ? (th?th.emoji:'🎁') : '📢';
+    const kindBadge=isOffer
+      ? '<span style="background:#f3e8ff;color:#6d28d9;padding:1px 7px;border-radius:8px;font-size:.64rem;font-weight:700">OFFER</span>'
+      : '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:8px;font-size:.64rem;font-weight:700">ANNOUNCEMENT</span>';
+    const when=h.date ? new Date(h.date).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const extra=[];
+    if(h.hasImage) extra.push('📷 Image');
+    if(isOffer && (h.from||h.to)) extra.push('📅 '+(h.from||'—')+' → '+(h.to||'no end'));
+    if(h.edited) extra.push('✏️ Edited '+new Date(h.edited).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}));
+    if(h.deletedOn) extra.push('<span style="color:#DC2626;font-weight:600">🗑 Offer deleted '+new Date(h.deletedOn).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+'</span>');
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--border,#e3e8ef);border-radius:10px;margin-bottom:6px${h.deletedOn?';opacity:.75':''}">
+      <input type="checkbox" class="ch-chk" value="${chEsc(h.id)}" onchange="updateChDelBtn()" style="margin-top:4px;width:16px;height:16px;cursor:pointer">
+      <span style="font-size:18px">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600">${kindBadge} ${chEsc(h.title||(h.text?h.text.slice(0,60):'')||'—')}</div>
+        ${h.title && h.text ? '<div style="font-size:.74rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+chEsc(h.text)+'">'+chEsc(h.text)+'</div>' : ''}
+        <div style="font-size:.68rem;color:var(--text3);margin-top:2px">🎯 ${chEsc(h.target||'All RMs')} · 🕐 ${when} · by ${chEsc(h.by||'Admin')}${extra.length?' · '+extra.join(' · '):''}</div>
+      </div>
+    </div>`;
+  }).join('');
+  box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--text2);cursor:pointer;font-weight:600">
+        <input type="checkbox" id="ch-all" onchange="document.querySelectorAll('.ch-chk').forEach(c=>c.checked=this.checked);updateChDelBtn()" style="width:15px;height:15px;cursor:pointer"> Select All
+      </label>
+      <span style="font-size:.72rem;color:var(--text3)">${list.length} record(s)</span>
+    </div>`+rows;
+  updateChDelBtn();
+}
+
+function updateChDelBtn(){
+  const n=document.querySelectorAll('.ch-chk:checked').length;
+  const btn=document.getElementById('ch-del-btn');
+  const cnt=document.getElementById('ch-del-count');
+  if(cnt) cnt.textContent=n;
+  if(btn) btn.style.display = n>0 ? '' : 'none';
+}
+
+function deleteSelectedHistory(){
+  if(!CU || CU.role!=='admin'){ toast('Admin only','error'); return; }
+  const ids=Array.from(document.querySelectorAll('.ch-chk:checked')).map(c=>c.value);
+  if(!ids.length){ toast('Select at least one record','error'); return; }
+  if(!confirm(ids.length+' history record(s) will be PERMANENTLY deleted from history.\n\nThis cannot be undone. Continue?')) return;
+  const idSet=new Set(ids);
+  saveCommHistory(getCommHistory().filter(h=>!idSet.has(h.id)));
+  renderCommHistory();
+  toast('🗑 '+ids.length+' history record(s) deleted','success');
+}
+
+function exportCommHistory(){
+  const list=chFiltered();
+  if(!list.length){ toast('No history to export','error'); return; }
+  const kindColor=v=>{ v=String(v||'').toLowerCase();
+    if(v==='offer') return {bg:'FFE9D5FF',font:'FF6D28D9'};
+    if(v==='announcement') return {bg:'FFDBEAFE',font:'FF1D4ED8'};
+    return null; };
+  const rows=list.map(h=>[
+    h.date?new Date(h.date).toLocaleString('en-IN'):'—',
+    h.kind==='offer'?'Offer':'Announcement',
+    h.title||'—',
+    h.text||'—',
+    h.target||'All RMs',
+    h.kind==='offer'?(h.theme||'—'):'—',
+    h.from||'—', h.to||'—',
+    h.by||'Admin',
+    h.deletedOn?('Deleted '+new Date(h.deletedOn).toLocaleDateString('en-IN')):(h.edited?'Edited':'Active/Sent'),
+    h.hasImage?'Yes':'—'
+  ]);
+  const cols=[
+    {header:'Date & Time',width:20},{header:'Type',width:14,align:'center',color:kindColor},
+    {header:'Title',width:28},{header:'Message',width:45},{header:'Target',width:20},
+    {header:'Theme',width:12,align:'center'},{header:'Valid From',width:12,align:'center'},
+    {header:'Valid To',width:12,align:'center'},{header:'By',width:12},
+    {header:'Status',width:16,align:'center'},{header:'Image',width:8,align:'center'}
+  ];
+  dnXlsx(`Announcement_Offer_History_${new Date().toISOString().slice(0,10)}.xlsx`, '📜 Announcements & Offers History — '+new Date().toLocaleDateString('en-IN'), cols, rows);
+  toast('Export done!','success');
 }
 
 // ── Festive popup for RMs — shows on every login/refresh while offer is live ──
