@@ -973,6 +973,7 @@ input:focus, select:focus, textarea:focus{
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterEq()" id="eq-rm"><option value="">All RMs</option></select>
           <select onchange="filterEq()" id="eq-followup-filter"><option value="">All Follow-ups</option>
+            <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
@@ -1063,6 +1064,7 @@ input:focus, select:focus, textarea:focus{
             <option>Investor</option><option>Prospect</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterMf()" id="mf-rm"><option value="">All RMs</option></select>
           <select onchange="filterMf()" id="mf-followup-filter"><option value="">All Follow-ups</option>
+            <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
@@ -3776,7 +3778,8 @@ function renderEqTable(){
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
-  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
+  if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
+  if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(ltFrom||ltTo) data=data.filter(c=>{
@@ -3913,7 +3916,8 @@ function renderMfTable(){
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
-  if(fu&&!['pending','today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
+  if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
+  if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
   if(lbFrom||lbTo) data=data.filter(c=>{
