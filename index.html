@@ -10634,6 +10634,24 @@ const CF = (function(){
   };
 })();
 
+// Short colored segment badge for Activity Log (Equity / MF / Lead / Other Products etc.)
+function alSegInfo(seg){
+  const s=String(seg||'').trim().toLowerCase();
+  if(s==='equity'||s==='eq')   return {label:'EQ',   full:'Equity',        bg:'#dbeafe', color:'#1e40af'};
+  if(s==='mf')                 return {label:'MF',   full:'Mutual Fund',   bg:'#d1fae5', color:'#065f46'};
+  if(s==='lead'||s==='leads')  return {label:'LEAD', full:'Lead',          bg:'#ede9fe', color:'#6d28d9'};
+  if(s==='mftxn')              return {label:'MF-TXN',full:'MF Transaction',bg:'#ccfbf1', color:'#0f766e'};
+  if(s==='demat')              return {label:'DEMAT',full:'Demat',         bg:'#fee2e2', color:'#991b1b'};
+  if(s==='sip')                return {label:'SIP',  full:'SIP',           bg:'#cffafe', color:'#155e75'};
+  if(s==='other'||s==='op'||s==='other_products') return {label:'OP', full:'Other Products', bg:'#fce7f3', color:'#9d174d'};
+  if(!s)                       return {label:'—',    full:'—',             bg:'#f1f5f9', color:'#64748b'};
+  return {label:s.toUpperCase().slice(0,8), full:seg, bg:'#fef9c3', color:'#854d0e'};
+}
+function alSegBadge(seg){
+  const i=alSegInfo(seg);
+  return `<span title="${i.full}" style="background:${i.bg};color:${i.color};padding:1px 6px;border-radius:8px;font-size:.68rem;font-weight:800;letter-spacing:.3px;white-space:nowrap">${i.label}</span>`;
+}
+
 function renderActivityLog(){
   const isAdmin = CU && CU.role==='admin';
   const seg = (document.getElementById('al-seg')||{value:''}).value;
@@ -10694,7 +10712,7 @@ function renderActivityLog(){
   }
 
   // Apply filters
-  if(seg) all=all.filter(l=>l.seg===seg);
+  if(seg) all=all.filter(l=>alSegInfo(l.seg).label===alSegInfo(seg).label);
   if(rmF) all=all.filter(l=>normRm(l.rm)===rmF);
   if(typeF) all=all.filter(l=>l.type===typeF);
   if(byF) all=all.filter(l=>l.by===byF);
@@ -10719,7 +10737,7 @@ function renderActivityLog(){
 
   // ── COMPACT VIEW ──
   if(alViewMode==='compact'){
-    let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>RM</th><th>By</th><th>Summary</th></tr></thead><tbody>';
+    let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>Seg</th><th>RM</th><th>By</th><th>Summary</th></tr></thead><tbody>';
     all.forEach(l=>{
       const dt = alWhen(l,false);
       const typeBadge=`<span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:1px 6px;border-radius:8px;font-size:.72rem;font-weight:700">${typeLabel[l.type]||l.type}</span>`;
@@ -10735,6 +10753,7 @@ function renderActivityLog(){
         <td style="white-space:nowrap;color:var(--gray)">${dt}</td>
         <td>${typeBadge}</td>
         <td style="font-weight:600">${l.client_name||'—'}</td>
+        <td>${alSegBadge(l.seg)}</td>
         <td>${l.rm||'—'}</td>
         <td>${l.by||'—'}</td>
         <td style="color:var(--gray);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${summary}">${summary}</td>
@@ -10766,7 +10785,7 @@ function renderActivityLog(){
       <td style="font-size:.8rem;white-space:nowrap">${dt}</td>
       <td><span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:700">${typeLabel[l.type]||l.type}</span></td>
       <td style="font-weight:600">${l.client_name||'—'}</td>
-      <td style="font-size:.8rem">${l.seg==='equity'?'📈 Equity':l.seg==='lead'?'👤 Lead':'🏦 MF'}</td>
+      <td>${alSegBadge(l.seg)}</td>
       <td style="font-size:.8rem">${l.rm||'—'}</td>
       <td style="font-size:.8rem">${l.by||'—'}</td>
       <td>${detail}</td>
@@ -10791,12 +10810,12 @@ function exportActivityLog(){
   all.forEach(l=>{
     const dt=alWhen(l,true);
     if(l.type==='call'){
-      rows.push([dt,'Call Log',l.client_name,l.seg,l.rm,l.by,'—','—','—',`Status: ${l.call_status}${l.next_call?' | Next: '+l.next_call:''} ${l.remarks}`]);
+      rows.push([dt,'Call Log',l.client_name,alSegInfo(l.seg).label,l.rm,l.by,'—','—','—',`Status: ${l.call_status}${l.next_call?' | Next: '+l.next_call:''} ${l.remarks}`]);
     } else if(!l.changes||!l.changes.length){
-      rows.push([dt,l.type==='add'?'New Client':'Edited',l.client_name,l.seg,l.rm,l.by,'—','—','—','']);
+      rows.push([dt,l.type==='add'?'New Client':'Edited',l.client_name,alSegInfo(l.seg).label,l.rm,l.by,'—','—','—','']);
     } else {
       l.changes.forEach((ch,i)=>{
-        rows.push([i===0?dt:'',i===0?'Edited':'',i===0?l.client_name:'',i===0?l.seg:'',i===0?l.rm:'',i===0?l.by:'',ch.field,ch.old,ch.new,'']);
+        rows.push([i===0?dt:'',i===0?'Edited':'',i===0?l.client_name:'',i===0?alSegInfo(l.seg).label:'',i===0?l.rm:'',i===0?l.by:'',ch.field,ch.old,ch.new,'']);
       });
     }
   });
