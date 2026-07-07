@@ -314,38 +314,16 @@ tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
 tbody td{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
-/* ── Equity table compact fit: squeeze 15 cols into one screen (no h-scroll) ── */
+/* ── Equity table: fit ALL columns on screen (no horizontal scroll) ──
+   Widths come from a <colgroup> built in renderEqTable (role-aware, so admin's
+   checkbox column doesn't shift things). table-layout:fixed + wrapping lets the
+   browser share 100% width across columns — widen one, others shrink, none leave
+   the screen. */
 #eq-table table{font-size:.6rem;table-layout:fixed;width:100%;}
-#eq-table thead th{padding:6px 3px;font-size:.6rem;}
-#eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;}
+#eq-table thead th{padding:6px 3px;font-size:.6rem;white-space:normal;word-break:break-word;}
+#eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;white-space:normal;word-break:break-word;overflow:hidden;}
 #eq-table tbody td small{font-size:.52rem;}
-/* per-column widths (order: [bulk] Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call) */
-#eq-table th:nth-child(2),#eq-table td:nth-child(2){width:6%;}   /* Code */
-#eq-table th:nth-child(3),#eq-table td:nth-child(3){width:13%;} /* Name */
-#eq-table th:nth-child(4),#eq-table td:nth-child(4){width:8%;}  /* Mobile */
-#eq-table th:nth-child(5),#eq-table td:nth-child(5){width:7%;}  /* RM */
-#eq-table th:nth-child(6),#eq-table td:nth-child(6){width:8%;}  /* Risk Val */
-#eq-table th:nth-child(7),#eq-table td:nth-child(7){width:8%;}  /* Ac Bal */
-#eq-table th:nth-child(8),#eq-table td:nth-child(8){width:8%;}  /* Last Trade */
-#eq-table th:nth-child(9),#eq-table td:nth-child(9){width:7%;}  /* Last Call */
-#eq-table th:nth-child(10),#eq-table td:nth-child(10){width:7%;}/* Next Call */
-#eq-table th:nth-child(11),#eq-table td:nth-child(11){width:8%;}/* Follow-up */
-#eq-table th:nth-child(12),#eq-table td:nth-child(12){width:8%;}/* Remarks */
-#eq-table th:nth-child(13),#eq-table td:nth-child(13){width:9%;}/* Actions */
-#eq-table th:nth-child(14),#eq-table td:nth-child(14){width:6%;}/* Status */
-#eq-table th:nth-child(15),#eq-table td:nth-child(15){width:4%;}/* Call */
-#eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
-/* ── Freeze left columns (checkbox + Code) so they never scroll off-screen ── */
-#eq-table .eqfz-cb, #eq-table .eqfz-code{position:sticky;z-index:3;}
-#eq-table thead .eqfz-cb, #eq-table thead .eqfz-code{z-index:5;}
-#eq-table .eqfz-cb{left:0;}
-/* .eqfz-code left offset is set inline (0 for RM, 36px for admin who has checkbox) */
-#eq-table tbody td.eqfz-cb, #eq-table tbody td.eqfz-code{background:#fff;}
-#eq-table tbody tr:nth-child(even) td.eqfz-cb, #eq-table tbody tr:nth-child(even) td.eqfz-code{background:#fafbfe;}
-#eq-table tbody tr.row-inactive td.eqfz-cb, #eq-table tbody tr.row-inactive td.eqfz-code{background:#fffbf0;}
-#eq-table tbody tr.row-alert td.eqfz-cb, #eq-table tbody tr.row-alert td.eqfz-code{background:var(--red2);}
-#eq-table tbody tr:hover td.eqfz-cb, #eq-table tbody tr:hover td.eqfz-code{background:#eef4ff;}
-#eq-table td.eqfz-code, #eq-table th.eqfz-code{box-shadow:2px 0 4px -2px rgba(0,0,0,.15);}
+#eq-table td .btn-icon{padding:1px 1px;font-size:.66rem;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -3911,9 +3889,13 @@ function renderEqTable(){
   const isAdmin = CU.role==='admin';
   const _eqArrow=i=>eqSortField===i?(eqSortDir===1?' ▲':' ▼'):'';
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
-  const _codeLeft = isAdmin ? 36 : 0;
-  let h=`<table><thead><tr>${BULK.th('eq')}
-    <th class="eqfz-code" style="left:${_codeLeft}px;cursor:pointer;white-space:nowrap" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
+  // Column widths (%) in display order. Checkbox col only exists for admin.
+  // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
+  const _eqCols = [6,13,8,6,8,7,8,6,6,7,6,8,4,4];
+  let _colGroup = (isAdmin?'<col style="width:3%">':'') +
+    _eqCols.map(w=>`<col style="width:${w}%">`).join('');
+  let h=`<table><colgroup>${_colGroup}</colgroup><thead><tr>${BULK.th('eq')}
+    <th style="cursor:pointer" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
     ${_eqSortTh(3,'RM','rm')}
@@ -3934,7 +3916,7 @@ function renderEqTable(){
     const rowCls=days>=90?'row-alert':c.status==='Inactive'?'row-inactive':'';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
-      <td class="eqfz-code" style="left:${_codeLeft}px">${c.code||'—'}</td>
+      <td>${c.code||'—'}</td>
       <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
@@ -12282,16 +12264,14 @@ const BULK = {
   // ── table cell builders (called from render functions) ──
   th(seg){
     if(!this.isAdmin()) return '';
-    const fz = seg==='eq'?' eqfz-cb':'';
-    return `<th class="${fz.trim()}" style="width:36px;text-align:center" onclick="event.stopPropagation()">`
+    return `<th style="text-align:center" onclick="event.stopPropagation()">`
       + `<input type="checkbox" id="bulk-all-${seg}" title="Select all on this page" `
       + `onclick="event.stopPropagation()" onchange="BULK.togglePage('${seg}',this.checked)"></th>`;
   },
   td(seg,id){
     if(!this.isAdmin()) return '';
     const ck=this.sel[seg].has(id)?'checked':'';
-    const fz = seg==='eq'?' eqfz-cb':'';
-    return `<td class="${fz.trim()}" style="text-align:center" onclick="event.stopPropagation()">`
+    return `<td style="text-align:center" onclick="event.stopPropagation()">`
       + `<input type="checkbox" class="bulk-cb" data-id="${id}" ${ck} `
       + `onclick="event.stopPropagation()" onchange="BULK.toggle('${seg}','${id}',this.checked)"></td>`;
   },
