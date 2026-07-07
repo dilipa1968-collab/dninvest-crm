@@ -320,8 +320,8 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
    browser share 100% width across columns — widen one, others shrink, none leave
    the screen. */
 #eq-table table{font-size:.6rem;table-layout:fixed;width:100%;}
-#eq-table thead th{padding:6px 3px;font-size:.6rem;white-space:normal;word-break:break-word;}
-#eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;white-space:normal;word-break:break-word;overflow:hidden;}
+#eq-table thead th{padding:6px 3px;font-size:.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #eq-table tbody td small{font-size:.52rem;}
 #eq-table td .btn-icon{padding:1px 1px;font-size:.66rem;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
@@ -3891,7 +3891,7 @@ function renderEqTable(){
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
   // Column widths (%) in display order. Checkbox col only exists for admin.
   // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
-  const _eqCols = [6,13,8,6,8,7,8,6,6,7,6,8,4,4];
+  const _eqCols = [6,12,8,6,7,7,7,6,6,7,6,9,6,4];
   let _colGroup = (isAdmin?'<col style="width:3%">':'') +
     _eqCols.map(w=>`<col style="width:${w}%">`).join('');
   let h=`<table><colgroup>${_colGroup}</colgroup><thead><tr>${BULK.th('eq')}
