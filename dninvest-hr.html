@@ -4344,6 +4344,23 @@ function downloadBrokerageTemplate(){
 // brokerage ≥ broClientThreshold, that RM earns broClientBonus flat this month.
 let _broParseResult = null; // holds last parsed result for apply step
 
+// Fetch a { normalizedClientCode : RM } map from the CRM's equity clients
+// (crm_data/eq_clients). Used when a brokerage file has no RM column — the RM
+// is derived from each client's code as stored in the CRM.
+function _normBrkCode(s){ return String(s||'').trim().toLowerCase().replace(/[\s\-]/g,''); }
+async function getCrmCodeRmMap(){
+  const map = {};
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc = await fdb.collection('crm_data').doc('eq_clients').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        doc.data().data.forEach(c=>{ if(c && c.code) map[_normBrkCode(c.code)] = (c.rm||''); });
+      }
+    }
+  }catch(e){ console.error('code→RM map fetch failed:', e); }
+  return map;
+}
+
 function parseBrokerageFile(inputEl){
   const file = inputEl.files[0];
   if(!file){ return; }
@@ -4361,7 +4378,7 @@ function parseBrokerageFile(inputEl){
   if(resEl) resEl.innerHTML = '<p style="color:var(--text3);font-size:12px">⏳ Reading file…</p>';
 
   const reader = new FileReader();
-  reader.onload = function(ev){
+  reader.onload = async function(ev){
     try{
       if(typeof XLSX === 'undefined'){
         document.getElementById('bro-upload-result').innerHTML = '<p style="color:var(--red)">SheetJS library not loaded. Reload the page and try again.</p>';
@@ -4395,14 +4412,31 @@ function parseBrokerageFile(inputEl){
         return -1;
       };
 
-      const idxBro = findCol('brok', 'brokerage');
-      const idxRm  = findCol('rm', 'dealer', 'adviser', 'agent');
+      const idxBro = findCol('gross brk', 'gross brokerage', 'grossbrk', 'brokerage', 'brok');
+      let   idxRm  = findCol('rm', 'dealer', 'adviser', 'agent', 'relationship');
+      const idxCode = findCol('client code', 'clientcode', 'code', 'client_code', 'ucc');
+      const idxName = findCol('client name', 'clientname', 'name', 'client_name');
 
-      if(idxBro < 0 || idxRm < 0){
+      // Need a brokerage column, plus EITHER an RM column OR a client-code column
+      // (with no RM column we look up each client's RM from the CRM by code).
+      if(idxBro < 0 || (idxRm < 0 && idxCode < 0)){
         document.getElementById('bro-upload-result').innerHTML =
           '<p style="color:var(--red)">Could not find required columns.<br>Headers found: <b>' +
-          headerRow.join(' | ') + '</b><br>Need: a Brokerage column and an RM/Dealer column.</p>';
+          headerRow.join(' | ') + '</b><br>Need: a Brokerage column (e.g. "Gross Brk") and either an RM/Dealer column or a Client Code column.</p>';
         return;
+      }
+
+      // If the file has no RM column, build a client-code → RM map from the CRM.
+      let codeRmMap = null;
+      if(idxRm < 0){
+        document.getElementById('bro-upload-result').innerHTML =
+          '<p style="color:var(--text3);font-size:12px">⏳ File has no RM column — fetching client→RM mapping from CRM…</p>';
+        codeRmMap = await getCrmCodeRmMap();
+        if(!codeRmMap || Object.keys(codeRmMap).length===0){
+          document.getElementById('bro-upload-result').innerHTML =
+            '<p style="color:var(--red)">Could not load client→RM mapping from the CRM (check internet). Try again, or upload a file that includes an RM column.</p>';
+          return;
+        }
       }
 
       // Parse data rows (skip header row)
@@ -4410,18 +4444,18 @@ function parseBrokerageFile(inputEl){
       const threshold  = parseFloat(document.getElementById('bro-client-threshold').value) || 100;
       const bonus      = parseFloat(document.getElementById('bro-client-bonus').value)     || 700;
 
-      const idxCode = findCol('client code', 'code', 'client_code');
-      const idxName = findCol('client name', 'name', 'client_name');
-
       const rmMap = {};
       let dataRows = 0;
       for(let i = headerRowIdx + 1; i < rawRows.length; i++){
         const row = rawRows[i];
-        const rm      = String(row[idxRm]  || '').trim().toUpperCase();
         const bro     = parseFloat(row[idxBro]) || 0;
         const code    = idxCode>=0 ? String(row[idxCode]||'').trim() : '';
         const cliName = idxName>=0 ? String(row[idxName]||'').trim() : '';
-        if(!rm) continue;
+        // RM from the file's RM column, or (no RM column) looked up from the CRM by code.
+        const rm = (idxRm>=0)
+          ? String(row[idxRm]||'').trim().toUpperCase()
+          : String((codeRmMap && codeRmMap[_normBrkCode(code)]) || '').trim().toUpperCase();
+        if(!rm) continue; // rows with no matchable RM are skipped
         dataRows++;
         if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0, clients:[]};
         rmMap[rm].totalClients++;
