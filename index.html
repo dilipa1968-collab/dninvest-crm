@@ -314,18 +314,17 @@ tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
 tbody td{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
-/* ── Equity table: fixed layout with user-resizable columns (drag the handle
-   on any header edge). Widths persist in localStorage. Content truncates with
-   "…" to the set width; drag wider to reveal more. Wrapper scrolls if the total
-   exceeds the screen (works on desktop & mobile). */
-#eq-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-#eq-table table{font-size:.62rem;table-layout:fixed;width:auto;}
-#eq-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;position:relative;}
-#eq-table tbody td{padding:3px 6px;font-size:.62rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#eq-table tbody td small{font-size:.54rem;}
-#eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
-#eq-table .eqrz{position:absolute;top:0;right:0;width:12px;height:100%;cursor:col-resize;user-select:none;touch-action:none;z-index:6;border-right:2px solid rgba(255,255,255,.3);}
-#eq-table .eqrz:hover, #eq-table .eqrz.active{border-right-color:#ffd24d;background:rgba(255,210,77,.25);}
+/* ── Resizable tables (Equity, MF, Leads): fixed layout + drag handles on
+   header edges; widths persist per table in localStorage. Wrapper scrolls if
+   total exceeds screen (desktop & mobile). */
+#eq-table, #mf-table, #leads-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#eq-table table, #mf-table table, #leads-table table{font-size:.62rem;table-layout:fixed;width:auto;}
+#eq-table thead th, #mf-table thead th, #leads-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;position:relative;}
+#eq-table tbody td, #mf-table tbody td, #leads-table tbody td{padding:3px 6px;font-size:.62rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#eq-table tbody td small, #mf-table tbody td small, #leads-table tbody td small{font-size:.54rem;}
+#eq-table td .btn-icon, #mf-table td .btn-icon, #leads-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
+.eqrz{position:absolute;top:0;right:0;width:12px;height:100%;cursor:col-resize;user-select:none;touch-action:none;z-index:6;border-right:2px solid rgba(255,255,255,.3);}
+.eqrz:hover, .eqrz.active{border-right-color:#ffd24d;background:rgba(255,210,77,.25);}
 body.eq-resizing{cursor:col-resize!important;user-select:none!important;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
@@ -3807,78 +3806,94 @@ function resetFilters(t){
 }
 
 // ══════════════════════════════════════════
-// EQUITY TABLE — user-resizable columns (drag header edge; widths persist)
+// RESIZABLE TABLE COLUMNS — generic system (Equity, MF, Leads)
+// Drag a header's right edge to resize; widths persist per table.
 // ══════════════════════════════════════════
-const EQ_DEFAULT_W = {
-  code:64, name:150, mobile:92, rm:64, risk:78, acbal:72,
-  lasttrade:88, lastcall:76, nextcall:76, followup:92, remarks:110,
-  actions:88, status:60, call:42
+const COL_CFG = {
+  eq: {
+    cont:'eq-table',
+    keys:['code','name','mobile','rm','risk','acbal','lasttrade','lastcall','nextcall','followup','remarks','actions','status','call'],
+    def:{code:64,name:150,mobile:92,rm:64,risk:78,acbal:72,lasttrade:88,lastcall:76,nextcall:76,followup:92,remarks:110,actions:88,status:60,call:42}
+  },
+  mf: {
+    cont:'mf-table',
+    keys:['name','mobile','pan','rm','aum','sipamt','sipcnt','lastcall','nextcall','followup','remarks','actions','status','call'],
+    def:{name:150,mobile:92,pan:88,rm:64,aum:82,sipamt:78,sipcnt:60,lastcall:76,nextcall:76,followup:92,remarks:110,actions:88,status:60,call:42}
+  },
+  leads: {
+    cont:'leads-table',
+    keys:['name','mobile','rm','calls','lastcall','nextcall','followup','remarks','source','segment','status','actions'],
+    def:{name:150,mobile:92,rm:64,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,source:80,segment:80,status:64,actions:88}
+  }
 };
-const EQ_COLKEYS = ['code','name','mobile','rm','risk','acbal','lasttrade','lastcall','nextcall','followup','remarks','actions','status','call'];
-function getEqColW(){
+function getColW(tid){
+  const cfg=COL_CFG[tid]; if(!cfg) return {};
   let saved={};
-  try{ saved = JSON.parse(localStorage.getItem('dninvest_eqcolw')||'{}'); }catch(e){}
+  try{ saved=JSON.parse(localStorage.getItem('dninvest_colw_'+tid)||'{}'); }catch(e){}
   const w={};
-  EQ_COLKEYS.forEach(k=>{ w[k] = (saved[k] && saved[k]>=24) ? saved[k] : EQ_DEFAULT_W[k]; });
+  cfg.keys.forEach(k=>{ w[k]=(saved[k]&&saved[k]>=24)?saved[k]:cfg.def[k]; });
   return w;
 }
-function saveEqColW(w){ try{ localStorage.setItem('dninvest_eqcolw', JSON.stringify(w)); }catch(e){} }
-// Attach drag handles to each header, mapping to the matching <col> element.
-function enableEqColResize(){
-  const tbl = document.querySelector('#eq-table table');
-  if(!tbl) return;
-  const cols = tbl.querySelectorAll('colgroup col');
-  const ths  = tbl.querySelectorAll('thead th');
-  if(!cols.length || !ths.length) return;
-  const isAdmin = (CU && CU.role==='admin');
-  const off = isAdmin ? 1 : 0; // first col/th is the checkbox for admin
-  const W = getEqColW();
-  EQ_COLKEYS.forEach((key, i)=>{
-    const th = ths[i+off]; const col = cols[i+off];
-    if(!th || !col) return;
-    const handle = document.createElement('span');
-    handle.className = 'eqrz';
-    handle.addEventListener('mousedown', e=>_eqRzStart(e, col, key, W));
-    handle.addEventListener('touchstart', e=>_eqRzStart(e, col, key, W), {passive:false});
+function saveColW(tid,w){ try{ localStorage.setItem('dninvest_colw_'+tid, JSON.stringify(w)); }catch(e){} }
+// Returns "<colgroup>...</colgroup>" plus the total table width, for a table.
+function colGroup(tid, hasCheckbox){
+  const cfg=COL_CFG[tid]; const W=getColW(tid);
+  const cg=(hasCheckbox?'<col style="width:30px">':'')+cfg.keys.map(k=>`<col style="width:${W[k]}px">`).join('');
+  const total=(hasCheckbox?30:0)+cfg.keys.reduce((s,k)=>s+W[k],0);
+  return {cg:`<colgroup>${cg}</colgroup>`, total};
+}
+// Attach drag handles to a rendered table's headers.
+function enableColResize(tid){
+  const cfg=COL_CFG[tid]; if(!cfg) return;
+  const tbl=document.querySelector('#'+cfg.cont+' table'); if(!tbl) return;
+  const cols=tbl.querySelectorAll('colgroup col');
+  const ths=tbl.querySelectorAll('thead th');
+  if(!cols.length||!ths.length) return;
+  const hasCb=(CU&&CU.role==='admin');
+  const off=hasCb?1:0;
+  const W=getColW(tid);
+  cfg.keys.forEach((key,i)=>{
+    const th=ths[i+off], col=cols[i+off];
+    if(!th||!col) return;
+    const handle=document.createElement('span');
+    handle.className='eqrz';
+    handle.addEventListener('mousedown', e=>_rzStart(e,tid,col,key,W));
+    handle.addEventListener('touchstart', e=>_rzStart(e,tid,col,key,W), {passive:false});
     th.appendChild(handle);
   });
 }
-let _eqRz = null;
-function _eqRzStart(e, col, key, W){
+let _rz=null;
+function _rzStart(e,tid,col,key,W){
   e.preventDefault(); e.stopPropagation();
-  const pt = e.touches ? e.touches[0] : e;
-  _eqRz = { col, key, W, startX: pt.clientX, startW: parseInt(col.style.width)||EQ_DEFAULT_W[key] };
+  const pt=e.touches?e.touches[0]:e;
+  _rz={tid,col,key,W,startX:pt.clientX,startW:parseInt(col.style.width)||COL_CFG[tid].def[key]};
   document.body.classList.add('eq-resizing');
   e.target.classList.add('active');
-  document.addEventListener('mousemove', _eqRzMove);
-  document.addEventListener('mouseup', _eqRzEnd);
-  document.addEventListener('touchmove', _eqRzMove, {passive:false});
-  document.addEventListener('touchend', _eqRzEnd);
+  document.addEventListener('mousemove',_rzMove);
+  document.addEventListener('mouseup',_rzEnd);
+  document.addEventListener('touchmove',_rzMove,{passive:false});
+  document.addEventListener('touchend',_rzEnd);
 }
-function _eqRzMove(e){
-  if(!_eqRz) return;
+function _rzMove(e){
+  if(!_rz) return;
   if(e.cancelable) e.preventDefault();
-  const pt = e.touches ? e.touches[0] : e;
-  let nw = _eqRz.startW + (pt.clientX - _eqRz.startX);
-  if(nw < 30) nw = 30;
-  const old = parseInt(_eqRz.col.style.width)||_eqRz.startW;
-  _eqRz.col.style.width = nw + 'px';
-  // grow/shrink the whole table by the delta so fixed-layout applies cleanly
-  const tbl = document.querySelector('#eq-table table');
-  if(tbl){ const tw=(parseInt(tbl.style.width)||tbl.offsetWidth)+(nw-old); tbl.style.width = tw+'px'; }
+  const pt=e.touches?e.touches[0]:e;
+  let nw=_rz.startW+(pt.clientX-_rz.startX);
+  if(nw<30) nw=30;
+  const old=parseInt(_rz.col.style.width)||_rz.startW;
+  _rz.col.style.width=nw+'px';
+  const tbl=document.querySelector('#'+COL_CFG[_rz.tid].cont+' table');
+  if(tbl){ const tw=(parseInt(tbl.style.width)||tbl.offsetWidth)+(nw-old); tbl.style.width=tw+'px'; }
 }
-function _eqRzEnd(){
-  if(_eqRz){
-    _eqRz.W[_eqRz.key] = parseInt(_eqRz.col.style.width)||EQ_DEFAULT_W[_eqRz.key];
-    saveEqColW(_eqRz.W);
-  }
-  _eqRz = null;
+function _rzEnd(){
+  if(_rz){ _rz.W[_rz.key]=parseInt(_rz.col.style.width)||COL_CFG[_rz.tid].def[_rz.key]; saveColW(_rz.tid,_rz.W); }
+  _rz=null;
   document.body.classList.remove('eq-resizing');
-  document.querySelectorAll('#eq-table .eqrz.active').forEach(el=>el.classList.remove('active'));
-  document.removeEventListener('mousemove', _eqRzMove);
-  document.removeEventListener('mouseup', _eqRzEnd);
-  document.removeEventListener('touchmove', _eqRzMove);
-  document.removeEventListener('touchend', _eqRzEnd);
+  document.querySelectorAll('.eqrz.active').forEach(el=>el.classList.remove('active'));
+  document.removeEventListener('mousemove',_rzMove);
+  document.removeEventListener('mouseup',_rzEnd);
+  document.removeEventListener('touchmove',_rzMove);
+  document.removeEventListener('touchend',_rzEnd);
 }
 
 function renderEqTable(){
@@ -3969,11 +3984,8 @@ function renderEqTable(){
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
   // Column widths (%) in display order. Checkbox col only exists for admin.
   // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
-  const _EQW = getEqColW();
-  const _EQCK = ['code','name','mobile','rm','risk','acbal','lasttrade','lastcall','nextcall','followup','remarks','actions','status','call'];
-  const _eqTotW = (isAdmin?30:0) + _EQCK.reduce((s,k)=>s+_EQW[k],0);
-  const _eqCg = (isAdmin?'<col style="width:30px">':'') + _EQCK.map(k=>`<col style="width:${_EQW[k]}px">`).join('');
-  let h=`<table style="width:${_eqTotW}px"><colgroup>${_eqCg}</colgroup><thead><tr>${BULK.th('eq')}
+  const _eqCG = colGroup('eq', isAdmin);
+  let h=`<table style="width:${_eqCG.total}px">${_eqCG.cg}<thead><tr>${BULK.th('eq')}
     <th style="cursor:pointer" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
@@ -4021,7 +4033,7 @@ function renderEqTable(){
   });
   h+='</tbody></table>';
   document.getElementById('eq-table').innerHTML=h;
-  enableEqColResize();
+  enableColResize('eq');
   BULK.afterRender('eq');
   renderPg('eq',data.length,eqPage);
 }
@@ -4111,7 +4123,8 @@ function renderMfTable(){
   const isAdmin = CU.role==='admin';
   const _mfArrow=i=>mfSortField===i?(mfSortDir===1?' ▲':' ▼'):'';
   const _mfSortTh=(i,label,cfCol)=>CF.th('mf',cfCol,`<span onclick="sortMfTable(${i})" style="cursor:pointer">${label}${_mfArrow(i)}</span>`);
-  let h=`<table><thead><tr>${BULK.th('mf')}
+  const _mfCG = colGroup('mf', isAdmin);
+  let h=`<table style="width:${_mfCG.total}px">${_mfCG.cg}<thead><tr>${BULK.th('mf')}
     ${_mfSortTh(0,'Name','name')}
     ${_mfSortTh(1,'Mobile','mobile')}
     ${_mfSortTh(2,'PAN','pan')}
@@ -4156,6 +4169,7 @@ function renderMfTable(){
   });
   h+='</tbody></table>';
   document.getElementById('mf-table').innerHTML=h;
+  enableColResize('mf');
   BULK.afterRender('mf');
   renderPg('mf',data.length,mfPage);
 }
@@ -4225,7 +4239,9 @@ function renderLeadsTable(){
   const isAdmin = CU.role==='admin';
   const _lArrow=i=>leadsSortField===i?(leadsSortDir===1?' ▲':' ▼'):'';
   const _lSortTh=(i,label,cfCol)=>CF.th('leads',cfCol,`<span onclick="sortLeadsTable(${i})" style="cursor:pointer">${label}${_lArrow(i)}</span>`);
-  let h=`<table><thead><tr>${BULK.th('leads')}
+  const _lIsAdmin = (CU && CU.role==='admin');
+  const _lCG = colGroup('leads', _lIsAdmin);
+  let h=`<table style="width:${_lCG.total}px">${_lCG.cg}<thead><tr>${BULK.th('leads')}
     ${_lSortTh(0,'Name','name')}
     ${_lSortTh(1,'Mobile','mobile')}
     ${_lSortTh(2,'RM','rm')}
@@ -4265,6 +4281,7 @@ function renderLeadsTable(){
   });
   h+='</tbody></table>';
   document.getElementById('leads-table').innerHTML=h;
+  enableColResize('leads');
   BULK.afterRender('leads');
   renderPg('leads',data.length,leadsPage);
 }
