@@ -2651,7 +2651,7 @@ async function doLogin(){
       }
     }
     CU = user;
-    sessionStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p}));
+    localStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p}));
     document.getElementById('lerr').style.display='none';
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
@@ -2857,7 +2857,8 @@ function openHrPortal(){
 
 function doLogout(){
   CU=null;
-  sessionStorage.removeItem('dninvest_session');
+  localStorage.removeItem('dninvest_session');
+  sessionStorage.removeItem('dninvest_session'); // clean up old-style sessions too
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('app').style.display='none';
   document.getElementById('lusr').value='';
@@ -2932,9 +2933,15 @@ async function doResetPassword(){
   document.getElementById('fp_newpass').value='';
 }
 
-// Auto-login if session exists
-function tryAutoLogin(){
-  const saved = sessionStorage.getItem('dninvest_session');
+// Auto-login if session exists (persistent — survives browser/app close).
+// Session is cleared only by Logout, wrong/changed credentials, or RM-on-mobile.
+async function tryAutoLogin(){
+  // Migrate any old sessionStorage session to localStorage (one-time)
+  let saved = localStorage.getItem('dninvest_session');
+  if(!saved){
+    const oldSess = sessionStorage.getItem('dninvest_session');
+    if(oldSess){ localStorage.setItem('dninvest_session', oldSess); sessionStorage.removeItem('dninvest_session'); saved = oldSess; }
+  }
   if(saved){
     try{
       const {username, password} = JSON.parse(saved);
@@ -2955,19 +2962,27 @@ function tryAutoLogin(){
         // Don't auto-login RMs on mobile — force them back to the login
         // screen so the desktop-only restriction in doLogin() applies.
         if(user.role!=='admin' && isMobileDevice()){
-          sessionStorage.removeItem('dninvest_session');
+          localStorage.removeItem('dninvest_session');
           return;
+        }
+        // RM: respect the CRM master switch (Admin can close CRM from HR Portal).
+        // Session is kept (not cleared) so auto-login resumes once reopened.
+        if(user.role!=='admin'){
+          try{ if(await isCrmBlockedForRm()) return; }catch(e){}
         }
         CU = user;
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').style.display='block';
         initApp();
         // Restart heartbeat pings after page refresh (session restore skips doLogin)
-        if(user.role!=='admin'){ startCrmHeartbeat(user); }
+        // AND mark today's HR attendance — with persistent auto-login an RM may
+        // never hit doLogin() on a new day. The function is idempotent: it skips
+        // if today is already marked, and flips a 10 AM "Absent" to "Late".
+        if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user); startCrmHeartbeat(user); }
         return;
       }
     }catch(e){}
-    sessionStorage.removeItem('dninvest_session');
+    localStorage.removeItem('dninvest_session');
   }
 }
 window.addEventListener('DOMContentLoaded', tryAutoLogin);
@@ -9610,9 +9625,9 @@ function saveChangeCred(){
   if(newPass) users[idx].password = newPass;
   if(newPin && CU.role==='rm') users[idx].pin = newPin;
 
-  // Update session
-  if(newPass){ CU.password = newPass; sessionStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass})); }
-  if(newPin && CU.role==='rm') CU.pin = newPin;
+  // Update persistent session so auto-login keeps working with the new credential
+  if(newPass){ CU.password = newPass; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass})); }
+  if(newPin && CU.role==='rm'){ CU.pin = newPin; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPin})); }
 
   DB.set('users', users);
   closeModal('changeCredModal');
