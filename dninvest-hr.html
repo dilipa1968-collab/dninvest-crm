@@ -4549,7 +4549,10 @@ function renderBroUploadResult(results, minClients, threshold, bonus){
   });
 
   html += `</tbody></table></div>
-    <button class="btn btn-primary" style="margin-top:16px;width:100%;padding:12px" onclick="applyBroClientIncentive()">✅ Apply to Selected Month's Incentive Data</button>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn" style="flex:0 0 130px;padding:12px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db" onclick="cancelBrokerageUpload()">✖ Cancel</button>
+      <button class="btn btn-primary" style="flex:1;padding:12px" onclick="applyBroClientIncentive()">✅ Apply to Selected Month's Incentive Data</button>
+    </div>
   </div>`;
 
   overlay.innerHTML = html;
@@ -4564,6 +4567,18 @@ function renderBroUploadResult(results, minClients, threshold, bonus){
 }
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Cancel/discard a parsed brokerage upload before applying it.
+function cancelBrokerageUpload(){
+  const ov = document.getElementById('bro-result-overlay');
+  if(ov) ov.remove();
+  _broParseResult = null;
+  window._broParseResult = null;
+  const fileEl = document.getElementById('bro-file-input');
+  if(fileEl) fileEl.value = '';
+  const inlineDiv = document.getElementById('bro-upload-result');
+  if(inlineDiv) inlineDiv.innerHTML = '<p style="color:var(--text3);font-size:12px">Upload cancelled. You can select a file again.</p>';
+}
 
 // Admin/RM: show client-wise brokerage detail popup (upgraded: summary cards, badges, sort/filter, total)
 function showBroClientDetail(empName, month){
