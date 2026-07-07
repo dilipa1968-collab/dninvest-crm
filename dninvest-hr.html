@@ -831,7 +831,7 @@ input:focus, select:focus, textarea:focus{
           <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Upload the monthly brokerage XLS/XLSX (columns: Client Code, Client Name, Brokerage, RM). The system will auto-calculate how many clients per RM gave brokerage ≥ threshold. If ≥ minimum client count, flat bonus is credited.</p>
           <div class="compact-grid3" style="margin-bottom:10px">
             <div class="field-inline"><label>Month</label><input type="month" id="bro-upload-month"></div>
-            <div class="field-inline"><label>Upload XLS / XLSX</label><input type="file" id="bro-file-input" accept=".xls,.xlsx" onchange="parseBrokerageFile(this)"></div>
+            <div class="field-inline"><label>Upload XLS / XLSX / CSV</label><input type="file" id="bro-file-input" accept=".xls,.xlsx,.csv" onchange="parseBrokerageFile(this)"></div>
             <div class="field-inline" style="align-self:flex-end">
               <button class="btn btn-sm" onclick="downloadBrokerageTemplate()" style="width:100%">⬇ Download Template</button>
             </div>
@@ -840,6 +840,9 @@ input:focus, select:focus, textarea:focus{
             <div class="field-inline"><label>Min clients (≥ threshold)</label><input type="number" id="bro-client-min" value="" placeholder="e.g. 50"></div>
             <div class="field-inline"><label>Per-client threshold (₹)</label><input type="number" id="bro-client-threshold" value="" placeholder="e.g. 100"></div>
             <div class="field-inline"><label>Flat bonus if qualified (₹)</label><input type="number" id="bro-client-bonus" value="" placeholder="e.g. 700"></div>
+          </div>
+          <div style="margin-bottom:8px">
+            <button class="btn btn-sm" onclick="clearBroForMonth()" style="background:#fee2e2;color:#b91c1c;border:1px solid #f3b4b4">🗑 Clear applied brokerage for selected month</button>
           </div>
           <div id="bro-upload-result" style="margin-top:8px"></div>
         </div>
@@ -4568,7 +4571,38 @@ function renderBroUploadResult(results, minClients, threshold, bonus){
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// Cancel/discard a parsed brokerage upload before applying it.
+// Remove the applied brokerage figures & client-bonus for the selected month
+// (for every employee). Salary, demat, MF, SIP, Other stay untouched.
+async function clearBroForMonth(){
+  const monthEl = document.getElementById('bro-upload-month');
+  const month = monthEl ? monthEl.value : '';
+  if(!month){ alert('Please select a month first.'); return; }
+  const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const all = getMfSipByMonth();
+  if(!all[month] || !Object.keys(all[month]).length){
+    alert('No data found for '+mLabel+'.'); return;
+  }
+  // count how many employees currently have brokerage applied
+  let n=0;
+  Object.values(all[month]).forEach(e=>{ if(e && ((e.brok||0)>0 || (e.broClientInc||0)>0 || (e.broClientRows&&e.broClientRows.length))) n++; });
+  if(!n){ alert('No applied brokerage found for '+mLabel+'.'); return; }
+  if(!confirm('⚠️ Clear applied BROKERAGE for '+mLabel+'?\n\nThis will reset the Brokerage amount and client bonus for '+n+' employee(s) in this month.\nSalary, Demat, MF, SIP and Other figures will NOT be touched.\n\nProceed?')) return;
+  Object.values(all[month]).forEach(e=>{
+    if(!e) return;
+    e.brok = 0;
+    e.broClientInc = 0;
+    e.broClientEligible = false;
+    e.broClientCount = 0;
+    e.broClientTotal = 0;
+    e.broClientRows = [];
+  });
+  await saveMfSipByMonth(all);
+  const inlineDiv = document.getElementById('bro-upload-result');
+  if(inlineDiv) inlineDiv.innerHTML = '<p style="color:var(--red);font-size:12px;font-weight:600">🗑 Cleared applied brokerage for '+mLabel+' ('+n+' employees).</p>';
+  renderIncentivePage();
+  alert('✅ Cleared applied brokerage for '+mLabel+'.');
+}
+
 function cancelBrokerageUpload(){
   const ov = document.getElementById('bro-result-overlay');
   if(ov) ov.remove();
