@@ -5794,7 +5794,7 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Client Code</label><input id="f_code" value="${c?.code||''}" placeholder="e.g. 12345"></div>
       <div class="form-field"><label>Client Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
-      <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
+      <div class="form-field"><label>Mobile Number ${(c && CU.role!=='admin')?'<span style="color:var(--gray);font-weight:400;font-size:.72rem">(admin only)</span>':''}</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile" ${(c && CU.role!=='admin')?'readonly title="Only admin can change the original number"':''}></div>
     </div>
     <div class="form-row three">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
@@ -5838,13 +5838,16 @@ function clientForm(seg, c){
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>
+    <div class="form-row">
+      <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM can edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
+    </div>
     ${callMergeSection()}`;
   } else {
     return `
     <div class="form-section">Basic Information</div>
     <div class="form-row three">
       <div class="form-field"><label>Investor Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
-      <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
+      <div class="form-field"><label>Mobile Number ${(c && CU.role!=='admin')?'<span style="color:var(--gray);font-weight:400;font-size:.72rem">(admin only)</span>':''}</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile" ${(c && CU.role!=='admin')?'readonly title="Only admin can change the original number"':''}></div>
       <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase" ${CU.role!=='admin'?'readonly':''}></div>
     </div>
     <div class="form-row">
@@ -5887,6 +5890,9 @@ function clientForm(seg, c){
         <option ${c?.followup_status==='TRANSFER REQUEST'?'selected':''}>TRANSFER REQUEST</option>
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM can edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     ${callMergeSection()}`;
   }
@@ -5975,10 +5981,14 @@ async function saveClient(){
     // safety: ensure no collision with existing client ids
     while(clients.some(x=>x.id===newId)) newId = uid();
   }
+  // Original mobile is admin-only to change. For an RM editing an existing client,
+  // keep the stored original regardless of the (read-only) field value.
+  const _exClient = currentEditId ? clients.find(x=>x.id===currentEditId) : null;
+  const _mobileVal = (_exClient && CU.role!=='admin') ? (_exClient.mobile||'') : gv2('f_mobile');
   if(seg==='equity'){
     rec={
       id: newId,
-      code:gv2('f_code'), name, mobile:gv2('f_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
+      code:gv2('f_code'), name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Active',
       asset_value:parseFloat(gv2('f_asset'))||null,
       revenue:parseFloat(gv2('f_revenue'))||null,
@@ -5992,7 +6002,7 @@ async function saveClient(){
   } else {
     rec={
       id: newId,
-      name, mobile:gv2('f_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
+      name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Investor',
       aum:parseFloat(gv2('f_aum'))||null,
       sip_amount:parseFloat(gv2('f_sip'))||null,
@@ -6082,6 +6092,8 @@ function viewClient(id,seg){
       <span class="badge ${st}" style="font-size:.82rem;padding:4px 12px">${c.status}</span>
       ${c.mobile?`<a href="tel:${c.mobile}" class="btn btn-outline" style="padding:5px 14px">📞 ${c.mobile}</a>`:''}
       ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px">💬 WhatsApp</a>`:''}
+      ${c.alt_mobile?`<a href="tel:${c.alt_mobile}" class="btn btn-outline" style="padding:5px 14px" title="Alternate number">📞 ${c.alt_mobile} (Alt)</a>`:''}
+      ${c.alt_mobile?`<a href="https://wa.me/91${c.alt_mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px" title="Alternate WhatsApp">💬 Alt</a>`:''}
       <button class="btn btn-primary" style="padding:5px 14px" onclick="closeModal('viewModal');editClient('${id}','${seg}')">✏️ Edit / Log Call</button>
     </div>`;
 
@@ -6143,6 +6155,8 @@ function viewLeadCalls(id){
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center">
       ${c.mobile?`<a href="tel:${c.mobile}" class="btn btn-outline" style="padding:5px 14px">📞 ${c.mobile}</a>`:''}
       ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px">💬 WhatsApp</a>`:''}
+      ${c.alt_mobile?`<a href="tel:${c.alt_mobile}" class="btn btn-outline" style="padding:5px 14px" title="Alternate number">📞 ${c.alt_mobile} (Alt)</a>`:''}
+      ${c.alt_mobile?`<a href="https://wa.me/91${c.alt_mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px" title="Alternate WhatsApp">💬 Alt</a>`:''}
       <button class="btn btn-primary" style="padding:5px 14px" onclick="closeModal('viewModal');editLead('${id}')">✏️ Edit / Log Call</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
