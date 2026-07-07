@@ -314,17 +314,16 @@ tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
 tbody td{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
-/* ── Equity table: fit ALL columns on screen (no horizontal scroll) ──
-   Widths come from a <colgroup> built in renderEqTable (role-aware, so admin's
-   checkbox column doesn't shift things). table-layout:fixed + wrapping lets the
-   browser share 100% width across columns — widen one, others shrink, none leave
-   the screen. */
-#eq-table table{font-size:.6rem;table-layout:fixed;width:100%;}
-#eq-table thead th{padding:6px 3px;font-size:.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#eq-table tbody td small{font-size:.52rem;}
-#eq-table td .btn-icon{padding:1px 1px;font-size:.66rem;}
-#eq-table tbody td.eqc-wrap{white-space:normal;word-break:break-word;line-height:1.15;}
+/* ── Equity table: columns auto-size to their content (tight gaps, nothing
+   truncated). On wide screens it fits; on narrow/mobile screens the wrapper
+   scrolls horizontally. Remarks is the only capped column (can be very long). */
+#eq-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#eq-table table{font-size:.62rem;table-layout:auto;width:auto;min-width:100%;}
+#eq-table thead th{padding:6px 5px;font-size:.62rem;white-space:nowrap;}
+#eq-table tbody td{padding:3px 5px;font-size:.62rem;max-width:none;white-space:nowrap;}
+#eq-table tbody td small{font-size:.54rem;}
+#eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
+#eq-table tbody td.eqc-rmk{max-width:150px;overflow:hidden;text-overflow:ellipsis;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -3892,10 +3891,7 @@ function renderEqTable(){
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
   // Column widths (%) in display order. Checkbox col only exists for admin.
   // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
-  const _eqCols = [5,17,7,5,6,6,7,6,6,10,6,8,5,3];
-  let _colGroup = (isAdmin?'<col style="width:3%">':'') +
-    _eqCols.map(w=>`<col style="width:${w}%">`).join('');
-  let h=`<table><colgroup>${_colGroup}</colgroup><thead><tr>${BULK.th('eq')}
+  let h=`<table><thead><tr>${BULK.th('eq')}
     <th style="cursor:pointer" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
@@ -3918,7 +3914,7 @@ function renderEqTable(){
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
-      <td class="eqc-wrap" style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
@@ -3927,7 +3923,7 @@ function renderEqTable(){
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td class="eqc-wrap"><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
-      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td class="eqc-rmk" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
