@@ -2731,6 +2731,9 @@ async function sendCrmHeartbeat(){
     // Session jo cutoff ke baad start hua — heartbeat mat bhejo, warna
     // late-night fresh login ka time out-time ban jata hai (HR portal jaisa hi fix)
     if(_crmHbBlocked) return;
+    // App background me (screen lock / recent apps) hai to ping mat bhejo — sirf
+    // foreground/active ping. Warna out-time real logoff se aage khisak jata hai.
+    if(typeof document!=='undefined' && document.visibilityState==='hidden') return;
     const n=new Date();
     const hhmm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
     const docRef=fdb.collection('hr_data').doc('heartbeats');
