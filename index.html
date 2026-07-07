@@ -11540,7 +11540,9 @@ function brkGuessMapping(headers, kind){
       if(!used.clientName && /(client|customer).*name|^name$/.test(hh)) field='clientName';
       else if(!used.clientCode && /(client.*code|ucc|trading.*code|client.*id)/.test(hh)) field='clientCode';
       else if(!used.pan && /pan/.test(hh)) field='pan';
-      else if(!used.brokerage && /(brokerage|commission)/.test(hh)) field='brokerage';
+      else if(!used.brokerage && /gross\s*\.?\s*brk|gross\s*brokerage/.test(hh)) field='brokerage';
+      else if(!used.turnover && /gross\s*\.?\s*to\b|gross\s*turnover/.test(hh)) field='turnover';
+      else if(!used.brokerage && /(^brokerage$|^brk$|brokerage|commission)/.test(hh)) field='brokerage';
       else if(!used.turnover && /(turnover|amount|amt|value|traded)/.test(hh)) field='turnover';
     }
     if(field!=='ignore') used[field]=true;
