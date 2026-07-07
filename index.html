@@ -2731,9 +2731,6 @@ async function sendCrmHeartbeat(){
     // Session jo cutoff ke baad start hua — heartbeat mat bhejo, warna
     // late-night fresh login ka time out-time ban jata hai (HR portal jaisa hi fix)
     if(_crmHbBlocked) return;
-    // App background me (screen lock / recent apps) hai to ping mat bhejo — sirf
-    // foreground/active ping. Warna out-time real logoff se aage khisak jata hai.
-    if(typeof document!=='undefined' && document.visibilityState==='hidden') return;
     const n=new Date();
     const hhmm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
     const docRef=fdb.collection('hr_data').doc('heartbeats');
@@ -2752,6 +2749,16 @@ function startCrmHeartbeat(user){
   _crmHbBlocked = (cutoff!==null && (n.getHours()+n.getMinutes()/60)>=cutoff);
   sendCrmHeartbeat(); // immediate first ping (blocked session me khud skip hoga)
   _crmHbTimer=setInterval(sendCrmHeartbeat, 5*60000); // every 5 min
+  bindCrmHbEdgePings();
+}
+// Tab hide/close/blur hone par extra ping — background me browser 5-min timer ko
+// throttle kar deta hai, isliye last-active moment tighter capture karne ke liye.
+let _crmHbEdgeBound=false;
+function bindCrmHbEdgePings(){
+  if(_crmHbEdgeBound) return; _crmHbEdgeBound=true;
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') sendCrmHeartbeat(); });
+  window.addEventListener('pagehide', ()=>{ sendCrmHeartbeat(); });
+  window.addEventListener('blur', ()=>{ sendCrmHeartbeat(); });
 }
 
 // Auto-marks HR attendance the moment an RM logs into the CRM — silent,
