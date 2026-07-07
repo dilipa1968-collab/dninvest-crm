@@ -2205,6 +2205,7 @@ input:focus, select:focus, textarea:focus{
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px" id="eqImportDesc2">
         Expected columns (header names flexible/auto-detect): <b>Code</b> (or Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (required for new clients), <b>Asset Value</b> (or Holding/Portfolio Value), <b>Last Trade Date</b> (or Last Trade)
+        <br><span style="color:var(--teal);font-weight:600">💡 Broker RMS Risk file (daily .xls with Clt Code / Risk Val columns) can also be dropped here — it's auto-detected and imports Ac Bal, Stk Val, Tot Expo, Risk Val &amp; Risk % against each client.</span>
       </p>
       <div class="import-zone" id="eq-zone" onclick="document.getElementById('eq-file').click()">
         📊 Drag the Equity Excel file here or click to browse
@@ -2216,6 +2217,17 @@ input:focus, select:focus, textarea:focus{
       <button class="btn btn-outline" onclick="closeModal('eqImportModal')">Cancel</button>
       <button class="btn btn-teal" id="eqImportBtnGo" onclick="doEqImport()" disabled>Import to CRM</button>
     </div>
+  </div>
+</div>
+
+<!-- Equity Risk Detail Modal (RMS file data) -->
+<div class="modal-overlay" id="eqRiskModal" onclick="if(event.target===this)closeModal('eqRiskModal')">
+  <div class="modal" style="width:440px;max-width:94vw">
+    <div class="modal-hdr" style="background:var(--navy,#0a1f4d)">
+      <h3>⚠️ Risk Details</h3>
+      <button class="modal-close" onclick="closeModal('eqRiskModal')">×</button>
+    </div>
+    <div class="modal-body" id="eqRiskModalBody"></div>
   </div>
 </div>
 
@@ -2480,7 +2492,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined') return;
     try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history']){
+      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -3848,6 +3860,7 @@ function renderEqTable(){
     ${_eqSortTh(2,'Mobile','mobile')}
     ${_eqSortTh(3,'RM','rm')}
     <th onclick="sortEqTable(4)" style="cursor:pointer;white-space:nowrap">Assets${_eqArrow(4)}</th>
+    <th style="white-space:nowrap">Risk Val</th>
     <th onclick="sortEqTable(5)" style="cursor:pointer;white-space:nowrap">Last Trade${_eqArrow(5)}</th>
     <th onclick="sortEqTable(6)" style="cursor:pointer;white-space:nowrap">Last Call${_eqArrow(6)}</th>
     <th onclick="sortEqTable(7)" style="cursor:pointer;white-space:nowrap">Next Call${_eqArrow(7)}</th>
@@ -3856,7 +3869,7 @@ function renderEqTable(){
     <th>Actions</th>${CF.th('eq','status','Status')}<th>Call</th>
   </tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="14" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="15" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -3868,6 +3881,7 @@ function renderEqTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
+      <td style="white-space:nowrap">${(()=>{const rk=eqRiskFor(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
@@ -10065,11 +10079,129 @@ function parseExcelDate(val){
   return '';
 }
 
+// ══════════════════════════════════════════
+// BROKER RMS RISK FILE (daily .xls) — import & display
+// Stores a map { [cltCode]: {ac_bal, stk_val, tot_expo, risk_val, risk_pct} }
+// under DB key 'eq_risk'. Signs are FLIPPED on import so holdings/credits
+// read as positive and debits/shortfalls read as negative (broker RMS shows
+// the reverse). Latest file replaces the previous day's data.
+// ══════════════════════════════════════════
+function getEqRisk(){ return DB.get('eq_risk') || {code:{}, updated:'', count:0}; }
+function eqRiskFor(code){
+  if(!code) return null;
+  const r = getEqRisk();
+  return (r.code && r.code[String(code).trim()]) || null;
+}
+// Detect + import the RMS file. Returns true if the file was an RMS risk file.
+function tryImportRiskFile(rows){
+  // locate header row containing the RMS signature columns
+  let hdr=-1, m={};
+  const want = {
+    code:['cltcode','clientcode','cltcd'],
+    name:['cltname','clientname'],
+    ac_bal:['acbal','accountbalance','ledgerbalance'],
+    stk_val:['stkval'],
+    tot_expo:['totexpo','totalexposure'],
+    risk_val:['riskval'],
+    risk_pct:['risk','riskpct','risk%']
+  };
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const map={};
+    (rows[i]||[]).forEach((cell,ci)=>{
+      const h=normHdr(cell);
+      for(const [f,vars] of Object.entries(want)){
+        if(vars.includes(h) && map[f]===undefined) map[f]=ci;
+      }
+    });
+    // Signature: must have Clt Code + Risk Val + Stk Val to qualify as RMS file
+    if(map.code!==undefined && map.risk_val!==undefined && map.stk_val!==undefined){
+      hdr=i; m=map; break;
+    }
+  }
+  if(hdr===-1) return false; // not an RMS file → let normal import handle it
+
+  const num = v => { const n=parseFloat(String(v==null?'':v).replace(/[₹,%\s]/g,'')); return isNaN(n)?0:n; };
+  const codeMap = {};
+  let cnt=0;
+  rows.slice(hdr+1).forEach(r=>{
+    const code = String(r[m.code]==null?'':r[m.code]).trim();
+    if(!code || !/\d/.test(code)) return; // skip blanks/subtotals
+    codeMap[code] = {
+      // SIGN FLIP on balance-type fields (holdings/credit → +, debit → −)
+      ac_bal:   -num(r[m.ac_bal]),
+      stk_val:  -num(r[m.stk_val]),
+      risk_val: -num(r[m.risk_val]),
+      // exposure & risk% kept as-is (already positive in the file)
+      tot_expo: m.tot_expo!==undefined ? num(r[m.tot_expo]) : 0,
+      risk_pct: m.risk_pct!==undefined ? num(r[m.risk_pct]) : 0
+    };
+    cnt++;
+  });
+
+  eqImportData = null; // this is not a client-list import
+  const payload = {code:codeMap, updated:new Date().toISOString(), count:cnt};
+  const pv = document.getElementById('eq-preview');
+  if(pv) pv.innerHTML =
+    `<div style="background:#eef6ff;color:var(--navy,#0a1f4d);padding:12px;border-radius:8px;font-size:.85rem;font-weight:600;border:1px solid #cfe0ff">
+       ⚠️ Broker RMS Risk file detected — <b>${cnt}</b> clients' risk data ready.<br>
+       <span style="font-weight:500;color:var(--gray)">Values sign-adjusted (holdings shown +, debits −). This replaces the previous day's risk data.</span>
+       <div style="margin-top:10px"><button class="btn btn-teal" onclick='doRiskImport(${JSON.stringify(payload).replace(/'/g,"&#39;")})'>Import Risk Data</button></div>
+     </div>`;
+  const goBtn=document.getElementById('eqImportBtnGo');
+  if(goBtn) goBtn.disabled = true; // normal import button stays off for RMS files
+  return true;
+}
+function doRiskImport(payload){
+  DB.set('eq_risk', payload);
+  closeModal('eqImportModal');
+  toast(`✅ Risk data imported for ${payload.count} clients`, 'success');
+  try{ renderEqTable(); }catch(e){}
+}
+// Formats a signed rupee value compactly with colour (green +, red −).
+function fmtRiskMoney(n){
+  if(n==null || n===0) return '<span style="color:#999">—</span>';
+  const abs=Math.abs(n);
+  const s = abs>=10000000 ? (abs/10000000).toFixed(2)+'Cr'
+          : abs>=100000  ? (abs/100000).toFixed(2)+'L'
+          : abs>=1000    ? (abs/1000).toFixed(1)+'K'
+          : Math.round(abs);
+  const pos=n>0;
+  return `<span style="color:${pos?'var(--green,#16a34a)':'var(--red,#dc2626)'};font-weight:700">${pos?'+':'−'}₹${s}</span>`;
+}
+function openEqRisk(code, name){
+  const r = eqRiskFor(code);
+  const body = document.getElementById('eqRiskModalBody');
+  if(!r){
+    body.innerHTML = `<div style="padding:8px 2px"><div style="font-weight:700;font-size:1rem;margin-bottom:6px">${escapeHtml(name||'')}</div>
+      <div style="color:var(--gray)">No risk data for this client. Upload today's Broker RMS Risk file from Equity → Import.</div></div>`;
+  } else {
+    const riskColor = r.risk_pct>=90?'var(--red,#dc2626)':r.risk_pct>=50?'var(--orange,#ea580c)':'var(--green,#16a34a)';
+    const rowHtml=(label,val)=>`<div style="display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid #eef1f6">
+      <span style="color:var(--gray);font-size:.86rem">${label}</span><span style="font-size:.95rem">${val}</span></div>`;
+    body.innerHTML = `
+      <div style="font-weight:700;font-size:1.05rem;margin-bottom:4px">${escapeHtml(name||'')}</div>
+      <div style="color:var(--gray);font-size:.78rem;margin-bottom:10px">Clt Code: ${escapeHtml(String(code))}</div>
+      ${rowHtml('Ac Balance', fmtRiskMoney(r.ac_bal))}
+      ${rowHtml('Stock Value', fmtRiskMoney(r.stk_val))}
+      ${rowHtml('Total Exposure', r.tot_expo?`₹${fmtNum(r.tot_expo)}`:'—')}
+      ${rowHtml('Risk Value', fmtRiskMoney(r.risk_val))}
+      ${rowHtml('Risk %', `<b style="color:${riskColor}">${(r.risk_pct||0).toFixed(2)}%</b>`)}
+      <div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded RMS file${getEqRisk().updated?' • '+fmtDate(getEqRisk().updated.split('T')[0]):''}</div>`;
+  }
+  document.getElementById('eqRiskModal').classList.add('open');
+}
+
 function handleEqFile(input){
   const file = input.files[0];
   if(!file) return;
   readExcel(file, function(err, rows){
     if(err){ toast('File read error: '+err.message,'error'); return; }
+
+    // ── AUTO-DETECT: Broker RMS Risk file ──────────────────────────────────
+    // Recognised by its signature header columns (Clt Code + Risk Val etc).
+    // If found, import risk metrics instead of the normal client sheet.
+    if(tryImportRiskFile(rows)) return;
+
     // Find header row - look for a row containing recognizable column names
     let hdrIdx = -1, colMap = {};
     const wanted = {
