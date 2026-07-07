@@ -320,12 +320,12 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
    exceeds the screen (works on desktop & mobile). */
 #eq-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 #eq-table table{font-size:.62rem;table-layout:fixed;width:auto;}
-#eq-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
+#eq-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;position:relative;}
 #eq-table tbody td{padding:3px 6px;font-size:.62rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #eq-table tbody td small{font-size:.54rem;}
 #eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
-#eq-table .eqrz{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;user-select:none;touch-action:none;z-index:4;}
-#eq-table .eqrz:hover, #eq-table .eqrz.active{background:rgba(255,255,255,.4);}
+#eq-table .eqrz{position:absolute;top:0;right:0;width:12px;height:100%;cursor:col-resize;user-select:none;touch-action:none;z-index:6;border-right:2px solid rgba(255,255,255,.3);}
+#eq-table .eqrz:hover, #eq-table .eqrz.active{border-right-color:#ffd24d;background:rgba(255,210,77,.25);}
 body.eq-resizing{cursor:col-resize!important;user-select:none!important;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
@@ -3861,7 +3861,11 @@ function _eqRzMove(e){
   const pt = e.touches ? e.touches[0] : e;
   let nw = _eqRz.startW + (pt.clientX - _eqRz.startX);
   if(nw < 30) nw = 30;
+  const old = parseInt(_eqRz.col.style.width)||_eqRz.startW;
   _eqRz.col.style.width = nw + 'px';
+  // grow/shrink the whole table by the delta so fixed-layout applies cleanly
+  const tbl = document.querySelector('#eq-table table');
+  if(tbl){ const tw=(parseInt(tbl.style.width)||tbl.offsetWidth)+(nw-old); tbl.style.width = tw+'px'; }
 }
 function _eqRzEnd(){
   if(_eqRz){
@@ -3967,8 +3971,9 @@ function renderEqTable(){
   // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
   const _EQW = getEqColW();
   const _EQCK = ['code','name','mobile','rm','risk','acbal','lasttrade','lastcall','nextcall','followup','remarks','actions','status','call'];
+  const _eqTotW = (isAdmin?30:0) + _EQCK.reduce((s,k)=>s+_EQW[k],0);
   const _eqCg = (isAdmin?'<col style="width:30px">':'') + _EQCK.map(k=>`<col style="width:${_EQW[k]}px">`).join('');
-  let h=`<table><colgroup>${_eqCg}</colgroup><thead><tr>${BULK.th('eq')}
+  let h=`<table style="width:${_eqTotW}px"><colgroup>${_eqCg}</colgroup><thead><tr>${BULK.th('eq')}
     <th style="cursor:pointer" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
