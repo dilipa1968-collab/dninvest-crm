@@ -3831,6 +3831,17 @@ function renderEqTable(){
   if(eqSortField!==null){
     const field = eqFieldMap[eqSortField];
     data = data.slice().sort((a,b)=>{
+      // Risk Val (col 10) — sorts by the imported RMS risk_val. Clients WITHOUT
+      // risk data always sink to the bottom; default (dir=1) shows biggest + on top.
+      if(eqSortField===10){
+        const ra=eqRiskFor(a.code), rb=eqRiskFor(b.code);
+        const ha=ra!=null, hb=rb!=null;
+        if(!ha && !hb) return 0;
+        if(!ha) return 1;   // a has no data → push down
+        if(!hb) return -1;  // b has no data → push down
+        const va=ra.risk_val||0, vb=rb.risk_val||0;
+        return -eqSortDir*(va-vb); // dir=1 → descending (+ big first)
+      }
       let va=a[field], vb=b[field];
       // numeric fields
       if(['asset_value'].includes(field)){
@@ -3859,8 +3870,7 @@ function renderEqTable(){
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
     ${_eqSortTh(3,'RM','rm')}
-    <th onclick="sortEqTable(4)" style="cursor:pointer;white-space:nowrap">Assets${_eqArrow(4)}</th>
-    <th style="white-space:nowrap">Risk Val</th>
+    <th onclick="sortEqTable(10)" style="cursor:pointer;white-space:nowrap">Risk Val${_eqArrow(10)}</th>
     <th onclick="sortEqTable(5)" style="cursor:pointer;white-space:nowrap">Last Trade${_eqArrow(5)}</th>
     <th onclick="sortEqTable(6)" style="cursor:pointer;white-space:nowrap">Last Call${_eqArrow(6)}</th>
     <th onclick="sortEqTable(7)" style="cursor:pointer;white-space:nowrap">Next Call${_eqArrow(7)}</th>
@@ -3869,7 +3879,7 @@ function renderEqTable(){
     <th>Actions</th>${CF.th('eq','status','Status')}<th>Call</th>
   </tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="15" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="14" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -3880,7 +3890,6 @@ function renderEqTable(){
       <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=eqRiskFor(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
