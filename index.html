@@ -335,6 +335,17 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 #eq-table th:nth-child(14),#eq-table td:nth-child(14){width:6%;}/* Status */
 #eq-table th:nth-child(15),#eq-table td:nth-child(15){width:4%;}/* Call */
 #eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
+/* ── Freeze left columns (checkbox + Code) so they never scroll off-screen ── */
+#eq-table .eqfz-cb, #eq-table .eqfz-code{position:sticky;z-index:3;}
+#eq-table thead .eqfz-cb, #eq-table thead .eqfz-code{z-index:5;}
+#eq-table .eqfz-cb{left:0;}
+/* .eqfz-code left offset is set inline (0 for RM, 36px for admin who has checkbox) */
+#eq-table tbody td.eqfz-cb, #eq-table tbody td.eqfz-code{background:#fff;}
+#eq-table tbody tr:nth-child(even) td.eqfz-cb, #eq-table tbody tr:nth-child(even) td.eqfz-code{background:#fafbfe;}
+#eq-table tbody tr.row-inactive td.eqfz-cb, #eq-table tbody tr.row-inactive td.eqfz-code{background:#fffbf0;}
+#eq-table tbody tr.row-alert td.eqfz-cb, #eq-table tbody tr.row-alert td.eqfz-code{background:var(--red2);}
+#eq-table tbody tr:hover td.eqfz-cb, #eq-table tbody tr:hover td.eqfz-code{background:#eef4ff;}
+#eq-table td.eqfz-code, #eq-table th.eqfz-code{box-shadow:2px 0 4px -2px rgba(0,0,0,.15);}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -3900,8 +3911,9 @@ function renderEqTable(){
   const isAdmin = CU.role==='admin';
   const _eqArrow=i=>eqSortField===i?(eqSortDir===1?' ▲':' ▼'):'';
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
+  const _codeLeft = isAdmin ? 36 : 0;
   let h=`<table><thead><tr>${BULK.th('eq')}
-    ${_eqSortTh(0,'Code','code')}
+    <th class="eqfz-code" style="left:${_codeLeft}px;cursor:pointer;white-space:nowrap" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
     ${_eqSortTh(3,'RM','rm')}
@@ -3922,7 +3934,7 @@ function renderEqTable(){
     const rowCls=days>=90?'row-alert':c.status==='Inactive'?'row-inactive':'';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
-      <td>${c.code||'—'}</td>
+      <td class="eqfz-code" style="left:${_codeLeft}px">${c.code||'—'}</td>
       <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
@@ -5958,7 +5970,11 @@ async function saveClient(){
       changes: []
     });
   }
-  await DB.setClient(key,rec);
+  // Optimistic save: setClient() writes localStorage synchronously (and sets the
+  // _writing guard) BEFORE its first network await, so we can update the UI
+  // instantly instead of waiting 5-10s for the full-list Firestore transaction.
+  // The transaction runs in the background and surfaces its own sync-error toast.
+  const _savePromise = DB.setClient(key,rec);
   maybeLogMergedCall(seg, rec.id, rec.name, rec.rm);
   closeModal('clientModal');
   toast(currentEditId?'Client updated!':'Client added!','success');
@@ -5966,6 +5982,7 @@ async function saveClient(){
   else renderMfTable();
   refreshDash();
   updateBadges();
+  _savePromise.catch(()=>{});
 }
 
 // ══════════════════════════════════════════
@@ -6191,7 +6208,10 @@ async function saveCallLog(){
     clients[idx].followup_status=fuStatus;
     if(note) clients[idx].remarks=note;
     clients[idx].rm = rm;
-    await DB.setClient(key, clients[idx]);
+    // Optimistic: setClient writes localStorage + sets the write-guard synchronously
+    // before its network await, so the screen updates instantly. The full-list
+    // Firestore transaction runs in the background (surfaces its own error toast).
+    DB.setClient(key, clients[idx]).catch(()=>{});
     // Save field changes to activity_logs too (so changes are visible in Activity Log)
     if(callChanges.length>0){
       DB.addActivityLog({
@@ -12262,14 +12282,16 @@ const BULK = {
   // ── table cell builders (called from render functions) ──
   th(seg){
     if(!this.isAdmin()) return '';
-    return `<th style="width:36px;text-align:center" onclick="event.stopPropagation()">`
+    const fz = seg==='eq'?' eqfz-cb':'';
+    return `<th class="${fz.trim()}" style="width:36px;text-align:center" onclick="event.stopPropagation()">`
       + `<input type="checkbox" id="bulk-all-${seg}" title="Select all on this page" `
       + `onclick="event.stopPropagation()" onchange="BULK.togglePage('${seg}',this.checked)"></th>`;
   },
   td(seg,id){
     if(!this.isAdmin()) return '';
     const ck=this.sel[seg].has(id)?'checked':'';
-    return `<td style="text-align:center" onclick="event.stopPropagation()">`
+    const fz = seg==='eq'?' eqfz-cb':'';
+    return `<td class="${fz.trim()}" style="text-align:center" onclick="event.stopPropagation()">`
       + `<input type="checkbox" class="bulk-cb" data-id="${id}" ${ck} `
       + `onclick="event.stopPropagation()" onchange="BULK.toggle('${seg}','${id}',this.checked)"></td>`;
   },
