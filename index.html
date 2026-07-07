@@ -5794,10 +5794,9 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Client Code</label><input id="f_code" value="${c?.code||''}" placeholder="e.g. 12345"></div>
       <div class="form-field"><label>Client Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
-      <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
+      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
     </div>
     <div class="form-row three">
-      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
       ${rmFieldHtml('equity', c, 'Equity RM *')}
     </div>
@@ -5839,6 +5838,7 @@ function clientForm(seg, c){
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>
     <div class="form-row">
+      <div class="form-field"><label>📱 Registered Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM can edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     ${callMergeSection()}`;
@@ -5847,11 +5847,10 @@ function clientForm(seg, c){
     <div class="form-section">Basic Information</div>
     <div class="form-row three">
       <div class="form-field"><label>Investor Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
-      <div class="form-field"><label>Mobile Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
       <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase" ${CU.role!=='admin'?'readonly':''}></div>
+      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       ${rmFieldHtml('mf', c, 'MF RM *')}
     </div>
     <div class="form-row">
@@ -5892,6 +5891,7 @@ function clientForm(seg, c){
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>
     <div class="form-row">
+      <div class="form-field"><label>📱 Registered Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM can edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     ${callMergeSection()}`;
@@ -5983,6 +5983,15 @@ async function saveClient(){
   }
   // Original mobile is now editable by everyone (admin & RM).
   const _mobileVal = gv2('f_mobile');
+  // Alert/confirm when the Registered (original) number is changed while editing.
+  if(currentEditId){
+    const _exC = clients.find(x=>x.id===currentEditId);
+    if(_exC && (_exC.mobile||'') !== _mobileVal){
+      if(!confirm('⚠️ You are changing the REGISTERED NUMBER.\n\nOld: '+(_exC.mobile||'(none)')+'\nNew: '+(_mobileVal||'(none)')+'\n\nDo you want to save this change?')){
+        return; // abort save; user can review
+      }
+    }
+  }
   if(seg==='equity'){
     rec={
       id: newId,
