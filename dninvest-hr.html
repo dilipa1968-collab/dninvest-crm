@@ -1946,6 +1946,10 @@ async function sendHeartbeatPing(){
   // Warna fresh late-night login ka time hi out-time ban jata hai (bug: 20:32 case).
   // Din-bhar wala purana heartbeat preserve rahega, autoOutTimeCheck usi se out bharega.
   if(_hbBlockedSession) return;
+  // App background me (screen lock / recent apps) hai to ping mat bhejo.
+  // Warna RM 5 baje kaam band kar de par tab zinda rahe to out-time galat
+  // (17:34 wala Komal case) aa jata hai. Sirf foreground/active ping karo.
+  if(typeof document!=='undefined' && document.visibilityState==='hidden') return;
   try{
     const ist=_hbIstNow();
     const hhmm=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
