@@ -3831,16 +3831,18 @@ function renderEqTable(){
   if(eqSortField!==null){
     const field = eqFieldMap[eqSortField];
     data = data.slice().sort((a,b)=>{
-      // Risk Val (col 10) — sorts by the imported RMS risk_val. Clients WITHOUT
-      // risk data always sink to the bottom; default (dir=1) shows biggest + on top.
+      // Risk Val (col 10) — one click: biggest + on top → down to biggest −.
+      // Second click: biggest − (debit) on top → down to biggest +.
+      // Clients WITHOUT risk data always sink to the very bottom, either way.
       if(eqSortField===10){
         const ra=eqRiskFor(a.code), rb=eqRiskFor(b.code);
         const ha=ra!=null, hb=rb!=null;
         if(!ha && !hb) return 0;
-        if(!ha) return 1;   // a has no data → push down
-        if(!hb) return -1;  // b has no data → push down
+        if(!ha) return 1;   // a has no data → push to bottom
+        if(!hb) return -1;  // b has no data → push to bottom
         const va=ra.risk_val||0, vb=rb.risk_val||0;
-        return -eqSortDir*(va-vb); // dir=1 → descending (+ big first)
+        if(va===vb) return 0;
+        return -eqSortDir*(va-vb); // dir=1 → + on top; dir=-1 → − on top
       }
       let va=a[field], vb=b[field];
       // numeric fields
