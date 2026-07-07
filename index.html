@@ -314,16 +314,19 @@ tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
 tbody td{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
-/* ── Equity table: columns auto-size to their content (tight gaps, nothing
-   truncated). On wide screens it fits; on narrow/mobile screens the wrapper
-   scrolls horizontally. Remarks is the only capped column (can be very long). */
+/* ── Equity table: fixed layout with user-resizable columns (drag the handle
+   on any header edge). Widths persist in localStorage. Content truncates with
+   "…" to the set width; drag wider to reveal more. Wrapper scrolls if the total
+   exceeds the screen (works on desktop & mobile). */
 #eq-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-#eq-table table{font-size:.62rem;table-layout:auto;width:auto;min-width:100%;}
-#eq-table thead th{padding:6px 5px;font-size:.62rem;white-space:nowrap;}
-#eq-table tbody td{padding:3px 5px;font-size:.62rem;max-width:none;white-space:nowrap;}
+#eq-table table{font-size:.62rem;table-layout:fixed;width:auto;}
+#eq-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
+#eq-table tbody td{padding:3px 6px;font-size:.62rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #eq-table tbody td small{font-size:.54rem;}
 #eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
-#eq-table tbody td.eqc-rmk{max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+#eq-table .eqrz{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;user-select:none;touch-action:none;z-index:4;}
+#eq-table .eqrz:hover, #eq-table .eqrz.active{background:rgba(255,255,255,.4);}
+body.eq-resizing{cursor:col-resize!important;user-select:none!important;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -3803,6 +3806,77 @@ function resetFilters(t){
   else if(t==='leads') filterLeads();
 }
 
+// ══════════════════════════════════════════
+// EQUITY TABLE — user-resizable columns (drag header edge; widths persist)
+// ══════════════════════════════════════════
+const EQ_DEFAULT_W = {
+  code:64, name:150, mobile:92, rm:64, risk:78, acbal:72,
+  lasttrade:88, lastcall:76, nextcall:76, followup:92, remarks:110,
+  actions:88, status:60, call:42
+};
+const EQ_COLKEYS = ['code','name','mobile','rm','risk','acbal','lasttrade','lastcall','nextcall','followup','remarks','actions','status','call'];
+function getEqColW(){
+  let saved={};
+  try{ saved = JSON.parse(localStorage.getItem('dninvest_eqcolw')||'{}'); }catch(e){}
+  const w={};
+  EQ_COLKEYS.forEach(k=>{ w[k] = (saved[k] && saved[k]>=24) ? saved[k] : EQ_DEFAULT_W[k]; });
+  return w;
+}
+function saveEqColW(w){ try{ localStorage.setItem('dninvest_eqcolw', JSON.stringify(w)); }catch(e){} }
+// Attach drag handles to each header, mapping to the matching <col> element.
+function enableEqColResize(){
+  const tbl = document.querySelector('#eq-table table');
+  if(!tbl) return;
+  const cols = tbl.querySelectorAll('colgroup col');
+  const ths  = tbl.querySelectorAll('thead th');
+  if(!cols.length || !ths.length) return;
+  const isAdmin = (CU && CU.role==='admin');
+  const off = isAdmin ? 1 : 0; // first col/th is the checkbox for admin
+  const W = getEqColW();
+  EQ_COLKEYS.forEach((key, i)=>{
+    const th = ths[i+off]; const col = cols[i+off];
+    if(!th || !col) return;
+    const handle = document.createElement('span');
+    handle.className = 'eqrz';
+    handle.addEventListener('mousedown', e=>_eqRzStart(e, col, key, W));
+    handle.addEventListener('touchstart', e=>_eqRzStart(e, col, key, W), {passive:false});
+    th.appendChild(handle);
+  });
+}
+let _eqRz = null;
+function _eqRzStart(e, col, key, W){
+  e.preventDefault(); e.stopPropagation();
+  const pt = e.touches ? e.touches[0] : e;
+  _eqRz = { col, key, W, startX: pt.clientX, startW: parseInt(col.style.width)||EQ_DEFAULT_W[key] };
+  document.body.classList.add('eq-resizing');
+  e.target.classList.add('active');
+  document.addEventListener('mousemove', _eqRzMove);
+  document.addEventListener('mouseup', _eqRzEnd);
+  document.addEventListener('touchmove', _eqRzMove, {passive:false});
+  document.addEventListener('touchend', _eqRzEnd);
+}
+function _eqRzMove(e){
+  if(!_eqRz) return;
+  if(e.cancelable) e.preventDefault();
+  const pt = e.touches ? e.touches[0] : e;
+  let nw = _eqRz.startW + (pt.clientX - _eqRz.startX);
+  if(nw < 30) nw = 30;
+  _eqRz.col.style.width = nw + 'px';
+}
+function _eqRzEnd(){
+  if(_eqRz){
+    _eqRz.W[_eqRz.key] = parseInt(_eqRz.col.style.width)||EQ_DEFAULT_W[_eqRz.key];
+    saveEqColW(_eqRz.W);
+  }
+  _eqRz = null;
+  document.body.classList.remove('eq-resizing');
+  document.querySelectorAll('#eq-table .eqrz.active').forEach(el=>el.classList.remove('active'));
+  document.removeEventListener('mousemove', _eqRzMove);
+  document.removeEventListener('mouseup', _eqRzEnd);
+  document.removeEventListener('touchmove', _eqRzMove);
+  document.removeEventListener('touchend', _eqRzEnd);
+}
+
 function renderEqTable(){
   let data = getMyEqClients();
   // Parse the RMS risk map ONCE per render (was being re-parsed per comparison
@@ -3891,7 +3965,10 @@ function renderEqTable(){
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
   // Column widths (%) in display order. Checkbox col only exists for admin.
   // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
-  let h=`<table><thead><tr>${BULK.th('eq')}
+  const _EQW = getEqColW();
+  const _EQCK = ['code','name','mobile','rm','risk','acbal','lasttrade','lastcall','nextcall','followup','remarks','actions','status','call'];
+  const _eqCg = (isAdmin?'<col style="width:30px">':'') + _EQCK.map(k=>`<col style="width:${_EQW[k]}px">`).join('');
+  let h=`<table><colgroup>${_eqCg}</colgroup><thead><tr>${BULK.th('eq')}
     <th style="cursor:pointer" onclick="sortEqTable(0)">Code${_eqArrow(0)}</th>
     ${_eqSortTh(1,'Name','name')}
     ${_eqSortTh(2,'Mobile','mobile')}
@@ -3939,6 +4016,7 @@ function renderEqTable(){
   });
   h+='</tbody></table>';
   document.getElementById('eq-table').innerHTML=h;
+  enableEqColResize();
   BULK.afterRender('eq');
   renderPg('eq',data.length,eqPage);
 }
