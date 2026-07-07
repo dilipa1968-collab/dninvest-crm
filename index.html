@@ -324,6 +324,7 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
 #eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #eq-table tbody td small{font-size:.52rem;}
 #eq-table td .btn-icon{padding:1px 1px;font-size:.66rem;}
+#eq-table tbody td.eqc-wrap{white-space:normal;word-break:break-word;line-height:1.15;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -3891,7 +3892,7 @@ function renderEqTable(){
   const _eqSortTh=(i,label,cfCol)=>CF.th('eq',cfCol,`<span onclick="sortEqTable(${i})" style="cursor:pointer">${label}${_eqArrow(i)}</span>`);
   // Column widths (%) in display order. Checkbox col only exists for admin.
   // Order: Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call
-  const _eqCols = [6,12,8,6,7,7,7,6,6,7,6,9,6,4];
+  const _eqCols = [5,17,7,5,6,6,7,6,6,10,6,8,5,3];
   let _colGroup = (isAdmin?'<col style="width:3%">':'') +
     _eqCols.map(w=>`<col style="width:${w}%">`).join('');
   let h=`<table><colgroup>${_colGroup}</colgroup><thead><tr>${BULK.th('eq')}
@@ -3917,7 +3918,7 @@ function renderEqTable(){
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
-      <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td class="eqc-wrap" style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
@@ -3925,7 +3926,7 @@ function renderEqTable(){
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
-      <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
+      <td class="eqc-wrap"><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
       <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
         <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
