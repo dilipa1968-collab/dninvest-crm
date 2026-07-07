@@ -3248,9 +3248,15 @@ function initApp(){
   const dematNav = document.getElementById('nav-eq-demat');
   if(dematNav) dematNav.style.display = hasEq ? 'flex' : 'none';
 
-  // Bulk Excel import is admin-only
+  // Bulk Excel import is admin-only; RMs with risk_upload permission also get it
+  // (so they can upload the daily Broker RMS Risk file).
   const eqImportBtn=document.getElementById('eqImportBtn');
-  if(eqImportBtn) eqImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const canImport = CU.role==='admin' || CU.risk_upload===true;
+  if(eqImportBtn){
+    eqImportBtn.style.display = canImport ? 'inline-flex' : 'none';
+    // Relabel for risk-only RMs so it's clear what they can upload
+    if(CU.role!=='admin' && CU.risk_upload===true){ eqImportBtn.innerHTML='📥 Upload Risk File'; }
+  }
   const eqRmUpdateBtn=document.getElementById('eqRmUpdateBtn');
   if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqPanUpdateBtn=document.getElementById('eqPanUpdateBtn');
@@ -3921,7 +3927,7 @@ function renderEqTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
-      <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?fmtRiskMoney(rk.ac_bal):'<span style="color:#ccc">—</span>';})()}</td>
+      <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.ac_bal)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
