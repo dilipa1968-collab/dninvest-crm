@@ -1946,10 +1946,6 @@ async function sendHeartbeatPing(){
   // Warna fresh late-night login ka time hi out-time ban jata hai (bug: 20:32 case).
   // Din-bhar wala purana heartbeat preserve rahega, autoOutTimeCheck usi se out bharega.
   if(_hbBlockedSession) return;
-  // App background me (screen lock / recent apps) hai to ping mat bhejo.
-  // Warna RM 5 baje kaam band kar de par tab zinda rahe to out-time galat
-  // (17:34 wala Komal case) aa jata hai. Sirf foreground/active ping karo.
-  if(typeof document!=='undefined' && document.visibilityState==='hidden') return;
   try{
     const ist=_hbIstNow();
     const hhmm=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
@@ -1964,6 +1960,18 @@ function startHeartbeat(){
   _hbBlockedSession = (cutoff!==null && istH>=cutoff); // cutoff ke baad fresh login → block
   sendHeartbeatPing(); // immediate first ping (blocked session me khud skip ho jayega)
   _heartbeatTimer = setInterval(sendHeartbeatPing, 5*60000); // every 5 min
+  bindHbEdgePings();
+}
+// Background me browser 5-min timer ko throttle/pause kar deta hai — isliye tab
+// hide ya close hone ke theek pehle ek extra ping bhejte hain. Isse "last active"
+// moment (jab RM ne app se dhyan hataya ya band kiya) tighter capture hota hai,
+// aur out-time 5 min purana ya throttle ki wajah se truncated nahi rehta.
+let _hbEdgeBound=false;
+function bindHbEdgePings(){
+  if(_hbEdgeBound) return; _hbEdgeBound=true;
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') sendHeartbeatPing(); });
+  window.addEventListener('pagehide', ()=>{ sendHeartbeatPing(); });
+  window.addEventListener('blur', ()=>{ sendHeartbeatPing(); });
 }
 function stopHeartbeat(){
   if(_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer=null; }
