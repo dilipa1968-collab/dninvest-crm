@@ -2526,6 +2526,7 @@ const DB = {
         }
       }
     }catch(e){ console.log('Firebase sync error:',e); }
+    try{ if(typeof clearEqRiskCache==='function') clearEqRiskCache(); }catch(e){}
   }
 };
 
@@ -3788,6 +3789,10 @@ function resetFilters(t){
 
 function renderEqTable(){
   let data = getMyEqClients();
+  // Parse the RMS risk map ONCE per render (was being re-parsed per comparison
+  // during sort → tens of thousands of JSON.parse of a 2700-entry object → hang).
+  const _riskMap = (getEqRisk().code) || {};
+  const _riskOf = code => (code ? _riskMap[String(code).trim()] : null) || null;
   const q=(document.getElementById('eq-search')||{value:''}).value.toLowerCase();
   const st=(document.getElementById('eq-status')||{value:''}).value;
   const rm=(document.getElementById('eq-rm')||{value:''}).value;
@@ -3835,7 +3840,7 @@ function renderEqTable(){
       // Second click: biggest − (debit) on top → down to biggest +.
       // Clients WITHOUT risk data always sink to the very bottom, either way.
       if(eqSortField===10){
-        const ra=eqRiskFor(a.code), rb=eqRiskFor(b.code);
+        const ra=_riskOf(a.code), rb=_riskOf(b.code);
         const ha=ra!=null, hb=rb!=null;
         if(!ha && !hb) return 0;
         if(!ha) return 1;   // a has no data → push to bottom
@@ -3892,7 +3897,7 @@ function renderEqTable(){
       <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td style="white-space:nowrap">${(()=>{const rk=eqRiskFor(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
+      <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
@@ -10097,7 +10102,13 @@ function parseExcelDate(val){
 // read as positive and debits/shortfalls read as negative (broker RMS shows
 // the reverse). Latest file replaces the previous day's data.
 // ══════════════════════════════════════════
-function getEqRisk(){ return DB.get('eq_risk') || {code:{}, updated:'', count:0}; }
+let _eqRiskCache=null;
+function getEqRisk(){
+  if(_eqRiskCache) return _eqRiskCache;
+  _eqRiskCache = DB.get('eq_risk') || {code:{}, updated:'', count:0};
+  return _eqRiskCache;
+}
+function clearEqRiskCache(){ _eqRiskCache=null; }
 function eqRiskFor(code){
   if(!code) return null;
   const r = getEqRisk();
@@ -10164,6 +10175,7 @@ function tryImportRiskFile(rows){
 }
 function doRiskImport(payload){
   DB.set('eq_risk', payload);
+  clearEqRiskCache();
   closeModal('eqImportModal');
   toast(`✅ Risk data imported for ${payload.count} clients`, 'success');
   try{ renderEqTable(); }catch(e){}
