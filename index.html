@@ -314,6 +314,27 @@ tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
 tbody td{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;text-transform:uppercase;}
 tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
+/* ── Equity table compact fit: squeeze 15 cols into one screen (no h-scroll) ── */
+#eq-table table{font-size:.6rem;table-layout:fixed;width:100%;}
+#eq-table thead th{padding:6px 3px;font-size:.6rem;}
+#eq-table tbody td{padding:3px 3px;font-size:.6rem;max-width:none;}
+#eq-table tbody td small{font-size:.52rem;}
+/* per-column widths (order: [bulk] Code Name Mobile RM Risk AcBal LastTrade LastCall NextCall Followup Remarks Actions Status Call) */
+#eq-table th:nth-child(2),#eq-table td:nth-child(2){width:6%;}   /* Code */
+#eq-table th:nth-child(3),#eq-table td:nth-child(3){width:13%;} /* Name */
+#eq-table th:nth-child(4),#eq-table td:nth-child(4){width:8%;}  /* Mobile */
+#eq-table th:nth-child(5),#eq-table td:nth-child(5){width:7%;}  /* RM */
+#eq-table th:nth-child(6),#eq-table td:nth-child(6){width:8%;}  /* Risk Val */
+#eq-table th:nth-child(7),#eq-table td:nth-child(7){width:8%;}  /* Ac Bal */
+#eq-table th:nth-child(8),#eq-table td:nth-child(8){width:8%;}  /* Last Trade */
+#eq-table th:nth-child(9),#eq-table td:nth-child(9){width:7%;}  /* Last Call */
+#eq-table th:nth-child(10),#eq-table td:nth-child(10){width:7%;}/* Next Call */
+#eq-table th:nth-child(11),#eq-table td:nth-child(11){width:8%;}/* Follow-up */
+#eq-table th:nth-child(12),#eq-table td:nth-child(12){width:8%;}/* Remarks */
+#eq-table th:nth-child(13),#eq-table td:nth-child(13){width:9%;}/* Actions */
+#eq-table th:nth-child(14),#eq-table td:nth-child(14){width:6%;}/* Status */
+#eq-table th:nth-child(15),#eq-table td:nth-child(15){width:4%;}/* Call */
+#eq-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
 .col-resize-handle{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
   user-select:none;z-index:3;}
 .col-resize-handle:hover, .col-resize-handle.active{background:rgba(255,255,255,.35);}
@@ -3839,13 +3860,14 @@ function renderEqTable(){
       // Risk Val (col 10) — one click: biggest + on top → down to biggest −.
       // Second click: biggest − (debit) on top → down to biggest +.
       // Clients WITHOUT risk data always sink to the very bottom, either way.
-      if(eqSortField===10){
+      if(eqSortField===10 || eqSortField===11){
         const ra=_riskOf(a.code), rb=_riskOf(b.code);
         const ha=ra!=null, hb=rb!=null;
         if(!ha && !hb) return 0;
         if(!ha) return 1;   // a has no data → push to bottom
         if(!hb) return -1;  // b has no data → push to bottom
-        const va=ra.risk_val||0, vb=rb.risk_val||0;
+        const fld = eqSortField===11 ? 'ac_bal' : 'risk_val';
+        const va=ra[fld]||0, vb=rb[fld]||0;
         if(va===vb) return 0;
         return -eqSortDir*(va-vb); // dir=1 → + on top; dir=-1 → − on top
       }
@@ -3878,6 +3900,7 @@ function renderEqTable(){
     ${_eqSortTh(2,'Mobile','mobile')}
     ${_eqSortTh(3,'RM','rm')}
     <th onclick="sortEqTable(10)" style="cursor:pointer;white-space:nowrap">Risk Val${_eqArrow(10)}</th>
+    <th onclick="sortEqTable(11)" style="cursor:pointer;white-space:nowrap">Ac Bal${_eqArrow(11)}</th>
     <th onclick="sortEqTable(5)" style="cursor:pointer;white-space:nowrap">Last Trade${_eqArrow(5)}</th>
     <th onclick="sortEqTable(6)" style="cursor:pointer;white-space:nowrap">Last Call${_eqArrow(6)}</th>
     <th onclick="sortEqTable(7)" style="cursor:pointer;white-space:nowrap">Next Call${_eqArrow(7)}</th>
@@ -3886,7 +3909,7 @@ function renderEqTable(){
     <th>Actions</th>${CF.th('eq','status','Status')}<th>Call</th>
   </tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="14" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="15" style="text-align:center;padding:36px;color:#bbb">No equity clients. <a href="#" onclick="openAddClient('equity')" style="color:var(--navy)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
@@ -3898,6 +3921,7 @@ function renderEqTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
+      <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?fmtRiskMoney(rk.ac_bal):'<span style="color:#ccc">—</span>';})()}</td>
       <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
@@ -8114,6 +8138,12 @@ function userForm(u){
         Also give MF Desk access (can view/enter MF Transactions for any RM, in addition to their own)
       </label>
     </div>
+    <div class="form-field" id="uf_risk_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
+        <input type="checkbox" id="uf_risk_upload" ${u?.risk_upload?'checked':''}>
+        Allow Broker RMS Risk file upload (daily .xls with Risk Val / Ac Bal)
+      </label>
+    </div>
     <div class="form-field"><label>Segments Access</label>
       <div style="display:flex;gap:12px;margin-top:6px">
         <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;text-transform:none;letter-spacing:0">
@@ -8133,6 +8163,7 @@ function saveUser(){
   const role=document.getElementById('uf_role').value;
   const pinVal=document.getElementById('uf_pin')?.value||'';
   const mfDeskAccess = role==='rm' && !!document.getElementById('uf_mfdesk_access')?.checked;
+  const riskUpload = role==='rm' && !!document.getElementById('uf_risk_upload')?.checked;
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
     toast('PIN must be 4 digits (0-9)','error'); return;
   }
@@ -8149,7 +8180,7 @@ function saveUser(){
     if(idx>=0){
       const mob=document.getElementById('uf_mobile').value.trim();
       const eml=document.getElementById('uf_email').value.trim();
-      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess};
+      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload};
       if(pwd) users[idx].password=pwd;
       if(role==='rm' && pinVal) users[idx].pin=pinVal;
     }
@@ -8158,7 +8189,7 @@ function saveUser(){
     if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
     const mob2=document.getElementById('uf_mobile').value.trim();
     const eml2=document.getElementById('uf_email').value.trim();
-    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess};
+    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload};
     if(role==='rm' && pinVal) newUser.pin=pinVal;
     users.push(newUser);
   }
@@ -9670,6 +9701,8 @@ function onUserRoleChange(sel){
   if(pinWrap) pinWrap.style.display = sel.value==='rm' ? '' : 'none';
   const mfDeskWrap = document.getElementById('uf_mfdesk_wrap');
   if(mfDeskWrap) mfDeskWrap.style.display = sel.value==='rm' ? '' : 'none';
+  const riskWrap = document.getElementById('uf_risk_wrap');
+  if(riskWrap) riskWrap.style.display = sel.value==='rm' ? '' : 'none';
 }
 
 
@@ -10141,6 +10174,19 @@ function tryImportRiskFile(rows){
     }
   }
   if(hdr===-1) return false; // not an RMS file → let normal import handle it
+
+  // Permission gate: only admin, or an RM explicitly granted risk_upload by admin.
+  if(!(CU && (CU.role==='admin' || CU.risk_upload===true))){
+    const pv0 = document.getElementById('eq-preview');
+    if(pv0) pv0.innerHTML =
+      `<div style="background:#fff3f3;color:var(--red,#dc2626);padding:12px;border-radius:8px;font-size:.85rem;font-weight:600;border:1px solid #f5c2c2">
+         🔒 This is a Broker RMS Risk file. You don't have permission to upload it.<br>
+         <span style="font-weight:500;color:var(--gray)">Please ask the admin to enable "Allow Broker RMS Risk file upload" for your account.</span>
+       </div>`;
+    const goBtn0=document.getElementById('eqImportBtnGo');
+    if(goBtn0) goBtn0.disabled = true;
+    return true; // handled (blocked) — don't fall through to normal import
+  }
 
   const num = v => { const n=parseFloat(String(v==null?'':v).replace(/[₹,%\s]/g,'')); return isNaN(n)?0:n; };
   const codeMap = {};
