@@ -1178,6 +1178,14 @@ input:focus, select:focus, textarea:focus{
               <label>Amount (₹) *</label>
               <input type="number" id="mftxn-amount" placeholder="e.g. 25000">
             </div>
+            <div class="form-field" id="mftxn-firstpay-wrap" style="min-width:160px;display:none">
+              <label id="mftxn-firstpay-label">First Payment (₹)</label>
+              <input type="number" id="mftxn-firstpay" placeholder="e.g. 1000">
+            </div>
+            <div class="form-field" id="mftxn-startdate-wrap" style="min-width:160px;display:none">
+              <label>Start Date *</label>
+              <input type="date" id="mftxn-startdate">
+            </div>
             <div class="form-field" style="min-width:200px;position:relative">
               <label>Fund Name *</label>
               <input type="text" id="mftxn-fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('mftxn-fund','mftxn-fund-results')" onfocus="searchFundName('mftxn-fund','mftxn-fund-results')">
@@ -1191,14 +1199,6 @@ input:focus, select:focus, textarea:focus{
             <div class="form-field" style="min-width:160px">
               <label>Date *</label>
               <input type="date" id="mftxn-date">
-            </div>
-            <div class="form-field" id="mftxn-firstpay-wrap" style="min-width:160px;display:none">
-              <label id="mftxn-firstpay-label">First Payment (₹)</label>
-              <input type="number" id="mftxn-firstpay" placeholder="e.g. 1000">
-            </div>
-            <div class="form-field" id="mftxn-startdate-wrap" style="min-width:160px;display:none">
-              <label>Start Date *</label>
-              <input type="date" id="mftxn-startdate">
             </div>
             <div class="form-field" style="justify-content:flex-end">
               <label>&nbsp;</label>
@@ -1934,6 +1934,10 @@ input:focus, select:focus, textarea:focus{
         </div>
         <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
       </div>
+      <div class="form-row" id="biz_schedule_wrap" style="display:none">
+        <div class="form-field"><label id="biz_firstpay_label">First Payment (₹)</label><input id="biz_firstpay" type="number" placeholder="e.g. 1000"></div>
+        <div class="form-field"><label>Start Date *</label><input id="biz_startdate" type="date"></div>
+      </div>
       <div class="form-row">
         <div class="form-field" style="position:relative"><label>Fund Name *</label>
           <input id="biz_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_fund','biz-fund-results')" onfocus="searchFundName('biz_fund','biz-fund-results')">
@@ -1946,10 +1950,6 @@ input:focus, select:focus, textarea:focus{
           <input id="biz_target_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_target_fund','biz-target-fund-results')" onfocus="searchFundName('biz_target_fund','biz-target-fund-results')">
           <div id="biz-target-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
         </div>
-      </div>
-      <div class="form-row" id="biz_schedule_wrap" style="display:none">
-        <div class="form-field"><label id="biz_firstpay_label">First Payment (₹)</label><input id="biz_firstpay" type="number" placeholder="e.g. 1000"></div>
-        <div class="form-field"><label>Start Date *</label><input id="biz_startdate" type="date"></div>
       </div>
     </div>
     <div class="modal-footer">
