@@ -2508,6 +2508,19 @@ const DB = {
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
+          if(key==='eq_risk'){
+            // eq_risk Firestore me COMPACT form me rehta hai: {codeJson:string, updated, count}.
+            // Yahan wapas normal shape {code:{...}, updated, count} me rehydrate karte hain
+            // taaki getEqRisk()/eqRiskFor() bina kisi change ke chalte rahein.
+            // Backward-compatible: agar purana {code:{...}} format mila to seedha use.
+            let codeObj={};
+            if(d && typeof d.codeJson==='string'){ try{ codeObj=JSON.parse(d.codeJson)||{}; }catch(_){ codeObj={}; } }
+            else if(d && d.code && typeof d.code==='object'){ codeObj=d.code; }
+            const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
+            localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
+            console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
+            continue;
+          }
           if(Array.isArray(d)){
             if(key==='call_logs'){
               // append-only & shared: merge server + any local-only entries by id
@@ -10393,8 +10406,27 @@ function tryImportRiskFile(rows){
   if(goBtn) goBtn.disabled = true; // normal import button stays off for RMS files
   return true;
 }
+// eq_risk ka data 3000+ clients ka hai. Agar poora nested map (code:{...}) native
+// Firestore fields me store karein to har numeric field index hota hai → 40,000
+// index-entries/doc limit cross → "too many index entries for entity .../eq_risk"
+// sync error. Fix: bade code-map ko EK JSON STRING me store karo (poora doc = 1
+// index entry). localStorage me normal object shape rakhte hain, isliye getEqRisk()
+// / eqRiskFor() bilkul waise hi chalte hain. Read-time rehydration syncFromFirebase
+// me handle hota hai (codeJson → code).
+function saveEqRisk(payload){
+  DB.setLocal('eq_risk', payload); // local: normal shape {code:{...}, updated, count}
+  try{
+    if(typeof fdb!=='undefined'){
+      fdb.collection('crm_data').doc('eq_risk').set({
+        data:{ codeJson: JSON.stringify(payload.code||{}), updated:payload.updated||'', count:payload.count||0 },
+        updated:new Date().toISOString()
+      }).then(()=>console.log('Firebase synced: eq_risk (compact,', payload.count,'clients)'))
+        .catch(e=>{ console.log('Firebase error eq_risk:',e); toast('Sync error: '+e.message,'error'); });
+    }
+  }catch(e){}
+}
 function doRiskImport(payload){
-  DB.set('eq_risk', payload);
+  saveEqRisk(payload);
   clearEqRiskCache();
   closeModal('eqImportModal');
   toast(`✅ Risk data imported for ${payload.count} clients`, 'success');
