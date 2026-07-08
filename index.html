@@ -2009,8 +2009,12 @@ input:focus, select:focus, textarea:focus{
         Adding <b id="atm-client-name"></b> to Mutual Fund. The Equity record stays unchanged.
       </div>
       <div class="form-field" style="margin-bottom:14px">
-        <label>PAN (required)</label>
+        <label>PAN <span id="atm-pan-req" style="color:var(--red)">(required)</span></label>
         <input type="text" id="atm-pan" maxlength="10" style="text-transform:uppercase" placeholder="ABCDE1234F">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.8rem;cursor:pointer">
+          <input type="checkbox" id="atm-minor" onchange="document.getElementById('atm-pan-req').style.display=this.checked?'none':''">
+          👶 Minor (PAN optional / guardian's PAN allowed)
+        </label>
       </div>
       <div class="form-field" style="margin-bottom:4px">
         <label>MF RM</label>
@@ -4470,6 +4474,8 @@ function addEquityToMf(eqId){
   _atmEqId=eqId;
   document.getElementById('atm-client-name').textContent=eq.name;
   document.getElementById('atm-pan').value=(eq.pan||'').toUpperCase();
+  const _atmMinor=document.getElementById('atm-minor'); if(_atmMinor){ _atmMinor.checked=false; }
+  const _atmReq=document.getElementById('atm-pan-req'); if(_atmReq){ _atmReq.style.display=''; }
 
   // RM dropdown: MF RM list, defaulting to the equity RM if they also do MF
   // Only Admin can change the MF RM — RMs can only add to their own name.
@@ -4494,18 +4500,22 @@ async function confirmAddEquityToMf(){
   const eq=eqClients.find(x=>x.id===eqId);
   if(!eq){ toast('Equity client not found','error'); closeModal('addToMfModal'); return; }
 
+  const isMinor = document.getElementById('atm-minor')?.checked || false;
   let pan=(document.getElementById('atm-pan').value||'').trim().toUpperCase();
-  if(!pan){ toast('PAN is required to add as MF Investor','error'); return; }
-  if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+  if(!pan && !isMinor){ toast('PAN is required to add as MF Investor','error'); return; }
+  if(pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
 
   const mfRm=document.getElementById('atm-rm').value;
   if(!mfRm){ toast('Please select an MF RM','error'); return; }
 
   const mfClients=DB.get('mf_clients')||[];
   const cleanMob=v=>String(v||'').replace(/\D/g,'').slice(-10);
-  // Duplicate guards: same PAN, or same mobile/name already in MF
-  const dupPan=mfClients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
-  if(dupPan){ toast(`⚠️ Already an MF Investor: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+  // Duplicate guards: same PAN, or same mobile/name already in MF.
+  // For a minor the PAN may be the guardian's (already used) — skip the PAN block.
+  if(pan && !isMinor){
+    const dupPan=mfClients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
+    if(dupPan){ toast(`⚠️ Already an MF Investor: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+  }
   const mob=cleanMob(eq.mobile);
   const dupOther=mfClients.find(c=>(mob && cleanMob(c.mobile)===mob) || (c.name||'').trim().toUpperCase()===(eq.name||'').trim().toUpperCase());
   if(dupOther){ toast(`⚠️ "${dupOther.name}" already exists in Mutual Fund`,'error'); return; }
@@ -4514,7 +4524,7 @@ async function confirmAddEquityToMf(){
   while(mfClients.some(x=>x.id===newId)) newId=uid();
   const rec={
     id:newId, name:eq.name, mobile:eq.mobile||'', pan, email:eq.email||'',
-    rm:mfRm, status:'Prospect',
+    rm:mfRm, status:'Prospect', is_minor:isMinor,
     aum:null, sip_amount:null, sip_count:null,
     last_invest_date:'', last_call_date:eq.last_call_date||'',
     next_call:'', followup_status:'', remarks:`Added from Equity${eq.code?' (Code: '+eq.code+')':''}`,
@@ -4537,13 +4547,15 @@ async function convertLead(id,seg){
   if(!lead) return;
   const label = seg==='equity'?'Equity Client':'MF Investor';
 
-  let pan='', clientCode='';
+  let pan='', clientCode='', isMinor=false;
   if(seg==='mf'){
-    pan=prompt(`Enter PAN for "${lead.name}" (required for MF Investor):`,'');
+    pan=prompt(`Enter PAN for "${lead.name}"\n(Leave blank if this is a MINOR without own PAN):`,'');
     if(pan===null) return;
     pan=pan.trim().toUpperCase();
-    if(!pan){ toast('PAN is required to convert to MF Investor','error'); return; }
-    if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+    if(!pan){
+      isMinor = confirm(`No PAN entered.\n\nIs "${lead.name}" a MINOR (investing under a guardian)?\n\nOK = add as Minor without PAN\nCancel = go back`);
+      if(!isMinor) return;
+    } else if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
   }
 
   if(seg==='equity'){
@@ -4558,9 +4570,13 @@ async function convertLead(id,seg){
   const clients=DB.get(key)||[];
 
   // Duplicate check - MF: PAN se, Equity: Client Code se
-  if(seg==='mf' && pan){
+  if(seg==='mf' && pan && !isMinor){
     const dupPan=clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
-    if(dupPan){ toast(`⚠️ Already exists as MF Investor: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+    if(dupPan){
+      const asMinor = confirm(`⚠️ This PAN already belongs to "${dupPan.name}".\n\nIf "${lead.name}" is a MINOR investing under this person (guardian), you can still add them.\n\nOK = add as Minor (guardian's PAN)\nCancel = stop`);
+      if(!asMinor) return;
+      isMinor = true;
+    }
   }
   if(seg==='equity' && clientCode){
     const dupCode=clients.find(c=>c.code && c.code.trim().toUpperCase()===clientCode);
@@ -4584,7 +4600,7 @@ async function convertLead(id,seg){
   } else {
     rec={
       id:newId, name:lead.name, mobile:lead.mobile, pan, email:'',
-      rm:lead.rm, status:'Prospect',
+      rm:lead.rm, status:'Prospect', is_minor:isMinor,
       aum:null, sip_amount:null, sip_count:null,
       last_invest_date:'', last_call_date:'',
       next_call:lead.next_call, followup_status:lead.followup_status, remarks:lead.remarks,
@@ -5892,7 +5908,11 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Investor Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
       <div class="form-field"><label>📱 Registered Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
-      <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase" ${CU.role!=='admin'?'readonly':''}></div>
+      <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase" ${CU.role!=='admin'?'readonly':''}>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:.76rem;cursor:pointer">
+          <input type="checkbox" id="f_minor" ${c?.is_minor?'checked':''} ${CU.role!=='admin'?'disabled':''}> 👶 Minor (PAN optional / guardian's PAN)
+        </label>
+      </div>
     </div>
     <div class="form-row three">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
@@ -5997,8 +6017,9 @@ async function saveClient(){
     }
   } else {
     const pan = (document.getElementById('f_pan')||{value:''}).value.trim();
-    if(!pan){
-      toast('⚠️ PAN Number is required — cannot save without PAN','error');
+    const _minor = document.getElementById('f_minor')?.checked;
+    if(!pan && !_minor){
+      toast('⚠️ PAN Number is required — cannot save without PAN (tick 👶 Minor if no PAN)','error');
       const el = document.getElementById('f_pan');
       if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
       return;
@@ -6014,7 +6035,8 @@ async function saveClient(){
   if(!currentEditId){
     if(seg==='mf'){
       const pan = gv2('f_pan').toUpperCase();
-      if(pan){
+      const _minor = document.getElementById('f_minor')?.checked;
+      if(pan && !_minor){
         const dup = clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
         if(dup){
           toast(`⚠️ MF Investor already exists: "${dup.name}" (PAN: ${dup.pan}) - RM: ${dup.rm||'—'}`,'error');
@@ -6036,7 +6058,8 @@ async function saveClient(){
     // Edit mode - same check but exclude current client
     if(seg==='mf'){
       const pan = gv2('f_pan').toUpperCase();
-      if(pan){
+      const _minor = document.getElementById('f_minor')?.checked;
+      if(pan && !_minor){
         const dup = clients.find(c=>c.id!==currentEditId && c.pan && c.pan.trim().toUpperCase()===pan);
         if(dup){
           toast(`⚠️ Yeh PAN already exists: "${dup.name}" (PAN: ${dup.pan}) - RM: ${dup.rm||'—'}`,'error');
@@ -6091,6 +6114,7 @@ async function saveClient(){
       id: newId,
       name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
       rm, status:gv2('f_status')||'Investor',
+      is_minor: document.getElementById('f_minor')?.checked || false,
       aum:parseFloat(gv2('f_aum'))||null,
       sip_amount:parseFloat(gv2('f_sip'))||null,
       sip_count:parseInt(gv2('f_sip_count'))||null,
