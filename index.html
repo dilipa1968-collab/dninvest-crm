@@ -375,8 +375,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   border-radius:16px 16px 0 0;box-shadow:0 2px 8px rgba(0,0,0,.15);}
 .modal-hdr h3{font-size:1rem;font-weight:800;}
 .modal-close{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;}
-.modal-body{padding:24px;}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;}
+.modal-body{padding:18px 22px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:7px;}
 .form-row.full{grid-template-columns:1fr;}
 .form-row.three{grid-template-columns:1fr 1fr 1fr;}
 .form-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);
@@ -387,7 +387,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--navy);}
 .form-field textarea{resize:vertical;min-height:56px;}
 .form-section{font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;
-  letter-spacing:1px;padding:14px 0 8px;border-bottom:1.5px solid var(--border);margin-bottom:14px;}
+  letter-spacing:1px;padding:9px 0 6px;border-bottom:1.5px solid var(--border);margin-bottom:9px;}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;
   justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px;}
 
@@ -5895,11 +5895,9 @@ function clientForm(seg, c){
       <div class="form-field"><label>📱 Registered Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
       <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase" ${CU.role!=='admin'?'readonly':''}></div>
     </div>
-    <div class="form-row">
+    <div class="form-row three">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       ${rmFieldHtml('mf', c, 'MF RM *')}
-    </div>
-    <div class="form-row">
       <div class="form-field"><label>Investor Status</label><select id="f_status"><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
     </div>
     <div class="form-section">Investment Details</div>
@@ -5908,9 +5906,10 @@ function clientForm(seg, c){
       <div class="form-field"><label>SIP Amount (₹/month)</label><input id="f_sip" type="number" value="${c?.sip_amount||''}" placeholder="e.g. 5000"></div>
       <div class="form-field"><label>SIP Count</label><input id="f_sip_count" type="number" value="${c?.sip_count||''}" placeholder="No. of SIPs"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row three">
       <div class="form-field"><label>Last Investment Date</label><input id="f_last_invest" type="date" value="${c?.last_invest_date||''}"></div>
       <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" max="${today()}"></div>
+      <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
@@ -5935,9 +5934,6 @@ function clientForm(seg, c){
         <option ${c?.followup_status==='TRANSFER REQUEST'?'selected':''}>TRANSFER REQUEST</option>
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM can edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     ${callMergeSection()}`;
   }
