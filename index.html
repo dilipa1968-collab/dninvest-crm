@@ -6469,10 +6469,24 @@ async function saveCallLog(){
   }
   closeModal('callModal');
   toast('Call logged!','success');
-  if(seg==='equity') renderEqTable(); else renderMfTable();
-  if(getCurrentPageId()==='eq-followup') renderFollowup('eqf');
-  if(getCurrentPageId()==='mf-followup') renderFollowup('mff');
-  refreshDash(); updateBadges();
+  const pg = getCurrentPageId();
+  // Re-render ONLY the view that's on screen right now, so the updated/removed
+  // row disappears instantly. Previously the full clients table (3k+ rows) and
+  // the dashboard were rendered synchronously even while sitting on the
+  // Follow-ups page — that off-screen work caused the 4-5s freeze.
+  if(pg==='eq-followup') renderFollowup('eqf');
+  else if(pg==='mf-followup') renderFollowup('mff');
+  else if(pg==='eq-clients') renderEqTable();
+  else if(pg==='mf-clients') renderMfTable();
+  // Everything else is off-screen — defer past the current paint so it never blocks.
+  setTimeout(()=>{
+    try{
+      if(pg!=='eq-clients' && seg==='equity') renderEqTable();
+      if(pg!=='mf-clients' && seg==='mf') renderMfTable();
+      refreshDash();
+      updateBadges();
+    }catch(_){}
+  }, 0);
 }
 
 // ══════════════════════════════════════════
