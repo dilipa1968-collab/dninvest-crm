@@ -1143,24 +1143,25 @@ input:focus, select:focus, textarea:focus{
           </div>
         </div>
 
-        <div class="tbl-wrap" style="padding:16px;margin-bottom:14px">
-          <div class="form-row" style="flex-wrap:wrap;gap:10px">
-            <div class="form-field" style="min-width:260px;position:relative">
+        <div class="tbl-wrap" style="padding:12px 14px;margin-bottom:14px;border-left:4px solid var(--teal);background:linear-gradient(180deg,var(--teal2) 0%,#fff 55%)">
+          <div style="font-size:.8rem;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">➕ New Transaction</div>
+          <div class="form-row three" style="gap:10px">
+            <div class="form-field" style="position:relative">
               <label>Client *</label>
               <input type="text" id="mftxn-client-search" placeholder="🔍 Search by Name / PAN / mobile..." autocomplete="off" oninput="searchMfTxnClient()" onfocus="searchMfTxnClient()">
               <div id="mftxn-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
             </div>
-            <div class="form-field" style="min-width:160px">
+            <div class="form-field">
               <label>Selected Client</label>
               <input type="text" id="mftxn-client-selected" placeholder="No client selected" readonly style="background:#f7f7f7">
             </div>
-            <div class="form-field" style="min-width:120px">
+            <div class="form-field">
               <label>RM</label>
               <input type="text" id="mftxn-client-rm" readonly style="background:#f7f7f7">
               <select id="mftxn-rm-select" style="display:none"></select>
             </div>
           </div>
-          <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
+          <div class="form-row three" style="gap:10px;margin-top:6px">
             <div class="form-field" style="min-width:160px">
               <label>Type *</label>
               <select id="mftxn-type" onchange="toggleMfTxnTarget()">
