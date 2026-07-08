@@ -2028,6 +2028,31 @@ input:focus, select:focus, textarea:focus{
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="convertMfModal" onclick="if(event.target===this)closeModal('convertMfModal')">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr" style="background:var(--teal)">
+      <h3 style="color:#fff">🏦 Convert Lead → MF Investor</h3>
+      <button class="modal-close" onclick="closeModal('convertMfModal')" style="color:#fff">×</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div style="font-size:.85rem;color:var(--gray);margin-bottom:14px">
+        Converting <b id="cmf-name"></b> to MF Investor. <span style="color:var(--orange)">The lead will be removed from the list.</span>
+      </div>
+      <div class="form-field" style="margin-bottom:4px">
+        <label>PAN <span id="cmf-pan-req" style="color:var(--red)">(required)</span></label>
+        <input type="text" id="cmf-pan" maxlength="10" style="text-transform:uppercase" placeholder="ABCDE1234F">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.8rem;cursor:pointer">
+          <input type="checkbox" id="cmf-minor" onchange="document.getElementById('cmf-pan-req').style.display=this.checked?'none':''">
+          👶 Minor (PAN optional / guardian's PAN allowed)
+        </label>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-outline" onclick="closeModal('convertMfModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmConvertLeadMf()">✅ Convert</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeModal('userModal')">
   <div class="modal">
     <div class="modal-hdr">
@@ -4541,6 +4566,61 @@ async function confirmAddEquityToMf(){
   renderMfTable(); refreshDash(); updateBadges();
 }
 
+// Lead → MF conversion via modal (PAN + Minor checkbox, like Add-to-MF).
+let _cmfLeadId=null;
+function openConvertMf(id){
+  const leads=DB.get('leads')||[];
+  const lead=leads.find(x=>x.id===id);
+  if(!lead) return;
+  _cmfLeadId=id;
+  document.getElementById('cmf-name').textContent=lead.name;
+  document.getElementById('cmf-pan').value='';
+  const mn=document.getElementById('cmf-minor'); if(mn) mn.checked=false;
+  const rq=document.getElementById('cmf-pan-req'); if(rq) rq.style.display='';
+  document.getElementById('convertMfModal').classList.add('open');
+  setTimeout(()=>document.getElementById('cmf-pan').focus(),100);
+}
+
+async function confirmConvertLeadMf(){
+  const id=_cmfLeadId; if(!id) return;
+  const leads=DB.get('leads')||[];
+  const lead=leads.find(x=>x.id===id);
+  if(!lead){ closeModal('convertMfModal'); return; }
+
+  const isMinor0 = document.getElementById('cmf-minor')?.checked || false;
+  let pan=(document.getElementById('cmf-pan').value||'').trim().toUpperCase();
+  if(!pan && !isMinor0){ toast('PAN is required — or tick 👶 Minor','error'); return; }
+  if(pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
+
+  let isMinor=isMinor0;
+  const mf=DB.get('mf_clients')||[];
+  // Guardian's PAN may already exist for a minor — allow after confirm.
+  if(pan && !isMinor){
+    const dupPan=mf.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
+    if(dupPan){
+      const asMinor = confirm(`⚠️ This PAN already belongs to "${dupPan.name}".\n\nIf "${lead.name}" is a MINOR investing under this person (guardian), you can still add them.\n\nOK = add as Minor (guardian's PAN)\nCancel = stop`);
+      if(!asMinor) return;
+      isMinor=true;
+    }
+  }
+
+  let newId=uid();
+  while(mf.some(x=>x.id===newId)) newId=uid();
+  const rec={
+    id:newId, name:lead.name, mobile:lead.mobile, pan, email:'',
+    rm:lead.rm, status:'Prospect', is_minor:isMinor,
+    aum:null, sip_amount:null, sip_count:null,
+    last_invest_date:'', last_call_date:'',
+    next_call:lead.next_call, followup_status:lead.followup_status, remarks:lead.remarks,
+    created:today(), updated:today()
+  };
+  await DB.setClient('mf_clients',rec);
+  await DB.deleteClient('leads',id);
+  closeModal('convertMfModal');
+  toast(`✅ "${lead.name}" converted to MF Investor${isMinor?' (Minor)':''}!`,'success');
+  renderLeadsTable(); renderMfTable(); refreshDash(); updateBadges();
+}
+
 async function convertLead(id,seg){
   const leads=DB.get('leads')||[];
   const lead=leads.find(x=>x.id===id);
@@ -4548,15 +4628,7 @@ async function convertLead(id,seg){
   const label = seg==='equity'?'Equity Client':'MF Investor';
 
   let pan='', clientCode='', isMinor=false;
-  if(seg==='mf'){
-    pan=prompt(`Enter PAN for "${lead.name}"\n(Leave blank if this is a MINOR without own PAN):`,'');
-    if(pan===null) return;
-    pan=pan.trim().toUpperCase();
-    if(!pan){
-      isMinor = confirm(`No PAN entered.\n\nIs "${lead.name}" a MINOR (investing under a guardian)?\n\nOK = add as Minor without PAN\nCancel = go back`);
-      if(!isMinor) return;
-    } else if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('Invalid PAN format (e.g. ABCDE1234F)','error'); return; }
-  }
+  if(seg==='mf'){ openConvertMf(id); return; }
 
   if(seg==='equity'){
     clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Leave blank if not yet assigned)`,'');
