@@ -370,7 +370,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .modal{background:#fff;border-radius:16px;width:700px;max-width:100%;max-height:90vh;
   overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
 .modal.wide{width:900px;}
-.modal-hdr{background:linear-gradient(90deg,var(--navy) 0%,var(--navy3) 100%);color:#fff;padding:18px 24px;display:flex;
+.modal-hdr{background:linear-gradient(90deg,var(--teal) 0%,var(--navy3) 60%,var(--navy) 100%);color:#fff;padding:18px 24px;display:flex;
   justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1;
   border-radius:16px 16px 0 0;box-shadow:0 2px 8px rgba(0,0,0,.15);}
 .modal-hdr h3{font-size:1rem;font-weight:800;}
@@ -2000,7 +2000,7 @@ input:focus, select:focus, textarea:focus{
 <!-- Add to Mutual Fund Modal -->
 <div class="modal-overlay" id="addToMfModal" onclick="if(event.target===this)closeModal('addToMfModal')">
   <div class="modal" style="width:420px">
-    <div class="modal-hdr" style="background:var(--teal)">
+    <div class="modal-hdr">
       <h3 style="color:#fff">🏦 Add to Mutual Fund</h3>
       <button class="modal-close" onclick="closeModal('addToMfModal')" style="color:#fff">×</button>
     </div>
@@ -2030,7 +2030,7 @@ input:focus, select:focus, textarea:focus{
 </div>
 <div class="modal-overlay" id="convertMfModal" onclick="if(event.target===this)closeModal('convertMfModal')">
   <div class="modal" style="width:420px">
-    <div class="modal-hdr" style="background:var(--teal)">
+    <div class="modal-hdr">
       <h3 style="color:#fff">🏦 Convert Lead → MF Investor</h3>
       <button class="modal-close" onclick="closeModal('convertMfModal')" style="color:#fff">×</button>
     </div>
@@ -2070,7 +2070,7 @@ input:focus, select:focus, textarea:focus{
 <!-- RM Message Admin Popup -->
 <div class="modal-overlay" id="msgAdminPopup" onclick="if(event.target===this)closeMsgPopup()">
   <div class="modal" style="width:460px">
-    <div class="modal-hdr" style="background:var(--navy)">
+    <div class="modal-hdr">
       <h3 style="color:#fff">✉️ Message Admin</h3>
       <button class="modal-close" onclick="closeMsgPopup()" style="color:#fff">×</button>
     </div>
@@ -2088,7 +2088,7 @@ input:focus, select:focus, textarea:focus{
 <!-- Temp Access Modal -->
 <div class="modal-overlay" id="tempAccessModal" onclick="if(event.target===this)closeModal('tempAccessModal')">
   <div class="modal" style="width:420px">
-    <div class="modal-hdr" style="background:var(--teal)">
+    <div class="modal-hdr">
       <h3 style="color:#fff">🔄 Temporary Access</h3>
       <button class="modal-close" onclick="closeModal('tempAccessModal')" style="color:#fff">×</button>
     </div>
@@ -2113,7 +2113,7 @@ input:focus, select:focus, textarea:focus{
 <!-- Change PIN/Password Modal -->
 <div class="modal-overlay" id="changeCredModal" onclick="if(event.target===this)closeModal('changeCredModal')">
   <div class="modal" style="width:400px">
-    <div class="modal-hdr" style="background:var(--navy)">
+    <div class="modal-hdr">
       <h3 style="color:#fff" id="changeCredTitle">🔑 Change Password/PIN</h3>
       <button class="modal-close" onclick="closeModal('changeCredModal')" style="color:#fff">×</button>
     </div>
@@ -2155,7 +2155,7 @@ input:focus, select:focus, textarea:focus{
 <!-- Followup Alert Popup (login ke baad RM ko dikhta hai) -->
 <div class="modal-overlay" id="followupAlertPopup">
   <div class="modal" style="max-width:480px">
-    <div class="modal-hdr" style="background:var(--navy)">
+    <div class="modal-hdr">
       <h3 style="color:#fff">📋 Pending Follow-ups</h3>
     </div>
     <div class="modal-body" id="followupAlertBody" style="padding:0;max-height:60vh;overflow-y:auto"></div>
@@ -2286,7 +2286,7 @@ input:focus, select:focus, textarea:focus{
 <!-- Equity Risk Detail Modal (RMS file data) -->
 <div class="modal-overlay" id="eqRiskModal" onclick="if(event.target===this)closeModal('eqRiskModal')">
   <div class="modal" style="width:440px;max-width:94vw">
-    <div class="modal-hdr" style="background:var(--navy,#0a1f4d)">
+    <div class="modal-hdr">
       <h3>⚠️ Risk Details</h3>
       <button class="modal-close" onclick="closeModal('eqRiskModal')">×</button>
     </div>
