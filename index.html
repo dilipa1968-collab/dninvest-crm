@@ -367,29 +367,29 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;
   align-items:center;justify-content:center;padding:16px;}
 .modal-overlay.open{display:flex;}
-.modal{background:#fff;border-radius:16px;width:700px;max-width:100%;max-height:90vh;
+.modal{background:#fff;border-radius:16px;width:700px;max-width:100%;max-height:92vh;
   overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
 .modal.wide{width:900px;}
-.modal-hdr{background:linear-gradient(90deg,var(--teal) 0%,var(--navy3) 60%,var(--navy) 100%);color:#fff;padding:18px 24px;display:flex;
+.modal-hdr{background:linear-gradient(90deg,var(--teal) 0%,var(--navy3) 60%,var(--navy) 100%);color:#fff;padding:13px 24px;display:flex;
   justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1;
   border-radius:16px 16px 0 0;box-shadow:0 2px 8px rgba(0,0,0,.15);}
 .modal-hdr h3{font-size:1rem;font-weight:800;}
 .modal-close{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;}
-.modal-body{padding:18px 22px;}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:7px;}
+.modal-body{padding:12px 22px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:5px;}
 .form-row.full{grid-template-columns:1fr;}
 .form-row.three{grid-template-columns:1fr 1fr 1fr;}
 .form-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);
-  text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
-.form-field input,.form-field select,.form-field textarea{width:100%;padding:6px 10px;
-  border:1.5px solid var(--border);border-radius:7px;font-size:.82rem;outline:none;
+  text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
+.form-field input,.form-field select,.form-field textarea{width:100%;padding:5px 10px;
+  border:1.5px solid var(--border);border-radius:7px;font-size:.8rem;outline:none;
   background:#fff;transition:border .2s;font-family:inherit;}
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--navy);}
-.form-field textarea{resize:vertical;min-height:56px;}
+.form-field textarea{resize:vertical;min-height:48px;}
 .form-section{font-size:.72rem;font-weight:800;color:var(--teal);text-transform:uppercase;
-  letter-spacing:1px;padding:7px 10px;border-left:4px solid var(--teal);border-bottom:none;margin-bottom:9px;
+  letter-spacing:1px;padding:5px 10px;border-left:4px solid var(--teal);border-bottom:none;margin:6px 0 6px;
   background:linear-gradient(90deg,var(--teal2) 0%,transparent 75%);border-radius:5px;}
-.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;
+.modal-footer{padding:11px 24px;border-top:1px solid var(--border);display:flex;
   justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px;}
 
 /* ── ANNOUNCEMENT ── */
@@ -5996,9 +5996,10 @@ function clientForm(seg, c){
       <div class="form-field"><label>SIP Amount (₹/month)</label><input id="f_sip" type="number" value="${c?.sip_amount||''}" placeholder="e.g. 5000"></div>
       <div class="form-field"><label>SIP Count</label><input id="f_sip_count" type="number" value="${c?.sip_count||''}" placeholder="No. of SIPs"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row three">
       <div class="form-field"><label>Last Investment Date</label><input id="f_last_invest" type="date" value="${c?.last_invest_date||''}"></div>
       <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" max="${today()}"></div>
+      <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
@@ -6023,9 +6024,6 @@ function clientForm(seg, c){
         <option ${c?.followup_status==='TRANSFER REQUEST'?'selected':''}>TRANSFER REQUEST</option>
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM can edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     ${callMergeSection()}`;
   }
