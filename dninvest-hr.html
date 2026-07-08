@@ -885,6 +885,17 @@ input:focus, select:focus, textarea:focus{
             <div class="field-inline"><label>From month</label><input type="month" id="mm-from" onchange="renderMultiMonthSummary()"></div>
             <div class="field-inline"><label>To month</label><input type="month" id="mm-to" onchange="renderMultiMonthSummary()"></div>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px">
+            <span style="font-size:11px;color:var(--text3);font-weight:600">Quick quarter (FY):</span>
+            <input type="number" id="mm-fy-year" style="width:78px;padding:4px 8px;font-size:12px;border:1px solid var(--border2);border-radius:var(--radius-sm)" title="Financial year start (April)" placeholder="Year">
+            <button class="btn btn-sm" onclick="setMmQuarter(1)">Q1 Apr–Jun</button>
+            <button class="btn btn-sm" onclick="setMmQuarter(2)">Q2 Jul–Sep</button>
+            <button class="btn btn-sm" onclick="setMmQuarter(3)">Q3 Oct–Dec</button>
+            <button class="btn btn-sm" onclick="setMmQuarter(4)">Q4 Jan–Mar</button>
+            <span style="flex:1"></span>
+            <button class="btn btn-sm btn-primary" onclick="toggleAllRmMultiMonth()" id="mm-allrm-btn">📊 All RMs total</button>
+          </div>
+          <div id="mm-allrm" style="margin-top:10px;display:none"></div>
           <hr class="divider">
           <div id="mm-summary"></div>
           <div class="field-inline" style="margin-top:10px"><label>Paying now (₹)</label><input type="number" id="mm-pay-amount" value="0" min="0" onchange="previewMultiMonthSplit()"></div>
@@ -4271,6 +4282,57 @@ function getMonthIncentiveInfo(name, month){
   return {month, total:tt.total, paid, balance};
 }
 
+// Quarter preset (Indian FY): Q1 Apr–Jun, Q2 Jul–Sep, Q3 Oct–Dec, Q4 Jan–Mar (next cal yr).
+function setMmQuarter(q){
+  const yEl=document.getElementById('mm-fy-year');
+  let y=parseInt(yEl&&yEl.value)||0;
+  if(!y){ const now=new Date(); y=(now.getMonth()+1)>=4?now.getFullYear():now.getFullYear()-1; if(yEl) yEl.value=y; }
+  const map={1:['04','06',y,y],2:['07','09',y,y],3:['10','12',y,y],4:['01','03',y+1,y+1]};
+  const P=map[q]; if(!P) return;
+  const f=document.getElementById('mm-from'), t=document.getElementById('mm-to');
+  if(f) f.value=`${P[2]}-${P[0]}`;
+  if(t) t.value=`${P[3]}-${P[1]}`;
+  renderMultiMonthSummary();
+}
+
+function toggleAllRmMultiMonth(){
+  const box=document.getElementById('mm-allrm');
+  if(!box) return;
+  if(box.style.display==='none'){ box.style.display=''; renderAllRmMultiMonth(); }
+  else box.style.display='none';
+}
+
+// Admin view: every RM's combined Total / Paid / Balance for the selected month range + grand total.
+function renderAllRmMultiMonth(){
+  const box=document.getElementById('mm-allrm');
+  const from=document.getElementById('mm-from'), to=document.getElementById('mm-to');
+  if(!box||!from||!to||box.style.display==='none') return;
+  const months=monthsInRange(from.value, to.value);
+  if(months.length===0){ box.innerHTML='<p style="font-size:12px;color:var(--text3)">Select From and To month (or a quarter) to see all-RM totals</p>'; return; }
+  const empSel=document.getElementById('mm-emp');
+  const names=empSel?[...empSel.options].map(o=>o.value).filter(Boolean):[];
+  const rows=names.map(name=>{
+    let total=0,paid=0,balance=0;
+    months.forEach(m=>{ const r=getMonthIncentiveInfo(name,m); total+=r.total; paid+=r.paid; balance+=r.balance; });
+    return {name,total,paid,balance};
+  }).sort((a,b)=>b.balance-a.balance);
+  const gt=rows.reduce((s,r)=>({total:s.total+r.total,paid:s.paid+r.paid,balance:s.balance+r.balance}),{total:0,paid:0,balance:0});
+  box.innerHTML=`
+    <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--accent)">📊 All RMs — combined (${months.length} months: ${months[0]} → ${months[months.length-1]})</div>
+    <table style="font-size:12.5px;width:100%">
+      <thead><tr><th style="text-align:left">RM</th><th style="text-align:right">Total Incentive</th><th style="text-align:right">Already Paid</th><th style="text-align:right">Balance</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr><td>${r.name}</td><td style="text-align:right">${fmt(r.total)}</td><td style="text-align:right;color:var(--green)">${fmt(r.paid)}</td><td style="text-align:right;color:${r.balance>0?'var(--red)':'var(--green)'}">${fmt(r.balance)}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr style="border-top:1px solid var(--border)">
+        <td style="padding-top:6px;font-weight:700">TOTAL (all RMs)</td>
+        <td style="text-align:right;padding-top:6px;font-weight:700">${fmt(gt.total)}</td>
+        <td style="text-align:right;padding-top:6px;font-weight:700;color:var(--green)">${fmt(gt.paid)}</td>
+        <td style="text-align:right;padding-top:6px;font-weight:700;color:var(--red)">${fmt(gt.balance)}</td>
+      </tr></tfoot>
+    </table>`;
+}
+
 function renderMultiMonthSummary(){
   const sel=document.getElementById('mm-emp');
   const from=document.getElementById('mm-from');
@@ -4295,6 +4357,7 @@ function renderMultiMonthSummary(){
       <tfoot><tr style="border-top:1px solid var(--border)"><td style="padding-top:6px;font-weight:600">Total balance (${months.length} months)</td><td></td><td></td><td style="text-align:right;padding-top:6px;font-weight:700;font-size:15px;color:var(--red)">${fmt(totalBalance)}</td></tr></tfoot>
     </table>`;
   previewMultiMonthSplit();
+  renderAllRmMultiMonth();
 }
 
 // Chronologically fills oldest month's balance first, then next, etc.
