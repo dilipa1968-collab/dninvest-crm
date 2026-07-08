@@ -1274,6 +1274,7 @@ input:focus, select:focus, textarea:focus{
             <div class="form-field" style="min-width:120px">
               <label>Trading RM (brokerage)</label>
               <input type="text" id="eqdemat-client-rm" readonly style="background:#f7f7f7" title="Client's RM — gets brokerage incentive">
+              <select id="eqdemat-rm-select" style="display:none" title="RM credited with the brokerage (defaults to client's RM)"></select>
             </div>
             <div class="form-field" style="min-width:140px">
               <label>Opening RM (gets opening bonus)</label>
@@ -7426,6 +7427,19 @@ function renderEqDematPage(){
     if(CU.role!=='admin') openSel.disabled=true;
   }
 
+  // Admin can credit the Trading RM (brokerage) to ANY RM — show a dropdown
+  // instead of the read-only box. RM users keep the read-only box.
+  const tradeSel=document.getElementById('eqdemat-rm-select');
+  const tradeRO=document.getElementById('eqdemat-client-rm');
+  if(tradeSel){
+    if(CU.role==='admin'){
+      tradeSel.innerHTML=getSegRMs('equity').map(r=>`<option>${escapeHtml(r)}</option>`).join('');
+      tradeSel.style.display=''; if(tradeRO) tradeRO.style.display='none';
+    } else {
+      tradeSel.style.display='none'; if(tradeRO) tradeRO.style.display='';
+    }
+  }
+
   populateEqDematMonths();
   renderEqDematTable();
 }
@@ -7492,6 +7506,11 @@ function selectEqDematClient(clientId){
   document.getElementById('eqdemat-client-rm').value=c.rm||'—';
   // Admin: default the Opening RM to the client's RM (can change if a different RM opened it)
   if(CU.role==='admin'){
+    const tradeSel=document.getElementById('eqdemat-rm-select');
+    if(tradeSel && c.rm){
+      if(![...tradeSel.options].some(o=>o.value===c.rm)) tradeSel.add(new Option(c.rm,c.rm));
+      tradeSel.value=c.rm;
+    }
     const openSel=document.getElementById('eqdemat-opening-rm');
     if(openSel && c.rm){
       if(![...openSel.options].some(o=>o.value===c.rm)) openSel.add(new Option(c.rm,c.rm));
@@ -7524,13 +7543,18 @@ function saveEqDematEntry(){
   const openingRm=(document.getElementById('eqdemat-opening-rm')?.value||CU.name||'').trim();
   if(!openingRm){ toast('Please select the Opening RM','error'); return; }
 
+  // Admin may credit the brokerage (Trading RM) to any RM via the dropdown.
+  let tradingRm = eqDematSelectedClient.rm;
+  const tradeSel=document.getElementById('eqdemat-rm-select');
+  if(CU.role==='admin' && tradeSel && tradeSel.style.display!=='none' && tradeSel.value){ tradingRm = tradeSel.value; }
+
   const eqEntries=getEqDematEntries();
   eqEntries.push({
     id: uid(),
     client_id: eqDematSelectedClient.id,
     client_name: eqDematSelectedClient.name,
     client_code: code,
-    rm: eqDematSelectedClient.rm,
+    rm: tradingRm,
     opening_rm: openingRm,
     type: 'Open Demat Account',
     date, remarks,
