@@ -1180,7 +1180,7 @@ input:focus, select:focus, textarea:focus{
             </div>
             <div class="form-field" id="mftxn-firstpay-wrap" style="min-width:160px;display:none">
               <label id="mftxn-firstpay-label">First Payment (₹)</label>
-              <input type="number" id="mftxn-firstpay" placeholder="e.g. 1000">
+              <input type="number" id="mftxn-firstpay" placeholder="e.g. 1000" onfocus="mfFirstPayFocus('mftxn-amount','mftxn-firstpay')">
             </div>
             <div class="form-field" id="mftxn-startdate-wrap" style="min-width:160px;display:none">
               <label>Start Date *</label>
@@ -1935,7 +1935,7 @@ input:focus, select:focus, textarea:focus{
         <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
       </div>
       <div class="form-row" id="biz_schedule_wrap" style="display:none">
-        <div class="form-field"><label id="biz_firstpay_label">First Payment (₹)</label><input id="biz_firstpay" type="number" placeholder="e.g. 1000"></div>
+        <div class="form-field"><label id="biz_firstpay_label">First Payment (₹)</label><input id="biz_firstpay" type="number" placeholder="e.g. 1000" onfocus="mfFirstPayFocus('biz_amount','biz_firstpay')"></div>
         <div class="form-field"><label>Start Date *</label><input id="biz_startdate" type="date"></div>
       </div>
       <div class="form-row">
@@ -6715,6 +6715,14 @@ function mfTxnTypeNeedsTarget(t){ return t==='Switch' || t==='STP'; }
 function mfTxnHasSchedule(t){ return t==='SIP' || t==='STP' || t==='SWP'; }
 // SWP label reads "First Withdrawal"; SIP/STP read "First Payment".
 function mfFirstPayLabel(t){ return t==='SWP' ? 'First Withdrawal (₹)' : 'First Payment (₹)'; }
+// Clicking the First Payment / First Withdrawal field, when it's still empty,
+// auto-fills it with the Amount above (the SIP/STP/SWP installment) — one click,
+// no retyping. User can still edit if the first instalment differs.
+function mfFirstPayFocus(amountId, firstPayId){
+  const a=document.getElementById(amountId);
+  const f=document.getElementById(firstPayId);
+  if(f && a && !String(f.value||'').trim() && Number(a.value)>0){ f.value = a.value; }
+}
 
 // Show/hide the Target Scheme field on the MF Transactions form based on Type,
 // and relabel the Fund Name field as "Source Scheme (From)" for Switch/STP so
