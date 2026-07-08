@@ -6221,6 +6221,68 @@ function di(label,val){
   return `<div class="form-field"><label>${label}</label><div class="dv" style="font-size:.88rem;font-weight:600;color:var(--navy);padding:4px 0">${val||'<span style="color:#ccc;font-style:italic;font-weight:400">—</span>'}</div></div>`;
 }
 
+// Show the FULL detail of a single MF Transaction / Demat entry when its
+// client name is clicked in the table (the row truncates fund names and hides
+// fields like First Payment, Start Date, remarks, who entered it, etc.).
+// Available to RM and Admin alike — no role gate.
+function viewMfTxnDetail(entryId){
+  const e=getMfBizEntries().find(x=>x.id===entryId);
+  if(!e) return;
+  const sched = mfTxnHasSchedule(e.type);
+  const needsTarget = mfTxnTypeNeedsTarget(e.type);
+  let incAmt=0; try{ incAmt = INC.mf(e).amt||0; }catch(_){}
+  const incStr = INC.fmt(incAmt) + (INC.isApproved(e)?'':' <span style="font-size:.68rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">pending</span>');
+  document.getElementById('viewModalTitle').textContent='Transaction Detail — '+(e.client_name||'');
+  let body=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
+      ${di('Date', fmtDate(e.date))}
+      ${di('Client', e.client_name)}
+      ${di('RM', e.rm)}
+      ${di('Type', e.type)}
+      ${di('Amount', e.amount!=null?'₹'+brkFmt(e.amount):null)}
+      ${di('Incentive', incStr)}
+      ${di(needsTarget?'Source Scheme (From)':'Fund Name', e.fund_name)}
+      ${needsTarget?di('Target Scheme (To)', e.target_scheme):''}
+      ${sched?di(e.type==='SWP'?'First Withdrawal':'First Payment', e.first_payment!=null?'₹'+brkFmt(e.first_payment):null):''}
+      ${sched?di('Start Date', fmtDate(e.start_date)):''}
+      ${di('Status', e.status||'Pending')}
+      ${(e.status==='Declined'&&e.decline_reason)?di('Decline Reason', e.decline_reason):''}
+      ${di('Entered By', (e.created_by||'')+(e.created_by_role?' ('+e.created_by_role+')':''))}
+      ${di('Entered On', fmtDate(e.created))}
+    </div>`;
+  if(e.cross_remark){
+    body+=`<div class="form-section">💬 Cross-Check Remark</div>
+      <p style="font-size:.88rem;color:var(--navy);margin:2px 0">${escapeHtml(e.cross_remark)}</p>
+      <p style="font-size:.72rem;color:var(--gray)">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</p>`;
+  }
+  document.getElementById('viewModalBody').innerHTML=body;
+  document.getElementById('viewModal').classList.add('open');
+}
+function viewDematDetail(entryId){
+  const e=getEqDematEntries().find(x=>x.id===entryId);
+  if(!e) return;
+  let incAmt=0; try{ incAmt = INC.demat(e).amt||0; }catch(_){}
+  const incStr = INC.fmt(incAmt) + (INC.isApproved(e)?'':' <span style="font-size:.68rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">pending</span>');
+  document.getElementById('viewModalTitle').textContent='Demat Detail — '+(e.client_name||'');
+  let body=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
+      ${di('Date', fmtDate(e.date))}
+      ${di('Client', e.client_name)}
+      ${di('Client Code / UCC', e.client_code)}
+      ${di('Trading RM', e.rm)}
+      ${di('Opening RM', e.opening_rm||e.rm)}
+      ${di('Incentive', incStr)}
+      ${di('Status', e.status||'Pending')}
+      ${(e.status==='Declined'&&e.decline_reason)?di('Decline Reason', e.decline_reason):''}
+      ${di('Entered By', e.created_by)}
+      ${di('Entered On', fmtDate(e.created))}
+    </div>`;
+  if(e.remarks){
+    body+=`<div class="form-section">📝 Remarks</div>
+      <p style="font-size:.88rem;color:var(--navy);margin:2px 0">${escapeHtml(e.remarks)}</p>`;
+  }
+  document.getElementById('viewModalBody').innerHTML=body;
+  document.getElementById('viewModal').classList.add('open');
+}
+
 // ══════════════════════════════════════════
 // CALL LOG
 // ══════════════════════════════════════════
@@ -7220,7 +7282,7 @@ function renderMfTxnTable(){
         return `<tr>
           ${MFTBULK.td(e.id)}
           <td style="width:68px;font-size:.67rem;white-space:nowrap">${e.date||'—'}</td>
-          <td style="width:105px;max-width:110px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600" title="${escapeHtml(e.client_name||'')}">${escapeHtml(e.client_name||'—')}</td>
+          <td onclick="viewMfTxnDetail('${e.id}')" style="width:105px;max-width:110px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;cursor:pointer;color:var(--teal,#0d9488);text-decoration:underline" title="Click to view full transaction detail">${escapeHtml(e.client_name||'—')}</td>
           <td style="width:40px;font-size:.67rem;white-space:nowrap">${escapeHtml(e.rm||'—')}</td>
           <td style="width:62px;white-space:nowrap"><span class="badge" style="background:${color}22;color:${color};font-size:.61rem;padding:1px 5px">${escapeHtml(e.type||'—')}</span></td>
           <td style="width:155px;max-width:160px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(e.fund_name||'')}${e.target_scheme?' → '+escapeHtml(e.target_scheme):''}">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<span style="font-size:.63rem;color:var(--teal,#0891b2);margin-left:3px">↳ ${escapeHtml(e.target_scheme)}</span>`:''}</td>
@@ -7502,7 +7564,7 @@ function renderEqDematTable(){
         const status = e.status||'Pending';
         return `<tr>
           <td>${e.date||'—'}</td>
-          <td>${escapeHtml(e.client_name||'—')}</td>
+          <td onclick="viewDematDetail('${e.id}')" style="cursor:pointer;color:var(--teal,#0d9488);text-decoration:underline;font-weight:600" title="Click to view full demat detail">${escapeHtml(e.client_name||'—')}</td>
           <td>${escapeHtml(e.client_code||'—')}</td>
           <td>${escapeHtml(e.rm||'—')}</td>
           <td><span style="background:var(--teal,#0d9488);color:#fff;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:600">${escapeHtml(e.opening_rm||e.rm||'—')}</span></td>
