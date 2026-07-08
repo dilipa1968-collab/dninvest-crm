@@ -1179,8 +1179,11 @@ input:focus, select:focus, textarea:focus{
               <input type="number" id="mftxn-amount" placeholder="e.g. 25000">
             </div>
             <div class="form-field" id="mftxn-firstpay-wrap" style="min-width:160px;display:none">
-              <label id="mftxn-firstpay-label">First Payment (₹)</label>
-              <input type="number" id="mftxn-firstpay" placeholder="e.g. 1000" onfocus="mfFirstPayFocus('mftxn-amount','mftxn-firstpay')">
+              <label id="mftxn-firstpay-label">First Payment</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--navy);cursor:pointer;height:38px">
+                <input type="checkbox" id="mftxn-firstpay" style="width:18px;height:18px;cursor:pointer">
+                <span id="mftxn-firstpay-hint">Done (= amount)</span>
+              </label>
             </div>
             <div class="form-field" id="mftxn-startdate-wrap" style="min-width:160px;display:none">
               <label>Start Date *</label>
@@ -1935,7 +1938,12 @@ input:focus, select:focus, textarea:focus{
         <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
       </div>
       <div class="form-row" id="biz_schedule_wrap" style="display:none">
-        <div class="form-field"><label id="biz_firstpay_label">First Payment (₹)</label><input id="biz_firstpay" type="number" placeholder="e.g. 1000" onfocus="mfFirstPayFocus('biz_amount','biz_firstpay')"></div>
+        <div class="form-field"><label id="biz_firstpay_label">First Payment</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--navy);cursor:pointer;padding:6px 0">
+            <input type="checkbox" id="biz_firstpay" style="width:18px;height:18px;cursor:pointer">
+            <span id="biz_firstpay_hint">Done (= amount)</span>
+          </label>
+        </div>
         <div class="form-field"><label>Start Date *</label><input id="biz_startdate" type="date"></div>
       </div>
       <div class="form-row">
@@ -6481,7 +6489,7 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
   const btEl=document.getElementById('biz_target_fund'); if(btEl) btEl.value='';
-  const fpEl=document.getElementById('biz_firstpay'); if(fpEl) fpEl.value='';
+  const fpEl=document.getElementById('biz_firstpay'); if(fpEl) fpEl.checked=false;
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value='';
   toggleBizTarget();
   document.getElementById('biz_date').value = today();
@@ -6501,12 +6509,12 @@ function saveBusinessEntry(){
   if(mfTxnTypeNeedsTarget(type) && !targetScheme){ toast('Please enter the target scheme','error'); return; }
   if(!date){ toast('Please enter the date','error'); return; }
 
-  // SIP / STP / SWP: First Payment (defaults to amount if blank) + Start Date (required)
+  // SIP / STP / SWP: First Payment is a tick (= amount when done) + Start Date (required)
   const sched = mfTxnHasSchedule(type);
   const startDate = (document.getElementById('biz_startdate')?.value||'').trim();
-  let firstPay = parseFloat(document.getElementById('biz_firstpay')?.value);
+  const firstPayDone = !!document.getElementById('biz_firstpay')?.checked;
+  const firstPay = (sched && firstPayDone) ? amount : null;
   if(sched && !startDate){ toast('Please enter the start date','error'); return; }
-  if(sched && (!firstPay || firstPay<=0)) firstPay = amount;
 
   const biz = DB.get('mf_business');
   const entries = Array.isArray(biz) ? biz : (biz?.entries || []);
@@ -6714,15 +6722,9 @@ function mfTxnTypeNeedsTarget(t){ return t==='Switch' || t==='STP'; }
 // installment/withdrawal) and a Start Date in addition to the txn date.
 function mfTxnHasSchedule(t){ return t==='SIP' || t==='STP' || t==='SWP'; }
 // SWP label reads "First Withdrawal"; SIP/STP read "First Payment".
-function mfFirstPayLabel(t){ return t==='SWP' ? 'First Withdrawal (₹)' : 'First Payment (₹)'; }
-// Clicking the First Payment / First Withdrawal field, when it's still empty,
-// auto-fills it with the Amount above (the SIP/STP/SWP installment) — one click,
-// no retyping. User can still edit if the first instalment differs.
-function mfFirstPayFocus(amountId, firstPayId){
-  const a=document.getElementById(amountId);
-  const f=document.getElementById(firstPayId);
-  if(f && a && !String(f.value||'').trim() && Number(a.value)>0){ f.value = a.value; }
-}
+function mfFirstPayLabel(t){ return t==='SWP' ? 'First Withdrawal' : 'First Payment'; }
+// Checkbox hint text depends on type.
+function mfFirstPayHint(t){ return t==='SWP' ? 'Withdrawn (= amount)' : 'Paid (= amount)'; }
 
 // Show/hide the Target Scheme field on the MF Transactions form based on Type,
 // and relabel the Fund Name field as "Source Scheme (From)" for Switch/STP so
@@ -6744,8 +6746,9 @@ function toggleMfTxnTarget(){
   const fpWrap=document.getElementById('mftxn-firstpay-wrap'); if(fpWrap) fpWrap.style.display = sched ? '' : 'none';
   const sdWrap=document.getElementById('mftxn-startdate-wrap'); if(sdWrap) sdWrap.style.display = sched ? '' : 'none';
   const fpLbl=document.getElementById('mftxn-firstpay-label'); if(fpLbl) fpLbl.textContent = mfFirstPayLabel(type);
+  const fpHint=document.getElementById('mftxn-firstpay-hint'); if(fpHint) fpHint.textContent = mfFirstPayHint(type);
   if(!sched){
-    const fp=document.getElementById('mftxn-firstpay'); if(fp) fp.value='';
+    const fp=document.getElementById('mftxn-firstpay'); if(fp) fp.checked=false;
     const sd=document.getElementById('mftxn-startdate'); if(sd) sd.value='';
   }
 }
@@ -6767,8 +6770,9 @@ function toggleBizTarget(){
   const sched = mfTxnHasSchedule(type);
   const schedWrap=document.getElementById('biz_schedule_wrap'); if(schedWrap) schedWrap.style.display = sched ? '' : 'none';
   const fpLbl=document.getElementById('biz_firstpay_label'); if(fpLbl) fpLbl.textContent = mfFirstPayLabel(type);
+  const fpHint=document.getElementById('biz_firstpay_hint'); if(fpHint) fpHint.textContent = mfFirstPayHint(type);
   if(!sched){
-    const fp=document.getElementById('biz_firstpay'); if(fp) fp.value='';
+    const fp=document.getElementById('biz_firstpay'); if(fp) fp.checked=false;
     const sd=document.getElementById('biz_startdate'); if(sd) sd.value='';
   }
 }
@@ -7149,12 +7153,12 @@ function saveMfTxnEntry(){
   if(mfTxnTypeNeedsTarget(type) && !targetScheme){ toast('Please enter the target scheme','error'); return; }
   if(!date){ toast('Please enter the date','error'); return; }
 
-  // SIP / STP / SWP: First Payment (defaults to amount if blank) + Start Date (required)
+  // SIP / STP / SWP: First Payment is a tick (= amount when done) + Start Date (required)
   const sched = mfTxnHasSchedule(type);
   const startDate = (document.getElementById('mftxn-startdate')?.value||'').trim();
-  let firstPay = parseFloat(document.getElementById('mftxn-firstpay')?.value);
+  const firstPayDone = !!document.getElementById('mftxn-firstpay')?.checked;
+  const firstPay = (sched && firstPayDone) ? amount : null;
   if(sched && !startDate){ toast('Please enter the start date','error'); return; }
-  if(sched && (!firstPay || firstPay<=0)) firstPay = amount;
 
   const entries=getMfBizEntries();
   entries.push({
@@ -7189,7 +7193,7 @@ function saveMfTxnEntry(){
   document.getElementById('mftxn-amount').value='';
   document.getElementById('mftxn-fund').value='';
   const tgtReset=document.getElementById('mftxn-target-fund'); if(tgtReset) tgtReset.value='';
-  const fpReset=document.getElementById('mftxn-firstpay'); if(fpReset) fpReset.value='';
+  const fpReset=document.getElementById('mftxn-firstpay'); if(fpReset) fpReset.checked=false;
   const sdReset=document.getElementById('mftxn-startdate'); if(sdReset) sdReset.value='';
   toggleMfTxnTarget();
 
@@ -8271,7 +8275,7 @@ function editBusinessEntry(id){
   document.getElementById('biz_amount').value = e.amount;
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value = e.fund_name||'';
   const btEl=document.getElementById('biz_target_fund'); if(btEl) btEl.value = e.target_scheme||'';
-  const fpEl=document.getElementById('biz_firstpay'); if(fpEl) fpEl.value = (e.first_payment!=null ? e.first_payment : '');
+  const fpEl=document.getElementById('biz_firstpay'); if(fpEl) fpEl.checked = !!(e.first_payment);
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value = e.start_date||'';
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
