@@ -10413,6 +10413,12 @@ function tryImportRiskFile(rows){
 // index entry). localStorage me normal object shape rakhte hain, isliye getEqRisk()
 // / eqRiskFor() bilkul waise hi chalte hain. Read-time rehydration syncFromFirebase
 // me handle hota hai (codeJson → code).
+// MERGE MODE: naye file ke clients ko office-wide risk map me MERGE karta hai —
+// jo codes file me hain sirf wahi update/add hote hain, baaki SABHI RMs ke purane
+// clients ka data waisa hi rehta hai. Isliye Raju apni (sirf apne clients wali)
+// broker RMS file upload kare to bhi kisi aur RM ka data wipe nahi hota; har RM
+// ke upload se poore office ka risk data cumulatively fresh banta rehta hai.
+// (Pehle poora doc replace hota tha → RM ka partial file baaki sab udaa deta tha.)
 function saveEqRisk(payload){
   DB.setLocal('eq_risk', payload); // local: normal shape {code:{...}, updated, count}
   try{
