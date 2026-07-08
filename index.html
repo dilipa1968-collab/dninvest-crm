@@ -12930,24 +12930,26 @@ const BULK = {
       const mobSet=new Set(existing.map(c=>cleanMob(c.mobile)).filter(Boolean));
       const nameSet=new Set(existing.map(c=>(c.name||'').trim().toUpperCase()));
       const panSet=new Set(existing.filter(c=>c.pan).map(c=>c.pan.trim().toUpperCase()));
-      let create=[], noPan=0, dup=0;
+      let create=[], minorCount=0, dup=0;
       recs.forEach(c=>{
         if(toMf){ const pan=(c.pan||'').trim().toUpperCase();
-          if(!validPan(pan)){ noPan++; return; }
-          if(panSet.has(pan)){ dup++; return; } panSet.add(pan); }
+          if(validPan(pan)){
+            if(panSet.has(pan)){ dup++; return; } panSet.add(pan);
+          } else { minorCount++; } // no valid PAN → will be added as Minor (guardian-operated)
+        }
         if(mobSet.has(cleanMob(c.mobile)) || nameSet.has((c.name||'').trim().toUpperCase())){ dup++; return; }
         nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
       });
-      if(!create.length){ toast(`Nothing converted — ${toMf?noPan+' without PAN, ':''}${dup} duplicate`,'error'); return; }
+      if(!create.length){ toast(`Nothing converted — ${dup} duplicate`,'error'); return; }
       this.confirm(`Convert Lead → ${toMf?'MF':'Equity'}`,
         `<b>${create.length}</b> lead(s) will become ${toMf?'MF Investor':'Equity Client'}s <i>(removed from the lead list — move)</i>.`
-        + (toMf&&noPan?`<br><span style="color:var(--orange)">⚠️ ${noPan} lead(s) without a valid PAN — skipped.</span>`:'')
+        + (toMf&&minorCount?`<br><span style="color:var(--teal)">👶 ${minorCount} lead(s) without PAN — added as Minor.</span>`:'')
         + (dup?`<br><span style="color:var(--gray)">${dup} duplicate — skipped.</span>`:''),
         toMf?'🏦 Convert':'📈 Convert','', async()=>{
           const recsNew=[], logs=[], movedIds=[];
           create.forEach(c=>{ let id=uid(); while(existing.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
             let rec = toMf
-              ? {id,name:c.name,mobile:c.mobile||'',pan:(c.pan||'').trim().toUpperCase(),email:'',rm:c.rm||'',status:'Prospect',aum:null,sip_amount:null,sip_count:null,last_invest_date:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()}
+              ? {id,name:c.name,mobile:c.mobile||'',pan:(c.pan||'').trim().toUpperCase(),email:'',rm:c.rm||'',status:'Prospect',is_minor:!validPan((c.pan||'').trim().toUpperCase()),aum:null,sip_amount:null,sip_count:null,last_invest_date:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()}
               : {id,code:'',name:c.name,mobile:c.mobile||'',email:'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()};
             recsNew.push(rec); movedIds.push(c.id);
             logs.push({id:uid(),type:'add',seg:toMf?'mf':'equity',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
