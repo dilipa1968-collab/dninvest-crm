@@ -1818,8 +1818,23 @@ async function doLogin(){
       if(errBox){errBox.style.display='block';errBox.textContent='✓ Today\'s attendance auto-recorded — in time: '+inTime;}
     }
   } else {
-    // Already marked with a normal status (Present/Late/Holiday) — do nothing
-    if(errBox){errBox.style.display='none';}
+    // Already marked (Present/Late/Half day/Holiday). Agar din ke beech (cutoff se
+    // pehle) out-time laga hua hai to wapas login ka matlab bandaa abhi office me
+    // hai → premature out hatao aur Half day ko Present/Late me revert karo. Isse
+    // subah ka galat logout (accidental tab-close/phone-lock) khud saaf ho jata hai.
+    const _n=new Date(); const nowIst=new Date(_n.getTime()+_n.getTimezoneOffset()*60000+5.5*3600000);
+    const dow=nowIst.getDay(); const nowH=nowIst.getHours()+nowIst.getMinutes()/60;
+    let cut=null; if(dow>=1&&dow<=5)cut=18.25; else if(dow===6)cut=14.25;
+    if(already.out && cut!==null && nowH<cut && (already.status==='Present'||already.status==='Late'||already.status==='Half day')){
+      let st=already.status;
+      if(st==='Half day'){
+        const m=/^(\d{1,2}):(\d{2})$/.exec(already.in||'');
+        const lateCut=(dow===6)?10.75:10;
+        st=(m&&(Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
+      }
+      await saveAttRecord(name, {...already, out:'', status:st});
+      if(errBox){errBox.style.display='block';errBox.textContent='✓ Welcome back — attendance active (early out-time cleared)';}
+    } else if(errBox){errBox.style.display='none';}
   }
   startApp();
 }
@@ -1996,21 +2011,14 @@ async function doLogout(){
         const utc=now.getTime()+now.getTimezoneOffset()*60000;
         const ist=new Date(utc+5.5*3600000);
         const outT=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
-        // 1:30 PM se pehle nikla → Half day (in/out times same rehte hain)
-        // Saturday exempt: Saturday office khud hi half day hai (2:15 PM cutoff)
-        const outH=ist.getHours()+ist.getMinutes()/60;
-        const isSatToday=(ist.getDay()===6);
-        let newStatus=rec.status;
-        if(!isSatToday && outH<13.5){
-          newStatus='Half day';
-        } else if(rec.status==='Half day'){
-          // Pehle 1:30 se pehle nikla tha (Half day laga), ab wapas aake der tak
-          // kaam kiya → status revert. In-time se decide: cutoff ke baad → Late.
-          const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
-          const lateCut=isSatToday?10.75:10; // Sat 10:45, Mon-Fri 10:00
-          newStatus=(m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
-        }
-        await saveAttRecord(currentUser, {...rec, out:outT, status:newStatus});
+        // NOTE: Logout par sirf actual out-time save hota hai — status ko HATH
+        // NAHI lagate. Half-day ka faisla cutoff (6:15 PM / Sat 2:15 PM) par
+        // autoOutTimeCheck karta hai, jahan final out-time dekh ke decide hota hai.
+        // Pehle yahan "1:30 se pehle logout → Half day" flip tha, jisse subah ka
+        // accidental/temporary logout (tab close, phone lock) galti se Half day
+        // bana deta tha — wo hata diya. Wapas login/heartbeat se record khud heal
+        // ho jata hai (login flow + autoOutTimeCheck pre-cutoff heal).
+        await saveAttRecord(currentUser, {...rec, out:outT});
       }
     }catch(e){}
   }
@@ -2163,7 +2171,47 @@ async function autoOutTimeCheck(){
     if(dow>=1 && dow<=5){ cutoff=18.25; cutoffStr='18:15'; }      // Mon–Fri 6:15 PM
     else if(dow===6){ cutoff=14.25; cutoffStr='14:15'; }           // Saturday 2:15 PM
 
-    if(cutoff===null || istH<cutoff) return; // cutoff nahi aaya abhi
+    if(cutoff===null) return; // Sunday — no cutoff, kuch nahi
+
+    // ── PRE-CUTOFF LIVE HEAL: cutoff se pehle agar kisi record me out-time laga
+    // hai LEKIN uska heartbeat abhi-abhi (last 15 min) aaya hai, matlab bandaa
+    // office me active hai → premature out (accidental logout) hatao aur Half day
+    // revert karo. Admin device sabke liye heal karta hai; RM apne liye. Isse
+    // Khokhan-type case (subah logout → wapas active) khud thik ho jata hai.
+    if(istH<cutoff){
+      const tdP=today();
+      const attP=getAtt();
+      const hbP=DB.get('heartbeats', {}) || {};
+      const nowMin=ist.getHours()*60+ist.getMinutes();
+      const hbFresh=(nm)=>{
+        const hb=hbP[nm];
+        if(!hb || hb.date!==tdP || !hb.time) return false;
+        const m=/^(\d{1,2}):(\d{2})$/.exec(hb.time); if(!m) return false;
+        return (nowMin-(Number(m[1])*60+Number(m[2])))<=15; // 15 min ke andar ka ping = active
+      };
+      const revertP=(rec)=>{
+        const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
+        const lateCut=(dow===6)?10.75:10;
+        return (m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
+      };
+      const scope = isAdmin ? Object.keys(attP) : (currentUser?[currentUser]:[]);
+      let healed=false;
+      for(const emp of scope){
+        const rec=(attP[emp]||[]).find(r=>r.date===tdP);
+        if(!rec || !rec.out) continue;
+        if(!(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) continue;
+        if(hbFresh(emp)){
+          const st = rec.status==='Half day' ? revertP(rec) : rec.status;
+          await saveAttRecord(emp, {...rec, out:'', status:st});
+          healed=true;
+        }
+      }
+      if(healed){
+        if(typeof renderDashboard==='function') renderDashboard();
+        if(typeof renderAttendancePage==='function') renderAttendancePage();
+      }
+      return; // pre-cutoff kaam ho gaya
+    }
 
     const td=today();
     const att=getAtt();
