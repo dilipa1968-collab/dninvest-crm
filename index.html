@@ -1156,6 +1156,7 @@ input:focus, select:focus, textarea:focus{
             <div class="form-field" style="min-width:120px">
               <label>RM</label>
               <input type="text" id="mftxn-client-rm" readonly style="background:#f7f7f7">
+              <select id="mftxn-rm-select" style="display:none"></select>
             </div>
           </div>
           <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
@@ -6813,6 +6814,19 @@ function renderMfTxnPage(){
 
   populateMfTxnMonths();
   renderMfTxnTable();
+
+  // Admin can attribute a new transaction to ANY RM — show a dropdown instead of
+  // the read-only RM box. RM users keep the read-only box (their own name).
+  const rmSel=document.getElementById('mftxn-rm-select');
+  const rmRO=document.getElementById('mftxn-client-rm');
+  if(rmSel){
+    if(CU.role==='admin'){
+      rmSel.innerHTML = getSegRMs('mf').map(r=>`<option>${escapeHtml(r)}</option>`).join('');
+      rmSel.style.display=''; if(rmRO) rmRO.style.display='none';
+    } else {
+      rmSel.style.display='none'; if(rmRO) rmRO.style.display='';
+    }
+  }
 }
 
 // Month dropdown me wahi mahine bhare jo data me actually hain (RM ke apne, Admin ke saare).
@@ -7126,6 +7140,12 @@ function selectMfTxnClient(clientId){
   mfTxnSelectedClient = {id:c.id, name:c.name, rm:c.rm||''};
   document.getElementById('mftxn-client-selected').value=c.name;
   document.getElementById('mftxn-client-rm').value=c.rm||'—';
+  // Admin: default the RM dropdown to the client's RM (can still be overridden).
+  const rmSel=document.getElementById('mftxn-rm-select');
+  if(rmSel && CU.role==='admin' && c.rm){
+    if(![...rmSel.options].some(o=>o.value===c.rm)){ rmSel.insertAdjacentHTML('afterbegin',`<option>${escapeHtml(c.rm)}</option>`); }
+    rmSel.value=c.rm;
+  }
   document.getElementById('mftxn-client-search').value='';
   const out=document.getElementById('mftxn-client-results');
   out.style.display='none'; out.innerHTML='';
@@ -7142,6 +7162,10 @@ document.addEventListener('click', e=>{
 
 function saveMfTxnEntry(){
   if(!mfTxnSelectedClient){ toast('Please select a client first','error'); return; }
+  // Admin may credit the entry to any RM via the dropdown; RM users use their own.
+  let rmForEntry = mfTxnSelectedClient.rm;
+  const rmSelEl=document.getElementById('mftxn-rm-select');
+  if(CU.role==='admin' && rmSelEl && rmSelEl.style.display!=='none' && rmSelEl.value){ rmForEntry = rmSelEl.value; }
   const type=document.getElementById('mftxn-type').value;
   const amount=parseFloat(document.getElementById('mftxn-amount').value);
   const fundName=document.getElementById('mftxn-fund').value.trim();
@@ -7165,7 +7189,7 @@ function saveMfTxnEntry(){
     id: uid(),
     client_id: mfTxnSelectedClient.id,
     client_name: mfTxnSelectedClient.name,
-    rm: mfTxnSelectedClient.rm,
+    rm: rmForEntry,
     type, amount, fund_name: fundName,
     target_scheme: mfTxnTypeNeedsTarget(type) ? targetScheme : '',
     first_payment: sched ? firstPay : null,
