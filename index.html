@@ -6157,10 +6157,23 @@ async function saveClient(){
   maybeLogMergedCall(seg, rec.id, rec.name, rec.rm);
   closeModal('clientModal');
   toast(currentEditId?'Client updated!':'Client added!','success');
-  if(seg==='equity') renderEqTable();
+  const pg = getCurrentPageId();
+  // Instantly refresh whatever list is visible — especially the Follow-ups page,
+  // which this save path previously never re-rendered, so an edited row lingered
+  // in the Today & Overdue list until a manual Refresh.
+  if(pg==='eq-followup') renderFollowup('eqf');
+  else if(pg==='mf-followup') renderFollowup('mff');
+  else if(seg==='equity') renderEqTable();
   else renderMfTable();
-  refreshDash();
-  updateBadges();
+  // Heavy/off-screen work (3k-row clients table, dashboard, badges) deferred past
+  // the paint so it never blocks the row from updating.
+  setTimeout(()=>{
+    try{
+      if(pg==='eq-followup' || pg==='mf-followup'){ if(seg==='equity') renderEqTable(); else renderMfTable(); }
+      refreshDash();
+      updateBadges();
+    }catch(_){}
+  }, 0);
   _savePromise.catch(()=>{});
 }
 
