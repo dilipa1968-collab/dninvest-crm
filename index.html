@@ -5978,6 +5978,9 @@ function clientForm(seg, c){
       <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
       ${rmFieldHtml('equity', c, 'Equity RM *')}
     </div>
+    <div class="form-row three">
+      <div class="form-field"><label>🎂 Date of Birth</label><input id="f_dob" type="date" value="${c?.dob||''}" max="${today()}"></div>
+    </div>
     <div class="form-section">Trading Info</div>
     <div class="form-row three">
       <div class="form-field"><label>Trading Status</label><select id="f_status"><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option><option ${c?.status==='Closed'?'selected':''}>Closed</option></select></div>
@@ -6210,7 +6213,7 @@ async function saveClient(){
   if(seg==='equity'){
     rec={
       id: newId,
-      code:gv2('f_code'), name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
+      code:gv2('f_code'), name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'), dob:gv2('f_dob'),
       rm, status:gv2('f_status')||'Active',
       asset_value:parseFloat(gv2('f_asset'))||null,
       revenue: (currentEditId ? (clients.find(x=>x.id===currentEditId)?.revenue ?? null) : null),
@@ -6245,7 +6248,7 @@ async function saveClient(){
       rec.created=old.created||today();
       // Audit log - track changed fields
       const auditFields = seg==='equity'
-        ? ['name','mobile','email','rm','status','code','asset_value','revenue','last_trade_date','last_call_date','next_call','followup_status','remarks']
+        ? ['name','mobile','email','dob','rm','status','code','asset_value','revenue','last_trade_date','last_call_date','next_call','followup_status','remarks']
         : ['name','mobile','email','rm','status','pan','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
       const changes = [];
       auditFields.forEach(f=>{
@@ -6336,6 +6339,7 @@ function viewClient(id,seg){
   if(seg==='equity'){
     body+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
       ${di('Client Code',c.code)}${di('RM',c.rm)}${di('Email',c.email)}
+      ${di('🎂 Date of Birth',c.dob?fmtDate(c.dob):null)}
       ${di('Asset Value',c.asset_value?'₹'+fmtNum(c.asset_value):null)}
       ${di('Revenue/Brokerage',c.revenue?'₹'+fmtNum(c.revenue):null)}
       ${di('Last Trade Date',fmtDate(c.last_trade_date)+(days!==null?` <small>(${days} days ago)</small>`:''))}
@@ -10839,6 +10843,7 @@ function handleEqFile(input){
       code: ['code','clientcode','clientid','ucccode','ucc'],
       mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
       email: ['email','emailid','emailaddress','mailid','mail'],
+      dob: ['dob','dateofbirth','birthdate','birthday','dateofbirthdob'],
       name: ['name','clientname','investorname'],
       asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
       last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate']
@@ -10867,6 +10872,7 @@ function handleEqFile(input){
         code: colMap.code!==undefined ? String(r[colMap.code]||'').trim() : '',
         mobile: colMap.mobile!==undefined ? cleanMobileNo(r[colMap.mobile]) : '',
         email: colMap.email!==undefined ? String(r[colMap.email]||'').trim().toLowerCase() : '',
+        dob: colMap.dob!==undefined ? parseExcelDate(r[colMap.dob]) : '',
         name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
         rm: colMap.rm!==undefined ? normRm(String(r[colMap.rm]||'').trim()) : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
@@ -10903,6 +10909,7 @@ async function doEqImport(){
       if(row.last_trade_date) ex.last_trade_date = row.last_trade_date;
       if(row.email) ex.email = row.email;      // always overwrite email from file
       if(row.mobile) ex.mobile = row.mobile;   // update mobile (country code stripped)
+      if(row.dob) ex.dob = row.dob;            // fill DOB if present in file
       ex.updated = today();
       touched.push(ex);
       updated++;
@@ -10915,7 +10922,7 @@ async function doEqImport(){
       while(usedIds.has(id)) id = uid();
       usedIds.add(id);
       const rec = {
-        id, code:row.code, name:row.name, mobile:row.mobile, email:row.email||'',
+        id, code:row.code, name:row.name, mobile:row.mobile, email:row.email||'', dob:row.dob||'',
         rm, status:'Active',
         asset_value: row.asset_value, revenue:null,
         last_trade_date: row.last_trade_date, last_trade_month:'',
@@ -11835,7 +11842,7 @@ function renderActivityLog(){
       detail=`<span style="color:var(--gray);font-size:.8rem">Added a new client</span>`;
     } else if(l.changes && l.changes.length){
       detail=l.changes.map(ch=>{
-        const fLabel={name:'Name',mobile:'Mobile',email:'Email',rm:'RM',status:'Status',code:'Client Code',asset_value:'Asset Value',revenue:'Revenue',last_trade_date:'Last Trade',last_call_date:'Last Call',next_call:'Next Call',followup_status:'Follow-up Status',remarks:'Remarks',pan:'PAN',aum:'AUM',sip_amount:'SIP Amount',sip_count:'SIP Count',last_invest_date:'Last Invest'}[ch.field]||ch.field;
+        const fLabel={name:'Name',mobile:'Mobile',email:'Email',dob:'Date of Birth',rm:'RM',status:'Status',code:'Client Code',asset_value:'Asset Value',revenue:'Revenue',last_trade_date:'Last Trade',last_call_date:'Last Call',next_call:'Next Call',followup_status:'Follow-up Status',remarks:'Remarks',pan:'PAN',aum:'AUM',sip_amount:'SIP Amount',sip_count:'SIP Count',last_invest_date:'Last Invest'}[ch.field]||ch.field;
         return `<div style="font-size:.78rem;margin-bottom:2px"><b>${fLabel}:</b> <span style="color:#ef4444;text-decoration:line-through">${ch.old}</span> → <span style="color:#16a34a">${ch.new}</span></div>`;
       }).join('');
     } else {
