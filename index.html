@@ -1001,6 +1001,7 @@ input:focus, select:focus, textarea:focus{
             <button class="btn btn-outline" onclick="openEqImportModal()" id="eqImportBtn">📥 Import Excel</button>
             <button class="btn btn-outline" onclick="openEqRmUpdateModal()" id="eqRmUpdateBtn" style="display:none">⇅ Bulk RM Update</button>
             <button class="btn btn-outline" onclick="openEqPanUpdateModal()" id="eqPanUpdateBtn" style="display:none">🪪 Bulk PAN Update</button>
+            <button class="btn btn-outline" onclick="fixAllMobiles()" id="eqFixMobileBtn" style="display:none">🧹 Fix Mobile (91)</button>
             <button class="btn btn-primary" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
@@ -3368,6 +3369,8 @@ function initApp(){
   if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqPanUpdateBtn=document.getElementById('eqPanUpdateBtn');
   if(eqPanUpdateBtn) eqPanUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqFixMobileBtn=document.getElementById('eqFixMobileBtn');
+  if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
   if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
@@ -10824,6 +10827,42 @@ function cleanMobileNo(v){
   let d = String(v||'').replace(/\D/g,'');
   if(d.length>10) d = d.slice(-10);   // drops leading 91 (or 0) country/trunk code
   return d;
+}
+
+// One-time cleanup: strip country code (91) from mobile of all EXISTING clients.
+async function fixAllMobiles(){
+  if(CU.role!=='admin') return;
+  const keys=['eq_clients','mf_clients'];
+  let total=0;
+  const preview={};
+  keys.forEach(k=>{
+    const list=DB.get(k)||[];
+    let n=0;
+    list.forEach(c=>{
+      const m=String(c.mobile||'').replace(/\D/g,'');
+      const a=String(c.alt_mobile||'').replace(/\D/g,'');
+      if(m.length>10 || a.length>10) n++;
+    });
+    preview[k]=n; total+=n;
+  });
+  if(total===0){ toast('✅ Sab mobile already clean hain — koi 91 country code nahi mila','success'); return; }
+  if(!confirm(`${total} clients ke mobile mein country code (91) mila hai.\n\nEquity: ${preview.eq_clients||0}\nMF: ${preview.mf_clients||0}\n\nSabse 91 hata ke last 10 digit rakh du? (Alternate number bhi)`)) return;
+  let fixed=0;
+  for(const k of keys){
+    const list=DB.get(k)||[];
+    const touched=[];
+    list.forEach(c=>{
+      let ch=false;
+      const m=String(c.mobile||'').replace(/\D/g,'');
+      if(m.length>10){ c.mobile=m.slice(-10); ch=true; }
+      const a=String(c.alt_mobile||'').replace(/\D/g,'');
+      if(a.length>10){ c.alt_mobile=a.slice(-10); ch=true; }
+      if(ch){ touched.push(c); fixed++; }
+    });
+    if(touched.length) await DB.setClientsBulk(k, touched);
+  }
+  toast(`✅ ${fixed} clients ke mobile fix ho gaye (91 hataya)`,'success');
+  renderEqTable(); if(typeof renderMfTable==='function') renderMfTable(); refreshDash(); updateBadges();
 }
 
 function handleEqFile(input){
