@@ -945,6 +945,7 @@ input:focus, select:focus, textarea:focus{
             <div class="dc-body"><div id="rmMfChart"></div></div>
           </div>
           <div class="dash-card"><h3 onclick="showPage('eq-followup')" style="cursor:pointer" title="View all follow-ups">📞 Follow-ups — Today &amp; Overdue <span id="fuHeadCount" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayFollowup"></div></div>
+          <div class="dash-card"><h3>🎂 Today's Birthdays <span id="bdayHeadCount" style="background:#e11d8f;color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayBirthday"></div></div>
           <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
@@ -3717,6 +3718,38 @@ function refreshDash(){
         </div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No pending follow-ups</p>';
+
+  // ── 🎂 Today's Birthdays (match dob month+day with today) ──
+  const bdayEl = document.getElementById('todayBirthday');
+  if(bdayEl){
+    const todayMD = tdStr.slice(5,10);            // mm-dd
+    const curYear = parseInt(tdStr.slice(0,4),10);
+    const bdays = [
+      ...eq.filter(c=>c.dob && c.dob.slice(5,10)===todayMD).map(c=>({name:c.name,rm:c.rm,mobile:c.mobile,dob:c.dob,seg:'EQ'})),
+      ...mf.filter(c=>c.dob && c.dob.slice(5,10)===todayMD).map(c=>({name:c.name,rm:c.rm,mobile:c.mobile,dob:c.dob,seg:'MF'}))
+    ];
+    const bHead=document.getElementById('bdayHeadCount');
+    if(bHead){bHead.textContent=bdays.length>0?bdays.length:'';bHead.style.display=bdays.length>0?'':'none';}
+    bdayEl.innerHTML = bdays.length
+      ? bdays.map(c=>{
+          const nm=c.name||'—';
+          let d=String(c.mobile||'').replace(/\D/g,'');
+          if(d.length===10) d='91'+d;                       // add country code for wa.me
+          const yr=parseInt(String(c.dob).slice(0,4),10);
+          const turns=(yr&&curYear>yr)?` <small style="color:var(--gray)">(turns ${curYear-yr})</small>`:'';
+          const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
+          const waBtn = d.length>=12
+            ? `<a href="https://wa.me/${d}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
+            : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
+          return `<div class="bar-row" style="border-left:3px solid #e11d8f;padding-left:9px;">
+            <span class="bar-name">${escapeHtml(nm)}${turns}</span>
+            <span class="badge ${c.seg==='EQ'?'b-eq':'b-mf'}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
+            <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
+            ${waBtn}
+          </div>`;
+        }).join('')
+      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 No birthdays today</p>';
+  }
 
   // Redemption / SIP Stop audit (Admin side) — last entry date per MF RM,
   // sorted with the most overdue (or never-logged) RM at the top, so Admin
