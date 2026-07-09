@@ -404,6 +404,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:5px;}
 .form-row.full{grid-template-columns:1fr;}
 .form-row.three{grid-template-columns:1fr 1fr 1fr;}
+.form-row.four{grid-template-columns:1fr 1fr 1fr 1fr;}
 .form-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);
   text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
 .form-field input,.form-field select,.form-field textarea{width:100%;padding:5px 10px;
@@ -605,6 +606,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .dash-grid{grid-template-columns:1fr;}
   .form-row{grid-template-columns:1fr;}
   .form-row.three{grid-template-columns:1fr;}
+  .form-row.four{grid-template-columns:1fr;}
   .content{padding:10px;}
   .page-title{font-size:1.1rem;}
   .modal{width:100%;max-width:100%;border-radius:0;max-height:100vh;height:100vh;}
@@ -5976,12 +5978,10 @@ function clientForm(seg, c){
       <div class="form-field"><label>Client Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
       <div class="form-field"><label>📱 Registered Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
     </div>
-    <div class="form-row three">
+    <div class="form-row four">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
       ${rmFieldHtml('equity', c, 'Equity RM *')}
-    </div>
-    <div class="form-row three">
       <div class="form-field"><label>🎂 Date of Birth</label><input id="f_dob" type="date" value="${c?.dob||''}" max="${today()}"></div>
     </div>
     <div class="form-section">Trading Info</div>
