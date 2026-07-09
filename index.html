@@ -10814,6 +10814,14 @@ function openEqRisk(code, name){
   document.getElementById('eqRiskModal').classList.add('open');
 }
 
+// Strip country code / non-digits from a mobile number → keep last 10 digits.
+// e.g. "919632817805" or "+91 96328-17805" → "9632817805"
+function cleanMobileNo(v){
+  let d = String(v||'').replace(/\D/g,'');
+  if(d.length>10) d = d.slice(-10);   // drops leading 91 (or 0) country/trunk code
+  return d;
+}
+
 function handleEqFile(input){
   const file = input.files[0];
   if(!file) return;
@@ -10830,6 +10838,7 @@ function handleEqFile(input){
     const wanted = {
       code: ['code','clientcode','clientid','ucccode','ucc'],
       mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
+      email: ['email','emailid','emailaddress','mailid','mail'],
       name: ['name','clientname','investorname'],
       asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
       last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate']
@@ -10856,7 +10865,8 @@ function handleEqFile(input){
       .filter(r=>r.some(c=>c!==''))
       .map(r=>({
         code: colMap.code!==undefined ? String(r[colMap.code]||'').trim() : '',
-        mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').trim() : '',
+        mobile: colMap.mobile!==undefined ? cleanMobileNo(r[colMap.mobile]) : '',
+        email: colMap.email!==undefined ? String(r[colMap.email]||'').trim().toLowerCase() : '',
         name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
         rm: colMap.rm!==undefined ? normRm(String(r[colMap.rm]||'').trim()) : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
@@ -10891,6 +10901,8 @@ async function doEqImport(){
     if(ex){
       if(row.asset_value!==null) ex.asset_value = row.asset_value;
       if(row.last_trade_date) ex.last_trade_date = row.last_trade_date;
+      if(row.email) ex.email = row.email;      // always overwrite email from file
+      if(row.mobile) ex.mobile = row.mobile;   // update mobile (country code stripped)
       ex.updated = today();
       touched.push(ex);
       updated++;
@@ -10903,7 +10915,7 @@ async function doEqImport(){
       while(usedIds.has(id)) id = uid();
       usedIds.add(id);
       const rec = {
-        id, code:row.code, name:row.name, mobile:row.mobile, email:'',
+        id, code:row.code, name:row.name, mobile:row.mobile, email:row.email||'',
         rm, status:'Active',
         asset_value: row.asset_value, revenue:null,
         last_trade_date: row.last_trade_date, last_trade_month:'',
