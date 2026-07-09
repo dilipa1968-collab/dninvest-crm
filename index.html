@@ -405,6 +405,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .form-row.full{grid-template-columns:1fr;}
 .form-row.three{grid-template-columns:1fr 1fr 1fr;}
 .form-row.four{grid-template-columns:1fr 1fr 1fr 1fr;}
+.eq-narrow input:not([type=checkbox]), .eq-narrow select{max-width:190px;}
+.eq-narrow #f_remarks, .eq-narrow #m_call_note{max-width:none;}
 .form-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);
   text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
 .form-field input,.form-field select,.form-field textarea{width:100%;padding:5px 10px;
@@ -607,6 +609,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .form-row{grid-template-columns:1fr;}
   .form-row.three{grid-template-columns:1fr;}
   .form-row.four{grid-template-columns:1fr;}
+  .eq-narrow input:not([type=checkbox]), .eq-narrow select{max-width:none;}
   .content{padding:10px;}
   .page-title{font-size:1.1rem;}
   .modal{width:100%;max-width:100%;border-radius:0;max-height:100vh;height:100vh;}
@@ -5972,6 +5975,7 @@ function maybeLogMergedCall(seg, id, name, rm){
 function clientForm(seg, c){
   if(seg==='equity'){
     return `
+    <div class="eq-narrow">
     <div class="form-section">Basic Information</div>
     <div class="form-row three">
       <div class="form-field"><label>Client Code</label><input id="f_code" value="${c?.code||''}" placeholder="e.g. 12345"></div>
@@ -6021,7 +6025,8 @@ function clientForm(seg, c){
       </select></div>
       <div class="form-field"><label>Remarks</label><input id="f_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
     </div>
-    ${callMergeSection()}`;
+    ${callMergeSection()}
+    </div>`;
   } else {
     return `
     <div class="form-section">Basic Information</div>
