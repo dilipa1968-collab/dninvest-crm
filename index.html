@@ -39,6 +39,29 @@ const firebaseConfig = {
   appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
 };
 try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
+
+// If the Firebase SDK scripts loaded slowly (mobile/5G blip), window.fdb may
+// still be undefined when auto-login fires. This waits up to ~8s for fdb to
+// appear, retrying init each time — so first-login attendance + client sync
+// don't silently skip (the "Raju logged in, no clients + no attendance" bug).
+window.waitForFdb = function(maxMs){
+  maxMs = maxMs || 8000;
+  return new Promise(function(resolve){
+    if(window.fdb){ resolve(true); return; }
+    var waited = 0, step = 300;
+    var t = setInterval(function(){
+      if(window.fdb){ clearInterval(t); resolve(true); return; }
+      // Firebase SDK may have finished loading after our first init attempt
+      if(typeof firebase !== 'undefined' && firebase.firestore){
+        try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+        try{ window.fdb = firebase.firestore(); }catch(e){}
+        if(window.fdb){ clearInterval(t); resolve(true); return; }
+      }
+      waited += step;
+      if(waited >= maxMs){ clearInterval(t); resolve(!!window.fdb); }
+    }, step);
+  });
+};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
@@ -2556,9 +2579,10 @@ const DB = {
     if(!this.get('mf_business')) this.set('mf_business', []);
   },
   async syncFromFirebase(){
+    if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
     if(typeof fdb==='undefined') return;
-    try{
-      for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
+    for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
+      try{
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -2603,8 +2627,8 @@ const DB = {
             console.log('Loaded from Firebase:',key, 'object');
           }
         }
+      }catch(e){ console.log('Firebase sync error for',key,':',e); }
       }
-    }catch(e){ console.log('Firebase sync error:',e); }
     try{ if(typeof clearEqRiskCache==='function') clearEqRiskCache(); }catch(e){}
   }
 };
@@ -2836,7 +2860,11 @@ function bindCrmHbEdgePings(){
 // status is recorded as "Holiday" instead of "Present".
 async function recordHrAttendanceOnCrmLogin(user){
   try{
-    if(typeof fdb==='undefined'){ console.log('[ATT] fdb undefined, skip'); return; }
+    // If Firebase isn't ready yet (slow mobile load), wait for it rather than
+    // silently skipping — otherwise a first login on a bad connection records
+    // no attendance at all for the day.
+    if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
+    if(typeof fdb==='undefined'){ console.log('[ATT] fdb still undefined after wait, skip'); return; }
     // Canonical HR employee names — MUST match dninvest-hr.html's EMPLOYEES list
     // exactly, so attendance is saved under the same key the HR Portal reads.
     const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
@@ -3038,6 +3066,11 @@ async function doResetPassword(){
 // Auto-login if session exists (persistent — survives browser/app close).
 // Session is cleared only by Logout, wrong/changed credentials, or RM-on-mobile.
 async function tryAutoLogin(){
+  // Wait for Firebase to be ready before doing anything — on a slow mobile
+  // connection the SDK scripts may not have loaded yet when this fires. Without
+  // this, auto-login used to run with fdb undefined → no client sync + skipped
+  // attendance (an RM would see an empty client list and no "Present" mark).
+  await window.waitForFdb(8000);
   // Migrate any old sessionStorage session to localStorage (one-time)
   let saved = localStorage.getItem('dninvest_session');
   if(!saved){
@@ -3093,7 +3126,13 @@ window.addEventListener('DOMContentLoaded', tryAutoLogin);
 // INIT
 // ══════════════════════════════════════════
 function initApp(){
-  // Sync from Firebase first, then setup real-time listeners
+  // Sync from Firebase first, then setup real-time listeners.
+  // If fdb isn't ready yet (slow load), wait for it so we don't skip the
+  // whole sync and leave the RM staring at an empty client list.
+  if(typeof fdb==='undefined'){
+    window.waitForFdb(8000).then(()=>{ if(typeof fdb!=='undefined') initApp(); });
+    return;
+  }
   if(typeof fdb!=='undefined'){
     DB.syncFromFirebase().then(()=>{
       DB.load(); // only seed defaults AFTER real Firestore data has been loaded
