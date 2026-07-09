@@ -277,15 +277,16 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 
 /* ── STATS ── */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
-.stat-card{background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 2px 8px rgba(10,20,50,.07);
-  border-top:3px solid var(--navy);cursor:pointer;transition:transform .18s,box-shadow .18s;}
-.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow2);}
-.stat-card.green{border-top-color:var(--green);}
-.stat-card.red{border-top-color:var(--red);}
-.stat-card.gold{border-top-color:var(--gold);}
-.stat-card.teal{border-top-color:var(--teal);}
-.stat-card.purple{border-top-color:var(--purple);}
-.stat-card.orange{border-top-color:var(--orange);}
+.stat-card{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 2px 10px rgba(10,20,50,.08);
+  border-left:4px solid var(--navy);cursor:pointer;transition:transform .18s,box-shadow .18s;position:relative;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(10,20,50,.13);}
+.stat-card:active{transform:translateY(0);box-shadow:0 2px 8px rgba(10,20,50,.08);}
+.stat-card.green{border-left-color:var(--green);}
+.stat-card.red{border-left-color:var(--red);}
+.stat-card.gold{border-left-color:var(--gold);}
+.stat-card.teal{border-left-color:var(--teal);}
+.stat-card.purple{border-left-color:var(--purple);}
+.stat-card.orange{border-left-color:var(--orange);}
 .stat-n{font-size:1.6rem;font-weight:900;color:var(--navy);line-height:1;letter-spacing:-.3px;}
 .stat-l{font-size:.67rem;color:var(--gray);margin-top:3px;font-weight:600;}
 
@@ -469,9 +470,9 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 
 /* ── DASHBOARD ── */
 .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:4px;}
-.dash-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
-.dash-card h3{font-size:.75rem;color:var(--gray);font-weight:800;text-transform:uppercase;
-  letter-spacing:.5px;margin-bottom:14px;}
+.dash-card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 2px 12px rgba(10,20,50,.07);border:1px solid rgba(10,20,50,.04);}
+.dash-card h3{font-size:.72rem;color:var(--gray);font-weight:800;text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
 .dash-card.collapsible h3{display:flex;align-items:center;justify-content:space-between;
   cursor:pointer;margin-bottom:0;user-select:none;}
 .dash-card.collapsible .dc-chevron{font-size:.7rem;color:var(--gray);transition:transform .2s;margin-left:8px;}
@@ -480,9 +481,10 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   font-weight:700;border-radius:10px;padding:1px 8px;margin-left:auto;margin-right:8px;}
 .dash-card.collapsible .dc-body{display:none;margin-top:14px;}
 .dash-card.collapsible.open .dc-body{display:block;}
-.bar-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f0f2f8;}
-.bar-row:last-child{border:none;}
-.bar-name{font-size:.8rem;font-weight:600;color:var(--navy);min-width:100px;max-width:120px;
+.bar-row{display:flex;align-items:center;padding:7px 6px;border-bottom:1px solid #f0f2f8;border-radius:6px;transition:background .15s;}
+.bar-row:last-child{border-bottom:none;}
+.bar-row:hover{background:#f6f8ff;}
+.bar-name{font-size:.82rem;font-weight:600;color:var(--navy);min-width:100px;max-width:130px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bar-wrap{flex:1;margin:0 10px;height:7px;background:var(--border);border-radius:4px;}
 .bar-fill{height:7px;border-radius:4px;background:var(--navy);transition:width .5s;}
@@ -570,10 +572,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .topbar-right{gap:4px;}
   .btn-sm{font-size:.7rem;padding:5px 7px;}
   .seg-indicator{display:none;}
-  /* Zoom widget compact on mobile so 🔑 / 👔 HR / Logout sab fit ho */
-  #dnZoomBar{margin-right:2px!important;padding:2px 4px!important;gap:2px!important;}
-  #dnZoomBar button{width:20px!important;height:20px!important;font-size:14px!important;}
-  #dnZoomBar #dnZoomVal{min-width:30px!important;font-size:10px!important;}
+  /* Zoom widget hidden on mobile — use pinch-zoom instead */
+  #dnZoomBar{display:none!important;}
   .sidebar{position:fixed;left:0;top:56px;height:calc(100vh - 56px);z-index:160;
     transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow2);}
   .sidebar.open{transform:translateX(0);}
@@ -629,7 +629,7 @@ body{
 }
 .filters{border-radius:14px;padding:10px 14px;gap:8px}
 .tbl-wrap{border-radius:14px}
-.stat-card{border-radius:14px;transition:transform .18s, box-shadow .18s}
+.stat-card{border-radius:14px;transition:transform .18s, box-shadow .18s;border-left-width:4px}
 .stat-card:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(16,30,60,.08), 0 18px 44px rgba(16,30,60,.12)}
 
 /* MORE SCREEN, LESS SCROLL — table stretches to viewport height */
@@ -915,7 +915,7 @@ input:focus, select:focus, textarea:focus{
             <h3 onclick="toggleDashCard('rmMfCard')">MF RM — AUM Summary <span class="dc-count" id="rmMfCount"></span><span class="dc-chevron">▶</span></h3>
             <div class="dc-body"><div id="rmMfChart"></div></div>
           </div>
-          <div class="dash-card"><h3>📞 Follow-ups — Today &amp; Overdue</h3><div id="todayFollowup"></div></div>
+          <div class="dash-card"><h3 onclick="showPage('eq-followup')" style="cursor:pointer" title="View all follow-ups">📞 Follow-ups — Today &amp; Overdue <span id="fuHeadCount" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayFollowup"></div></div>
           <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
@@ -3656,14 +3656,16 @@ function refreshDash(){
     ...op.filter(c=>c.next_call&&c.next_call<=tdStr).map(c=>({name:c.client_name||c.name,rm:c.rm,next_call:c.next_call,seg:c.product_type||'Other'}))
   ].sort((a,b)=>a.next_call.localeCompare(b.next_call));
   const segCls = s=>s==='EQ'?'b-eq':s==='MF'?'b-mf':s==='Lead'?'b-lead':'b-op';
+  const fuHeadEl=document.getElementById('fuHeadCount');
+  if(fuHeadEl){fuHeadEl.textContent=fuAll.length>0?fuAll.length:'';fuHeadEl.style.display=fuAll.length>0?'':'none';}
   document.getElementById('todayFollowup').innerHTML = fuAll.length
     ? fuAll.map(c=>{
         const isOverdue = c.next_call < tdStr;
-        return `<div class="bar-row">
+        return `<div class="bar-row" style="border-left:3px solid ${isOverdue?'var(--red)':'transparent'};padding-left:9px;">
           <span class="bar-name">${escapeHtml(c.name||'—')}</span>
-          <span class="badge ${segCls(c.seg)}" style="margin:0 6px">${c.seg}</span>
-          <span style="font-size:.72rem;color:${isOverdue?'var(--red)':'var(--gray)'};margin-right:4px">${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
-          <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
+          <span class="badge ${segCls(c.seg)}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
+          <span style="font-size:.72rem;color:${isOverdue?'var(--red)':'var(--gray)'};margin-right:4px;font-weight:${isOverdue?'700':'400'}">${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
+          <span style="font-size:.72rem;color:var(--gray);margin-left:auto">${escapeHtml(c.rm||'')}</span>
         </div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No pending follow-ups</p>';
