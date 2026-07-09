@@ -910,6 +910,9 @@ input:focus, select:focus, textarea:focus{
       <div class="nav-item" onclick="showPage('announcements')" id="nav-announcements">
         <span class="icon">📢</span> Announcements
       </div>
+      <div class="nav-item" onclick="showPage('brokerage')" id="nav-brokerage">
+        <span class="icon">💰</span> Brokerage
+      </div>
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Users & Settings
         <span class="badge" id="admin-inbox-badge-nav" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
@@ -3329,6 +3332,8 @@ function initApp(){
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
   const annNav=document.getElementById('nav-announcements');
   if(annNav) annNav.style.display=CU.role==='admin'?'flex':'none';
+  const brkNav=document.getElementById('nav-brokerage');
+  if(brkNav) brkNav.style.display=CU.role==='admin'?'flex':'none';
 
   // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
