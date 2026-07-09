@@ -3600,6 +3600,25 @@ function hardRefresh(){
   }
 }
 
+// ── Birthday "Wish All" stepper: opens each client's WhatsApp chat one-by-one ──
+let _bdayQueue=[], _bdayStep=0;
+function wishAllBirthdays(){
+  const btn=document.getElementById('wishAllBtn');
+  if(!_bdayQueue.length) return;
+  if(_bdayStep>=_bdayQueue.length) _bdayStep=0;   // allow restart
+  const c=_bdayQueue[_bdayStep];
+  window.open(c.url,'_blank','noopener');
+  _bdayStep++;
+  if(btn){
+    if(_bdayStep>=_bdayQueue.length){
+      btn.innerHTML='✅ All opened — click to restart';
+    } else {
+      const nx=_bdayQueue[_bdayStep];
+      btn.innerHTML=`Next ▶ ${escapeHtml((nx.name||'').split(' ')[0]||nx.name)} (${_bdayStep+1}/${_bdayQueue.length})`;
+    }
+  }
+}
+
 function refreshDash(){
   const eq = getMyEqClients();
   const activeEq = getActiveEqClients();
@@ -3730,16 +3749,20 @@ function refreshDash(){
     ];
     const bHead=document.getElementById('bdayHeadCount');
     if(bHead){bHead.textContent=bdays.length>0?bdays.length:'';bHead.style.display=bdays.length>0?'':'none';}
+    _bdayQueue=[]; _bdayStep=0;   // reset stepper on each dashboard refresh
     bdayEl.innerHTML = bdays.length
-      ? bdays.map(c=>{
+      ? (()=>{
+        const rows = bdays.map(c=>{
           const nm=c.name||'—';
           let d=String(c.mobile||'').replace(/\D/g,'');
           if(d.length===10) d='91'+d;                       // add country code for wa.me
           const yr=parseInt(String(c.dob).slice(0,4),10);
           const turns=(yr&&curYear>yr)?` <small style="color:var(--gray)">(turns ${curYear-yr})</small>`:'';
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
+          const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
+          if(d.length>=12) _bdayQueue.push({name:nm, url});   // add to Wish-All queue
           const waBtn = d.length>=12
-            ? `<a href="https://wa.me/${d}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
+            ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
             : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
           return `<div class="bar-row" style="border-left:3px solid #e11d8f;padding-left:9px;">
             <span class="bar-name">${escapeHtml(nm)}${turns}</span>
@@ -3747,7 +3770,12 @@ function refreshDash(){
             <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
             ${waBtn}
           </div>`;
-        }).join('')
+        }).join('');
+        const wishAll = _bdayQueue.length>=2
+          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All (${_bdayQueue.length}) — opens one by one</button>`
+          : '';
+        return wishAll + rows;
+      })()
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 No birthdays today</p>';
   }
 
