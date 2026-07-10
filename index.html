@@ -601,6 +601,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .seg-indicator{display:none;}
   /* Zoom widget hidden on mobile — use pinch-zoom instead */
   #dnZoomBar{display:none!important;}
+  #dnSqBell{padding:5px 8px!important;font-size:.68rem!important}
+  #dnSqBell .sq-bell-label{display:none;}
   .sidebar{position:fixed;left:0;top:56px;height:calc(100vh - 56px);z-index:160;
     transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow2);}
   .sidebar.open{transform:translateX(0);}
@@ -863,10 +865,6 @@ input:focus, select:focus, textarea:focus{
         <span class="icon">⚠️</span> No-Trade Alerts
         <span class="nav-badge red" id="nb-eqnt">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('eq-squareoff')" id="nav-eq-squareoff">
-        <span class="icon">🔻</span> Square-off (T+5)
-        <span class="nav-badge red" id="nb-eqsq">0</span>
-      </div>
       <div class="nav-item" onclick="showPage('eq-nocall')" id="nav-eq-nocall">
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-eqnc">0</span>
@@ -1095,8 +1093,7 @@ input:focus, select:focus, textarea:focus{
         <div class="filters" style="padding:10px 16px 6px">
           <input type="text" id="sq-search" placeholder="🔍 Search name / code..." oninput="renderSquareoff()" style="min-width:240px">
           <select id="sq-rm" onchange="renderSquareoff()" style="display:none"><option value="">All RMs</option></select>
-          <select id="sq-date" onchange="renderSquareoff()"><option value="">All Dates</option></select>
-          <button class="btn btn-outline" onclick="document.getElementById('sq-search').value='';document.getElementById('sq-rm').value='';document.getElementById('sq-date').value='';renderSquareoff()">✕ Clear</button>
+          <button class="btn btn-outline" onclick="document.getElementById('sq-search').value='';document.getElementById('sq-rm').value='';renderSquareoff()">✕ Clear</button>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll"><table id="sq-table"></table></div></div>
       </div>
@@ -8499,79 +8496,74 @@ function renderSquareoff(){
   let rows=sqMyRows();
   const search=((document.getElementById('sq-search')||{value:''}).value||'').toLowerCase().trim();
   const rmF=(document.getElementById('sq-rm')||{value:''}).value;
-  const dateF=(document.getElementById('sq-date')||{value:''}).value;
 
   if(rmSel){
     const prev=rmSel.value;
     const rms=[...new Set(getSquareoff().map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort();
     rmSel.innerHTML='<option value="">All RMs</option>'+rms.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
   }
-  const dSel=document.getElementById('sq-date');
-  if(dSel){
-    const prev=dSel.value;
-    const ds=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
-    dSel.innerHTML='<option value="">All Dates</option>'+ds.map(d=>`<option value="${d}"${d===prev?' selected':''}>${sqFmtD(d)}</option>`).join('');
-  }
 
   if(search) rows=rows.filter(r=>(r.name||'').toLowerCase().includes(search)||(r.code||'').toLowerCase().includes(search));
   if(isAdmin && rmF) rows=rows.filter(r=>String(r.dealer||'').trim().toUpperCase()===rmF);
-  if(dateF) rows=rows.filter(r=>r.sqDate===dateF);
-
-  const total=rows.reduce((s,r)=>s+(r.debit||0),0);
-  const cntEl=document.getElementById('sq-count');
-  if(cntEl) cntEl.textContent=rows.length?`— ${rows.length} clients · ₹${Math.round(total).toLocaleString('en-IN')}`:'';
 
   const tbl=document.getElementById('sq-table'); if(!tbl) return;
   if(!getSquareoff().length){
     tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">No square-off file uploaded yet.${isAdmin?" Upload today's file above.":''}</td></tr>`;
+    if(document.getElementById('sq-count')) document.getElementById('sq-count').textContent='';
     return;
   }
   if(!rows.length){
     tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">🎉 No square-off clients for you right now.</td></tr>`;
+    if(document.getElementById('sq-count')) document.getElementById('sq-count').textContent='';
     return;
   }
 
-  // Group by square-off date, most urgent (earliest) date first
-  const groups={};
-  rows.forEach(r=>{ const k=r.sqDate||'Unknown'; (groups[k]=groups[k]||[]).push(r); });
-  const dateKeys=Object.keys(groups).sort();
+  // Distinct dates across visible rows, earliest (most urgent) first
+  const dateKeys=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
   const todayStr=today();
-  // Color palette per date group — cycles if more than 4 dates shown at once
-  const palette=[
-    {bar:'#dc2626',bg:'#fef2f2',chip:'#dc2626'},   // red — most urgent
-    {bar:'#ea580c',bg:'#fff7ed',chip:'#ea580c'},   // orange
-    {bar:'#ca8a04',bg:'#fefce8',chip:'#ca8a04'},   // amber
-    {bar:'#0891b2',bg:'#ecfeff',chip:'#0891b2'},   // teal
-    {bar:'#7c3aed',bg:'#f5f3ff',chip:'#7c3aed'},   // violet
-  ];
+  const palette=['#dc2626','#ea580c','#ca8a04','#0891b2','#7c3aed','#be185d'];
+  const dateColor={}; dateKeys.forEach((d,i)=>dateColor[d]=palette[i%palette.length]);
 
-  let html='';
-  dateKeys.forEach((dk,gi)=>{
-    const grp=groups[dk].slice().sort((a,b)=>(b.debit||0)-(a.debit||0));
-    const gTotal=grp.reduce((s,r)=>s+(r.debit||0),0);
-    const col=palette[gi%palette.length];
-    const isToday=dk===todayStr;
-    html+=`<tr><td colspan="6" style="padding:0;border:none">
-      <div style="margin:14px 0 6px;padding:9px 14px;border-left:5px solid ${col.bar};background:${col.bg};
-        border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-weight:800;color:${col.chip};font-size:.92rem">${sqFmtD(dk)}${isToday?' — AAJ 🔴':''}</span>
-        <span style="font-size:.78rem;color:#475569">${grp.length} clients</span>
-        <span style="font-size:.78rem;color:#475569;margin-left:auto;font-weight:700">₹${Math.round(gTotal).toLocaleString('en-IN')}</span>
-      </div>
-    </td></tr>`;
-    html+='<tr style="font-size:.72rem;color:#94a3b8"><td style="padding:2px 12px">Code</td><td style="padding:2px 12px">Client Name</td>'+(isAdmin?'<td style="padding:2px 12px">RM</td>':'')+'<td style="padding:2px 12px;text-align:right">Debit (₹)</td><td style="padding:2px 12px">T-5 Date</td><td></td></tr>';
-    grp.forEach(r=>{
-      const big=(r.debit||0)>=50000;
-      html+=`<tr style="${big?'background:#fffbeb':''}">
-        <td>${r.code||'—'}</td>
-        <td style="font-weight:600">${r.name||'—'}</td>
-        ${isAdmin?`<td>${r.dealer||'—'}</td>`:''}
-        <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${(r.debit||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-        <td style="white-space:nowrap;color:var(--gray)">${r.t5?sqFmtD(r.t5):'—'}</td>
-        <td></td>
-      </tr>`;
-    });
+  // Pivot: one row per client code (fallback name if code blank)
+  const byClient={};
+  rows.forEach(r=>{
+    const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{}};
+    byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
+    // keep freshest name/dealer if it varies between files
+    byClient[key].name = r.name || byClient[key].name;
+    byClient[key].dealer = r.dealer || byClient[key].dealer;
   });
+  let clients=Object.values(byClient);
+  // Sort by total debit desc
+  clients.forEach(c=>{ c.total=Object.values(c.vals).reduce((s,v)=>s+v,0); });
+  clients.sort((a,b)=>b.total-a.total);
+
+  const total=clients.reduce((s,c)=>s+c.total,0);
+  const cntEl=document.getElementById('sq-count');
+  if(cntEl) cntEl.textContent=`— ${clients.length} clients · ₹${Math.round(total).toLocaleString('en-IN')}`;
+
+  let html='<thead><tr><th>Client Code</th><th>Client Name</th>'+(isAdmin?'<th>RM</th>':'');
+  dateKeys.forEach(dk=>{
+    const isToday=dk===todayStr;
+    html+=`<th style="color:${dateColor[dk]};background:${dateColor[dk]}14">${sqFmtD(dk)}${isToday?' 🔴':''}</th>`;
+  });
+  html+='<th>Total</th></tr></thead><tbody>';
+  clients.forEach(c=>{
+    html+=`<tr><td>${c.code||'—'}</td><td style="font-weight:600">${c.name||'—'}</td>`;
+    if(isAdmin) html+=`<td>${c.dealer||'—'}</td>`;
+    dateKeys.forEach(dk=>{
+      const v=c.vals[dk];
+      if(v==null){
+        html+=`<td style="text-align:center;color:#cbd5e1">—</td>`;
+      }else{
+        const big=v>=50000;
+        html+=`<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:${big?800:600};background:${dateColor[dk]}${big?'22':'0d'}">${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>`;
+      }
+    });
+    html+=`<td style="text-align:right;font-weight:800;color:var(--navy,#132039)">${c.total.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`;
+  });
+  html+='</tbody>';
   tbl.innerHTML=html;
 }
 function sqUpdateBell(){
@@ -8583,14 +8575,33 @@ function sqUpdateBell(){
 }
 function sqExport(){
   const isAdmin=!!(CU && CU.role==='admin');
-  let rows=sqMyRows().slice().sort((a,b)=>String(a.sqDate||'').localeCompare(String(b.sqDate||''))||((b.debit||0)-(a.debit||0)));
+  let rows=sqMyRows();
   if(!rows.length){ toast('No data to export','error'); return; }
-  const cols=[{header:'Square-off Date',width:16},{header:'Client Code',width:14},{header:'Client Name',width:32}]
+  const dateKeys=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
+  const byClient={};
+  rows.forEach(r=>{
+    const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{}};
+    byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
+    byClient[key].name=r.name||byClient[key].name;
+    byClient[key].dealer=r.dealer||byClient[key].dealer;
+  });
+  let clients=Object.values(byClient);
+  clients.forEach(c=>{ c.total=Object.values(c.vals).reduce((s,v)=>s+v,0); });
+  clients.sort((a,b)=>b.total-a.total);
+
+  const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32}]
     .concat(isAdmin?[{header:'RM',width:12}]:[])
-    .concat([{header:'Debit',money:true,width:15},{header:'T-5 Date',width:14}]);
-  const data=rows.map(r=>{ const a=[sqFmtD(r.sqDate),r.code,r.name]; if(isAdmin) a.push(r.dealer); a.push(r.debit, r.t5?sqFmtD(r.t5):''); return a; });
-  const total=rows.reduce((s,r)=>s+(r.debit||0),0);
-  const totalRow=isAdmin?['','','TOTAL','',total,'']:['','','TOTAL',total,''];
+    .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
+    .concat([{header:'Total',money:true,width:15}]);
+  const data=clients.map(c=>{
+    const row=[c.code,c.name]; if(isAdmin) row.push(c.dealer);
+    dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
+    row.push(c.total);
+    return row;
+  });
+  const grandTotal=clients.reduce((s,c)=>s+c.total,0);
+  const totalRow=(isAdmin?['','','TOTAL']:['','TOTAL']).concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0))).concat([grandTotal]);
   dnXlsx('Square-off_'+today()+'.xlsx','Square-off (T+5)',cols,data,totalRow);
 }
 function ntReport(d){
@@ -13682,13 +13693,16 @@ const MFTBULK = {
     const bell=document.createElement('button');
     bell.id='dnSqBell';
     bell.title='Square-off (T+5) alerts';
-    bell.style.cssText='display:none;align-items:center;gap:4px;background:#dc2626;color:#fff;border:none;'+
-      'border-radius:20px;padding:5px 10px;margin-right:6px;font-size:.78rem;font-weight:700;cursor:pointer;flex-shrink:0';
-    bell.innerHTML='🔻 <span id="dnSqBellCount">0</span>';
+    bell.style.cssText='display:none;align-items:center;gap:5px;background:#dc2626;color:#fff;border:none;'+
+      'border-radius:20px;padding:5px 12px;margin-right:6px;font-size:.75rem;font-weight:700;cursor:pointer;'+
+      'flex-shrink:0;white-space:nowrap';
+    bell.innerHTML='🔻 <span class="sq-bell-label">Square-off (T+5)</span> <span id="dnSqBellCount" style="background:rgba(255,255,255,.28);'+
+      'border-radius:10px;padding:1px 7px;margin-left:2px">0</span>';
     bell.onclick=()=>{ if(typeof showPage==='function') showPage('eq-squareoff'); };
-    if(host && bar && bar.nextSibling) host.insertBefore(bell, bar.nextSibling);
-    else if(host) host.insertBefore(bell, host.firstChild);
-    else document.body.appendChild(bell);
+    // Insert to the LEFT of the zoom bar (i.e. before it in DOM order)
+    if(host && bar){ host.insertBefore(bell, bar); }
+    else if(host){ host.insertBefore(bell, host.firstChild); }
+    else { document.body.appendChild(bell); }
     if(typeof sqUpdateBell==='function') sqUpdateBell();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',build);
