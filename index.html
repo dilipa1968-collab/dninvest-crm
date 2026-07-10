@@ -8500,7 +8500,12 @@ function getSquareoff(){ return DB.get('squareoff')||[]; }
 function sqMyRows(){
   const rows=getSquareoff();
   if(!(CU) ) return [];
-  if(canUploadSquareoff()) return rows;
+  // VIEW scope stays "own clients only" even for RMs granted upload rights
+  // (risk_upload / backoffice_access) — that permission lets them upload the
+  // office-wide file, but they should still only SEE their own clients here,
+  // same as any other RM. Full office view is reserved for actual admin and
+  // the standalone Back Office role (who have no "own" clients of their own).
+  if(CU.role==='admin' || CU.role==='backoffice') return rows;
   const tempDealers = (typeof getTempAccessDealers==='function') ? getTempAccessDealers('eq') : [];
   const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),...tempDealers])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
   return rows.filter(r=>myRMs.includes(String(r.dealer||'').trim().toUpperCase()));
@@ -8582,24 +8587,31 @@ function sqClear(){
   DB.set('squareoff', []); renderSquareoff(); updateBadges(); toast('Square-off cleared','success');
 }
 function renderSquareoff(){
-  const isAdmin=canUploadSquareoff();
-  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isAdmin?'inline-flex':'none');
+  const canUpload=canUploadSquareoff();
+  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=canUpload?'inline-flex':'none');
 
   let rows=sqMyRows();
   const search=((document.getElementById('sq-search')||{value:''}).value||'').toLowerCase().trim();
 
-  // RM dropdown: admin always sees it (all RMs in data). Non-admin sees it only
-  // when their visible data spans more than one RM (own + a temp-access absent RM),
-  // so they can pick "just mine" vs "the absent RM's clients".
+  // Full office-wide VIEW (see + filter by every RM) is reserved for actual
+  // admin and the standalone Back Office role. RMs granted upload rights
+  // (risk_upload / backoffice_access) can upload the whole file but their own
+  // view here stays scoped to their own clients — sqMyRows() already enforces
+  // that, so this flag only controls the "All RMs" dropdown behaviour.
+  const isFullView = !!(CU && (CU.role==='admin' || CU.role==='backoffice'));
+
+  // RM dropdown: full-view users always see it (all RMs in data). Everyone
+  // else sees it only when their visible data spans more than one RM (own +
+  // a temp-access absent RM), so they can pick "just mine" vs "the absent RM's".
   const rmSel=document.getElementById('sq-rm');
   const myRMsInData=[...new Set(rows.map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort();
-  const showRmSel = isAdmin || myRMsInData.length>1;
+  const showRmSel = isFullView || myRMsInData.length>1;
   if(rmSel) rmSel.style.display = showRmSel ? '' : 'none';
   const rmF=(document.getElementById('sq-rm')||{value:''}).value;
 
   if(rmSel && showRmSel){
     const prev=rmSel.value;
-    const optList = isAdmin
+    const optList = isFullView
       ? [...new Set(getSquareoff().map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort()
       : myRMsInData;
     rmSel.innerHTML='<option value="">All RMs</option>'+optList.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
@@ -8611,7 +8623,7 @@ function renderSquareoff(){
   const tbl=document.getElementById('sq-table'); if(!tbl) return;
   const stripElEmpty=document.getElementById('sq-stat-strip');
   if(!getSquareoff().length){
-    tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">No square-off file uploaded yet.${isAdmin?" Upload today's file above.":''}</td></tr>`;
+    tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">No square-off file uploaded yet.${canUpload?" Upload today's file above.":''}</td></tr>`;
     if(stripElEmpty) stripElEmpty.innerHTML='';
     return;
   }
