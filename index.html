@@ -1035,7 +1035,7 @@ input:focus, select:focus, textarea:focus{
             <button class="btn btn-outline" onclick="openEqRmUpdateModal()" id="eqRmUpdateBtn" style="display:none">⇅ Bulk RM Update</button>
             <button class="btn btn-outline" onclick="openEqPanUpdateModal()" id="eqPanUpdateBtn" style="display:none">🪪 Bulk PAN Update</button>
             <button class="btn btn-outline" onclick="fixAllMobiles()" id="eqFixMobileBtn" style="display:none">🧹 Fix Mobile (91)</button>
-            <button class="btn btn-primary" onclick="openAddClient('equity')">+ Add Client</button>
+            <button class="btn btn-primary" id="eqAddClientBtn" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
         <div class="filters" id="eq-filters">
@@ -1146,7 +1146,7 @@ input:focus, select:focus, textarea:focus{
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
-            <button class="btn btn-teal" onclick="openAddClient('mf')">+ Add Investor</button>
+            <button class="btn btn-teal" id="mfAddClientBtn" onclick="openAddClient('mf')">+ Add Investor</button>
           </div>
         </div>
         <div class="filters">
@@ -3398,27 +3398,30 @@ function initApp(){
     if(mfTxnNav) mfTxnNav.style.display='flex';
   }
 
-  // Back Office — an office-wide upload role. Can upload Brokerage (CAMS/KFin)
-  // and Square-off (T+5) files, mapped against ALL clients for matching purposes,
-  // but gets no view of Demat Opening, MF Transactions, Leads, or any other page,
-  // and no add/edit/delete power anywhere.
+  // Back Office — an office-wide upload/import role. Can bulk-import Equity
+  // clients and MF investors (AUM/SIP/contact Excel uploads), and view Square-off
+  // (T+5) via the header/mobile shortcut. No Demat Opening, MF Transactions,
+  // Leads, Brokerage, or any other page, and no add/edit/delete power anywhere
+  // (those buttons are separately hidden for this role below).
   if(CU.role==='backoffice'){
     ['nav-dashboard','nav-leads','nav-seminars',
-     'nav-eq-clients','nav-eq-followup','nav-eq-notrade','nav-eq-nocall','nav-eq-demat',
-     'nav-mf-clients','nav-mf-followup','nav-mf-sip','nav-mf-nocall','nav-mf-txns',
+     'nav-eq-followup','nav-eq-notrade','nav-eq-nocall','nav-eq-demat',
+     'nav-mf-followup','nav-mf-sip','nav-mf-nocall','nav-mf-txns',
      'nav-other-products','nav-reports','nav-activity-log',
-     'nav-announcements','nav-admin'].forEach(id=>{
+     'nav-announcements','nav-admin','nav-brokerage'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='none';
     });
-    ['main-nav-section','eq-nav-section','mf-nav-section','op-nav-section','reports-nav-section'].forEach(id=>{
+    ['main-nav-section','op-nav-section','reports-nav-section'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='none';
     });
-    // Admin section wrapper stays visible so the Brokerage link (inside it) shows
-    if(adminSec) adminSec.style.display='';
-    const brkNavBO=document.getElementById('nav-brokerage');
-    if(brkNavBO) brkNavBO.style.display='flex';
+    // nav-eq-clients and nav-mf-clients stay visible — that's where the
+    // Import Excel (Equity) and AUM/SIP/Contact upload (MF) buttons live.
+    const eqClientsNav=document.getElementById('nav-eq-clients');
+    if(eqClientsNav) eqClientsNav.style.display='flex';
+    const mfClientsNav=document.getElementById('nav-mf-clients');
+    if(mfClientsNav) mfClientsNav.style.display='flex';
   }
 
   // Messages nav — only for RMs (not admin, not Back Office — not a page they use)
@@ -3441,13 +3444,14 @@ function initApp(){
   if(dematNav) dematNav.style.display = hasEq ? 'flex' : 'none';
 
   // Bulk Excel import is admin-only; RMs with risk_upload permission also get it
-  // (so they can upload the daily Broker RMS Risk file).
+  // (so they can upload the daily Broker RMS Risk file). Back Office also gets
+  // Equity Import Excel + MF Import (AUM/SIP/Contact) — that's their whole job.
   const eqImportBtn=document.getElementById('eqImportBtn');
-  const canImport = CU.role==='admin' || CU.risk_upload===true;
+  const canImport = CU.role==='admin' || CU.risk_upload===true || CU.role==='backoffice';
   if(eqImportBtn){
     eqImportBtn.style.display = canImport ? 'inline-flex' : 'none';
     // Relabel for risk-only RMs so it's clear what they can upload
-    if(CU.role!=='admin' && CU.risk_upload===true){ eqImportBtn.innerHTML='📥 Upload Risk File'; }
+    if(CU.role!=='admin' && CU.role!=='backoffice' && CU.risk_upload===true){ eqImportBtn.innerHTML='📥 Upload Risk File'; }
   }
   const eqRmUpdateBtn=document.getElementById('eqRmUpdateBtn');
   if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
@@ -3456,10 +3460,15 @@ function initApp(){
   const eqFixMobileBtn=document.getElementById('eqFixMobileBtn');
   if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
-  if(mfImportBtn) mfImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  if(mfImportBtn) mfImportBtn.style.display=isBackOfficeOrAdmin()?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
   if(leadsImportBtn) leadsImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   document.querySelectorAll('.admin-only-inc').forEach(el=>el.style.display=CU.role==='admin'?'inline-flex':'none');
+  // Back Office: upload + view only — no manual Add Client/Investor
+  const eqAddBtn=document.getElementById('eqAddClientBtn');
+  if(eqAddBtn) eqAddBtn.style.display=CU.role==='backoffice'?'none':'';
+  const mfAddBtn=document.getElementById('mfAddClientBtn');
+  if(mfAddBtn) mfAddBtn.style.display=CU.role==='backoffice'?'none':'';
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isBackOfficeOrAdmin()?'inline-flex':'none');
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -3472,8 +3481,8 @@ function initApp(){
   // this scoped role and its nav item is hidden, so don't leave them on it.
   if(CU.role==='mf_desk') showPage('mf-txns');
   if(CU.role==='backoffice'){
-    showPage('brokerage');
-    ['mnav-dashboard','mnav-eq','mnav-fu','mnav-mf','mnav-ann'].forEach(id=>{
+    showPage('eq-clients');
+    ['mnav-dashboard','mnav-fu','mnav-ann'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='none';
     });
@@ -4295,10 +4304,10 @@ function renderEqTable(){
       <td class="eqc-wrap"><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
       <td class="eqc-rmk" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
-        <button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>
+        ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>`:''}
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
-        <button class="btn-icon" onclick="addEquityToMf('${c.id}')" title="Add to Mutual Fund" style="color:var(--teal)">🏦</button>
-        <button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','equity')" title="Map to Other Product" style="color:var(--purple,#7c3aed)">🎯</button>
+        ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="addEquityToMf('${c.id}')" title="Add to Mutual Fund" style="color:var(--teal)">🏦</button>`:''}
+        ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','equity')" title="Map to Other Product" style="color:var(--purple,#7c3aed)">🎯</button>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','equity','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Active'?'b-active':c.status==='Closed'?'b-closed':'b-inactive'}">${c.status||'—'}</span></td>
@@ -4432,9 +4441,9 @@ function renderMfTable(){
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
       <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
-        <button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>
+        ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>`:''}
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
-        <button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','mf')" title="Map to Other Product" style="color:#7c3aed">🎯</button>
+        ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="quickAddOpFromClient('${c.id}','mf')" title="Map to Other Product" style="color:#7c3aed">🎯</button>`:''}
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteClient('${c.id}','mf','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td>
       <td><span class="badge ${c.status==='Investor'?'b-investor':'b-prospect'}">${c.status||'—'}</span></td>
@@ -6491,7 +6500,7 @@ function viewClient(id,seg){
       ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px">💬 WhatsApp</a>`:''}
       ${c.alt_mobile?`<a href="tel:${c.alt_mobile}" class="btn btn-outline" style="padding:5px 14px" title="Alternate number">📞 ${c.alt_mobile} (Alt)</a>`:''}
       ${c.alt_mobile?`<a href="https://wa.me/91${c.alt_mobile}" target="_blank" class="btn btn-success" style="padding:5px 14px" title="Alternate WhatsApp">💬 Alt</a>`:''}
-      <button class="btn btn-primary" style="padding:5px 14px" onclick="closeModal('viewModal');editClient('${id}','${seg}')">✏️ Edit / Log Call</button>
+      ${CU.role!=='backoffice'?`<button class="btn btn-primary" style="padding:5px 14px" onclick="closeModal('viewModal');editClient('${id}','${seg}')">✏️ Edit / Log Call</button>`:''}
     </div>`;
 
   if(seg==='equity'){
@@ -10971,7 +10980,7 @@ async function doImport(){
       } else {
         // Add new
         let rm = row.rm || '';
-        if(CU.role!=='admin') rm = CU.name;
+        if(CU.role!=='admin' && CU.role!=='backoffice') rm = CU.name;
         newClients.push({
           id: uid(),
           name: row.name, pan: row.pan, mobile:'', email:'', rm,
@@ -10996,7 +11005,7 @@ async function doImport(){
         updated++;
       } else {
         newClients.push({
-          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: CU.role!=='admin'?CU.name:'',
+          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: (CU.role!=='admin'&&CU.role!=='backoffice')?CU.name:(row.rm||''),
           status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created:today(), updated:today()
@@ -11025,7 +11034,7 @@ function openEqImportModal(){
   document.getElementById('eq-preview').innerHTML='';
   document.getElementById('eqImportBtnGo').disabled=true;
   document.getElementById('eq-file').value='';
-  if(CU.role!=='admin'){
+  if(CU.role!=='admin' && CU.role!=='backoffice'){
     document.getElementById('eqImportDesc1').innerHTML =
       `Upload an Excel file with <b>Asset Value</b> and <b>Last Trade Date</b>. Matching will be done on <b>Client Code</b> (not mobile — family accounts can share the same mobile) — if a match is found, the existing client will be updated; if not, a new client will be added under <b>your (${CU.name}) RM name</b>.`;
     document.getElementById('eqImportDesc2').innerHTML =
@@ -11357,10 +11366,11 @@ async function doEqImport(){
       touched.push(ex);
       updated++;
     } else if(row.name){
-      // New client - staff must use their own RM; admin can leave RM blank
-      // (to be assigned later) if not present in the Excel.
+      // New client - staff must use their own RM; admin (and Back Office,
+      // uploading the whole office's file) can leave RM blank / use the
+      // file's RM column if not present in the Excel.
       let rm = row.rm || '';
-      if(CU.role!=='admin') rm = CU.name;
+      if(CU.role!=='admin' && CU.role!=='backoffice') rm = CU.name;
       let id = uid();
       while(usedIds.has(id)) id = uid();
       usedIds.add(id);
@@ -12532,9 +12542,8 @@ function brkCompute(){
   const kwList=(kwEl?kwEl.value:'').split(',').map(k=>brkNorm(k.trim())).filter(Boolean);
   const isNewBiz = t=>{ const tt=brkNorm(t); return tt && kwList.some(k=>tt.includes(k)); };
 
-  // RM filter - staff will only see their own data. Back Office sees everything
-  // too (office-wide upload role) but gets no other admin power.
-  const isAdmin = isBackOfficeOrAdmin();
+  // RM filter - staff will only see their own data
+  const isAdmin = CU && CU.role==='admin';
   const myMfDealers = CU ? (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase()) : [];
   const myEqDealers = CU ? (CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase()) : [];
 
