@@ -349,9 +349,9 @@ tbody tr:hover{background:var(--blue2)!important;}
 .sq-amt.sq-big{font-weight:800;display:inline-flex;align-items:center;gap:5px;color:#92400e!important;}
 .sq-amt.sq-big::before{content:'';width:6px;height:6px;border-radius:50%;background:#F0B429;display:inline-block;flex-shrink:0;}
 .sq-amt-empty{color:#d1d5db;font-weight:400;}
-.sq-date-pill{display:inline-flex;align-items:center;gap:6px;font-weight:700;letter-spacing:.5px;font-size:.68rem;
-  text-transform:uppercase;color:#cbd5e1;}
-.sq-date-dot{width:6px;height:6px;border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(255,255,255,.08);}
+.sq-date-pill{display:inline-flex;align-items:center;gap:6px;font-weight:800;letter-spacing:.5px;font-size:.88rem;
+  text-transform:uppercase;color:#e2e8f0;}
+.sq-date-dot{width:7px;height:7px;border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(255,255,255,.08);}
 .sq-stat-strip{display:flex;flex-wrap:wrap;gap:12px;padding:14px 16px 4px;margin:0;}
 .sq-stat-chip{background:linear-gradient(180deg,#fff,#fafbfe);border:1px solid #e8ecf3;border-radius:10px;padding:10px 18px;
   box-shadow:0 1px 2px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:2px;min-width:130px;position:relative;}
@@ -8696,11 +8696,11 @@ function renderSquareoff(){
     const isToday=dk===todayStr;
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
-    html+=`<th style="min-width:150px;padding-top:10px;padding-bottom:10px;text-align:center;
+    html+=`<th style="min-width:160px;padding-top:12px;padding-bottom:12px;text-align:center;
         box-shadow:inset 0 3px 0 ${dateColor[dk]}">
       <div class="sq-date-pill" style="justify-content:center;color:${dateColor[dk]}"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · AAJ':''}</div>
-      <div style="font-size:.9rem;font-weight:800;color:#fff;margin-top:4px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
-      <div style="font-size:.62rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:2px;text-align:center">${dCount} clients</div>
+      <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:5px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
+      <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:2px;text-align:center">${dCount} clients</div>
     </th>`;
   });
   html+='</tr></thead><tbody>';
