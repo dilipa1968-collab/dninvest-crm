@@ -8435,8 +8435,12 @@ function sqMyRows(){
 function sqFmtD(d){ if(!d) return '—'; const x=new Date(d); return isNaN(x)?String(d):x.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
 function sqToISO(v){
   if(!v) return '';
-  if(v instanceof Date) return isNaN(v)?'':v.toISOString().slice(0,10);
-  const d=new Date(v); return isNaN(d)?String(v):d.toISOString().slice(0,10);
+  // Use LOCAL date parts (not toISOString/UTC) — SheetJS builds Date objects
+  // from local y/m/d, so converting via UTC shifts the date back a day in IST.
+  const pad=n=>String(n).padStart(2,'0');
+  const d = (v instanceof Date) ? v : new Date(v);
+  if(isNaN(d)) return String(v);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 function sqUpload(input){
   if(!(CU && CU.role==='admin')){ toast('Only admin can upload','error'); input.value=''; return; }
@@ -8548,7 +8552,7 @@ function renderSquareoff(){
     const isToday=dk===todayStr;
     html+=`<th style="color:${dateColor[dk]};background:${dateColor[dk]}14">${sqFmtD(dk)}${isToday?' 🔴':''}</th>`;
   });
-  html+='<th>Total</th></tr></thead><tbody>';
+  html+='</tr></thead><tbody>';
   clients.forEach(c=>{
     html+=`<tr><td>${c.code||'—'}</td><td style="font-weight:600">${c.name||'—'}</td>`;
     if(isAdmin) html+=`<td>${c.dealer||'—'}</td>`;
@@ -8561,7 +8565,7 @@ function renderSquareoff(){
         html+=`<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:${big?800:600};background:${dateColor[dk]}${big?'22':'0d'}">${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>`;
       }
     });
-    html+=`<td style="text-align:right;font-weight:800;color:var(--navy,#132039)">${c.total.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`;
+    html+=`</tr>`;
   });
   html+='</tbody>';
   tbl.innerHTML=html;
@@ -8595,16 +8599,13 @@ function sqExport(){
 
   const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32}]
     .concat(isAdmin?[{header:'RM',width:12}]:[])
-    .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
-    .concat([{header:'Total',money:true,width:15}]);
+    .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})));
   const data=clients.map(c=>{
     const row=[c.code,c.name]; if(isAdmin) row.push(c.dealer);
     dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
-    row.push(c.total);
     return row;
   });
-  const grandTotal=clients.reduce((s,c)=>s+c.total,0);
-  const totalRow=(isAdmin?['','','TOTAL']:['','TOTAL']).concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0))).concat([grandTotal]);
+  const totalRow=(isAdmin?['','','TOTAL']:['','TOTAL']).concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)));
   dnXlsx('Square-off_'+today()+'.xlsx','Square-off (T+5)',cols,data,totalRow);
 }
 function ntReport(d){
