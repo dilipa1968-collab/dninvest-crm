@@ -334,6 +334,28 @@ thead th:hover{background:var(--navy2);}
 thead th.sorted{background:#253f72;}
 tbody tr{border-bottom:1px solid var(--border);transition:background .12s;line-height:1.2;}
 tbody tr:hover{background:var(--blue2)!important;}
+
+/* ── SQUARE-OFF (T+5) — colorful alert-style table ── */
+#sq-table{font-size:.78rem;}
+#sq-table thead th{font-size:.7rem;padding:10px 12px;}
+#sq-table tbody td{padding:9px 12px;vertical-align:middle;}
+#sq-table tbody tr{transition:background .15s, transform .1s;}
+#sq-table tbody tr:hover{transform:scale(1.002);}
+.sq-code{color:#94a3b8;font-size:.74rem;font-variant-numeric:tabular-nums;}
+.sq-name{font-weight:700;color:#1e293b;}
+.sq-rm-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:800;letter-spacing:.3px;color:#fff;white-space:nowrap;}
+.sq-amt{font-variant-numeric:tabular-nums;font-weight:700;}
+.sq-amt.sq-big{font-weight:900;display:inline-flex;align-items:center;gap:4px;}
+.sq-amt.sq-big::before{content:'🔥';font-size:.72rem;}
+.sq-amt-empty{color:#cbd5e1;font-weight:400;}
+.sq-date-pill{display:inline-flex;align-items:center;gap:5px;font-weight:800;letter-spacing:.3px;}
+.sq-date-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.sq-stat-strip{display:flex;flex-wrap:wrap;gap:10px;padding:12px 16px;margin:0 0 2px;}
+.sq-stat-chip{background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:8px 16px;
+  box-shadow:0 1px 3px rgba(15,23,42,.06);display:flex;flex-direction:column;gap:1px;min-width:120px;}
+.sq-stat-chip .n{font-size:1.05rem;font-weight:900;font-variant-numeric:tabular-nums;}
+.sq-stat-chip .l{font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
+@media(max-width:640px){ .sq-stat-strip{padding:10px} .sq-stat-chip{min-width:100px;padding:7px 12px} }
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
@@ -1095,6 +1117,7 @@ input:focus, select:focus, textarea:focus{
           <select id="sq-rm" onchange="renderSquareoff()" style="display:none"><option value="">All RMs</option></select>
           <button class="btn btn-outline" onclick="document.getElementById('sq-search').value='';document.getElementById('sq-rm').value='';renderSquareoff()">✕ Clear</button>
         </div>
+        <div class="sq-stat-strip" id="sq-stat-strip"></div>
         <div class="tbl-wrap"><div class="tbl-scroll"><table id="sq-table"></table></div></div>
       </div>
 
@@ -8538,14 +8561,15 @@ function renderSquareoff(){
   if(showRmSel && rmF) rows=rows.filter(r=>String(r.dealer||'').trim().toUpperCase()===rmF);
 
   const tbl=document.getElementById('sq-table'); if(!tbl) return;
+  const stripElEmpty=document.getElementById('sq-stat-strip');
   if(!getSquareoff().length){
     tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">No square-off file uploaded yet.${isAdmin?" Upload today's file above.":''}</td></tr>`;
-    if(document.getElementById('sq-count')) document.getElementById('sq-count').textContent='';
+    if(stripElEmpty) stripElEmpty.innerHTML='';
     return;
   }
   if(!rows.length){
     tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">🎉 No square-off clients for you right now.</td></tr>`;
-    if(document.getElementById('sq-count')) document.getElementById('sq-count').textContent='';
+    if(stripElEmpty) stripElEmpty.innerHTML='';
     return;
   }
 
@@ -8572,24 +8596,57 @@ function renderSquareoff(){
 
   const total=clients.reduce((s,c)=>s+c.total,0);
   const cntEl=document.getElementById('sq-count');
-  if(cntEl) cntEl.textContent=`— ${clients.length} clients · ₹${Math.round(total).toLocaleString('en-IN')}`;
+  if(cntEl) cntEl.textContent='';
+
+  // RM pill colors — deterministic hash so each RM always gets the same shade
+  const rmPalette=['#2563eb','#0891b2','#7c3aed','#db2777','#059669','#d97706','#dc2626','#4f46e5','#0d9488','#c026d3'];
+  const rmColor={};
+  const rmColorFor=name=>{
+    const key=String(name||'—').trim().toUpperCase();
+    if(!rmColor[key]){
+      let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0;
+      rmColor[key]=rmPalette[h%rmPalette.length];
+    }
+    return rmColor[key];
+  };
+
+  // Colorful stat strip — total + per-date subtotal chips
+  let stripHtml=`<div class="sq-stat-chip" style="border-left:4px solid var(--navy,#132039)">
+      <span class="n">${clients.length}</span><span class="l">Clients</span></div>
+    <div class="sq-stat-chip" style="border-left:4px solid #16a34a">
+      <span class="n">₹${Math.round(total).toLocaleString('en-IN')}</span><span class="l">Total Debit</span></div>`;
+  dateKeys.forEach(dk=>{
+    const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
+    const dCount=clients.filter(c=>c.vals[dk]!=null).length;
+    const isToday=dk===todayStr;
+    stripHtml+=`<div class="sq-stat-chip" style="border-left:4px solid ${dateColor[dk]}">
+      <span class="n" style="color:${dateColor[dk]}">₹${Math.round(dTotal).toLocaleString('en-IN')}</span>
+      <span class="l">${sqFmtD(dk)}${isToday?' · AAJ':''} — ${dCount} clients</span></div>`;
+  });
+  const stripEl=document.getElementById('sq-stat-strip');
+  if(stripEl) stripEl.innerHTML=stripHtml;
 
   let html='<thead><tr><th>Client Code</th><th>Client Name</th><th>RM</th>';
   dateKeys.forEach(dk=>{
     const isToday=dk===todayStr;
-    html+=`<th style="color:${dateColor[dk]};background:${dateColor[dk]}14">${sqFmtD(dk)}${isToday?' 🔴':''}</th>`;
+    html+=`<th style="color:${dateColor[dk]};background:${dateColor[dk]}1c">
+      <span class="sq-date-pill"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' 🔴 AAJ':''}</span></th>`;
   });
   html+='</tr></thead><tbody>';
   clients.forEach(c=>{
-    html+=`<tr><td>${c.code||'—'}</td><td style="font-weight:600">${c.name||'—'}</td>`;
-    html+=`<td>${c.dealer||'—'}</td>`;
+    const rc=rmColorFor(c.dealer);
+    html+=`<tr>
+      <td><span class="sq-code">${c.code||'—'}</span></td>
+      <td><span class="sq-name">${c.name||'—'}</span></td>
+      <td><span class="sq-rm-pill" style="background:${rc}">${c.dealer||'—'}</span></td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
       if(v==null){
-        html+=`<td style="text-align:center;color:#cbd5e1">—</td>`;
+        html+=`<td style="text-align:center"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
-        html+=`<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:${big?800:600};background:${dateColor[dk]}${big?'22':'0d'}">${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>`;
+        html+=`<td style="text-align:right;background:${dateColor[dk]}${big?'26':'0d'}">
+          <span class="sq-amt${big?' sq-big':''}" style="color:${big?dateColor[dk]:'#334155'}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
       }
     });
     html+=`</tr>`;
