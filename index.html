@@ -337,7 +337,7 @@ tbody tr:hover{background:var(--blue2)!important;}
 
 /* ── SQUARE-OFF (T+5) — premium navy/gold themed table ── */
 #sq-table{font-size:.83rem;border-collapse:separate;border-spacing:0;}
-#sq-table thead th{font-size:.7rem;padding:12px 14px;vertical-align:top;white-space:normal;}
+#sq-table thead th{font-size:.82rem;padding:12px 14px;vertical-align:top;white-space:normal;color:#fff;font-weight:800;}
 #sq-table tbody td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #eef1f6;}
 #sq-table tbody tr{transition:background .15s;}
 #sq-table tbody tr:hover{background:#f8fafc!important;}
@@ -8571,13 +8571,12 @@ function sqUpload(input){
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
-      // Merge by date: replace rows for any date(s) present in this upload,
-      // keep rows for other dates untouched (so history accumulates, stays light).
-      const newDates = new Set(out.map(r=>r.sqDate).filter(Boolean));
-      const existing = getSquareoff().filter(r=>!newDates.has(r.sqDate));
-      const merged = [...existing, ...out];
-      DB.set('squareoff', merged);
-      toast('Square-off updated — '+out.length+' clients ('+[...newDates].map(sqFmtD).join(', ')+')','success');
+      // Full replace: every new upload wipes out whatever was there before and
+      // becomes the sole active square-off dataset (today's file, both its
+      // sheets/dates). Keeps the table from accumulating old, stale dates.
+      DB.set('squareoff', out);
+      const uploadedDates = [...new Set(out.map(r=>r.sqDate).filter(Boolean))];
+      toast('Square-off updated — '+out.length+' clients ('+uploadedDates.map(sqFmtD).join(', ')+')','success');
       renderSquareoff(); updateBadges(); sqUpdateBell();
     }catch(err){ console.error(err); toast('Upload failed: '+err.message,'error'); }
     input.value='';
