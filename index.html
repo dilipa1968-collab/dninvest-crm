@@ -861,7 +861,7 @@ input:focus, select:focus, textarea:focus{
   <div class="app-body">
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
-      <div class="sidebar-section">Main</div>
+      <div class="sidebar-section" id="main-nav-section">Main</div>
       <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
         <span class="icon">📊</span> Dashboard
       </div>
@@ -922,7 +922,7 @@ input:focus, select:focus, textarea:focus{
         <span class="icon">🎯</span><span>Other Products</span><span class="badge-num" id="badge-op"></span>
       </div>
 
-      <div class="sidebar-section">Reports</div>
+      <div class="sidebar-section" id="reports-nav-section">Reports</div>
       <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
         <span class="icon">📋</span> Reports
       </div>
@@ -2722,6 +2722,10 @@ function normRm(rmStr){
 // STATE
 // ══════════════════════════════════════════
 let CU = null; // current user
+// Back Office = office-wide upload role (Brokerage + Square-off), scoped like
+// admin ONLY for data visibility in those two features — never for edit/delete
+// power or any other page (that stays gated strictly to role==='admin').
+function isBackOfficeOrAdmin(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice')); }
 let PG_SIZE = 50;
 let eqPage=1, mfPage=1, leadsPage=1;
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
@@ -3394,11 +3398,35 @@ function initApp(){
     if(mfTxnNav) mfTxnNav.style.display='flex';
   }
 
-  // Messages nav — only for RMs (not admin)
+  // Back Office — an office-wide upload role. Can upload Brokerage (CAMS/KFin)
+  // and Square-off (T+5) files, mapped against ALL clients for matching purposes,
+  // but gets no view of Demat Opening, MF Transactions, Leads, or any other page,
+  // and no add/edit/delete power anywhere.
+  if(CU.role==='backoffice'){
+    ['nav-dashboard','nav-leads','nav-seminars',
+     'nav-eq-clients','nav-eq-followup','nav-eq-notrade','nav-eq-nocall','nav-eq-demat',
+     'nav-mf-clients','nav-mf-followup','nav-mf-sip','nav-mf-nocall','nav-mf-txns',
+     'nav-other-products','nav-reports','nav-activity-log',
+     'nav-announcements','nav-admin'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.display='none';
+    });
+    ['main-nav-section','eq-nav-section','mf-nav-section','op-nav-section','reports-nav-section'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.display='none';
+    });
+    // Admin section wrapper stays visible so the Brokerage link (inside it) shows
+    if(adminSec) adminSec.style.display='';
+    const brkNavBO=document.getElementById('nav-brokerage');
+    if(brkNavBO) brkNavBO.style.display='flex';
+  }
+
+  // Messages nav — only for RMs (not admin, not Back Office — not a page they use)
   const msgNav = document.getElementById('nav-msg-admin');
   const msgSec = document.getElementById('msg-admin-nav-section');
-  if(msgNav) msgNav.style.display = CU.role!=='admin' ? 'flex' : 'none';
-  if(msgSec) msgSec.style.display = CU.role!=='admin' ? '' : 'none';
+  const showMsgNav = CU.role!=='admin' && CU.role!=='backoffice';
+  if(msgNav) msgNav.style.display = showMsgNav ? 'flex' : 'none';
+  if(msgSec) msgSec.style.display = showMsgNav ? '' : 'none';
   updateMsgBadge();
   // Show Change PIN/Password button for all users
   const credBtn = document.getElementById('changeCredBtn');
@@ -3432,7 +3460,7 @@ function initApp(){
   const leadsImportBtn=document.getElementById('leadsImportBtn');
   if(leadsImportBtn) leadsImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   document.querySelectorAll('.admin-only-inc').forEach(el=>el.style.display=CU.role==='admin'?'inline-flex':'none');
-  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=CU.role==='admin'?'inline-flex':'none');
+  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isBackOfficeOrAdmin()?'inline-flex':'none');
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -3443,6 +3471,13 @@ function initApp(){
   // MF Desk lands directly on MF Transactions — Dashboard isn't relevant to
   // this scoped role and its nav item is hidden, so don't leave them on it.
   if(CU.role==='mf_desk') showPage('mf-txns');
+  if(CU.role==='backoffice'){
+    showPage('brokerage');
+    ['mnav-dashboard','mnav-eq','mnav-fu','mnav-mf','mnav-ann'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.display='none';
+    });
+  }
 }
 
 function getTempAccessDealers(seg){
@@ -3493,10 +3528,10 @@ function getAllRMs(){
   return (DB.get('users')||[]).filter(u=>u.active!==false).map(u=>u.name);
 }
 function getSegRMs(seg){
-  // Excludes 'mf_desk' — that's a back-office role, not an actual RM clients
-  // get assigned to, so it must never show up in RM-assignment dropdowns
-  // (Lead RM, Attendee RM, client RM, etc.) anywhere in the app.
-  return (DB.get('users')||[]).filter(u=>u.active!==false && u.role!=='mf_desk' && (u.segments||[]).includes(seg)).map(u=>u.name);
+  // Excludes 'mf_desk' and 'backoffice' — both are back-office roles, not actual
+  // RMs clients get assigned to, so they must never show up in RM-assignment
+  // dropdowns (Lead RM, Attendee RM, client RM, etc.) anywhere in the app.
+  return (DB.get('users')||[]).filter(u=>u.active!==false && u.role!=='mf_desk' && u.role!=='backoffice' && (u.segments||[]).includes(seg)).map(u=>u.name);
 }
 
 function populateRmDropdowns(){
@@ -8452,7 +8487,7 @@ function getSquareoff(){ return DB.get('squareoff')||[]; }
 function sqMyRows(){
   const rows=getSquareoff();
   if(!(CU) ) return [];
-  if(CU.role==='admin') return rows;
+  if(isBackOfficeOrAdmin()) return rows;
   const tempDealers = (typeof getTempAccessDealers==='function') ? getTempAccessDealers('eq') : [];
   const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),...tempDealers])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
   return rows.filter(r=>myRMs.includes(String(r.dealer||'').trim().toUpperCase()));
@@ -8484,7 +8519,7 @@ function sqToISO(v){
   return s;
 }
 function sqUpload(input){
-  if(!(CU && CU.role==='admin')){ toast('Only admin can upload','error'); input.value=''; return; }
+  if(!isBackOfficeOrAdmin()){ toast('Only admin/back-office can upload','error'); input.value=''; return; }
   const file=input.files[0]; if(!file){ return; }
   const reader=new FileReader();
   reader.onload=function(e){
@@ -8529,12 +8564,12 @@ function sqUpload(input){
   reader.readAsBinaryString(file);
 }
 function sqClear(){
-  if(!(CU && CU.role==='admin')) return;
+  if(!isBackOfficeOrAdmin()) return;
   if(!confirm('Clear all square-off data?')) return;
   DB.set('squareoff', []); renderSquareoff(); updateBadges(); toast('Square-off cleared','success');
 }
 function renderSquareoff(){
-  const isAdmin=!!(CU && CU.role==='admin');
+  const isAdmin=isBackOfficeOrAdmin();
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isAdmin?'inline-flex':'none');
 
   let rows=sqMyRows();
@@ -8665,7 +8700,7 @@ function sqUpdateBell(){
   bell.style.display='inline-flex';
 }
 function sqExport(){
-  const isAdmin=!!(CU && CU.role==='admin');
+  const isAdmin=isBackOfficeOrAdmin();
   let rows=sqMyRows();
   if(!rows.length){ toast('No data to export','error'); return; }
   const dateKeys=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
@@ -8981,7 +9016,7 @@ function renderAdmin(){
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
         <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
-        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}</div>
+        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
@@ -9030,6 +9065,7 @@ function userForm(u){
         <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
         <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
         <option ${u?.role==='mf_desk'?'selected':''} value="mf_desk">MF Desk (MF Transactions only)</option>
+        <option ${u?.role==='backoffice'?'selected':''} value="backoffice">Back Office (Brokerage + Square-off upload only)</option>
       </select></div>
       <div class="form-field" id="uf_pin_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
         <label>4-Digit PIN (RM only)</label>
@@ -12496,8 +12532,9 @@ function brkCompute(){
   const kwList=(kwEl?kwEl.value:'').split(',').map(k=>brkNorm(k.trim())).filter(Boolean);
   const isNewBiz = t=>{ const tt=brkNorm(t); return tt && kwList.some(k=>tt.includes(k)); };
 
-  // RM filter - staff will only see their own data
-  const isAdmin = CU && CU.role==='admin';
+  // RM filter - staff will only see their own data. Back Office sees everything
+  // too (office-wide upload role) but gets no other admin power.
+  const isAdmin = isBackOfficeOrAdmin();
   const myMfDealers = CU ? (CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase()) : [];
   const myEqDealers = CU ? (CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase()) : [];
 
