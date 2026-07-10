@@ -601,8 +601,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .seg-indicator{display:none;}
   /* Zoom widget hidden on mobile — use pinch-zoom instead */
   #dnZoomBar{display:none!important;}
-  #dnSqBell{padding:5px 8px!important;font-size:.68rem!important}
-  #dnSqBell .sq-bell-label{display:none;}
+  #dnSqBell{display:none!important;}
   .sidebar{position:fixed;left:0;top:56px;height:calc(100vh - 56px);z-index:160;
     transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow2);}
   .sidebar.open{transform:translateX(0);}
@@ -8514,20 +8513,29 @@ function sqClear(){
 function renderSquareoff(){
   const isAdmin=!!(CU && CU.role==='admin');
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isAdmin?'inline-flex':'none');
-  const rmSel=document.getElementById('sq-rm'); if(rmSel) rmSel.style.display=isAdmin?'':'none';
 
   let rows=sqMyRows();
   const search=((document.getElementById('sq-search')||{value:''}).value||'').toLowerCase().trim();
+
+  // RM dropdown: admin always sees it (all RMs in data). Non-admin sees it only
+  // when their visible data spans more than one RM (own + a temp-access absent RM),
+  // so they can pick "just mine" vs "the absent RM's clients".
+  const rmSel=document.getElementById('sq-rm');
+  const myRMsInData=[...new Set(rows.map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort();
+  const showRmSel = isAdmin || myRMsInData.length>1;
+  if(rmSel) rmSel.style.display = showRmSel ? '' : 'none';
   const rmF=(document.getElementById('sq-rm')||{value:''}).value;
 
-  if(rmSel){
+  if(rmSel && showRmSel){
     const prev=rmSel.value;
-    const rms=[...new Set(getSquareoff().map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort();
-    rmSel.innerHTML='<option value="">All RMs</option>'+rms.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
+    const optList = isAdmin
+      ? [...new Set(getSquareoff().map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort()
+      : myRMsInData;
+    rmSel.innerHTML='<option value="">All RMs</option>'+optList.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
   }
 
   if(search) rows=rows.filter(r=>(r.name||'').toLowerCase().includes(search)||(r.code||'').toLowerCase().includes(search));
-  if(isAdmin && rmF) rows=rows.filter(r=>String(r.dealer||'').trim().toUpperCase()===rmF);
+  if(showRmSel && rmF) rows=rows.filter(r=>String(r.dealer||'').trim().toUpperCase()===rmF);
 
   const tbl=document.getElementById('sq-table'); if(!tbl) return;
   if(!getSquareoff().length){
