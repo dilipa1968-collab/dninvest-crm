@@ -831,6 +831,7 @@ input:focus, select:focus, textarea:focus{
   <nav class="mnav" id="mnav">
     <button class="mnav-item active" id="mnav-dashboard" onclick="showPage('dashboard')"><span class="mi">🏠</span>Home</button>
     <button class="mnav-item" id="mnav-eq" onclick="showPage('eq-clients')"><span class="mi">📈</span>Equity</button>
+    <button class="mnav-item" id="mnav-sq" onclick="showPage('eq-squareoff')"><span class="mi">🔻</span>SQ-Off<span class="mnav-badge" id="mnav-sq-badge" style="display:none">0</span></button>
     <button class="mnav-item" id="mnav-fu" onclick="showPage('eq-followup')"><span class="mi">📞</span>Follow-up<span class="mnav-badge" id="mnav-fu-badge" style="display:none">0</span></button>
     <button class="mnav-item" id="mnav-mf" onclick="showPage('mf-clients')"><span class="mi">🏦</span>MF</button>
     <button class="mnav-item" id="mnav-ann" onclick="openAnnAlerts()"><span class="mi">📢</span>Alerts</button>
@@ -3558,6 +3559,7 @@ function updateMobileNav(id){
   const map={
     'dashboard':'mnav-dashboard',
     'eq-clients':'mnav-eq','eq-notrade':'mnav-eq','eq-nocall':'mnav-eq','eq-demat':'mnav-eq',
+    'eq-squareoff':'mnav-sq',
     'eq-followup':'mnav-fu','mf-followup':'mnav-fu',
     'mf-clients':'mnav-mf','mf-sip':'mnav-mf','mf-nocall':'mnav-mf','mf-txns':'mnav-mf',
     'announcements':'mnav-ann'
@@ -8587,14 +8589,14 @@ function renderSquareoff(){
   tbl.innerHTML=html;
 }
 function sqUpdateBell(){
-  const bell=document.getElementById('dnSqBell'); if(!bell) return;
   const rows=sqMyRows();
   const n=new Set(rows.map(r=>(r.code||'').trim()||('N:'+(r.name||'').trim().toLowerCase()))).size;
+  const mBadge=document.getElementById('mnav-sq-badge');
+  if(mBadge){ mBadge.textContent=n>99?'99+':n; mBadge.style.display=n>0?'':'none'; }
+  const bell=document.getElementById('dnSqBell'); if(!bell) return;
   const badge=document.getElementById('dnSqBellCount');
   if(badge){ badge.textContent=n>99?'99+':n; }
   bell.style.display='inline-flex';
-  bell.style.background = n>0 ? '#dc2626' : '#64748b';
-  bell.style.opacity = n>0 ? '1' : '.75';
 }
 function sqExport(){
   const isAdmin=!!(CU && CU.role==='admin');
@@ -13696,7 +13698,10 @@ const MFTBULK = {
       '#dnZoomBar button:hover{background:#3d63ad;}'+
       '#dnZoomBar #dnZoomVal{color:#fff;font-size:11px;font-weight:700;min-width:38px;'+
       'text-align:center;cursor:pointer;user-select:none;}'+
-      '@media print{#dnZoomBar{display:none!important;}}';
+      '@media print{#dnZoomBar{display:none!important;}}'+
+      '@keyframes dnSqBlink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(220,38,38,.55)}50%{opacity:.72;box-shadow:0 0 0 5px rgba(220,38,38,0)}}'+
+      '#dnSqBell{animation:dnSqBlink 1.5s ease-in-out infinite;}'+
+      '#dnSqBell:hover{animation-play-state:paused;}';
     document.head.appendChild(s);
     var host=document.querySelector('.topbar-right');
     var anchor=document.getElementById('segBadge');
