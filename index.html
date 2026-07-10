@@ -863,6 +863,10 @@ input:focus, select:focus, textarea:focus{
         <span class="icon">⚠️</span> No-Trade Alerts
         <span class="nav-badge red" id="nb-eqnt">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('eq-squareoff')" id="nav-eq-squareoff">
+        <span class="icon">🔻</span> Square-off (T+5)
+        <span class="nav-badge red" id="nb-eqsq">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('eq-nocall')" id="nav-eq-nocall">
         <span class="icon">📵</span> No-Call Alerts
         <span class="nav-badge red" id="nb-eqnc">0</span>
@@ -1075,6 +1079,26 @@ input:focus, select:focus, textarea:focus{
           <div class="tab-item" onclick="switchTab('nt','180')">⚫ 180+ Days</div>
         </div>
         <div id="nt-content"></div>
+      </div>
+
+      <!-- ── EQUITY SQUARE-OFF (T+5) ── -->
+      <div class="page" id="page-eq-squareoff">
+        <div class="page-hdr">
+          <div class="page-title">Square-off (T+5) <span id="sq-count" class="res-count"></span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="sqExport()">⬇️ Export</button>
+            <button class="btn btn-outline admin-only-sq" id="sq-clrbtn" style="display:none" onclick="sqClear()">🗑️ Clear</button>
+            <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" onclick="document.getElementById('sq-file').click()">⬆️ Upload Today's File</button>
+            <input type="file" id="sq-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sqUpload(this)">
+          </div>
+        </div>
+        <div class="filters" style="padding:10px 16px 6px">
+          <input type="text" id="sq-search" placeholder="🔍 Search name / code..." oninput="renderSquareoff()" style="min-width:240px">
+          <select id="sq-rm" onchange="renderSquareoff()" style="display:none"><option value="">All RMs</option></select>
+          <select id="sq-date" onchange="renderSquareoff()"><option value="">All Dates</option></select>
+          <button class="btn btn-outline" onclick="document.getElementById('sq-search').value='';document.getElementById('sq-rm').value='';document.getElementById('sq-date').value='';renderSquareoff()">✕ Clear</button>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll"><table id="sq-table"></table></div></div>
       </div>
 
       <!-- ── EQUITY NO-CALL ALERTS ── -->
@@ -3214,7 +3238,7 @@ function initApp(){
       });
 
       // Real-time listeners for small array collections (users, call_logs, mf_business)
-      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary'].forEach(key=>{
+      ['call_logs','users','mf_business','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','squareoff'].forEach(key=>{
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.exists && doc.data() && doc.data().data){
             const newData = doc.data().data;
@@ -3261,6 +3285,7 @@ function initApp(){
                 if(pg==='mf-txns' && typeof renderMfTxnTable==='function') renderMfTxnTable();
                 if(pg==='eq-demat' && typeof renderEqDematTable==='function') renderEqDematTable();
               }
+              if(key==='squareoff' && getCurrentPageId()==='eq-squareoff' && typeof renderSquareoff==='function') renderSquareoff();
               refreshDash(); updateBadges();
             }
           }
@@ -3387,6 +3412,7 @@ function initApp(){
   const leadsImportBtn=document.getElementById('leadsImportBtn');
   if(leadsImportBtn) leadsImportBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   document.querySelectorAll('.admin-only-inc').forEach(el=>el.style.display=CU.role==='admin'?'inline-flex':'none');
+  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=CU.role==='admin'?'inline-flex':'none');
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -3507,6 +3533,7 @@ function showPage(id){
   else if(id==='eq-followup'){ renderFollowup('eqf'); }
   else if(id==='mf-followup'){ renderFollowup('mff'); }
   else if(id==='eq-notrade') renderNoTrade();
+  else if(id==='eq-squareoff') renderSquareoff();
   else if(id==='eq-nocall') renderNoCall('equity');
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
@@ -3865,6 +3892,7 @@ function updateBadges(){
   document.getElementById('nb-eqnt').textContent=activeEq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
   document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
   document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
+  try{ const sqb=document.getElementById('nb-eqsq'); if(sqb){ const n=sqMyRows().length; sqb.textContent=n; sqb.style.display=n>0?'':'none'; } }catch(e){}
 
   // Admin-only: Pending counts for MF Transactions and Demat (nav badge + dashboard card)
   if(CU && CU.role==='admin'){
@@ -8394,6 +8422,141 @@ function lastTradeReport(){
 function noTrade30(){ ntReport(30); }
 function noTrade60(){ ntReport(60); }
 function noTrade90(){ ntReport(90); }
+
+// ══════════════════════════════════════════
+// SQUARE-OFF (T+5) — daily admin upload, RM-filtered view
+// Stored as a single array in crm_data/squareoff (overwritten daily → stays light)
+// ══════════════════════════════════════════
+function getSquareoff(){ return DB.get('squareoff')||[]; }
+function sqMyRows(){
+  const rows=getSquareoff();
+  if(!(CU) ) return [];
+  if(CU.role==='admin') return rows;
+  const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
+  return rows.filter(r=>myRMs.includes(String(r.dealer||'').trim().toUpperCase()));
+}
+function sqFmtD(d){ if(!d) return '—'; const x=new Date(d); return isNaN(x)?String(d):x.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
+function sqToISO(v){
+  if(!v) return '';
+  if(v instanceof Date) return isNaN(v)?'':v.toISOString().slice(0,10);
+  const d=new Date(v); return isNaN(d)?String(v):d.toISOString().slice(0,10);
+}
+function sqUpload(input){
+  if(!(CU && CU.role==='admin')){ toast('Only admin can upload','error'); input.value=''; return; }
+  const file=input.files[0]; if(!file){ return; }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      const out=[];
+      wb.SheetNames.forEach(sn=>{
+        const ws=wb.Sheets[sn];
+        const arr=XLSX.utils.sheet_to_json(ws,{defval:''});
+        arr.forEach(r=>{
+          const pick=(...needles)=>{
+            const keys=Object.keys(r);
+            const norm=k=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+            // exact match first (so 'code' hits "Code", not "GroupCode")
+            for(const k of keys){ if(needles.includes(norm(k))) return r[k]; }
+            // then partial
+            for(const k of keys){ const hk=norm(k); if(needles.some(n=>hk.includes(n))) return r[k]; }
+            return '';
+          };
+          const name=String(pick('name')||'').replace(/\s+/g,' ').trim();
+          const code=String(pick('code')||'').trim();
+          const dealer=String(pick('dealer')||'').trim();
+          const debit=parseFloat(String(pick('sqoffdebit','debit','sqoff')||'0').replace(/[,\s]/g,''))||0;
+          const t5=sqToISO(pick('t590daydate','t5','90day','tminus'));
+          const sqDate=sqToISO(pick('squareoffdate','sqdate','squareoff'));
+          if(!code && !name) return;
+          out.push({code,name,dealer,debit,t5,sqDate});
+        });
+      });
+      if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
+      DB.set('squareoff', out);
+      toast('Square-off updated — '+out.length+' clients','success');
+      renderSquareoff(); updateBadges();
+    }catch(err){ console.error(err); toast('Upload failed: '+err.message,'error'); }
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+function sqClear(){
+  if(!(CU && CU.role==='admin')) return;
+  if(!confirm('Clear all square-off data?')) return;
+  DB.set('squareoff', []); renderSquareoff(); updateBadges(); toast('Square-off cleared','success');
+}
+function renderSquareoff(){
+  const isAdmin=!!(CU && CU.role==='admin');
+  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isAdmin?'inline-flex':'none');
+  const rmSel=document.getElementById('sq-rm'); if(rmSel) rmSel.style.display=isAdmin?'':'none';
+
+  let rows=sqMyRows();
+  const search=((document.getElementById('sq-search')||{value:''}).value||'').toLowerCase().trim();
+  const rmF=(document.getElementById('sq-rm')||{value:''}).value;
+  const dateF=(document.getElementById('sq-date')||{value:''}).value;
+
+  if(rmSel){
+    const prev=rmSel.value;
+    const rms=[...new Set(getSquareoff().map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort();
+    rmSel.innerHTML='<option value="">All RMs</option>'+rms.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
+  }
+  const dSel=document.getElementById('sq-date');
+  if(dSel){
+    const prev=dSel.value;
+    const ds=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
+    dSel.innerHTML='<option value="">All Dates</option>'+ds.map(d=>`<option value="${d}"${d===prev?' selected':''}>${sqFmtD(d)}</option>`).join('');
+  }
+
+  if(search) rows=rows.filter(r=>(r.name||'').toLowerCase().includes(search)||(r.code||'').toLowerCase().includes(search));
+  if(isAdmin && rmF) rows=rows.filter(r=>String(r.dealer||'').trim().toUpperCase()===rmF);
+  if(dateF) rows=rows.filter(r=>r.sqDate===dateF);
+  rows=rows.slice().sort((a,b)=>String(a.sqDate||'').localeCompare(String(b.sqDate||''))||((b.debit||0)-(a.debit||0)));
+
+  const total=rows.reduce((s,r)=>s+(r.debit||0),0);
+  const cntEl=document.getElementById('sq-count');
+  if(cntEl) cntEl.textContent=rows.length?`— ${rows.length} clients · ₹${Math.round(total).toLocaleString('en-IN')}`:'';
+
+  const tbl=document.getElementById('sq-table'); if(!tbl) return;
+  const colspan=isAdmin?6:5;
+  if(!getSquareoff().length){
+    tbl.innerHTML=`<tr><td colspan="${colspan}" style="text-align:center;padding:32px;color:var(--gray)">No square-off file uploaded yet.${isAdmin?" Upload today's file above.":''}</td></tr>`;
+    return;
+  }
+  if(!rows.length){
+    tbl.innerHTML=`<tr><td colspan="${colspan}" style="text-align:center;padding:32px;color:var(--gray)">🎉 No square-off clients for you right now.</td></tr>`;
+    return;
+  }
+  const todayStr=today();
+  let html='<thead><tr><th>Square-off Date</th><th>Client Code</th><th>Client Name</th>'+(isAdmin?'<th>RM</th>':'')+'<th style="text-align:right">Debit (₹)</th><th>T-5 Date</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const isToday=r.sqDate && r.sqDate===todayStr;
+    const big=(r.debit||0)>=50000;
+    const rowStyle=isToday?'background:#fee2e2':(big?'background:#fef3c7':'');
+    html+=`<tr style="${rowStyle}">
+      <td style="white-space:nowrap;font-weight:600;${isToday?'color:#b91c1c':''}">${sqFmtD(r.sqDate)}${isToday?' 🔴':''}</td>
+      <td>${r.code||'—'}</td>
+      <td style="font-weight:600">${r.name||'—'}</td>
+      ${isAdmin?`<td>${r.dealer||'—'}</td>`:''}
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${(r.debit||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="white-space:nowrap;color:var(--gray)">${r.t5?sqFmtD(r.t5):'—'}</td>
+    </tr>`;
+  });
+  html+='</tbody>';
+  tbl.innerHTML=html;
+}
+function sqExport(){
+  const isAdmin=!!(CU && CU.role==='admin');
+  let rows=sqMyRows().slice().sort((a,b)=>String(a.sqDate||'').localeCompare(String(b.sqDate||''))||((b.debit||0)-(a.debit||0)));
+  if(!rows.length){ toast('No data to export','error'); return; }
+  const cols=[{header:'Square-off Date',width:16},{header:'Client Code',width:14},{header:'Client Name',width:32}]
+    .concat(isAdmin?[{header:'RM',width:12}]:[])
+    .concat([{header:'Debit',money:true,width:15},{header:'T-5 Date',width:14}]);
+  const data=rows.map(r=>{ const a=[sqFmtD(r.sqDate),r.code,r.name]; if(isAdmin) a.push(r.dealer); a.push(r.debit, r.t5?sqFmtD(r.t5):''); return a; });
+  const total=rows.reduce((s,r)=>s+(r.debit||0),0);
+  const totalRow=isAdmin?['','','TOTAL','',total,'']:['','','TOTAL',total,''];
+  dnXlsx('Square-off_'+today()+'.xlsx','Square-off (T+5)',cols,data,totalRow);
+}
 function ntReport(d){
   const rows=getActiveEqClients().filter(c=>daysDiff(c.last_trade_date)>=d)
     .sort((a,b)=>daysDiff(b.last_trade_date)-daysDiff(a.last_trade_date))
