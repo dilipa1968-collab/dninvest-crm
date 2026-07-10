@@ -335,27 +335,30 @@ thead th.sorted{background:#253f72;}
 tbody tr{border-bottom:1px solid var(--border);transition:background .12s;line-height:1.2;}
 tbody tr:hover{background:var(--blue2)!important;}
 
-/* ── SQUARE-OFF (T+5) — colorful alert-style table ── */
-#sq-table{font-size:.78rem;}
-#sq-table thead th{font-size:.7rem;padding:10px 12px;vertical-align:top;white-space:normal;}
-#sq-table tbody td{padding:9px 12px;vertical-align:middle;}
-#sq-table tbody tr{transition:background .15s, transform .1s;}
-#sq-table tbody tr:hover{transform:scale(1.002);}
-.sq-code{color:#94a3b8;font-size:.74rem;font-variant-numeric:tabular-nums;}
-.sq-name{font-weight:700;color:#1e293b;}
-.sq-rm-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:800;letter-spacing:.3px;color:#fff;white-space:nowrap;}
-.sq-amt{font-variant-numeric:tabular-nums;font-weight:700;}
-.sq-amt.sq-big{font-weight:900;display:inline-flex;align-items:center;gap:4px;}
-.sq-amt.sq-big::before{content:'🔥';font-size:.72rem;}
-.sq-amt-empty{color:#cbd5e1;font-weight:400;}
-.sq-date-pill{display:inline-flex;align-items:center;gap:5px;font-weight:800;letter-spacing:.3px;}
-.sq-date-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-.sq-stat-strip{display:flex;flex-wrap:wrap;gap:10px;padding:12px 16px;margin:0 0 2px;}
-.sq-stat-chip{background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:8px 16px;
-  box-shadow:0 1px 3px rgba(15,23,42,.06);display:flex;flex-direction:column;gap:1px;min-width:120px;}
-.sq-stat-chip .n{font-size:1.05rem;font-weight:900;font-variant-numeric:tabular-nums;}
-.sq-stat-chip .l{font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
-@media(max-width:640px){ .sq-stat-strip{padding:10px} .sq-stat-chip{min-width:100px;padding:7px 12px} }
+/* ── SQUARE-OFF (T+5) — premium navy/gold themed table ── */
+#sq-table{font-size:.78rem;border-collapse:separate;border-spacing:0;}
+#sq-table thead th{font-size:.7rem;padding:12px 14px;vertical-align:top;white-space:normal;}
+#sq-table tbody td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #eef1f6;}
+#sq-table tbody tr{transition:background .15s;}
+#sq-table tbody tr:hover{background:#f8fafc!important;}
+.sq-code{color:#94a3b8;font-size:.72rem;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
+.sq-name{font-weight:700;color:#1e293b;letter-spacing:.1px;}
+.sq-rm-pill{display:inline-block;padding:3px 12px;border-radius:6px;font-size:.68rem;font-weight:700;letter-spacing:.4px;
+  color:#e2e8f0;background:rgba(255,255,255,.06);border:1px solid currentColor;white-space:nowrap;}
+.sq-amt{font-variant-numeric:tabular-nums;font-weight:700;color:#334155;}
+.sq-amt.sq-big{font-weight:800;display:inline-flex;align-items:center;gap:5px;color:#92400e!important;}
+.sq-amt.sq-big::before{content:'';width:6px;height:6px;border-radius:50%;background:#F0B429;display:inline-block;flex-shrink:0;}
+.sq-amt-empty{color:#d1d5db;font-weight:400;}
+.sq-date-pill{display:inline-flex;align-items:center;gap:6px;font-weight:700;letter-spacing:.5px;font-size:.68rem;
+  text-transform:uppercase;color:#cbd5e1;}
+.sq-date-dot{width:6px;height:6px;border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(255,255,255,.08);}
+.sq-stat-strip{display:flex;flex-wrap:wrap;gap:12px;padding:14px 16px 4px;margin:0;}
+.sq-stat-chip{background:linear-gradient(180deg,#fff,#fafbfe);border:1px solid #e8ecf3;border-radius:10px;padding:10px 18px;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:2px;min-width:130px;position:relative;}
+.sq-stat-chip::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0;background:var(--chip-accent,#132039);}
+.sq-stat-chip .n{font-size:1.08rem;font-weight:800;font-variant-numeric:tabular-nums;color:#132039;letter-spacing:.2px;}
+.sq-stat-chip .l{font-size:.63rem;color:#8592a6;text-transform:uppercase;letter-spacing:.6px;font-weight:700;}
+@media(max-width:640px){ .sq-stat-strip{padding:10px} .sq-stat-chip{min-width:100px;padding:8px 14px} }
 tbody tr.row-inactive{background:#fffbf0;}
 tbody tr.row-alert{background:var(--red2);}
 tbody tr.row-mf{background:var(--teal2);}
@@ -8670,32 +8673,34 @@ function renderSquareoff(){
     return rmColor[key];
   };
 
-  // Colorful stat strip — total + per-date subtotal chips
-  let stripHtml=`<div class="sq-stat-chip" style="border-left:4px solid var(--navy,#132039)">
+  // Stat strip — clean cards with a thin top accent bar instead of flooded colour
+  let stripHtml=`<div class="sq-stat-chip" style="--chip-accent:#132039">
       <span class="n">${clients.length}</span><span class="l">Clients</span></div>
-    <div class="sq-stat-chip" style="border-left:4px solid #16a34a">
+    <div class="sq-stat-chip" style="--chip-accent:#0d9488">
       <span class="n">₹${Math.round(total).toLocaleString('en-IN')}</span><span class="l">Total Debit</span></div>`;
   dateKeys.forEach(dk=>{
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
     const isToday=dk===todayStr;
-    stripHtml+=`<div class="sq-stat-chip" style="border-left:4px solid ${dateColor[dk]}">
+    stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:${dateColor[dk]}">
       <span class="n" style="color:${dateColor[dk]}">₹${Math.round(dTotal).toLocaleString('en-IN')}</span>
       <span class="l">${sqFmtD(dk)}${isToday?' · AAJ':''} — ${dCount} clients</span></div>`;
   });
   const stripEl=document.getElementById('sq-stat-strip');
   if(stripEl) stripEl.innerHTML=stripHtml;
 
+  // Header stays on-brand navy for every column; each date column gets a thin
+  // coloured top accent bar + coloured dot/amount instead of a flooded tint.
   let html='<thead><tr><th style="min-width:100px">Client Code</th><th style="min-width:180px">Client Name</th><th style="min-width:110px">RM</th>';
   dateKeys.forEach(dk=>{
     const isToday=dk===todayStr;
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
-    html+=`<th style="color:${dateColor[dk]};background:linear-gradient(180deg,${dateColor[dk]}22,${dateColor[dk]}10);
-        border-left:2px solid ${dateColor[dk]}55;min-width:150px;padding-top:8px;padding-bottom:8px;text-align:center">
-      <div class="sq-date-pill" style="justify-content:center"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' 🔴 AAJ':''}</div>
-      <div style="font-size:.86rem;font-weight:900;color:${dateColor[dk]};margin-top:3px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
-      <div style="font-size:.62rem;font-weight:600;color:#64748b;text-transform:none;letter-spacing:0;margin-top:1px;text-align:center">${dCount} clients</div>
+    html+=`<th style="min-width:150px;padding-top:10px;padding-bottom:10px;text-align:center;
+        box-shadow:inset 0 3px 0 ${dateColor[dk]}">
+      <div class="sq-date-pill" style="justify-content:center;color:${dateColor[dk]}"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · AAJ':''}</div>
+      <div style="font-size:.9rem;font-weight:800;color:#fff;margin-top:4px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
+      <div style="font-size:.62rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:2px;text-align:center">${dCount} clients</div>
     </th>`;
   });
   html+='</tr></thead><tbody>';
@@ -8704,15 +8709,15 @@ function renderSquareoff(){
     html+=`<tr>
       <td><span class="sq-code">${c.code||'—'}</span></td>
       <td><span class="sq-name">${c.name||'—'}</span></td>
-      <td><span class="sq-rm-pill" style="background:${rc}">${c.dealer||'—'}</span></td>`;
+      <td><span class="sq-rm-pill" style="color:${rc}">${c.dealer||'—'}</span></td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
       if(v==null){
-        html+=`<td style="text-align:center;border-left:2px solid ${dateColor[dk]}30"><span class="sq-amt-empty">—</span></td>`;
+        html+=`<td style="text-align:center"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
-        html+=`<td style="text-align:center;background:${dateColor[dk]}${big?'26':'0d'};border-left:2px solid ${dateColor[dk]}30">
-          <span class="sq-amt${big?' sq-big':''}" style="color:${big?dateColor[dk]:'#334155'}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+        html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}">
+          <span class="sq-amt${big?' sq-big':''}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
       }
     });
     html+=`</tr>`;
