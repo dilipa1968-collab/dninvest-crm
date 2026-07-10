@@ -8690,14 +8690,14 @@ function renderSquareoff(){
 
   // Header stays on-brand navy for every column; each date column gets a thin
   // coloured top accent bar + coloured dot/amount instead of a flooded tint.
-  let html='<thead><tr><th style="min-width:100px">Client Code</th><th style="min-width:180px">Client Name</th><th style="min-width:110px">RM</th>';
+  let html='<thead><tr><th style="min-width:100px">Client Code</th><th style="min-width:180px">Client Name</th><th style="min-width:110px;text-align:center">RM</th>';
   dateKeys.forEach(dk=>{
     const isToday=dk===todayStr;
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
     html+=`<th style="min-width:160px;padding-top:12px;padding-bottom:12px;text-align:center;
         box-shadow:inset 0 3px 0 ${dateColor[dk]}">
-      <div class="sq-date-pill" style="justify-content:center;color:${dateColor[dk]}"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · AAJ':''}</div>
+      <div class="sq-date-pill" style="justify-content:center;color:#fff"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · AAJ':''}</div>
       <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:5px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
       <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:2px;text-align:center">${dCount} clients</div>
     </th>`;
@@ -8708,7 +8708,7 @@ function renderSquareoff(){
     html+=`<tr>
       <td><span class="sq-code">${c.code||'—'}</span></td>
       <td><span class="sq-name">${c.name||'—'}</span></td>
-      <td><span class="sq-rm-pill" style="color:${rc}">${c.dealer||'—'}</span></td>`;
+      <td style="text-align:center"><span class="sq-rm-pill" style="color:${rc}">${c.dealer||'—'}</span></td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
       if(v==null){
