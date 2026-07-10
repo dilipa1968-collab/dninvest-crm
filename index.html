@@ -8692,10 +8692,10 @@ function renderSquareoff(){
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
     html+=`<th style="color:${dateColor[dk]};background:linear-gradient(180deg,${dateColor[dk]}22,${dateColor[dk]}10);
-        border-left:2px solid ${dateColor[dk]}55;min-width:150px;padding-top:8px;padding-bottom:8px">
-      <div class="sq-date-pill"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' 🔴 AAJ':''}</div>
-      <div style="font-size:.86rem;font-weight:900;color:${dateColor[dk]};margin-top:3px;letter-spacing:.2px">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
-      <div style="font-size:.62rem;font-weight:600;color:#64748b;text-transform:none;letter-spacing:0;margin-top:1px">${dCount} clients</div>
+        border-left:2px solid ${dateColor[dk]}55;min-width:150px;padding-top:8px;padding-bottom:8px;text-align:center">
+      <div class="sq-date-pill" style="justify-content:center"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' 🔴 AAJ':''}</div>
+      <div style="font-size:.86rem;font-weight:900;color:${dateColor[dk]};margin-top:3px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
+      <div style="font-size:.62rem;font-weight:600;color:#64748b;text-transform:none;letter-spacing:0;margin-top:1px;text-align:center">${dCount} clients</div>
     </th>`;
   });
   html+='</tr></thead><tbody>';
@@ -8711,7 +8711,7 @@ function renderSquareoff(){
         html+=`<td style="text-align:center;border-left:2px solid ${dateColor[dk]}30"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
-        html+=`<td style="text-align:right;background:${dateColor[dk]}${big?'26':'0d'};border-left:2px solid ${dateColor[dk]}30">
+        html+=`<td style="text-align:center;background:${dateColor[dk]}${big?'26':'0d'};border-left:2px solid ${dateColor[dk]}30">
           <span class="sq-amt${big?' sq-big':''}" style="color:${big?dateColor[dk]:'#334155'}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
       }
     });
