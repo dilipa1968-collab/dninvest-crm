@@ -11124,8 +11124,8 @@ function tryImportRiskFile(rows){
   }
   if(hdr===-1) return false; // not an RMS file → let normal import handle it
 
-  // Permission gate: only admin, or an RM explicitly granted risk_upload by admin.
-  if(!(CU && (CU.role==='admin' || CU.risk_upload===true))){
+  // Permission gate: admin, Back Office, or an RM explicitly granted risk_upload by admin.
+  if(!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.risk_upload===true))){
     const pv0 = document.getElementById('eq-preview');
     if(pv0) pv0.innerHTML =
       `<div style="background:#fff3f3;color:var(--red,#dc2626);padding:12px;border-radius:8px;font-size:.85rem;font-weight:600;border:1px solid #f5c2c2">
