@@ -2726,6 +2726,10 @@ let CU = null; // current user
 // admin ONLY for data visibility in those two features — never for edit/delete
 // power or any other page (that stays gated strictly to role==='admin').
 function isBackOfficeOrAdmin(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice')); }
+// The single "Allow Broker RMS Risk file upload" checkbox grants BOTH the daily
+// Risk file AND Square-off (T+5) upload/view — they're both office-wide broker
+// files uploaded together, so one permission covers both.
+function canUploadSquareoff(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.risk_upload===true)); }
 let PG_SIZE = 50;
 let eqPage=1, mfPage=1, leadsPage=1;
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
@@ -3469,7 +3473,7 @@ function initApp(){
   if(eqAddBtn) eqAddBtn.style.display=CU.role==='backoffice'?'none':'';
   const mfAddBtn=document.getElementById('mfAddClientBtn');
   if(mfAddBtn) mfAddBtn.style.display=CU.role==='backoffice'?'none':'';
-  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isBackOfficeOrAdmin()?'inline-flex':'none');
+  document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=canUploadSquareoff()?'inline-flex':'none');
 
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -8496,7 +8500,7 @@ function getSquareoff(){ return DB.get('squareoff')||[]; }
 function sqMyRows(){
   const rows=getSquareoff();
   if(!(CU) ) return [];
-  if(isBackOfficeOrAdmin()) return rows;
+  if(canUploadSquareoff()) return rows;
   const tempDealers = (typeof getTempAccessDealers==='function') ? getTempAccessDealers('eq') : [];
   const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),...tempDealers])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
   return rows.filter(r=>myRMs.includes(String(r.dealer||'').trim().toUpperCase()));
@@ -8528,7 +8532,7 @@ function sqToISO(v){
   return s;
 }
 function sqUpload(input){
-  if(!isBackOfficeOrAdmin()){ toast('Only admin/back-office can upload','error'); input.value=''; return; }
+  if(!canUploadSquareoff()){ toast('Only admin/back-office/risk-upload RMs can upload','error'); input.value=''; return; }
   const file=input.files[0]; if(!file){ return; }
   const reader=new FileReader();
   reader.onload=function(e){
@@ -8573,12 +8577,12 @@ function sqUpload(input){
   reader.readAsBinaryString(file);
 }
 function sqClear(){
-  if(!isBackOfficeOrAdmin()) return;
+  if(!canUploadSquareoff()) return;
   if(!confirm('Clear all square-off data?')) return;
   DB.set('squareoff', []); renderSquareoff(); updateBadges(); toast('Square-off cleared','success');
 }
 function renderSquareoff(){
-  const isAdmin=isBackOfficeOrAdmin();
+  const isAdmin=canUploadSquareoff();
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=isAdmin?'inline-flex':'none');
 
   let rows=sqMyRows();
@@ -8709,7 +8713,7 @@ function sqUpdateBell(){
   bell.style.display='inline-flex';
 }
 function sqExport(){
-  const isAdmin=isBackOfficeOrAdmin();
+  const isAdmin=canUploadSquareoff();
   let rows=sqMyRows();
   if(!rows.length){ toast('No data to export','error'); return; }
   const dateKeys=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
@@ -9090,7 +9094,7 @@ function userForm(u){
     <div class="form-field" id="uf_risk_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
         <input type="checkbox" id="uf_risk_upload" ${u?.risk_upload?'checked':''}>
-        Allow Broker RMS Risk file upload (daily .xls with Risk Val / Ac Bal)
+        Allow Broker RMS Risk file + Square-off (T+5) upload (office-wide daily broker files)
       </label>
     </div>
     <div class="form-field"><label>Segments Access</label>
@@ -11303,8 +11307,8 @@ function handleEqFileEntry(input){
         if(hasCode && hasDealer && hasSqSignal){ isSquareoff = true; break; }
       }
       if(isSquareoff){
-        if(!isBackOfficeOrAdmin()){
-          toast('Square-off (T+5) files can only be uploaded by admin/back-office','error');
+        if(!canUploadSquareoff()){
+          toast('Square-off (T+5) files can only be uploaded by admin/back-office/risk-upload RMs','error');
           input.value=''; return;
         }
         sqUpload(input); // re-reads the same file; handles multi-sheet date-merge itself
