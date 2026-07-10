@@ -8566,7 +8566,7 @@ function renderSquareoff(){
   const cntEl=document.getElementById('sq-count');
   if(cntEl) cntEl.textContent=`— ${clients.length} clients · ₹${Math.round(total).toLocaleString('en-IN')}`;
 
-  let html='<thead><tr><th>Client Code</th><th>Client Name</th>'+(isAdmin?'<th>RM</th>':'');
+  let html='<thead><tr><th>Client Code</th><th>Client Name</th><th>RM</th>';
   dateKeys.forEach(dk=>{
     const isToday=dk===todayStr;
     html+=`<th style="color:${dateColor[dk]};background:${dateColor[dk]}14">${sqFmtD(dk)}${isToday?' 🔴':''}</th>`;
@@ -8574,7 +8574,7 @@ function renderSquareoff(){
   html+='</tr></thead><tbody>';
   clients.forEach(c=>{
     html+=`<tr><td>${c.code||'—'}</td><td style="font-weight:600">${c.name||'—'}</td>`;
-    if(isAdmin) html+=`<td>${c.dealer||'—'}</td>`;
+    html+=`<td>${c.dealer||'—'}</td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
       if(v==null){
@@ -8616,15 +8616,14 @@ function sqExport(){
   clients.forEach(c=>{ c.total=Object.values(c.vals).reduce((s,v)=>s+v,0); });
   clients.sort((a,b)=>b.total-a.total);
 
-  const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32}]
-    .concat(isAdmin?[{header:'RM',width:12}]:[])
+  const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32},{header:'RM',width:12}]
     .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})));
   const data=clients.map(c=>{
-    const row=[c.code,c.name]; if(isAdmin) row.push(c.dealer);
+    const row=[c.code,c.name,c.dealer];
     dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
     return row;
   });
-  const totalRow=(isAdmin?['','','TOTAL']:['','TOTAL']).concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)));
+  const totalRow=['','','TOTAL'].concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)));
   dnXlsx('Square-off_'+today()+'.xlsx','Square-off (T+5)',cols,data,totalRow);
 }
 function ntReport(d){
