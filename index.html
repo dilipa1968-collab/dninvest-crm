@@ -8568,10 +8568,13 @@ function renderSquareoff(){
 }
 function sqUpdateBell(){
   const bell=document.getElementById('dnSqBell'); if(!bell) return;
-  const n=sqMyRows().length;
+  const rows=sqMyRows();
+  const n=new Set(rows.map(r=>(r.code||'').trim()||('N:'+(r.name||'').trim().toLowerCase()))).size;
   const badge=document.getElementById('dnSqBellCount');
   if(badge){ badge.textContent=n>99?'99+':n; }
-  bell.style.display = n>0 ? 'inline-flex' : 'none';
+  bell.style.display='inline-flex';
+  bell.style.background = n>0 ? '#dc2626' : '#64748b';
+  bell.style.opacity = n>0 ? '1' : '.75';
 }
 function sqExport(){
   const isAdmin=!!(CU && CU.role==='admin');
@@ -13693,7 +13696,7 @@ const MFTBULK = {
     const bell=document.createElement('button');
     bell.id='dnSqBell';
     bell.title='Square-off (T+5) alerts';
-    bell.style.cssText='display:none;align-items:center;gap:5px;background:#dc2626;color:#fff;border:none;'+
+    bell.style.cssText='display:inline-flex;align-items:center;gap:5px;background:#dc2626;color:#fff;border:none;'+
       'border-radius:20px;padding:5px 12px;margin-right:6px;font-size:.75rem;font-weight:700;cursor:pointer;'+
       'flex-shrink:0;white-space:nowrap';
     bell.innerHTML='🔻 <span class="sq-bell-label">Square-off (T+5)</span> <span id="dnSqBellCount" style="background:rgba(255,255,255,.28);'+
