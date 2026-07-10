@@ -8431,7 +8431,8 @@ function sqMyRows(){
   const rows=getSquareoff();
   if(!(CU) ) return [];
   if(CU.role==='admin') return rows;
-  const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name])])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
+  const tempDealers = (typeof getTempAccessDealers==='function') ? getTempAccessDealers('eq') : [];
+  const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),...tempDealers])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
   return rows.filter(r=>myRMs.includes(String(r.dealer||'').trim().toUpperCase()));
 }
 function sqFmtD(d){ if(!d) return '—'; const x=new Date(d); return isNaN(x)?String(d):x.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
