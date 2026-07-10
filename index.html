@@ -8434,13 +8434,29 @@ function sqMyRows(){
 }
 function sqFmtD(d){ if(!d) return '—'; const x=new Date(d); return isNaN(x)?String(d):x.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
 function sqToISO(v){
-  if(!v) return '';
-  // Use LOCAL date parts (not toISOString/UTC) — SheetJS builds Date objects
-  // from local y/m/d, so converting via UTC shifts the date back a day in IST.
+  if(v==null || v==='') return '';
   const pad=n=>String(n).padStart(2,'0');
-  const d = (v instanceof Date) ? v : new Date(v);
-  if(isNaN(d)) return String(v);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  // 1) Raw Excel serial number (what we get since we read WITHOUT cellDates) —
+  //    pure UTC-days arithmetic, zero dependency on browser timezone.
+  if(typeof v==='number' && !isNaN(v)){
+    const utcDays = Math.floor(v - 25569); // days since Unix epoch (handles 1900 leap-bug correctly)
+    const d = new Date(utcDays*86400*1000);
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+  }
+  // 2) Already a JS Date object — read it back via UTC getters (matches how it was built)
+  if(v instanceof Date){
+    if(isNaN(v)) return '';
+    return `${v.getUTCFullYear()}-${pad(v.getUTCMonth()+1)}-${pad(v.getUTCDate())}`;
+  }
+  // 3) Plain text — pull Y-M-D straight out of the string, no Date() timezone parsing
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); // DD/MM/YYYY
+  if(m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  const d=new Date(s);
+  if(!isNaN(d)) return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+  return s;
 }
 function sqUpload(input){
   if(!(CU && CU.role==='admin')){ toast('Only admin can upload','error'); input.value=''; return; }
@@ -8448,7 +8464,7 @@ function sqUpload(input){
   const reader=new FileReader();
   reader.onload=function(e){
     try{
-      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      const wb=XLSX.read(e.target.result,{type:'binary'});
       const out=[];
       wb.SheetNames.forEach(sn=>{
         const ws=wb.Sheets[sn];
