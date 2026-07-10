@@ -2352,7 +2352,7 @@ input:focus, select:focus, textarea:focus{
       </p>
       <div class="import-zone" id="eq-zone" onclick="document.getElementById('eq-file').click()">
         📊 Drag the Equity Excel file here or click to browse
-        <input type="file" id="eq-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqFile(this)">
+        <input type="file" id="eq-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqFileEntry(this)">
       </div>
       <div id="eq-preview" style="margin-top:12px"></div>
     </div>
@@ -11043,7 +11043,8 @@ function openEqImportModal(){
     document.getElementById('eqImportDesc1').innerHTML =
       `Upload an Excel file with <b>Asset Value</b> and <b>Last Trade Date</b>. Matching will be done on <b>Client Code</b> (not mobile — family accounts can share the same mobile) — if a match is found, the existing client will be updated; if not, a <b>new client will be added</b>.`;
     document.getElementById('eqImportDesc2').innerHTML =
-      `Expected columns (header names flexible/auto-detect): <b>Code</b> (or Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (required for new clients), <b>Asset Value</b> (or Holding/Portfolio Value), <b>Last Trade Date</b> (or Last Trade)`;
+      `Expected columns (header names flexible/auto-detect): <b>Code</b> (or Client Code), <b>Name</b>, <b>Mobile</b>, <b>RM</b> (required for new clients), <b>Asset Value</b> (or Holding/Portfolio Value), <b>Last Trade Date</b> (or Last Trade)<br>
+       <span style="color:var(--teal)">This box also auto-detects the daily <b>Broker RMS Risk file</b> and the <b>Square-off (T+5)</b> file — just drop either one here, no need to go anywhere else.</span>`;
   }
   document.getElementById('eqImportModal').classList.add('open');
 }
@@ -11276,6 +11277,44 @@ async function fixAllMobiles(){
   }
   toast(`✅ ${fixed} clients ke mobile fix ho gaye (91 hataya)`,'success');
   renderEqTable(); if(typeof renderMfTable==='function') renderMfTable(); refreshDash(); updateBadges();
+}
+
+// Entry point for the Equity "Import Excel" file input. Peeks at every sheet's
+// header row first: if it matches the Square-off (T+5) file signature
+// (Code + Dealer + Sq off Debit/Square Off Date), hands off to sqUpload() —
+// which correctly merges ALL sheets/dates — instead of the normal single-sheet
+// equity-client import. This lets Back Office upload T+5 files from the same
+// Import Excel button without needing a separate page.
+function handleEqFileEntry(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      let isSquareoff = false;
+      for(const sn of wb.SheetNames){
+        const arr = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+        if(!arr.length) continue;
+        const hdrRow = (arr[0]||[]).map(h=>String(h).toLowerCase().replace(/[^a-z0-9]/g,''));
+        const hasCode = hdrRow.includes('code');
+        const hasDealer = hdrRow.includes('dealer');
+        const hasSqSignal = hdrRow.some(h=>h.includes('sqoffdebit')) || hdrRow.some(h=>h.includes('squareoffdate'));
+        if(hasCode && hasDealer && hasSqSignal){ isSquareoff = true; break; }
+      }
+      if(isSquareoff){
+        if(!isBackOfficeOrAdmin()){
+          toast('Square-off (T+5) files can only be uploaded by admin/back-office','error');
+          input.value=''; return;
+        }
+        sqUpload(input); // re-reads the same file; handles multi-sheet date-merge itself
+        setTimeout(()=>{ const m=document.getElementById('eqImportModal'); if(m) m.classList.remove('open'); }, 300);
+        return;
+      }
+    }catch(err){ /* detection failed silently — fall through to normal import */ }
+    handleEqFile(input);
+  };
+  reader.readAsBinaryString(file);
 }
 
 function handleEqFile(input){
