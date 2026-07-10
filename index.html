@@ -2725,11 +2725,11 @@ let CU = null; // current user
 // Back Office = office-wide upload role (Brokerage + Square-off), scoped like
 // admin ONLY for data visibility in those two features — never for edit/delete
 // power or any other page (that stays gated strictly to role==='admin').
-function isBackOfficeOrAdmin(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice')); }
+function isBackOfficeOrAdmin(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.backoffice_access===true)); }
 // The single "Allow Broker RMS Risk file upload" checkbox grants BOTH the daily
 // Risk file AND Square-off (T+5) upload/view — they're both office-wide broker
 // files uploaded together, so one permission covers both.
-function canUploadSquareoff(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.risk_upload===true)); }
+function canUploadSquareoff(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.risk_upload===true || CU.backoffice_access===true)); }
 let PG_SIZE = 50;
 let eqPage=1, mfPage=1, leadsPage=1;
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
@@ -3447,15 +3447,15 @@ function initApp(){
   const dematNav = document.getElementById('nav-eq-demat');
   if(dematNav) dematNav.style.display = hasEq ? 'flex' : 'none';
 
-  // Bulk Excel import is admin-only; RMs with risk_upload permission also get it
-  // (so they can upload the daily Broker RMS Risk file). Back Office also gets
-  // Equity Import Excel + MF Import (AUM/SIP/Contact) — that's their whole job.
+  // Bulk Excel import is admin-only; RMs with risk_upload or backoffice_access
+  // permission also get it. Back Office (role or additive access) gets Equity
+  // Import Excel + MF Import (AUM/SIP/Contact) mapped to ALL clients.
   const eqImportBtn=document.getElementById('eqImportBtn');
-  const canImport = CU.role==='admin' || CU.risk_upload===true || CU.role==='backoffice';
+  const canImport = CU.role==='admin' || CU.risk_upload===true || CU.role==='backoffice' || CU.backoffice_access===true;
   if(eqImportBtn){
     eqImportBtn.style.display = canImport ? 'inline-flex' : 'none';
-    // Relabel for risk-only RMs so it's clear what they can upload
-    if(CU.role!=='admin' && CU.role!=='backoffice' && CU.risk_upload===true){ eqImportBtn.innerHTML='📥 Upload Risk File'; }
+    // Relabel for risk-only RMs (no broader Back Office access) so it's clear what they can upload
+    if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access && CU.risk_upload===true){ eqImportBtn.innerHTML='📥 Upload Risk File'; }
   }
   const eqRmUpdateBtn=document.getElementById('eqRmUpdateBtn');
   if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
@@ -9029,7 +9029,7 @@ function renderAdmin(){
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
         <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
-        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}</div>
+        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
@@ -9078,7 +9078,7 @@ function userForm(u){
         <option ${u?.role==='admin'?'selected':''} value="admin">Admin</option>
         <option ${u?.role==='rm'||!u?'selected':''} value="rm">RM</option>
         <option ${u?.role==='mf_desk'?'selected':''} value="mf_desk">MF Desk (MF Transactions only)</option>
-        <option ${u?.role==='backoffice'?'selected':''} value="backoffice">Back Office (Brokerage + Square-off upload only)</option>
+        <option ${u?.role==='backoffice'?'selected':''} value="backoffice">Back Office (Equity/MF Import + Risk/Square-off upload only, no RM work)</option>
       </select></div>
       <div class="form-field" id="uf_pin_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
         <label>4-Digit PIN (RM only)</label>
@@ -9095,6 +9095,12 @@ function userForm(u){
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
         <input type="checkbox" id="uf_risk_upload" ${u?.risk_upload?'checked':''}>
         Allow Broker RMS Risk file + Square-off (T+5) upload (office-wide daily broker files)
+      </label>
+    </div>
+    <div class="form-field" id="uf_backoffice_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
+        <input type="checkbox" id="uf_backoffice_access" ${u?.backoffice_access?'checked':''}>
+        Also give Back Office access (Equity/MF Import Excel maps to ALL clients office-wide, in addition to their own RM work)
       </label>
     </div>
     <div class="form-field"><label>Segments Access</label>
@@ -9117,6 +9123,7 @@ function saveUser(){
   const pinVal=document.getElementById('uf_pin')?.value||'';
   const mfDeskAccess = role==='rm' && !!document.getElementById('uf_mfdesk_access')?.checked;
   const riskUpload = role==='rm' && !!document.getElementById('uf_risk_upload')?.checked;
+  const backofficeAccess = role==='rm' && !!document.getElementById('uf_backoffice_access')?.checked;
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
     toast('PIN must be 4 digits (0-9)','error'); return;
   }
@@ -9133,7 +9140,7 @@ function saveUser(){
     if(idx>=0){
       const mob=document.getElementById('uf_mobile').value.trim();
       const eml=document.getElementById('uf_email').value.trim();
-      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload};
+      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
       if(pwd) users[idx].password=pwd;
       if(role==='rm' && pinVal) users[idx].pin=pinVal;
     }
@@ -9142,7 +9149,7 @@ function saveUser(){
     if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
     const mob2=document.getElementById('uf_mobile').value.trim();
     const eml2=document.getElementById('uf_email').value.trim();
-    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload};
+    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
     if(role==='rm' && pinVal) newUser.pin=pinVal;
     users.push(newUser);
   }
@@ -10656,6 +10663,8 @@ function onUserRoleChange(sel){
   if(mfDeskWrap) mfDeskWrap.style.display = sel.value==='rm' ? '' : 'none';
   const riskWrap = document.getElementById('uf_risk_wrap');
   if(riskWrap) riskWrap.style.display = sel.value==='rm' ? '' : 'none';
+  const boWrap = document.getElementById('uf_backoffice_wrap');
+  if(boWrap) boWrap.style.display = sel.value==='rm' ? '' : 'none';
 }
 
 
@@ -10984,7 +10993,7 @@ async function doImport(){
       } else {
         // Add new
         let rm = row.rm || '';
-        if(CU.role!=='admin' && CU.role!=='backoffice') rm = CU.name;
+        if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) rm = CU.name;
         newClients.push({
           id: uid(),
           name: row.name, pan: row.pan, mobile:'', email:'', rm,
@@ -11009,7 +11018,7 @@ async function doImport(){
         updated++;
       } else {
         newClients.push({
-          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: (CU.role!=='admin'&&CU.role!=='backoffice')?CU.name:(row.rm||''),
+          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: (CU.role!=='admin'&&CU.role!=='backoffice'&&!CU.backoffice_access)?CU.name:(row.rm||''),
           status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created:today(), updated:today()
@@ -11038,7 +11047,7 @@ function openEqImportModal(){
   document.getElementById('eq-preview').innerHTML='';
   document.getElementById('eqImportBtnGo').disabled=true;
   document.getElementById('eq-file').value='';
-  if(CU.role!=='admin' && CU.role!=='backoffice'){
+  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){
     document.getElementById('eqImportDesc1').innerHTML =
       `Upload an Excel file with <b>Asset Value</b> and <b>Last Trade Date</b>. Matching will be done on <b>Client Code</b> (not mobile — family accounts can share the same mobile) — if a match is found, the existing client will be updated; if not, a new client will be added under <b>your (${CU.name}) RM name</b>.`;
     document.getElementById('eqImportDesc2').innerHTML =
@@ -11413,7 +11422,7 @@ async function doEqImport(){
       // uploading the whole office's file) can leave RM blank / use the
       // file's RM column if not present in the Excel.
       let rm = row.rm || '';
-      if(CU.role!=='admin' && CU.role!=='backoffice') rm = CU.name;
+      if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) rm = CU.name;
       let id = uid();
       while(usedIds.has(id)) id = uid();
       usedIds.add(id);
