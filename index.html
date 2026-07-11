@@ -1324,6 +1324,7 @@ input:focus, select:focus, textarea:focus{
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">To:
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-to-date" style="padding:6px;font-size:.78rem"></label>
+          <button type="button" onclick="clearMfTxnFilters()" title="Clear all filters" style="padding:6px 12px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--gray);cursor:pointer;white-space:nowrap">🔄 Clear</button>
           <span class="res-count" id="mftxn-count"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
@@ -7234,6 +7235,16 @@ function populateMfTxnMonths(){
 }
 
 // Month chunne pe From/To date clear kar do taaki conflict na ho.
+function clearMfTxnFilters(){
+  const s=document.getElementById('mftxn-search'); if(s) s.value='';
+  const rm=document.getElementById('mftxn-rm-filter'); if(rm) rm.value='';
+  const st=document.getElementById('mftxn-status-filter'); if(st) st.value='';
+  const tp=document.getElementById('mftxn-type-filter'); if(tp) tp.value='';
+  const mo=document.getElementById('mftxn-month-filter'); if(mo) mo.value='';
+  const fd=document.getElementById('mftxn-from-date'); if(fd) fd.value='';
+  const td=document.getElementById('mftxn-to-date'); if(td) td.value='';
+  renderMfTxnTable();
+}
 function onMfTxnMonthChange(){
   const m=document.getElementById('mftxn-month-filter')?.value||'';
   if(m){
