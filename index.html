@@ -14988,20 +14988,25 @@ window.QUIZ = (function(){
       var rows=[];
       snap.forEach(function(doc){ var r=doc.data(); if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r); });
       var winner=null;
+      var results=[];
+      function msOf(r){ return (r.at&&r.at.toMillis&&host.startedAtServerMs)?Math.max(0,r.at.toMillis()-host.startedAtServerMs):null; }
       if(host.type==='mcq'){
-        for(var i=0;i<rows.length;i++){ if(rows[i].answer===host.correctIndex){ winner=rows[i]; break; } }
+        var corrects=[], wrongs=[];
+        rows.forEach(function(r){ (r.answer===host.correctIndex?corrects:wrongs).push(r); });
+        corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r)}); });
+        wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r)}); });
+        winner = corrects.length?corrects[0]:null;
       } else {
+        rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r)}); });
         winner = rows.length?rows[0]:null;
       }
-      var winMs=null;
-      if(winner && winner.at && winner.at.toMillis && host.startedAtServerMs){
-        var v=winner.at.toMillis()-host.startedAtServerMs; if(v>=0) winMs=v;
-      }
+      var winMs = winner ? msOf(winner) : null;
       await DOC().set({
         state:'reveal',
         revealIndex:(host.type==='mcq'?host.correctIndex:null),
         winnerName:(winner?winner.name:null),
-        winnerMs:winMs
+        winnerMs:winMs,
+        results:results.slice(0,150)
       }, {merge:true});
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
@@ -15137,16 +15142,42 @@ window.QUIZ = (function(){
     }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Jawab nahi gaya, phir se try kijiye.'); }
   }
 
+  function ordinal(n){ var s=["th","st","nd","rd"],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+
   function renderReveal(d){
     var wt = (d.winnerMs!=null) ? '<br><span style="font-size:.8rem;color:#94a3b8">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec me</span>' : '';
-    var iAmWinner = d.winnerName && d.winnerName===player.name;
-    if(iAmWinner){
-      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">Aap jeet gaye!</b>'+wt+'<br><br>'+(d.prize?'🎁 '+esc(d.prize):'Badhai ho!'));
-    } else if(d.winnerName){
-      C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>Agle sawaal ke liye taiyaar rahiye!');
-    } else {
-      C().innerHTML=msgCard('Is baar koi winner nahi.<br><br>Agle sawaal ke liye taiyaar rahiye!');
+    var me=null;
+    if(d.results && d.results.length){ for(var i=0;i<d.results.length;i++){ if(d.results[i].id===player.id){ me=d.results[i]; break; } } }
+    var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Aapka time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
+
+    // Didn't answer at all
+    if(!me){
+      if(d.winnerName) C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>Aapne is baar jawab nahi diya. 😅<br>Agle sawaal me zaroor try kijiye!');
+      else C().innerHTML=msgCard('Is baar koi winner nahi.<br><br>Agle sawaal ke liye taiyaar rahiye!');
+      return;
     }
+
+    // MCQ — wrong answer
+    if(me.correct===false){
+      var corrTxt='';
+      if(d.revealIndex!=null && d.options && d.options[d.revealIndex]!=null)
+        corrTxt='<br><span style="font-size:.85rem;color:#94a3b8">Sahi jawab: <b style="color:#fff">'+esc(d.options[d.revealIndex])+'</b></span>';
+      C().innerHTML=msgCard('<div style="font-size:2rem">❌</div><b style="font-size:1.2rem">Galat jawab</b>'+corrTxt+myTime+'<br><br>'+(d.winnerName?'🏆 Winner: <b>'+esc(d.winnerName)+'</b>':'')+'<br>Koi baat nahi — agle me try kijiye!');
+      return;
+    }
+
+    // Winner (rank 1)
+    if(me.rank===1){
+      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">Aap jeet gaye!</b>'+myTime+'<br><br>'+(d.prize?'🎁 '+esc(d.prize):'Badhai ho!'));
+      return;
+    }
+
+    // Correct/buzzed but not first — show rank
+    var rankTxt = me.rank ? ordinal(me.rank)+' place' : '';
+    var head = (me.correct===true) ? '✅ Sahi jawab!' : '🔔 Aapne buzz kiya!';
+    C().innerHTML=msgCard('<div style="font-size:1.8rem">👏</div><b style="font-size:1.15rem">'+head+'</b><br>'
+      + '<span style="font-size:1rem;color:#fbbf24">Aap '+esc(rankTxt)+' par rahe</span>'+myTime
+      + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>Thodi der se — next time aap winner!');
   }
 
   // boot: player mode runs immediately; host inits when its page opens
