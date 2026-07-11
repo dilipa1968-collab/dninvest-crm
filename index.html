@@ -1101,6 +1101,7 @@ input:focus, select:focus, textarea:focus{
               <div style="display:flex;gap:6px">
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.8rem" onclick="QUIZ.clearResults()">🧹 Clear Results</button>
                 <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
+                <button class="btn btn-teal" onclick="QUIZ.showPodium()" title="Show cumulative Top-3 podium on big screen">🥇 Show Podium</button>
               </div>
             </div>
             <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">No question is live.</div>
@@ -15059,12 +15060,30 @@ window.QUIZ = (function(){
         winner = rows.length?rows[0]:null;
       }
       var winMs = winner ? msOf(winner) : null;
+      // ── cumulative leaderboard: award +1 to each correct player (mcq) or the
+      //    first buzzer (buzzer). Guarded by scoredKeys so re-pressing Reveal on
+      //    the SAME question never double-counts. Reload-proof (read from doc).
+      var scores={}, scoredKeys=[];
+      try{ var _cd=(await DOC().get()).data()||{}; scores=_cd.scores||{}; scoredKeys=_cd.scoredKeys||[]; }catch(e){}
+      var _sk = host.sessionId+':'+host.qIndex;
+      if(scoredKeys.indexOf(_sk)===-1){
+        var awardList = (host.type==='mcq') ? corrects : (winner?[winner]:[]);
+        awardList.forEach(function(r){
+          var pid=r.playerId||r.name;
+          if(!scores[pid]) scores[pid]={name:r.name,pts:0};
+          scores[pid].name=r.name;
+          scores[pid].pts=(scores[pid].pts||0)+1;
+        });
+        scoredKeys.push(_sk);
+      }
       await DOC().set({
         state:'reveal',
         revealIndex:(host.type==='mcq'?host.correctIndex:null),
         winnerName:(winner?winner.name:null),
         winnerMs:winMs,
-        results:results.slice(0,150)
+        results:results.slice(0,150),
+        scores:scores,
+        scoredKeys:scoredKeys
       }, {merge:true});
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
@@ -15073,6 +15092,22 @@ window.QUIZ = (function(){
         ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (first correct answer)':' (first to buzz)')+tt+cnt
         : (rows.length? 'No correct answer — '+rows.length+' response'+(rows.length===1?'':'s')+' received.' : 'No responses received. Ask players to answer before Reveal.');
     }catch(e){ alert('Reveal fail: '+e.message); }
+  }
+
+  async function showPodium(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{
+      var d=(await DOC().get()).data()||{};
+      var scores=d.scores||{};
+      if(!Object.keys(scores).length){ alert('No scores yet. Reveal at least one question first.'); return; }
+      await DOC().set({ state:'podium' }, {merge:true});
+      // host status line: show top 3 text
+      var arr=Object.keys(scores).map(function(k){ return {name:scores[k].name,pts:scores[k].pts||0}; })
+        .sort(function(a,b){ return (b.pts-a.pts)||String(a.name).localeCompare(String(b.name)); });
+      var medals=['🥇','🥈','🥉'];
+      var txt=arr.slice(0,3).map(function(r,i){ return medals[i]+' '+esc(r.name)+' ('+r.pts+')'; }).join(' &nbsp; ');
+      var st=document.getElementById('quiz-live-status'); if(st) st.innerHTML='🏆 Podium on big screen — '+txt;
+    }catch(e){ alert('Podium fail: '+e.message); }
   }
 
   async function newSession(){
@@ -15084,7 +15119,7 @@ window.QUIZ = (function(){
       var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
     }catch(e){}
     host.sessionId='s'+Date.now(); host.qIndex=0;
-    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, revealIndex:null, results:[], scores:{}, scoredKeys:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New quiz ready. Ask players to join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -15164,6 +15199,7 @@ window.QUIZ = (function(){
 
     if(d.state==='live'){ renderLiveQuestion(d); }
     else if(d.state==='reveal'){ renderReveal(d); }
+    else if(d.state==='podium'){ renderPlayerPodium(d); }
     else { C().innerHTML=msgCard('👋 Hi <b>'+esc(player.name)+'</b>!<br><br>Waiting for the quiz to start…'); }
   }
 
@@ -15247,6 +15283,27 @@ window.QUIZ = (function(){
       + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>So close — you could be next!');
   }
 
+  function renderPlayerPodium(d){
+    var scores=(d&&d.scores)||{};
+    var arr=Object.keys(scores).map(function(k){ return {id:k,name:scores[k].name,pts:scores[k].pts||0}; })
+      .sort(function(a,b){ return (b.pts-a.pts)||String(a.name).localeCompare(String(b.name)); });
+    arr.forEach(function(r,i){ r.rank=i+1; });
+    if(!arr.length){ C().innerHTML=msgCard('🏆 Final results are on the big screen!'); return; }
+    var medals={1:'🥇',2:'🥈',3:'🥉'};
+    var me=null; for(var i=0;i<arr.length;i++){ if(arr[i].id===player.id){ me=arr[i]; break; } }
+    var top='';
+    arr.slice(0,3).forEach(function(r){
+      top+='<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;margin-top:6px;font-weight:700">'
+        +'<span>'+(medals[r.rank]||('#'+r.rank))+' '+esc(r.name)+'</span><span style="color:#fbbf24">'+r.pts+'</span></div>';
+    });
+    var mine = me
+      ? (me.rank<=3
+          ? '<div style="font-size:1.5rem;margin-top:10px">🎉 You finished '+ordinal(me.rank)+'! ('+me.pts+' pt'+(me.pts===1?'':'s')+')</div>'
+          : '<div style="margin-top:10px;color:#fbbf24">Your rank: <b>'+ordinal(me.rank)+'</b> · '+me.pts+' pt'+(me.pts===1?'':'s')+'</div>')
+      : '<div style="margin-top:10px;color:#94a3b8">You didn\'t score this round — next time! 💪</div>';
+    C().innerHTML=msgCard('<b style="font-size:1.2rem">🏆 Final Leaderboard</b>'+top+mine);
+  }
+
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
   var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, timer:null, ansCount:0, linkOpen:true };
   function isScreenMode(){ try{ return new URLSearchParams(location.search).has('screen'); }catch(e){ return false; } }
@@ -15323,6 +15380,7 @@ window.QUIZ = (function(){
     clearTimerRing();
     if(d.state==='live') screenLive(d);
     else if(d.state==='reveal') screenReveal(d);
+    else if(d.state==='podium') screenPodium(d);
     else screenLobby(d);
   }
 
@@ -15441,6 +15499,60 @@ window.QUIZ = (function(){
     if(d.winnerName) confettiBurst();
   }
 
+  // rank cumulative scores → [{name,pts,rank}] (pts desc, name asc tiebreak)
+  function rankScores(d){
+    var scores=(d&&d.scores)||{};
+    var arr=Object.keys(scores).map(function(k){ return {name:scores[k].name, pts:scores[k].pts||0}; });
+    arr.sort(function(a,b){ return (b.pts-a.pts) || String(a.name).localeCompare(String(b.name)); });
+    arr.forEach(function(r,i){ r.rank=i+1; });
+    return arr;
+  }
+
+  function screenPodium(d){
+    clearTimerRing();
+    var arr=rankScores(d);
+    if(!arr.length){
+      S().innerHTML='<div class="qs-pop">'+screenHeader('reveal')
+        +'<div style="text-align:center;margin-top:6vh;font-size:3vw;color:#94a3b8;font-weight:800">No scores yet 🙌</div></div>';
+      return;
+    }
+    var top3=arr.slice(0,3);
+    // podium order on screen: 2nd (left) · 1st (center) · 3rd (right)
+    var order=[top3[1], top3[0], top3[2]];
+    var meta={
+      1:{medal:'🥇',h:'34vh',grad:'linear-gradient(135deg,#f59e0b,#fbbf24,#f59e0b)',fs:'3vw',crown:'👑'},
+      2:{medal:'🥈',h:'26vh',grad:'linear-gradient(135deg,#cbd5e1,#e2e8f0,#94a3b8)',fs:'2.6vw',crown:''},
+      3:{medal:'🥉',h:'20vh',grad:'linear-gradient(135deg,#d97706,#f59e0b,#b45309)',fs:'2.4vw',crown:''}
+    };
+    var pod='<div class="qs-podium">';
+    order.forEach(function(r){
+      if(!r) return;
+      var m=meta[r.rank];
+      pod+='<div class="qs-pop" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:22vw">'
+        + (m.crown?'<div style="font-size:3.4vw;line-height:1">'+m.crown+'</div>':'')
+        + '<div style="font-size:'+m.fs+';font-weight:900;color:#fff;text-align:center;margin-bottom:1vh;text-shadow:0 2px 12px rgba(0,0,0,.5);max-width:22vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name)+'</div>'
+        + '<div class="qs-pod" style="width:100%;height:'+m.h+';background:'+m.grad+';background-size:200% 200%;animation:qsBG 5s ease infinite;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2.4vh;box-shadow:0 0 6vh rgba(251,191,36,.35)">'
+        +   '<div style="font-size:5vw;line-height:1">'+m.medal+'</div>'
+        +   '<div style="font-size:2vw;font-weight:900;color:#1f2937;margin-top:1vh">'+r.pts+' pt'+(r.pts===1?'':'s')+'</div>'
+        + '</div></div>';
+    });
+    pod+='</div>';
+    // 4th+ list (up to 8)
+    var rest=arr.slice(3,8), list='';
+    if(rest.length){
+      list='<div style="max-width:60vw;margin:3vh auto 0;display:flex;flex-direction:column;gap:1vh">';
+      rest.forEach(function(r){
+        list+='<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:1.2vh;padding:1vh 2vw;font-size:1.7vw;font-weight:700;color:#e2e8f0">'
+          +'<span>#'+r.rank+' &nbsp; '+esc(r.name)+'</span><span style="color:#fbbf24">'+r.pts+'</span></div>';
+      });
+      list+='</div>';
+    }
+    S().innerHTML='<div class="qs-pop">'+screenHeader('reveal')
+      +'<div style="text-align:center;font-size:2.2vw;font-weight:800;color:#cbd5e1;margin-top:-1vh">🏆 Final Leaderboard</div>'
+      +pod+list+'</div>';
+    confettiBurst();
+  }
+
   // ─────────── LINK OPEN/CLOSE (admin) ───────────
   var lcUnsub=null;
   async function initLinkControl(){
@@ -15483,7 +15595,7 @@ window.QUIZ = (function(){
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, pushQuestion:pushQuestion,
-    closeQuestion:closeQuestion, reveal:reveal, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
+    closeQuestion:closeQuestion, reveal:reveal, showPodium:showPodium, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl
   };
 })();
