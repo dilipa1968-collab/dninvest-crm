@@ -400,9 +400,34 @@ function exportCSV(){
   a.download='seminar-feedback.csv'; a.click();
 }
 
+// ── Feedback link open/close (controlled from CRM → Seminars → Link Control) ──
+async function checkFeedbackOpen(){
+  try{
+    const d=await fdb.collection('app_settings').doc('links').get();
+    const v=d.exists?(d.data()||{}):{};
+    if(v.feedbackOpen===false){ showFeedbackClosed(); return; }
+  }catch(e){}
+  loadSeminars();
+  // keep watching — if admin closes while page is open, show closed live
+  try{
+    fdb.collection('app_settings').doc('links').onSnapshot(s=>{
+      const v=s.data()||{};
+      if(v.feedbackOpen===false) showFeedbackClosed();
+    });
+  }catch(e){}
+}
+function showFeedbackClosed(){
+  const w=document.getElementById('formWrap');
+  if(w) w.innerHTML='<div class="card head" style="text-align:center;padding:40px 24px">'
+    +'<div style="font-size:44px;margin-bottom:12px">🔒</div>'
+    +'<div class="form-title">Feedback abhi band hai</div>'
+    +'<div class="form-sub" style="margin-top:8px">Seminar ke samay ye link chaalu hoga.<br>Dhanyawaad! 🙏<br><br><b>D N Investment</b>, Jamshedpur</div>'
+    +'</div>';
+}
+
 // ── Init ─────────────────────────────────────────────────────────
 if(new URLSearchParams(location.search).get('view')==='responses'){ loadResponses(); }
-else{ loadSeminars(); }
+else{ checkFeedbackOpen(); }
 </script>
 </body>
 </html>
