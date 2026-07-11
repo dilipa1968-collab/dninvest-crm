@@ -1295,15 +1295,15 @@ input:focus, select:focus, textarea:focus{
         </div>
 
         <div class="filters">
-          <input type="text" placeholder="🔍 Search client / RM / fund..." oninput="renderMfTxnTable()" id="mftxn-search">
-          <select onchange="renderMfTxnTable()" id="mftxn-rm-filter"><option value="">All RMs</option></select>
-          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Filter by status">
+          <input type="text" placeholder="🔍 Search..." oninput="renderMfTxnTable()" id="mftxn-search" style="max-width:150px;padding:4px 8px;font-size:.72rem">
+          <select onchange="renderMfTxnTable()" id="mftxn-rm-filter" style="padding:4px 6px;font-size:.72rem"><option value="">All RMs</option></select>
+          <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Filter by status" style="padding:4px 6px;font-size:.72rem">
             <option value="">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Approved">Approved</option>
             <option value="Declined">Declined</option>
           </select>
-          <select onchange="renderMfTxnTable()" id="mftxn-type-filter">
+          <select onchange="renderMfTxnTable()" id="mftxn-type-filter" style="padding:4px 6px;font-size:.72rem">
             <option value="">All Types</option>
             <option value="Lumpsum">Lumpsum</option>
             <option value="SIP">New SIP</option>
@@ -1316,10 +1316,9 @@ input:focus, select:focus, textarea:focus{
             <option value="SIP Bounce Buy">SIP Bounce Buy</option>
             <option value="SIP Pause">SIP Pause</option>
           </select>
-          <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="View month-wise">
+          <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="View month-wise" style="padding:4px 6px;font-size:.72rem">
             <option value="">All Months</option>
           </select>
-          <div class="filter-sep"></div>
           <label style="font-size:.72rem;color:var(--gray);display:flex;align-items:center;gap:2px">From:
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:4px;font-size:.72rem"></label>
           <label style="font-size:.72rem;color:var(--gray);display:flex;align-items:center;gap:2px">To:
