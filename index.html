@@ -8709,14 +8709,26 @@ function renderSquareoff(){
   const cntEl=document.getElementById('sq-count');
   if(cntEl) cntEl.textContent='';
 
-  // RM pill colors — deterministic hash so each RM always gets the same shade
-  const rmPalette=['#2563eb','#0891b2','#7c3aed','#db2777','#059669','#d97706','#dc2626','#4f46e5','#0d9488','#c026d3'];
+  // RM pill colors — fixed premium deep tones (muted, no neon). Each RM gets its
+  // own distinct shade; unknown names fall back to a deep hashed palette.
+  const rmFixed={
+    'ROHIT':'#4338CA',   // indigo
+    'RIYA':'#BE185D',    // rose
+    'RAJU':'#9F1239',    // wine
+    'BHARAT':'#047857',  // emerald
+    'KHOKHAN':'#0F766E', // teal
+    'PUJA':'#0369A1',    // deep sky
+    'KOMAL':'#7E22CE',   // plum
+    'MEGHA':'#B45309',   // bronze
+    'ANJALI':'#475569'   // slate
+  };
+  const rmFallback=['#334155','#1E4620','#4C1D95','#831843','#155E75','#7C2D12','#365314','#5B21B6','#134E4A','#701A75'];
   const rmColor={};
   const rmColorFor=name=>{
     const key=String(name||'—').trim().toUpperCase();
     if(!rmColor[key]){
-      let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0;
-      rmColor[key]=rmPalette[h%rmPalette.length];
+      if(rmFixed[key]){ rmColor[key]=rmFixed[key]; }
+      else{ let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0; rmColor[key]=rmFallback[h%rmFallback.length]; }
     }
     return rmColor[key];
   };
@@ -8757,7 +8769,7 @@ function renderSquareoff(){
     html+=`<tr>
       <td><span class="sq-code">${c.code||'—'}</span></td>
       <td><span class="sq-name">${c.name||'—'}</span></td>
-      <td style="text-align:center"><span class="sq-rm-pill" style="color:${rc}">${c.dealer||'—'}</span></td>`;
+      <td style="text-align:center"><span class="sq-rm-pill" style="color:${rc};background:${rc}14;border-color:${rc}">${c.dealer||'—'}</span></td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
       if(v==null){
