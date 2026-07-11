@@ -839,6 +839,11 @@ input:focus, select:focus, textarea:focus{
   </div>
 </div>
 
+<!-- ══ SEMINAR QUIZ — BIG SCREEN (LCD / projector) ══ -->
+<div id="quizScreen" style="display:none;position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at 50% 0%,#1e293b,#0f172a 70%);color:#fff;overflow:hidden;padding:3vh 4vw;box-sizing:border-box;font-family:inherit">
+  <div id="qs-content" style="height:100%;display:flex;flex-direction:column;justify-content:center"></div>
+</div>
+
 <!-- ══ APP ══ -->
 <div id="app">
   <div class="topbar">
@@ -1064,6 +1069,7 @@ input:focus, select:focus, textarea:focus{
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.78rem" onclick="QUIZ.copyLink()">📋 Copy</button>
               </div>
               <div style="margin-top:10px;font-size:.82rem">👥 Joined players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
+              <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Big Screen kholo (LCD)</button></div>
             </div>
           </div>
 
@@ -3212,7 +3218,7 @@ async function doResetPassword(){
 async function tryAutoLogin(){
   // Client "player mode" (?play in URL): skip CRM login entirely — the quiz
   // player overlay handles everything. Guard so RM/admin auto-login never runs.
-  if(typeof QUIZ!=='undefined' && QUIZ.isPlayMode && QUIZ.isPlayMode()) return;
+  if(typeof QUIZ!=='undefined' && ((QUIZ.isPlayMode && QUIZ.isPlayMode()) || (QUIZ.isScreenMode && QUIZ.isScreenMode()))) return;
   // Wait for Firebase to be ready before doing anything — on a slow mobile
   // connection the SDK scripts may not have loaded yet when this fires. Without
   // this, auto-login used to run with fdb undefined → no client sync + skipped
@@ -15204,11 +15210,135 @@ window.QUIZ = (function(){
       + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>Thodi der se — next time aap winner!');
   }
 
-  // boot: player mode runs immediately; host inits when its page opens
-  function boot(){ if(isPlayMode()) bootPlayer(); }
+  // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
+  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, timer:null, ansCount:0 };
+  function isScreenMode(){ try{ return new URLSearchParams(location.search).has('screen'); }catch(e){ return false; } }
+  function openScreen(){ window.open(location.origin+location.pathname+'?screen=1','_blank'); }
+  function S(){ return document.getElementById('qs-content'); }
+
+  async function bootScreen(){
+    document.getElementById('quizScreen').style.display='block';
+    var app=document.getElementById('app'); if(app) app.style.display='none';
+    var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
+    try{ document.documentElement.requestFullscreen && S(); }catch(e){}
+    await window.waitForFdb(9000);
+    if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Connect nahi ho paaya</div>'; return; }
+    if(screen.unsubDoc) screen.unsubDoc();
+    if(screen.unsubResp) screen.unsubResp();
+    screen.unsubDoc = DOC().onSnapshot(function(doc){ renderScreen(doc.data()||{}); }, function(){});
+    screen.unsubResp = RESPONSES().onSnapshot(function(snap){
+      var n=0; snap.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===screen.sessionId && (r.qIndex||0)===screen.qIndex) n++; });
+      screen.ansCount=n; var el=document.getElementById('qs-ans-count'); if(el) el.textContent=n;
+    }, function(){});
+  }
+
+  function renderScreen(d){
+    screen.sessionId=d.sessionId||screen.sessionId;
+    if(d.qIndex!==screen.qIndex){ screen.qIndex=d.qIndex||0; screen.ansCount=0; }
+    if(screen.timer){ clearInterval(screen.timer); screen.timer=null; }
+    if(d.state==='live') screenLive(d);
+    else if(d.state==='reveal') screenReveal(d);
+    else screenLobby(d);
+  }
+
+  function screenLobby(d){
+    var link=joinLink();
+    S().innerHTML =
+      '<div style="text-align:center">'
+      + '<div style="font-size:5vw;font-weight:900;margin-bottom:2vh">🎯 D N Investment Quiz</div>'
+      + '<div style="font-size:2.2vw;color:#94a3b8;margin-bottom:4vh">Apne mobile se join kijiye</div>'
+      + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data='+encodeURIComponent(link)+'" style="width:26vh;height:26vh;background:#fff;padding:1.5vh;border-radius:2vh">'
+      + '<div style="font-size:2vw;margin-top:3vh;color:#e2e8f0">'+esc(link)+'</div>'
+      + '</div>';
+  }
+
+  function screenLive(d){
+    var opts=d.options||[];
+    var optHtml='';
+    if(d.type==='buzzer'){
+      optHtml='<div style="font-size:6vw;font-weight:900;color:#ef4444;text-align:center;margin-top:4vh">🔔 BUZZ karo!</div>';
+    } else {
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2vh;margin-top:3vh">';
+      opts.forEach(function(o,i){
+        optHtml+='<div style="background:rgba(255,255,255,.08);border:0.4vh solid rgba(255,255,255,.15);border-radius:1.6vh;padding:2.4vh;font-size:2.6vw;font-weight:700">'
+              + '<span style="color:#14b8a6;margin-right:1vw">'+String.fromCharCode(65+i)+'.</span>'+esc(o)+'</div>';
+      });
+      optHtml+='</div>';
+    }
+    var prize=d.prize?'<div style="font-size:2.2vw;color:#fbbf24;text-align:center;margin-bottom:2vh">🎁 '+esc(d.prize)+'</div>':'';
+    S().innerHTML =
+      '<div>'
+      + '<div style="text-align:center;font-size:1.8vw;color:#94a3b8;margin-bottom:1vh">Q'+(d.qIndex||'')+'</div>'
+      + prize
+      + '<div style="font-size:4vw;font-weight:800;text-align:center;line-height:1.25">'+esc(d.question)+'</div>'
+      + optHtml
+      + '<div style="text-align:center;font-size:2vw;margin-top:4vh;color:#cbd5e1">👥 <b id="qs-ans-count">'+screen.ansCount+'</b> ne jawab diya</div>'
+      + '</div>';
+    // countdown timer
+    if(d.timeSec && d.startedAt){
+      var endAt = d.startedAt + d.timeSec*1000;
+      var tick=function(){
+        var rem=Math.max(0,Math.ceil((endAt-Date.now())/1000));
+        var t=document.getElementById('qs-timer'); if(t) t.textContent=rem;
+        if(rem<=0 && screen.timer){ clearInterval(screen.timer); screen.timer=null; }
+      };
+      // (timer number shown small at corner)
+      var wrap=document.createElement('div');
+      wrap.style.cssText='position:absolute;top:3vh;right:4vw;font-size:4vw;font-weight:900;color:#f59e0b';
+      wrap.innerHTML='<span id="qs-timer">'+d.timeSec+'</span>s';
+      document.getElementById('quizScreen').appendChild(wrap);
+      screen.timer=setInterval(tick,300); tick();
+    }
+  }
+
+  function screenReveal(d){
+    // remove any leftover timer badge
+    var qs=document.getElementById('quizScreen');
+    Array.prototype.forEach.call(qs.querySelectorAll('div[style*="position:absolute"]'),function(el){ el.remove(); });
+    var opts=d.options||[]; var ci=d.revealIndex;
+    var optHtml='';
+    if(d.type!=='buzzer' && opts.length){
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2vh;margin-top:3vh">';
+      opts.forEach(function(o,i){
+        var ok=(i===ci);
+        optHtml+='<div style="background:'+(ok?'#16a34a':'rgba(255,255,255,.06)')+';border-radius:1.6vh;padding:2.4vh;font-size:2.6vw;font-weight:700;opacity:'+(ok?'1':'.45')+'">'
+              + '<span style="margin-right:1vw">'+String.fromCharCode(65+i)+'.</span>'+esc(o)+(ok?' ✅':'')+'</div>';
+      });
+      optHtml+='</div>';
+    }
+    // top 3
+    var top='';
+    if(d.results && d.results.length){
+      var ranked=d.results.filter(function(r){ return r.rank; }).sort(function(a,b){ return a.rank-b.rank; }).slice(0,3);
+      if(ranked.length){
+        var medals=['🥇','🥈','🥉'];
+        top='<div style="margin-top:4vh;display:flex;justify-content:center;gap:2vw;flex-wrap:wrap">';
+        ranked.forEach(function(r,i){
+          top+='<div style="background:rgba(255,255,255,.08);border-radius:1.4vh;padding:1.6vh 2.2vw;font-size:2vw">'
+             + medals[i]+' <b>'+esc(r.name)+'</b>'+(r.ms!=null?' <span style="color:#94a3b8;font-size:1.5vw">'+(r.ms/1000).toFixed(2)+'s</span>':'')+'</div>';
+        });
+        top+='</div>';
+      }
+    }
+    var winnerBlock = d.winnerName
+      ? '<div style="text-align:center;margin-top:4vh"><div style="font-size:2.4vw;color:#94a3b8">🏆 Winner</div>'
+        + '<div style="font-size:6vw;font-weight:900;color:#fbbf24">'+esc(d.winnerName)+'</div>'
+        + (d.winnerMs!=null?'<div style="font-size:2vw;color:#cbd5e1">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec me</div>':'')
+        + (d.prize?'<div style="font-size:2.4vw;color:#14b8a6;margin-top:1vh">🎁 '+esc(d.prize)+'</div>':'')
+        + '</div>'
+      : '<div style="text-align:center;margin-top:4vh;font-size:3vw;color:#94a3b8">Is baar koi winner nahi</div>';
+    S().innerHTML =
+      '<div>'
+      + (d.question?'<div style="font-size:3vw;font-weight:800;text-align:center;line-height:1.25">'+esc(d.question)+'</div>':'')
+      + optHtml + winnerBlock + top
+      + '</div>';
+  }
+
+  // boot: play / screen mode run immediately; host inits when its page opens
+  function boot(){ if(isPlayMode()) bootPlayer(); else if(isScreenMode()) bootScreen(); }
 
   return {
-    isPlayMode:isPlayMode, boot:boot,
+    isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, clearResults:clearResults, newSession:newSession, copyLink:copyLink
   };
