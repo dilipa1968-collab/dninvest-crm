@@ -828,6 +828,17 @@ input:focus, select:focus, textarea:focus{
   </div>
 </div>
 
+<!-- ══ SEMINAR QUIZ — CLIENT (PLAYER) VIEW ══ -->
+<div id="quizPlayer" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);color:#fff;overflow-y:auto;padding:20px;box-sizing:border-box;font-family:inherit">
+  <div style="max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column">
+    <div style="text-align:center;margin:20px 0 24px">
+      <div style="font-size:1.6rem;font-weight:800;letter-spacing:.5px">🎯 D N Investment</div>
+      <div style="font-size:.85rem;color:#94a3b8;margin-top:2px">Seminar Quiz</div>
+    </div>
+    <div id="qp-content" style="flex:1"></div>
+  </div>
+</div>
+
 <!-- ══ APP ══ -->
 <div id="app">
   <div class="topbar">
@@ -875,6 +886,9 @@ input:focus, select:focus, textarea:focus{
       <div class="nav-item" onclick="showPage('seminars')" id="nav-seminars">
         <span class="icon">🎤</span> Seminars
         <span class="nav-badge" id="nb-seminars">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('seminar-quiz')" id="nav-seminar-quiz">
+        <span class="icon">🎯</span> Seminar Quiz
       </div>
 
       <div class="sidebar-section" id="eq-nav-section">Equity</div>
@@ -1026,6 +1040,77 @@ input:focus, select:focus, textarea:focus{
           </div>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="seminars-table"></div></div>
+      </div>
+
+      <!-- ── SEMINAR QUIZ (HOST / ADMIN) ── -->
+      <div class="page" id="page-seminar-quiz">
+        <div class="page-hdr">
+          <div class="page-title">🎯 Seminar Quiz <span style="font-size:.7rem;color:var(--gray);font-weight:500">— Live buzzer / MCQ for clients</span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="QUIZ.newSession()" title="Naya quiz — players & jawab reset">🔄 Reset / New Quiz</button>
+          </div>
+        </div>
+
+        <div id="quiz-host-body" style="display:flex;flex-direction:column;gap:14px">
+
+          <!-- Join info -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+            <div id="quiz-qr-box" style="flex-shrink:0"></div>
+            <div style="flex:1;min-width:220px">
+              <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 Client join karne ke liye</div>
+              <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Screen pe QR dikhaiye ya link bhejiye. Bina login, sirf naam daal ke join.</div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <input type="text" id="quiz-join-link" readonly style="flex:1;min-width:180px;padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+                <button class="btn btn-outline" style="padding:6px 10px;font-size:.78rem" onclick="QUIZ.copyLink()">📋 Copy</button>
+              </div>
+              <div style="margin-top:10px;font-size:.82rem">👥 Joined players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
+            </div>
+          </div>
+
+          <!-- Question builder -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="font-weight:700;font-size:.95rem;margin-bottom:10px">➕ Question banaiye</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+              <label style="font-size:.8rem">Type:
+                <select id="quiz-q-type" onchange="QUIZ.onTypeChange()" style="padding:5px 8px;font-size:.8rem;border:1px solid var(--border);border-radius:6px;margin-left:4px">
+                  <option value="mcq">MCQ (auto winner)</option>
+                  <option value="buzzer">Buzzer (host check)</option>
+                </select>
+              </label>
+              <label style="font-size:.8rem">⏱️ Time (sec):
+                <input type="number" id="quiz-q-time" value="20" min="5" max="120" style="width:60px;padding:5px;font-size:.8rem;border:1px solid var(--border);border-radius:6px;margin-left:4px">
+              </label>
+              <label style="font-size:.8rem;flex:1;min-width:160px">🎁 Prize:
+                <input type="text" id="quiz-q-prize" placeholder="e.g. ₹500 gift voucher" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid var(--border);border-radius:6px;margin-top:3px">
+              </label>
+            </div>
+            <input type="text" id="quiz-q-text" placeholder="Question likhiye..." style="width:100%;padding:8px;font-size:.9rem;border:1px solid var(--border);border-radius:6px;margin-bottom:10px">
+            <div id="quiz-mcq-options">
+              <div style="font-size:.78rem;color:var(--gray);margin-bottom:6px">Options — sahi wale ka radio select kijiye:</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="quiz-correct" value="0" checked><input type="text" id="quiz-opt-0" placeholder="Option A" style="flex:1;padding:6px;font-size:.82rem;border:1px solid var(--border);border-radius:6px"></label>
+                <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="quiz-correct" value="1"><input type="text" id="quiz-opt-1" placeholder="Option B" style="flex:1;padding:6px;font-size:.82rem;border:1px solid var(--border);border-radius:6px"></label>
+                <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="quiz-correct" value="2"><input type="text" id="quiz-opt-2" placeholder="Option C" style="flex:1;padding:6px;font-size:.82rem;border:1px solid var(--border);border-radius:6px"></label>
+                <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="quiz-correct" value="3"><input type="text" id="quiz-opt-3" placeholder="Option D" style="flex:1;padding:6px;font-size:.82rem;border:1px solid var(--border);border-radius:6px"></label>
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-teal" onclick="QUIZ.launchQuestion()">🚀 Launch Question (live)</button>
+              <button class="btn btn-outline" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
+            </div>
+          </div>
+
+          <!-- Live results -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div style="font-weight:700;font-size:.95rem">📊 Live results</div>
+              <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
+            </div>
+            <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">Koi question live nahi hai.</div>
+            <div id="quiz-results"></div>
+          </div>
+
+        </div>
       </div>
 
       <!-- ── EQUITY CLIENTS ── -->
@@ -3142,6 +3227,9 @@ async function doResetPassword(){
 // Auto-login if session exists (persistent — survives browser/app close).
 // Session is cleared only by Logout, wrong/changed credentials, or RM-on-mobile.
 async function tryAutoLogin(){
+  // Client "player mode" (?play in URL): skip CRM login entirely — the quiz
+  // player overlay handles everything. Guard so RM/admin auto-login never runs.
+  if(typeof QUIZ!=='undefined' && QUIZ.isPlayMode && QUIZ.isPlayMode()) return;
   // Wait for Firebase to be ready before doing anything — on a slow mobile
   // connection the SDK scripts may not have loaded yet when this fires. Without
   // this, auto-login used to run with fdb undefined → no client sync + skipped
@@ -3419,6 +3507,8 @@ function initApp(){
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
   const annNav=document.getElementById('nav-announcements');
   if(annNav) annNav.style.display=CU.role==='admin'?'flex':'none';
+  const quizNav=document.getElementById('nav-seminar-quiz');
+  if(quizNav) quizNav.style.display=CU.role==='admin'?'flex':'none';
   const brkNav=document.getElementById('nav-brokerage');
   if(brkNav) brkNav.style.display=CU.role==='admin'?'flex':'none';
 
@@ -3632,6 +3722,7 @@ function showPage(id){
   else if(id==='mf-clients') renderMfTable();
   else if(id==='leads') renderLeadsTable();
   else if(id==='seminars') renderSeminarsTable();
+  else if(id==='seminar-quiz'){ if(typeof QUIZ!=='undefined') QUIZ.hostInit(); }
   else if(id==='eq-followup'){ renderFollowup('eqf'); }
   else if(id==='mf-followup'){ renderFollowup('mff'); }
   else if(id==='eq-notrade') renderNoTrade();
@@ -14720,6 +14811,310 @@ window.__DN_LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAScAAAEsCAYAAACB
 (function(){function fill(){document.querySelectorAll(".dn-logo-slot").forEach(function(i){if(!i.src)i.src=window.__DN_LOGO;});}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",fill);else fill();
 window.__dnFillLogo=fill;})();
+</script>
+
+<!-- ══════════════ SEMINAR QUIZ MODULE (host + client) ══════════════ -->
+<script>
+window.QUIZ = (function(){
+  var DOC = function(){ return window.fdb.collection('quiz').doc('live'); };
+  var PLAYERS = function(){ return DOC().collection('players'); };
+  var RESPONSES = function(){ return DOC().collection('responses'); };
+  var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+
+  // host-only working memory (correct answer never leaves the host until reveal)
+  var host = { correctIndex:0, qIndex:0, type:'mcq', sessionId:'', unsubPlayers:null, unsubResp:null };
+
+  function isPlayMode(){
+    try{ return new URLSearchParams(location.search).has('play'); }catch(e){ return false; }
+  }
+
+  function joinLink(){
+    return location.origin + location.pathname + '?play=1';
+  }
+
+  // ─────────── HOST ───────────
+  async function hostInit(){
+    await window.waitForFdb(8000);
+    if(!window.fdb) return;
+    // join link + QR
+    var li=document.getElementById('quiz-join-link'); if(li) li.value=joinLink();
+    var qr=document.getElementById('quiz-qr-box');
+    if(qr){ qr.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(joinLink())+'" width="160" height="160" style="border-radius:10px;background:#fff;padding:6px" alt="Join QR">'; }
+    onTypeChange();
+    // ensure live doc exists
+    try{
+      var d=await DOC().get();
+      if(!d.exists || !d.data() || !d.data().sessionId){
+        host.sessionId = 's'+Date.now();
+        await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId }, {merge:true});
+      } else {
+        var dd=d.data();
+        host.sessionId=dd.sessionId; host.qIndex=dd.qIndex||0; host.type=dd.type||'mcq';
+      }
+    }catch(e){}
+    attachHostListeners();
+  }
+
+  function attachHostListeners(){
+    if(host.unsubPlayers) host.unsubPlayers();
+    if(host.unsubResp) host.unsubResp();
+    host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
+      var n=0; snap.forEach(function(doc){ if((doc.data().sessionId||'')===host.sessionId) n++; });
+      var el=document.getElementById('quiz-player-count'); if(el) el.textContent=n;
+    }, function(){});
+    host.unsubResp = RESPONSES().onSnapshot(function(snap){
+      renderHostResults(snap);
+    }, function(){});
+  }
+
+  function currentResponses(snap){
+    var rows=[];
+    snap.forEach(function(doc){
+      var r=doc.data();
+      if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r);
+    });
+    // order by server timestamp (nulls — pending writes — go last)
+    rows.sort(function(a,b){
+      var ta=a.at&&a.at.toMillis?a.at.toMillis():Infinity;
+      var tb=b.at&&b.at.toMillis?b.at.toMillis():Infinity;
+      return ta-tb;
+    });
+    return rows;
+  }
+
+  function renderHostResults(snap){
+    var box=document.getElementById('quiz-results'); if(!box) return;
+    var rows = snap ? currentResponses(snap) : [];
+    if(!rows.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Abhi tak kisi ne jawab nahi diya.</div>'; return; }
+    var html='<div style="display:flex;flex-direction:column;gap:6px">';
+    rows.forEach(function(r,i){
+      var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
+      var badge = host.type==='buzzer'
+        ? '<span style="background:#3b82f6;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">BUZZ</span>'
+        : (correct ? '<span style="background:#16a34a;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✔ Sahi</span>'
+                   : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Galat</span>');
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:'+(i===0?'#fef9c3':'#fff')+'">'
+          + '<span style="font-weight:700;width:20px">'+(i+1)+'</span>'
+          + '<span style="flex:1;font-weight:600">'+esc(r.name)+'</span>'
+          + badge + '</div>';
+    });
+    html+='</div>';
+    box.innerHTML=html;
+  }
+
+  function onTypeChange(){
+    var t=(document.getElementById('quiz-q-type')||{}).value||'mcq';
+    var opts=document.getElementById('quiz-mcq-options');
+    if(opts) opts.style.display = (t==='mcq') ? '' : 'none';
+  }
+
+  async function launchQuestion(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var type=(document.getElementById('quiz-q-type')||{}).value||'mcq';
+    var qtext=(document.getElementById('quiz-q-text')||{}).value.trim();
+    var prize=(document.getElementById('quiz-q-prize')||{}).value.trim();
+    var timeSec=parseInt((document.getElementById('quiz-q-time')||{}).value,10)||20;
+    if(!qtext){ alert('Question likhiye.'); return; }
+    var options=[]; var correctIndex=0;
+    if(type==='mcq'){
+      for(var i=0;i<4;i++){ var v=(document.getElementById('quiz-opt-'+i)||{}).value.trim(); if(v) options.push(v); }
+      if(options.length<2){ alert('Kam se kam 2 options daaliye.'); return; }
+      var sel=document.querySelector('input[name="quiz-correct"]:checked');
+      correctIndex=sel?parseInt(sel.value,10):0;
+      if(correctIndex>=options.length){ alert('Sahi option us slot me khaali hai.'); return; }
+    }
+    host.qIndex=(host.qIndex||0)+1;
+    host.type=type; host.correctIndex=correctIndex;
+    try{
+      // NOTE: correct answer is NOT written to the live doc — players can't see it
+      await DOC().set({
+        state:'live', type:type, qIndex:host.qIndex, sessionId:host.sessionId,
+        question:qtext, options:(type==='mcq'?options:[]), prize:prize, timeSec:timeSec,
+        startedAt:Date.now(), revealIndex:null, winnerName:null
+      }, {merge:true});
+      var st=document.getElementById('quiz-live-status');
+      if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(qtext)+'</b>'+(prize?' · 🎁 '+esc(prize):'');
+      var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Jawab aane ka intezaar...</div>';
+    }catch(e){ alert('Launch fail hua: '+e.message); }
+  }
+
+  async function closeQuestion(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{ await DOC().set({ state:'lobby' }, {merge:true}); }catch(e){}
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Koi question live nahi hai.';
+  }
+
+  async function reveal(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{
+      var snap=await RESPONSES().orderBy('at').get();
+      var rows=[];
+      snap.forEach(function(doc){ var r=doc.data(); if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r); });
+      var winner=null;
+      if(host.type==='mcq'){
+        for(var i=0;i<rows.length;i++){ if(rows[i].answer===host.correctIndex){ winner=rows[i]; break; } }
+      } else {
+        winner = rows.length?rows[0]:null;
+      }
+      await DOC().set({
+        state:'reveal',
+        revealIndex:(host.type==='mcq'?host.correctIndex:null),
+        winnerName:(winner?winner.name:null)
+      }, {merge:true});
+      var st=document.getElementById('quiz-live-status');
+      if(st) st.innerHTML = winner
+        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (sabse pehle sahi jawab)':' (sabse pehle buzz)')
+        : 'Kisi ne sahi jawab nahi diya.';
+    }catch(e){ alert('Reveal fail: '+e.message); }
+  }
+
+  async function newSession(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    if(!confirm('Naya quiz shuru? Purane players aur jawab hat jaayenge.')) return;
+    try{
+      // delete old players + responses (seminar scale — few dozen docs)
+      var ps=await PLAYERS().get(); var b1=window.fdb.batch(); ps.forEach(function(d){ b1.delete(d.ref); }); await b1.commit();
+      var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
+    }catch(e){}
+    host.sessionId='s'+Date.now(); host.qIndex=0;
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, revealIndex:null }, {merge:true}); }catch(e){}
+    attachHostListeners();
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Naya quiz taiyaar. Players ko join karaiye.';
+    var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
+    var pc=document.getElementById('quiz-player-count'); if(pc) pc.textContent='0';
+  }
+
+  function copyLink(){
+    var li=document.getElementById('quiz-join-link'); if(!li) return;
+    li.select(); try{ document.execCommand('copy'); }catch(e){}
+    try{ navigator.clipboard && navigator.clipboard.writeText(joinLink()); }catch(e){}
+    alert('Link copy ho gaya!');
+  }
+
+  // ─────────── CLIENT (PLAYER) ───────────
+  var player = { id:'', name:'', sessionId:'', qIndex:0, answered:false, unsub:null, state:'' };
+
+  function C(){ return document.getElementById('qp-content'); }
+
+  async function bootPlayer(){
+    document.getElementById('quizPlayer').style.display='block';
+    var app=document.getElementById('app'); if(app) app.style.display='none';
+    var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
+    await window.waitForFdb(9000);
+    if(!window.fdb){ C().innerHTML=msgCard('⚠️ Connect nahi ho paaya. Net check karke page refresh kijiye.'); return; }
+    player.id = localStorage.getItem('dnquiz_pid') || ('p'+Date.now()+Math.floor(Math.random()*9999));
+    localStorage.setItem('dnquiz_pid', player.id);
+    player.name = localStorage.getItem('dnquiz_name') || '';
+    if(player.name){ await joinAndListen(); } else { renderNameForm(); }
+  }
+
+  function msgCard(html){
+    return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px;text-align:center;font-size:1rem">'+html+'</div>';
+  }
+
+  function renderNameForm(){
+    C().innerHTML =
+      '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px">'
+      + '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;text-align:center">Apna naam daaliye</div>'
+      + '<input id="qp-name" placeholder="Naam" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      + '<button id="qp-join-btn" style="width:100%;padding:14px;font-size:1.1rem;font-weight:700;border:none;border-radius:12px;background:#14b8a6;color:#fff;cursor:pointer">Join Quiz →</button>'
+      + '</div>';
+    var inp=document.getElementById('qp-name'); if(inp) inp.focus();
+    document.getElementById('qp-join-btn').onclick=async function(){
+      var v=(document.getElementById('qp-name')||{}).value.trim();
+      if(!v){ inp.focus(); return; }
+      player.name=v; localStorage.setItem('dnquiz_name', v);
+      await joinAndListen();
+    };
+  }
+
+  async function joinAndListen(){
+    C().innerHTML=msgCard('⏳ Join ho raha hai...');
+    try{
+      var d=await DOC().get();
+      player.sessionId = (d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
+      await PLAYERS().doc(player.id).set({ name:player.name, sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() });
+    }catch(e){}
+    if(player.unsub) player.unsub();
+    player.unsub = DOC().onSnapshot(function(doc){ renderPlayerState(doc.data()||{}); }, function(){});
+  }
+
+  function renderPlayerState(d){
+    // session changed by host reset → rejoin under new session
+    if(d.sessionId && d.sessionId!==player.sessionId){
+      player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
+      try{ PLAYERS().doc(player.id).set({ name:player.name, sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
+    }
+    if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; }
+
+    if(d.state==='live'){ renderLiveQuestion(d); }
+    else if(d.state==='reveal'){ renderReveal(d); }
+    else { C().innerHTML=msgCard('👋 Namaste <b>'+esc(player.name)+'</b>!<br><br>Quiz shuru hone ka intezaar kijiye...'); }
+  }
+
+  function renderLiveQuestion(d){
+    if(player.answered){
+      C().innerHTML=msgCard('✅ Aapka jawab lock ho gaya!<br><br>Result ka intezaar kijiye...');
+      return;
+    }
+    var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
+    var html='<div>'+prize
+      + '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:20px;margin-bottom:16px">'
+      + '<div style="font-size:1.2rem;font-weight:700;text-align:center">'+esc(d.question)+'</div></div>';
+    if(d.type==='buzzer'){
+      html+='<button id="qp-buzz" style="width:100%;padding:40px 0;font-size:1.8rem;font-weight:900;border:none;border-radius:20px;background:#ef4444;color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(239,68,68,.4)">🔔 BUZZ!</button>';
+    } else {
+      html+='<div style="display:flex;flex-direction:column;gap:10px">';
+      (d.options||[]).forEach(function(opt,i){
+        html+='<button class="qp-opt" data-i="'+i+'" style="width:100%;padding:16px;font-size:1.05rem;font-weight:600;border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;text-align:left">'
+            + String.fromCharCode(65+i)+'. '+esc(opt)+'</button>';
+      });
+      html+='</div>';
+    }
+    html+='</div>';
+    C().innerHTML=html;
+    if(d.type==='buzzer'){
+      document.getElementById('qp-buzz').onclick=function(){ submitAnswer(d,'buzz'); };
+    } else {
+      Array.prototype.forEach.call(document.querySelectorAll('.qp-opt'),function(b){
+        b.onclick=function(){ submitAnswer(d, parseInt(b.getAttribute('data-i'),10)); };
+      });
+    }
+  }
+
+  async function submitAnswer(d, answer){
+    if(player.answered) return;
+    player.answered=true;
+    C().innerHTML=msgCard('✅ Jawab bhej diya!<br><br>Result ka intezaar kijiye...');
+    try{
+      await RESPONSES().doc(player.sessionId+'_'+player.qIndex+'_'+player.id).set({
+        playerId:player.id, name:player.name, qIndex:player.qIndex, sessionId:player.sessionId,
+        answer:answer, at:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Jawab nahi gaya, phir se try kijiye.'); }
+  }
+
+  function renderReveal(d){
+    var iAmWinner = d.winnerName && d.winnerName===player.name;
+    if(iAmWinner){
+      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">Aap jeet gaye!</b><br><br>'+(d.prize?'🎁 '+esc(d.prize):'Badhai ho!'));
+    } else if(d.winnerName){
+      C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b><br><br>Agle sawaal ke liye taiyaar rahiye!');
+    } else {
+      C().innerHTML=msgCard('Is baar koi winner nahi.<br><br>Agle sawaal ke liye taiyaar rahiye!');
+    }
+  }
+
+  // boot: player mode runs immediately; host inits when its page opens
+  function boot(){ if(isPlayMode()) bootPlayer(); }
+
+  return {
+    isPlayMode:isPlayMode, boot:boot,
+    hostInit:hostInit, onTypeChange:onTypeChange, launchQuestion:launchQuestion,
+    closeQuestion:closeQuestion, reveal:reveal, newSession:newSession, copyLink:copyLink
+  };
+})();
+QUIZ.boot();
 </script>
 </body>
 </html>
