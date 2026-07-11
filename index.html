@@ -1043,7 +1043,7 @@ input:focus, select:focus, textarea:focus{
         </div>
         <div id="link-control" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;flex-wrap:wrap;gap:14px;align-items:center">
           <span style="font-weight:700;font-size:.9rem">🔗 Link Control</span>
-          <span style="font-size:.78rem;color:var(--gray)">Seminar na ho to links band rakhein — client ko "band hai" dikhega.</span>
+          <span style="font-size:.78rem;color:var(--gray)">Keep links closed when no seminar is running — clients will see "closed".</span>
           <div style="display:flex;gap:14px;align-items:center;margin-left:auto;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:600">📋 Feedback:
               <button id="lc-feedback" class="btn" style="padding:5px 14px;font-size:.8rem" onclick="QUIZ.toggleLink('feedback')">...</button></label>
@@ -1060,7 +1060,7 @@ input:focus, select:focus, textarea:focus{
           <div class="page-title">🎯 Seminar Quiz <span style="font-size:.7rem;color:var(--gray);font-weight:500">— Live buzzer / MCQ for clients</span></div>
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="showPage('seminars')">← Seminars</button>
-            <button class="btn btn-outline" onclick="QUIZ.newSession()" title="Naya quiz — players & jawab reset">🔄 Reset / New Quiz</button>
+            <button class="btn btn-outline" onclick="QUIZ.newSession()" title="New quiz — resets players & answers">🔄 Reset / New Quiz</button>
           </div>
         </div>
 
@@ -1070,21 +1070,21 @@ input:focus, select:focus, textarea:focus{
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
             <div id="quiz-qr-box" style="flex-shrink:0"></div>
             <div style="flex:1;min-width:220px">
-              <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 Client join karne ke liye</div>
-              <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Screen pe QR dikhaiye ya link bhejiye. Bina login, sirf naam daal ke join.</div>
+              <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 How clients join</div>
+              <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Show the QR on screen or share the link. No login — just enter a name to join.</div>
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="text" id="quiz-join-link" readonly style="flex:1;min-width:180px;padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.78rem" onclick="QUIZ.copyLink()">📋 Copy</button>
               </div>
               <div style="margin-top:10px;font-size:.82rem">👥 Joined players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
-              <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Big Screen kholo (LCD)</button></div>
+              <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Open Big Screen (LCD)</button></div>
             </div>
           </div>
 
           <!-- Question bank (up to 5, pre-filled — host just pushes) -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <div style="font-weight:700;font-size:.95rem">➕ Question Bank (5) — pehle bhar lijiye, seminar me sirf "Push" dabaiye</div>
+              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — fill these in advance, then just hit "Push" during the seminar</div>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
@@ -1103,7 +1103,7 @@ input:focus, select:focus, textarea:focus{
                 <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
               </div>
             </div>
-            <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">Koi question live nahi hai.</div>
+            <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">No question is live.</div>
             <div id="quiz-results"></div>
           </div>
 
@@ -14890,14 +14890,14 @@ window.QUIZ = (function(){
   function renderHostResults(snap){
     var box=document.getElementById('quiz-results'); if(!box) return;
     var rows = snap ? currentResponses(snap) : [];
-    if(!rows.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Abhi tak kisi ne jawab nahi diya.</div>'; return; }
+    if(!rows.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No answers yet.</div>'; return; }
     var html='<div style="display:flex;flex-direction:column;gap:6px">';
     rows.forEach(function(r,i){
       var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
       var badge = host.type==='buzzer'
         ? '<span style="background:#3b82f6;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">BUZZ</span>'
-        : (correct ? '<span style="background:#16a34a;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✔ Sahi</span>'
-                   : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Galat</span>');
+        : (correct ? '<span style="background:#16a34a;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✔ Correct</span>'
+                   : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Wrong</span>');
       var tms = (r.at&&r.at.toMillis&&host.startedAtServerMs) ? (r.at.toMillis()-host.startedAtServerMs) : null;
       var tstr = (tms!=null && tms>=0) ? '<span style="font-size:.72rem;color:#64748b;font-weight:600;min-width:52px;text-align:right">'+(tms/1000).toFixed(2)+'s</span>' : '';
       html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:'+(i===0?'#fef9c3':'#fff')+'">'
@@ -14934,7 +14934,7 @@ window.QUIZ = (function(){
         + '<label style="font-size:.75rem">⏱️<input type="number" id="qb'+n+'-time" value="'+(q.time||20)+'" min="5" max="120" style="width:50px;padding:4px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;margin-left:2px"> sec</label>'
         + '<label style="font-size:.75rem;flex:1;min-width:120px">🎁<input type="text" id="qb'+n+'-prize" value="'+esc(q.prize||'')+'" placeholder="Prize" style="width:100%;padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px"></label>'
         + '</div>'
-        + '<input type="text" id="qb'+n+'-text" value="'+esc(q.text||'')+'" placeholder="Question '+(n+1)+' likhiye..." style="width:100%;box-sizing:border-box;padding:7px;font-size:.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">'
+        + '<input type="text" id="qb'+n+'-text" value="'+esc(q.text||'')+'" placeholder="Question '+(n+1)+' text…" style="width:100%;box-sizing:border-box;padding:7px;font-size:.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">'
         + '<div id="qb'+n+'-opts" style="display:'+(q.type==='mcq'?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+optRows+'</div>'
         + '<button class="btn btn-teal" style="padding:6px 14px;font-size:.82rem" onclick="QUIZ.pushQuestion('+n+')">🚀 Push Q'+(n+1)+'</button>'
         + '</div>';
@@ -14959,22 +14959,22 @@ window.QUIZ = (function(){
   function saveBank(){
     var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
     try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}
-    alert('5 sawaal save ho gaye. Ab jab chaahein "Push" dabaiye.');
+    alert('All 5 questions saved. Hit "Push" whenever you are ready.');
   }
   function clearBank(){
-    if(!confirm('Saare 5 sawaal khaali kar dein?')) return;
+    if(!confirm('Clear all 5 questions?')) return;
     try{ localStorage.removeItem(BANK_KEY); }catch(e){}
     renderBank();
   }
   async function pushQuestion(n){
     saveBankSilent();
     var q=readBankRow(n);
-    if(!q.text){ alert('Q'+(n+1)+' khaali hai — pehle question likhiye.'); return; }
+    if(!q.text){ alert('Q'+(n+1)+' is empty — please enter the question first.'); return; }
     var options=[];
     if(q.type==='mcq'){
       for(var i=0;i<4;i++){ if((q.opts[i]||'').trim()) options.push(q.opts[i].trim()); }
-      if(options.length<2){ alert('Q'+(n+1)+': kam se kam 2 options daaliye.'); return; }
-      if(q.correct>=options.length){ alert('Q'+(n+1)+': sahi option us slot me khaali hai.'); return; }
+      if(options.length<2){ alert('Q'+(n+1)+': add at least 2 options.'); return; }
+      if(q.correct>=options.length){ alert('Q'+(n+1)+': the correct-option slot is empty.'); return; }
     }
     await launchQuestionObj({type:q.type, text:q.text, options:options, correct:q.correct, time:q.time, prize:q.prize});
   }
@@ -15001,8 +15001,8 @@ window.QUIZ = (function(){
         host.startedAtServerMs=d.data().startedAtServer.toMillis();
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
-      var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Jawab aane ka intezaar...</div>';
-    }catch(e){ alert('Launch fail hua: '+e.message); }
+      var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting for answers…</div>';
+    }catch(e){ alert('Launch failed: '+e.message); }
   }
 
   async function clearResults(){
@@ -15015,14 +15015,14 @@ window.QUIZ = (function(){
       if(cnt) await batch.commit();
       await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true});
     }catch(e){}
-    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Koi question live nahi hai.';
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No question is live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
 
   async function closeQuestion(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
-    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Koi question live nahi hai.';
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No question is live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
 
@@ -15056,14 +15056,14 @@ window.QUIZ = (function(){
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
       if(st) st.innerHTML = winner
-        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (sabse pehle sahi jawab)':' (sabse pehle buzz)')+tt
-        : 'Kisi ne sahi jawab nahi diya.';
+        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (first correct answer)':' (first to buzz)')+tt
+        : 'No one answered correctly.';
     }catch(e){ alert('Reveal fail: '+e.message); }
   }
 
   async function newSession(){
     await window.waitForFdb(8000); if(!window.fdb) return;
-    if(!confirm('Naya quiz shuru? Purane players aur jawab hat jaayenge.')) return;
+    if(!confirm('Start a new quiz? Current players and answers will be cleared.')) return;
     try{
       // delete old players + responses (seminar scale — few dozen docs)
       var ps=await PLAYERS().get(); var b1=window.fdb.batch(); ps.forEach(function(d){ b1.delete(d.ref); }); await b1.commit();
@@ -15072,7 +15072,7 @@ window.QUIZ = (function(){
     host.sessionId='s'+Date.now(); host.qIndex=0;
     try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
-    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Naya quiz taiyaar. Players ko join karaiye.';
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New quiz ready. Ask players to join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
     var pc=document.getElementById('quiz-player-count'); if(pc) pc.textContent='0';
   }
@@ -15081,7 +15081,7 @@ window.QUIZ = (function(){
     var li=document.getElementById('quiz-join-link'); if(!li) return;
     li.select(); try{ document.execCommand('copy'); }catch(e){}
     try{ navigator.clipboard && navigator.clipboard.writeText(joinLink()); }catch(e){}
-    alert('Link copy ho gaya!');
+    alert('Link copied!');
   }
 
   // ─────────── CLIENT (PLAYER) ───────────
@@ -15094,7 +15094,7 @@ window.QUIZ = (function(){
     var app=document.getElementById('app'); if(app) app.style.display='none';
     var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
     await window.waitForFdb(9000);
-    if(!window.fdb){ C().innerHTML=msgCard('⚠️ Connect nahi ho paaya. Net check karke page refresh kijiye.'); return; }
+    if(!window.fdb){ C().innerHTML=msgCard('⚠️ Could not connect. Please check your network and refresh.'); return; }
     player.id = localStorage.getItem('dnquiz_pid') || ('p'+Date.now()+Math.floor(Math.random()*9999));
     localStorage.setItem('dnquiz_pid', player.id);
     player.name = localStorage.getItem('dnquiz_name') || '';
@@ -15115,8 +15115,8 @@ window.QUIZ = (function(){
   function renderNameForm(){
     C().innerHTML =
       '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px">'
-      + '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;text-align:center">Apna naam daaliye</div>'
-      + '<input id="qp-name" placeholder="Naam" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      + '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;text-align:center">Enter your name</div>'
+      + '<input id="qp-name" placeholder="Name" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
       + '<button id="qp-join-btn" style="width:100%;padding:14px;font-size:1.1rem;font-weight:700;border:none;border-radius:12px;background:#14b8a6;color:#fff;cursor:pointer">Join Quiz →</button>'
       + '</div>';
     var inp=document.getElementById('qp-name'); if(inp) inp.focus();
@@ -15129,7 +15129,7 @@ window.QUIZ = (function(){
   }
 
   async function joinAndListen(){
-    C().innerHTML=msgCard('⏳ Join ho raha hai...');
+    C().innerHTML=msgCard('⏳ Joining…');
     try{
       var d=await DOC().get();
       player.sessionId = (d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
@@ -15150,12 +15150,12 @@ window.QUIZ = (function(){
 
     if(d.state==='live'){ renderLiveQuestion(d); }
     else if(d.state==='reveal'){ renderReveal(d); }
-    else { C().innerHTML=msgCard('👋 Namaste <b>'+esc(player.name)+'</b>!<br><br>Quiz shuru hone ka intezaar kijiye...'); }
+    else { C().innerHTML=msgCard('👋 Hi <b>'+esc(player.name)+'</b>!<br><br>Waiting for the quiz to start…'); }
   }
 
   function renderLiveQuestion(d){
     if(player.answered){
-      C().innerHTML=msgCard('✅ Aapka jawab lock ho gaya!<br><br>Result ka intezaar kijiye...');
+      C().innerHTML=msgCard('✅ Your answer is locked in!<br><br>Waiting for the result…');
       return;
     }
     var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
@@ -15186,13 +15186,13 @@ window.QUIZ = (function(){
   async function submitAnswer(d, answer){
     if(player.answered) return;
     player.answered=true;
-    C().innerHTML=msgCard('✅ Jawab bhej diya!<br><br>Result ka intezaar kijiye...');
+    C().innerHTML=msgCard('✅ Answer submitted!<br><br>Waiting for the result…');
     try{
       await RESPONSES().doc(player.sessionId+'_'+player.qIndex+'_'+player.id).set({
         playerId:player.id, name:player.name, qIndex:player.qIndex, sessionId:player.sessionId,
         answer:answer, at:firebase.firestore.FieldValue.serverTimestamp()
       });
-    }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Jawab nahi gaya, phir se try kijiye.'); }
+    }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Could not send your answer, please try again.'); }
   }
 
   function ordinal(n){ var s=["th","st","nd","rd"],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
@@ -15201,12 +15201,12 @@ window.QUIZ = (function(){
     var wt = (d.winnerMs!=null) ? '<br><span style="font-size:.8rem;color:#94a3b8">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec me</span>' : '';
     var me=null;
     if(d.results && d.results.length){ for(var i=0;i<d.results.length;i++){ if(d.results[i].id===player.id){ me=d.results[i]; break; } } }
-    var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Aapka time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
+    var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Your time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
 
     // Didn't answer at all
     if(!me){
-      if(d.winnerName) C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>Aapne is baar jawab nahi diya. 😅<br>Agle sawaal me zaroor try kijiye!');
-      else C().innerHTML=msgCard('Is baar koi winner nahi.<br><br>Agle sawaal ke liye taiyaar rahiye!');
+      if(d.winnerName) C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>You did not answer this time. 😅<br>Do try the next one!');
+      else C().innerHTML=msgCard('No winner this time.<br><br>Get ready for the next question!');
       return;
     }
 
@@ -15214,23 +15214,23 @@ window.QUIZ = (function(){
     if(me.correct===false){
       var corrTxt='';
       if(d.revealIndex!=null && d.options && d.options[d.revealIndex]!=null)
-        corrTxt='<br><span style="font-size:.85rem;color:#94a3b8">Sahi jawab: <b style="color:#fff">'+esc(d.options[d.revealIndex])+'</b></span>';
-      C().innerHTML=msgCard('<div style="font-size:2rem">❌</div><b style="font-size:1.2rem">Galat jawab</b>'+corrTxt+myTime+'<br><br>'+(d.winnerName?'🏆 Winner: <b>'+esc(d.winnerName)+'</b>':'')+'<br>Koi baat nahi — agle me try kijiye!');
+        corrTxt='<br><span style="font-size:.85rem;color:#94a3b8">Correct answer: <b style="color:#fff">'+esc(d.options[d.revealIndex])+'</b></span>';
+      C().innerHTML=msgCard('<div style="font-size:2rem">❌</div><b style="font-size:1.2rem">Wrong answer</b>'+corrTxt+myTime+'<br><br>'+(d.winnerName?'🏆 Winner: <b>'+esc(d.winnerName)+'</b>':'')+'<br>No worries — try the next one!');
       return;
     }
 
     // Winner (rank 1)
     if(me.rank===1){
-      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">Aap jeet gaye!</b>'+myTime+'<br><br>'+(d.prize?'🎁 '+esc(d.prize):'Badhai ho!'));
+      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">You won!</b>'+myTime+'<br><br>'+(d.prize?'🎁 '+esc(d.prize):'Congratulations!'));
       return;
     }
 
     // Correct/buzzed but not first — show rank
     var rankTxt = me.rank ? ordinal(me.rank)+' place' : '';
-    var head = (me.correct===true) ? '✅ Sahi jawab!' : '🔔 Aapne buzz kiya!';
+    var head = (me.correct===true) ? '✅ Correct!' : '🔔 You buzzed!';
     C().innerHTML=msgCard('<div style="font-size:1.8rem">👏</div><b style="font-size:1.15rem">'+head+'</b><br>'
-      + '<span style="font-size:1rem;color:#fbbf24">Aap '+esc(rankTxt)+' par rahe</span>'+myTime
-      + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>Thodi der se — next time aap winner!');
+      + '<span style="font-size:1rem;color:#fbbf24">You finished '+esc(rankTxt)+'</span>'+myTime
+      + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>So close — you could be next!');
   }
 
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
@@ -15239,19 +15239,56 @@ window.QUIZ = (function(){
   function openScreen(){ window.open(location.origin+location.pathname+'?screen=1','_blank'); }
   function S(){ return document.getElementById('qs-content'); }
 
+  function injectScreenCSS(){
+    if(document.getElementById('qs-css')) return;
+    var st=document.createElement('style'); st.id='qs-css';
+    st.textContent=[
+      '#quizScreen{background:linear-gradient(135deg,#0b1220,#131c33 40%,#1a1140 100%);background-size:200% 200%;animation:qsBG 18s ease infinite}',
+      '@keyframes qsBG{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}',
+      '.qs-pop{opacity:0;transform:translateY(24px) scale(.96);animation:qsPop .5s cubic-bezier(.2,.9,.3,1.2) forwards}',
+      '@keyframes qsPop{to{opacity:1;transform:none}}',
+      '.qs-qpill{display:inline-block;background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:.5vh 2.4vw;border-radius:99px;font-size:1.8vw;font-weight:800;letter-spacing:.15vw;box-shadow:0 0 30px rgba(139,92,246,.6)}',
+      '.qs-opt{position:relative;display:flex;align-items:center;gap:1.4vw;border-radius:2vh;padding:2.6vh 2vw;font-size:2.7vw;font-weight:800;color:#fff;box-shadow:0 1vh 3vh rgba(0,0,0,.35);overflow:hidden}',
+      '.qs-opt .qs-badge{flex-shrink:0;width:4.6vw;height:4.6vw;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:1.2vh;background:rgba(0,0,0,.25);font-weight:900;font-size:2.6vw}',
+      '.qs-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qs-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qs-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qs-d{background:linear-gradient(135deg,#e0a800,#c08a00)}',
+      '.qs-dim{opacity:.28;filter:grayscale(.7);box-shadow:none}',
+      '.qs-correct{outline:.7vh solid #34d399;box-shadow:0 0 6vh rgba(52,211,153,.75);animation:qsGlow 1s ease-in-out infinite alternate}',
+      '@keyframes qsGlow{to{box-shadow:0 0 9vh rgba(52,211,153,1)}}',
+      '.qs-ring{position:fixed;top:3vh;right:3vw;width:11vh;height:11vh;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .3s}',
+      '.qs-ring-inner{width:8.6vh;height:8.6vh;border-radius:50%;background:#0b1220;display:flex;align-items:center;justify-content:center;font-size:4vh;font-weight:900;color:#fff}',
+      '.qs-low .qs-ring-inner{color:#f87171}.qs-low{animation:qsPulse .6s ease-in-out infinite}',
+      '@keyframes qsPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}',
+      '.qs-winner{background:linear-gradient(135deg,#f59e0b,#fbbf24,#f59e0b);background-size:200% 200%;animation:qsBG 4s ease infinite;color:#3b1d00;border-radius:3vh;padding:4vh 5vw;box-shadow:0 0 10vh rgba(251,191,36,.6)}',
+      '.qs-conf{position:fixed;top:-6vh;font-size:3vh;animation:qsFall linear forwards;pointer-events:none;z-index:5}',
+      '@keyframes qsFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}',
+      '.qs-podium{display:flex;align-items:flex-end;justify-content:center;gap:2vw;margin-top:5vh}',
+      '.qs-pod{border-radius:1.6vh 1.6vh 0 0;padding:2vh 2.4vw;text-align:center;font-weight:800;color:#fff}',
+      '.qs-buzz{font-size:8vw;font-weight:900;text-align:center;background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;animation:qsPulse .7s ease-in-out infinite}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+  function confettiBurst(){
+    var qs=document.getElementById('quizScreen'); if(!qs) return;
+    var emo=['🎉','🎊','⭐','🏆','✨','🎈'];
+    for(var i=0;i<28;i++){ (function(i){ var s=document.createElement('div'); s.className='qs-conf';
+      s.textContent=emo[i%emo.length]; s.style.left=(Math.random()*100)+'vw';
+      s.style.animationDuration=(2.2+Math.random()*2)+'s'; s.style.animationDelay=(Math.random()*.6)+'s';
+      qs.appendChild(s); setTimeout(function(){ s.remove(); },5200); })(i); }
+  }
+
   async function bootScreen(){
     document.getElementById('quizScreen').style.display='block';
+    injectScreenCSS();
     var app=document.getElementById('app'); if(app) app.style.display='none';
     var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
-    try{ document.documentElement.requestFullscreen && S(); }catch(e){}
     await window.waitForFdb(9000);
-    if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Connect nahi ho paaya</div>'; return; }
+    if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Could not connect. Please check the network and refresh.</div>'; return; }
     if(screen.unsubDoc) screen.unsubDoc();
     if(screen.unsubResp) screen.unsubResp();
     screen.unsubDoc = DOC().onSnapshot(function(doc){ if(screen.linkOpen===false){ return; } renderScreen(doc.data()||{}); }, function(){});
     LINKS().onSnapshot(function(d){
       var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false;
-      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} S().innerHTML='<div style="text-align:center"><div style="font-size:6vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz abhi band hai</div></div>'; }
+      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz is currently closed</div></div>'; }
       else { DOC().get().then(function(dd){ renderScreen(dd.data()||{}); }); }
     }, function(){});
     screen.unsubResp = RESPONSES().onSnapshot(function(snap){
@@ -15259,11 +15296,14 @@ window.QUIZ = (function(){
       screen.ansCount=n; var el=document.getElementById('qs-ans-count'); if(el) el.textContent=n;
     }, function(){});
   }
+  function clearTimerRing(){ var w=document.getElementById('qs-ring-wrap'); if(w) w.remove(); }
+
 
   function renderScreen(d){
     screen.sessionId=d.sessionId||screen.sessionId;
     if(d.qIndex!==screen.qIndex){ screen.qIndex=d.qIndex||0; screen.ansCount=0; }
     if(screen.timer){ clearInterval(screen.timer); screen.timer=null; }
+    clearTimerRing();
     if(d.state==='live') screenLive(d);
     else if(d.state==='reveal') screenReveal(d);
     else screenLobby(d);
@@ -15272,94 +15312,102 @@ window.QUIZ = (function(){
   function screenLobby(d){
     var link=joinLink();
     S().innerHTML =
-      '<div style="text-align:center">'
-      + '<div style="font-size:5vw;font-weight:900;margin-bottom:2vh">🎯 D N Investment Quiz</div>'
-      + '<div style="font-size:2.2vw;color:#94a3b8;margin-bottom:4vh">Apne mobile se join kijiye</div>'
-      + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data='+encodeURIComponent(link)+'" style="width:26vh;height:26vh;background:#fff;padding:1.5vh;border-radius:2vh">'
+      '<div style="text-align:center" class="qs-pop">'
+      + '<div style="font-size:5.5vw;font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 D N Investment Quiz</div>'
+      + '<div style="font-size:2.4vw;color:#94a3b8;margin-bottom:4vh">Scan the QR to join from your phone</div>'
+      + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:30vh;height:30vh;background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
       + '<div style="font-size:2vw;margin-top:3vh;color:#e2e8f0">'+esc(link)+'</div>'
+      + '<div style="font-size:1.8vw;margin-top:3vh;color:#64748b">Waiting for the quiz to start…</div>'
       + '</div>';
   }
 
   function screenLive(d){
-    var opts=d.options||[];
+    var opts=d.options||[]; var cls=['qs-a','qs-b','qs-c','qs-d'];
     var optHtml='';
     if(d.type==='buzzer'){
-      optHtml='<div style="font-size:6vw;font-weight:900;color:#ef4444;text-align:center;margin-top:4vh">🔔 BUZZ karo!</div>';
+      optHtml='<div class="qs-buzz" style="margin-top:5vh">🔔 BUZZ NOW!</div>';
     } else {
-      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2vh;margin-top:3vh">';
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:4vh">';
       opts.forEach(function(o,i){
-        optHtml+='<div style="background:rgba(255,255,255,.08);border:0.4vh solid rgba(255,255,255,.15);border-radius:1.6vh;padding:2.4vh;font-size:2.6vw;font-weight:700">'
-              + '<span style="color:#14b8a6;margin-right:1vw">'+String.fromCharCode(65+i)+'.</span>'+esc(o)+'</div>';
+        optHtml+='<div class="qs-opt '+cls[i]+' qs-pop" style="animation-delay:'+(0.1+i*0.09)+'s">'
+              + '<span class="qs-badge">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+'</span></div>';
       });
       optHtml+='</div>';
     }
-    var prize=d.prize?'<div style="font-size:2.2vw;color:#fbbf24;text-align:center;margin-bottom:2vh">🎁 '+esc(d.prize)+'</div>':'';
+    var prize=d.prize?'<div style="font-size:2.2vw;color:#fbbf24;text-align:center;margin-bottom:1.5vh;font-weight:700">🎁 '+esc(d.prize)+'</div>':'';
     S().innerHTML =
-      '<div>'
-      + '<div style="text-align:center;font-size:1.8vw;color:#94a3b8;margin-bottom:1vh">Q'+(d.qIndex||'')+'</div>'
+      '<div class="qs-pop">'
+      + '<div style="text-align:center;margin-bottom:2vh"><span class="qs-qpill">QUESTION '+(d.qIndex||'')+'</span></div>'
       + prize
-      + '<div style="font-size:4vw;font-weight:800;text-align:center;line-height:1.25">'+esc(d.question)+'</div>'
+      + '<div style="font-size:4.4vw;font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
       + optHtml
-      + '<div style="text-align:center;font-size:2vw;margin-top:4vh;color:#cbd5e1">👥 <b id="qs-ans-count">'+screen.ansCount+'</b> ne jawab diya</div>'
+      + '<div style="text-align:center;font-size:2.1vw;margin-top:4.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> answered</div>'
       + '</div>';
-    // countdown timer
+    // countdown ring
     if(d.timeSec && d.startedAt){
-      var endAt = d.startedAt + d.timeSec*1000;
-      var tick=function(){
-        var rem=Math.max(0,Math.ceil((endAt-Date.now())/1000));
-        var t=document.getElementById('qs-timer'); if(t) t.textContent=rem;
-        if(rem<=0 && screen.timer){ clearInterval(screen.timer); screen.timer=null; }
-      };
-      // (timer number shown small at corner)
-      var wrap=document.createElement('div');
-      wrap.style.cssText='position:absolute;top:3vh;right:4vw;font-size:4vw;font-weight:900;color:#f59e0b';
-      wrap.innerHTML='<span id="qs-timer">'+d.timeSec+'</span>s';
+      var endAt = d.startedAt + d.timeSec*1000, total=d.timeSec;
+      var wrap=document.createElement('div'); wrap.id='qs-ring-wrap';
+      wrap.innerHTML='<div class="qs-ring" id="qs-ring" style="background:conic-gradient(#f59e0b 100%, rgba(255,255,255,.12) 0)"><div class="qs-ring-inner"><span id="qs-timer">'+total+'</span></div></div>';
       document.getElementById('quizScreen').appendChild(wrap);
-      screen.timer=setInterval(tick,300); tick();
+      var tick=function(){
+        var remMs=Math.max(0,endAt-Date.now());
+        var rem=Math.ceil(remMs/1000);
+        var pct=Math.max(0,Math.min(100,(remMs/(total*1000))*100));
+        var t=document.getElementById('qs-timer'); if(t) t.textContent=rem;
+        var ring=document.getElementById('qs-ring');
+        if(ring){
+          var col = rem<=5 ? '#ef4444' : (rem<=10 ? '#f59e0b' : '#34d399');
+          ring.style.background='conic-gradient('+col+' '+pct+'%, rgba(255,255,255,.12) 0)';
+          ring.classList.toggle('qs-low', rem<=5);
+        }
+        if(remMs<=0 && screen.timer){ clearInterval(screen.timer); screen.timer=null; }
+      };
+      screen.timer=setInterval(tick,200); tick();
     }
   }
 
   function screenReveal(d){
-    // remove any leftover timer badge
-    var qs=document.getElementById('quizScreen');
-    Array.prototype.forEach.call(qs.querySelectorAll('div[style*="position:absolute"]'),function(el){ el.remove(); });
-    var opts=d.options||[]; var ci=d.revealIndex;
+    clearTimerRing();
+    var opts=d.options||[]; var ci=d.revealIndex; var cls=['qs-a','qs-b','qs-c','qs-d'];
     var optHtml='';
     if(d.type!=='buzzer' && opts.length){
-      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2vh;margin-top:3vh">';
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:3vh">';
       opts.forEach(function(o,i){
         var ok=(i===ci);
-        optHtml+='<div style="background:'+(ok?'#16a34a':'rgba(255,255,255,.06)')+';border-radius:1.6vh;padding:2.4vh;font-size:2.6vw;font-weight:700;opacity:'+(ok?'1':'.45')+'">'
-              + '<span style="margin-right:1vw">'+String.fromCharCode(65+i)+'.</span>'+esc(o)+(ok?' ✅':'')+'</div>';
+        optHtml+='<div class="qs-opt '+cls[i]+(ok?' qs-correct':' qs-dim')+'">'
+              + '<span class="qs-badge">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+(ok?' ✅':'')+'</span></div>';
       });
       optHtml+='</div>';
     }
-    // top 3
     var top='';
     if(d.results && d.results.length){
       var ranked=d.results.filter(function(r){ return r.rank; }).sort(function(a,b){ return a.rank-b.rank; }).slice(0,3);
       if(ranked.length){
-        var medals=['🥇','🥈','🥉'];
-        top='<div style="margin-top:4vh;display:flex;justify-content:center;gap:2vw;flex-wrap:wrap">';
+        var medals=['🥇','🥈','🥉']; var h=['16vh','12vh','9vh']; var bg=['linear-gradient(135deg,#fbbf24,#f59e0b)','linear-gradient(135deg,#cbd5e1,#94a3b8)','linear-gradient(135deg,#d9955b,#b06e35)'];
+        top='<div class="qs-podium">';
         ranked.forEach(function(r,i){
-          top+='<div style="background:rgba(255,255,255,.08);border-radius:1.4vh;padding:1.6vh 2.2vw;font-size:2vw">'
-             + medals[i]+' <b>'+esc(r.name)+'</b>'+(r.ms!=null?' <span style="color:#94a3b8;font-size:1.5vw">'+(r.ms/1000).toFixed(2)+'s</span>':'')+'</div>';
+          top+='<div class="qs-pod qs-pop" style="background:'+bg[i]+';height:'+h[i]+';min-width:14vw;animation-delay:'+(0.2+i*0.15)+'s">'
+             + '<div style="font-size:3vw">'+medals[i]+'</div>'
+             + '<div style="font-size:2vw">'+esc(r.name)+'</div>'
+             + (r.ms!=null?'<div style="font-size:1.4vw;opacity:.8">'+(r.ms/1000).toFixed(2)+'s</div>':'')+'</div>';
         });
         top+='</div>';
       }
     }
     var winnerBlock = d.winnerName
-      ? '<div style="text-align:center;margin-top:4vh"><div style="font-size:2.4vw;color:#94a3b8">🏆 Winner</div>'
-        + '<div style="font-size:6vw;font-weight:900;color:#fbbf24">'+esc(d.winnerName)+'</div>'
-        + (d.winnerMs!=null?'<div style="font-size:2vw;color:#cbd5e1">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec me</div>':'')
-        + (d.prize?'<div style="font-size:2.4vw;color:#14b8a6;margin-top:1vh">🎁 '+esc(d.prize)+'</div>':'')
-        + '</div>'
-      : '<div style="text-align:center;margin-top:4vh;font-size:3vw;color:#94a3b8">Is baar koi winner nahi</div>';
+      ? '<div style="text-align:center;margin-top:4vh"><div class="qs-winner qs-pop" style="display:inline-block">'
+        + '<div style="font-size:2.2vw;font-weight:800;opacity:.85">🏆 WINNER</div>'
+        + '<div style="font-size:6.5vw;font-weight:900;line-height:1.1">'+esc(d.winnerName)+'</div>'
+        + (d.winnerMs!=null?'<div style="font-size:2vw;opacity:.85">⏱️ in '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
+        + (d.prize?'<div style="font-size:2.4vw;font-weight:800;margin-top:1vh">🎁 '+esc(d.prize)+'</div>':'')
+        + '</div></div>'
+      : '<div style="text-align:center;margin-top:4vh;font-size:3vw;color:#94a3b8">No winner this time</div>';
     S().innerHTML =
-      '<div>'
-      + (d.question?'<div style="font-size:3vw;font-weight:800;text-align:center;line-height:1.25">'+esc(d.question)+'</div>':'')
+      '<div class="qs-pop">'
+      + (d.question?'<div style="font-size:3.2vw;font-weight:800;text-align:center;line-height:1.2">'+esc(d.question)+'</div>':'')
       + optHtml + winnerBlock + top
       + '</div>';
+    if(d.winnerName) confettiBurst();
   }
 
   // ─────────── LINK OPEN/CLOSE (admin) ───────────
@@ -15386,16 +15434,16 @@ window.QUIZ = (function(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     var key = which==='feedback' ? 'feedbackOpen' : 'quizOpen';
     var next = which==='feedback' ? !linksState.feedbackOpen : !linksState.quizOpen;
-    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' link band karein? Client ko "band hai" dikhega.')) return;
+    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' link? Clients will see "closed".')) return;
     var upd={}; upd[key]=next;
-    try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update fail: '+e.message); }
+    try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update failed: '+e.message); }
   }
 
   function closedCard(what){
     return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:30px;text-align:center">'
       + '<div style="font-size:2.4rem;margin-bottom:10px">🔒</div>'
-      + '<b style="font-size:1.2rem">'+what+' abhi band hai</b><br><br>'
-      + '<span style="color:#94a3b8;font-size:.9rem">Seminar ke samay ye link chaalu hoga. Dhanyawaad! 🙏</span></div>';
+      + '<b style="font-size:1.2rem">'+what+' is currently closed</b><br><br>'
+      + '<span style="color:#94a3b8;font-size:.9rem">This link opens during the seminar. Thank you! 🙏</span></div>';
   }
 
   // boot: play / screen mode run immediately; host inits when its page opens
