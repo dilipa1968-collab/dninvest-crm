@@ -1084,7 +1084,10 @@ input:focus, select:focus, textarea:focus{
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
               <div style="font-weight:700;font-size:.95rem">📊 Live results</div>
-              <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-outline" style="padding:6px 10px;font-size:.8rem" onclick="QUIZ.clearResults()">🧹 Clear Results</button>
+                <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
+              </div>
             </div>
             <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">Koi question live nahi hai.</div>
             <div id="quiz-results"></div>
@@ -14981,10 +14984,25 @@ window.QUIZ = (function(){
     }catch(e){ alert('Launch fail hua: '+e.message); }
   }
 
+  async function clearResults(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{
+      // delete this question's responses so results box truly empties
+      var rs=await RESPONSES().get();
+      var batch=window.fdb.batch(); var cnt=0;
+      rs.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===host.sessionId){ batch.delete(d.ref); cnt++; } });
+      if(cnt) await batch.commit();
+      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true});
+    }catch(e){}
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Koi question live nahi hai.';
+    var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
+  }
+
   async function closeQuestion(){
     await window.waitForFdb(8000); if(!window.fdb) return;
-    try{ await DOC().set({ state:'lobby' }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Koi question live nahi hai.';
+    var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
 
   async function reveal(){
@@ -15031,7 +15049,7 @@ window.QUIZ = (function(){
       var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
     }catch(e){}
     host.sessionId='s'+Date.now(); host.qIndex=0;
-    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, revealIndex:null }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='Naya quiz taiyaar. Players ko join karaiye.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -15192,7 +15210,7 @@ window.QUIZ = (function(){
   return {
     isPlayMode:isPlayMode, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, pushQuestion:pushQuestion,
-    closeQuestion:closeQuestion, reveal:reveal, newSession:newSession, copyLink:copyLink
+    closeQuestion:closeQuestion, reveal:reveal, clearResults:clearResults, newSession:newSession, copyLink:copyLink
   };
 })();
 QUIZ.boot();
