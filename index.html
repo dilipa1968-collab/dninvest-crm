@@ -15366,7 +15366,7 @@ window.QUIZ = (function(){
   var lcUnsub=null;
   async function initLinkControl(){
     var panel=document.getElementById('link-control'); if(!panel) return;
-    if(!(window.CU && window.CU.role==='admin')){ panel.style.display='none'; return; }
+    if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ panel.style.display='none'; return; }
     panel.style.display='flex';
     await window.waitForFdb(8000); if(!window.fdb) return;
     if(lcUnsub) lcUnsub();
