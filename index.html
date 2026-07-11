@@ -1041,6 +1041,16 @@ input:focus, select:focus, textarea:focus{
             <button class="btn btn-teal" onclick="openAddSeminar()">+ Add Seminar</button>
           </div>
         </div>
+        <div id="link-control" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;flex-wrap:wrap;gap:14px;align-items:center">
+          <span style="font-weight:700;font-size:.9rem">🔗 Link Control</span>
+          <span style="font-size:.78rem;color:var(--gray)">Seminar na ho to links band rakhein — client ko "band hai" dikhega.</span>
+          <div style="display:flex;gap:14px;align-items:center;margin-left:auto;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:600">📋 Feedback:
+              <button id="lc-feedback" class="btn" style="padding:5px 14px;font-size:.8rem" onclick="QUIZ.toggleLink('feedback')">...</button></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:600">🎯 Quiz:
+              <button id="lc-quiz" class="btn" style="padding:5px 14px;font-size:.8rem" onclick="QUIZ.toggleLink('quiz')">...</button></label>
+          </div>
+        </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="seminars-table"></div></div>
       </div>
 
@@ -3709,7 +3719,7 @@ function showPage(id){
   if(id==='eq-clients') renderEqTable();
   else if(id==='mf-clients') renderMfTable();
   else if(id==='leads') renderLeadsTable();
-  else if(id==='seminars') renderSeminarsTable();
+  else if(id==='seminars'){ renderSeminarsTable(); if(typeof QUIZ!=='undefined') QUIZ.initLinkControl(); }
   else if(id==='seminar-quiz'){ if(typeof QUIZ!=='undefined') QUIZ.hostInit(); }
   else if(id==='eq-followup'){ renderFollowup('eqf'); }
   else if(id==='mf-followup'){ renderFollowup('mff'); }
@@ -14811,6 +14821,8 @@ window.QUIZ = (function(){
   var DOC = function(){ return window.fdb.collection('quiz').doc('live'); };
   var PLAYERS = function(){ return DOC().collection('players'); };
   var RESPONSES = function(){ return DOC().collection('responses'); };
+  var LINKS = function(){ return window.fdb.collection('app_settings').doc('links'); };
+  var linksState = { feedbackOpen:true, quizOpen:true };
   var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
 
   // host-only working memory (correct answer never leaves the host until reveal)
@@ -15086,7 +15098,14 @@ window.QUIZ = (function(){
     player.id = localStorage.getItem('dnquiz_pid') || ('p'+Date.now()+Math.floor(Math.random()*9999));
     localStorage.setItem('dnquiz_pid', player.id);
     player.name = localStorage.getItem('dnquiz_name') || '';
-    if(player.name){ await joinAndListen(); } else { renderNameForm(); }
+    player.linkOpen = true; player.started = false;
+    // watch open/close flag first
+    LINKS().onSnapshot(function(d){
+      var v=d.data()||{};
+      player.linkOpen = v.quizOpen!==false;
+      if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
+      if(!player.started){ player.started=true; if(player.name){ joinAndListen(); } else { renderNameForm(); } }
+    }, function(){ if(!player.started){ player.started=true; if(player.name){ joinAndListen(); } else { renderNameForm(); } } });
   }
 
   function msgCard(html){
@@ -15121,6 +15140,7 @@ window.QUIZ = (function(){
   }
 
   function renderPlayerState(d){
+    if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
     // session changed by host reset → rejoin under new session
     if(d.sessionId && d.sessionId!==player.sessionId){
       player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
@@ -15214,7 +15234,7 @@ window.QUIZ = (function(){
   }
 
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
-  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, timer:null, ansCount:0 };
+  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, timer:null, ansCount:0, linkOpen:true };
   function isScreenMode(){ try{ return new URLSearchParams(location.search).has('screen'); }catch(e){ return false; } }
   function openScreen(){ window.open(location.origin+location.pathname+'?screen=1','_blank'); }
   function S(){ return document.getElementById('qs-content'); }
@@ -15228,7 +15248,12 @@ window.QUIZ = (function(){
     if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Connect nahi ho paaya</div>'; return; }
     if(screen.unsubDoc) screen.unsubDoc();
     if(screen.unsubResp) screen.unsubResp();
-    screen.unsubDoc = DOC().onSnapshot(function(doc){ renderScreen(doc.data()||{}); }, function(){});
+    screen.unsubDoc = DOC().onSnapshot(function(doc){ if(screen.linkOpen===false){ return; } renderScreen(doc.data()||{}); }, function(){});
+    LINKS().onSnapshot(function(d){
+      var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false;
+      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} S().innerHTML='<div style="text-align:center"><div style="font-size:6vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz abhi band hai</div></div>'; }
+      else { DOC().get().then(function(dd){ renderScreen(dd.data()||{}); }); }
+    }, function(){});
     screen.unsubResp = RESPONSES().onSnapshot(function(snap){
       var n=0; snap.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===screen.sessionId && (r.qIndex||0)===screen.qIndex) n++; });
       screen.ansCount=n; var el=document.getElementById('qs-ans-count'); if(el) el.textContent=n;
@@ -15337,13 +15362,50 @@ window.QUIZ = (function(){
       + '</div>';
   }
 
+  // ─────────── LINK OPEN/CLOSE (admin) ───────────
+  var lcUnsub=null;
+  async function initLinkControl(){
+    var panel=document.getElementById('link-control'); if(!panel) return;
+    if(!(window.CU && window.CU.role==='admin')){ panel.style.display='none'; return; }
+    panel.style.display='flex';
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    if(lcUnsub) lcUnsub();
+    lcUnsub = LINKS().onSnapshot(function(d){
+      var v=d.data()||{};
+      linksState.feedbackOpen = v.feedbackOpen!==false;
+      linksState.quizOpen = v.quizOpen!==false;
+      paintLinkButtons();
+    }, function(){ paintLinkButtons(); });
+  }
+  function paintLinkButtons(){
+    var fb=document.getElementById('lc-feedback'), qz=document.getElementById('lc-quiz');
+    if(fb){ var o=linksState.feedbackOpen; fb.textContent=o?'🟢 OPEN':'🔴 CLOSED'; fb.style.background=o?'#16a34a':'#dc2626'; fb.style.color='#fff'; }
+    if(qz){ var o2=linksState.quizOpen; qz.textContent=o2?'🟢 OPEN':'🔴 CLOSED'; qz.style.background=o2?'#16a34a':'#dc2626'; qz.style.color='#fff'; }
+  }
+  async function toggleLink(which){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var key = which==='feedback' ? 'feedbackOpen' : 'quizOpen';
+    var next = which==='feedback' ? !linksState.feedbackOpen : !linksState.quizOpen;
+    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' link band karein? Client ko "band hai" dikhega.')) return;
+    var upd={}; upd[key]=next;
+    try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update fail: '+e.message); }
+  }
+
+  function closedCard(what){
+    return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:30px;text-align:center">'
+      + '<div style="font-size:2.4rem;margin-bottom:10px">🔒</div>'
+      + '<b style="font-size:1.2rem">'+what+' abhi band hai</b><br><br>'
+      + '<span style="color:#94a3b8;font-size:.9rem">Seminar ke samay ye link chaalu hoga. Dhanyawaad! 🙏</span></div>';
+  }
+
   // boot: play / screen mode run immediately; host inits when its page opens
   function boot(){ if(isPlayMode()) bootPlayer(); else if(isScreenMode()) bootScreen(); }
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, pushQuestion:pushQuestion,
-    closeQuestion:closeQuestion, reveal:reveal, clearResults:clearResults, newSession:newSession, copyLink:copyLink
+    closeQuestion:closeQuestion, reveal:reveal, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
+    toggleLink:toggleLink, initLinkControl:initLinkControl
   };
 })();
 QUIZ.boot();
