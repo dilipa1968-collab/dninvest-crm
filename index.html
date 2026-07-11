@@ -14822,6 +14822,7 @@ window.QUIZ = (function(){
   var PLAYERS = function(){ return DOC().collection('players'); };
   var RESPONSES = function(){ return DOC().collection('responses'); };
   var LINKS = function(){ return window.fdb.collection('app_settings').doc('links'); };
+  var ANSWERKEY = function(){ return window.fdb.collection('quiz').doc('answerkey'); };
   var linksState = { feedbackOpen:true, quizOpen:true };
   var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
 
@@ -14999,6 +15000,8 @@ window.QUIZ = (function(){
       var d=await DOC().get();
       if(d.exists && d.data() && d.data().startedAtServer && d.data().startedAtServer.toMillis)
         host.startedAtServerMs=d.data().startedAtServer.toMillis();
+      // store correct answer in a SEPARATE doc (players never read it) so reveal is reload-proof
+      try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs }); }catch(e){}
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
       var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting for answers…</div>';
@@ -15029,6 +15032,16 @@ window.QUIZ = (function(){
   async function reveal(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     try{
+      // recover the correct answer + timing from the answer-key doc (reload-proof)
+      try{
+        var ak=await ANSWERKEY().get();
+        if(ak.exists){ var a=ak.data()||{};
+          if((a.sessionId||'')===host.sessionId && (a.qIndex||0)===host.qIndex){
+            host.correctIndex=a.correctIndex; host.type=a.type||host.type;
+            if(a.startedAtServerMs) host.startedAtServerMs=a.startedAtServerMs;
+          }
+        }
+      }catch(e){}
       var snap=await RESPONSES().orderBy('at').get();
       var rows=[];
       snap.forEach(function(doc){ var r=doc.data(); if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r); });
@@ -15055,9 +15068,10 @@ window.QUIZ = (function(){
       }, {merge:true});
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
+      var cnt = ' · '+rows.length+' response'+(rows.length===1?'':'s');
       if(st) st.innerHTML = winner
-        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (first correct answer)':' (first to buzz)')+tt
-        : 'No one answered correctly.';
+        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (first correct answer)':' (first to buzz)')+tt+cnt
+        : (rows.length? 'No correct answer — '+rows.length+' response'+(rows.length===1?'':'s')+' received.' : 'No responses received. Ask players to answer before Reveal.');
     }catch(e){ alert('Reveal fail: '+e.message); }
   }
 
