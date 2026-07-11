@@ -337,8 +337,8 @@ tbody tr:hover{background:var(--blue2)!important;}
 
 /* ── SQUARE-OFF (T+5) — premium navy/gold themed table ── */
 #sq-table{font-size:.83rem;border-collapse:separate;border-spacing:0;}
-#sq-table thead th{font-size:.82rem;padding:12px 14px;vertical-align:top;white-space:normal;color:#fff;font-weight:800;}
-#sq-table tbody td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #eef1f6;}
+#sq-table thead th{font-size:.8rem;padding:8px 12px;vertical-align:top;white-space:normal;color:#fff;font-weight:800;}
+#sq-table tbody td{padding:6px 14px;vertical-align:middle;border-bottom:1px solid #eef1f6;}
 #sq-table tbody tr{transition:background .15s;}
 #sq-table tbody tr:hover{background:#f8fafc!important;}
 .sq-code{color:#334155;font-size:.82rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
@@ -352,8 +352,8 @@ tbody tr:hover{background:var(--blue2)!important;}
 .sq-date-pill{display:inline-flex;align-items:center;gap:6px;font-weight:800;letter-spacing:.5px;font-size:.88rem;
   text-transform:uppercase;color:#e2e8f0;}
 .sq-date-dot{width:7px;height:7px;border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(255,255,255,.08);}
-.sq-stat-strip{display:flex;flex-wrap:wrap;gap:12px;padding:14px 16px 4px;margin:0;}
-.sq-stat-chip{background:linear-gradient(180deg,#fff,#fafbfe);border:1px solid #e8ecf3;border-radius:10px;padding:10px 18px;
+.sq-stat-strip{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px 3px;margin:0;}
+.sq-stat-chip{background:linear-gradient(180deg,#fff,#fafbfe);border:1px solid #e8ecf3;border-radius:10px;padding:6px 16px;
   box-shadow:0 1px 2px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:2px;min-width:130px;position:relative;}
 .sq-stat-chip::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0;background:var(--chip-accent,#132039);}
 .sq-stat-chip .n{font-size:1.08rem;font-weight:800;font-variant-numeric:tabular-nums;color:#132039;letter-spacing:.2px;}
@@ -8695,11 +8695,11 @@ function renderSquareoff(){
     const isToday=dk===todayStr;
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
-    html+=`<th style="min-width:160px;padding-top:12px;padding-bottom:12px;text-align:center;
+    html+=`<th style="min-width:160px;padding-top:8px;padding-bottom:8px;text-align:center;
         box-shadow:inset 0 3px 0 ${dateColor[dk]}">
       <div class="sq-date-pill" style="justify-content:center;color:#fff"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · AAJ':''}</div>
-      <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:5px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
-      <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:2px;text-align:center">${dCount} clients</div>
+      <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:2px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
+      <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:1px;text-align:center">${dCount} clients</div>
     </th>`;
   });
   html+='</tr></thead><tbody>';
