@@ -3323,6 +3323,26 @@ function initApp(){
         });
       });
 
+      // Real-time listener for eq_risk (Broker RMS Risk Val / Ac Bal).
+      // Stored in Firestore as a COMPACT payload {codeJson:string, updated, count}
+      // to dodge the 40K-index-entries-per-doc limit — rehydrate back to the
+      // normal {code:{...}, updated, count} shape before caching, same as the
+      // initial load does, so getEqRisk()/eqRiskFor() need no changes.
+      fdb.collection('crm_data').doc('eq_risk').onSnapshot(doc=>{
+        if(!(doc.exists && doc.data() && doc.data().data)) return;
+        const d = doc.data().data;
+        let codeObj={};
+        if(d && typeof d.codeJson==='string'){ try{ codeObj=JSON.parse(d.codeJson)||{}; }catch(_){ codeObj={}; } }
+        else if(d && d.code && typeof d.code==='object'){ codeObj=d.code; }
+        const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
+        const existingRaw = localStorage.getItem('dninvest_eq_risk');
+        if(existingRaw===JSON.stringify(norm)) return; // no real change
+        localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
+        console.log('Real-time update: eq_risk (compact,', norm.count, 'clients)');
+        if(typeof clearEqRiskCache==='function') clearEqRiskCache();
+        if(getCurrentPageId()==='eq-clients' && typeof renderEqTable==='function') renderEqTable();
+      });
+
       // Real-time listeners for eq_clients/mf_clients arrays.
       // Skip updates that originate from this client's own pending (unconfirmed)
       // write, AND skip while a setClient/deleteClient/setClientsBulk write is
