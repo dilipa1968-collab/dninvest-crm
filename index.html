@@ -2736,6 +2736,17 @@ function canUploadSquareoff(){ return !!(CU && (CU.role==='admin' || CU.role==='
 let PG_SIZE = 50;
 let eqPage=1, mfPage=1, leadsPage=1;
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
+// Restore column-sort state after page reload (app auto-reloads every 30 min),
+// so the user's chosen sort (e.g. Name) is not lost on the auto-refresh.
+try{
+  const _ss=JSON.parse(localStorage.getItem('dninvest_sort_state')||'{}');
+  if(_ss.eqField!==undefined && _ss.eqField!==null){ eqSortField=_ss.eqField; eqSortDir=_ss.eqDir||1; }
+  if(_ss.mfField!==undefined && _ss.mfField!==null){ mfSortField=_ss.mfField; mfSortDir=_ss.mfDir||1; }
+  if(_ss.leadsField!==undefined && _ss.leadsField!==null){ leadsSortField=_ss.leadsField; leadsSortDir=_ss.leadsDir||1; }
+}catch(e){}
+function _saveSortState(){
+  try{ localStorage.setItem('dninvest_sort_state', JSON.stringify({eqField:eqSortField,eqDir:eqSortDir,mfField:mfSortField,mfDir:mfSortDir,leadsField:leadsSortField,leadsDir:leadsSortDir})); }catch(e){}
+}
 let eqFiltered=[], mfFiltered=[], leadsFiltered=[];
 let currentCallTarget = null;
 let currentEditId = null;
@@ -4044,6 +4055,7 @@ function sortEqTable(colIndex){
   if(eqSortField===colIndex) eqSortDir = -eqSortDir;
   else { eqSortField=colIndex; eqSortDir=1; }
   eqPage=1;
+  _saveSortState();
   renderEqTable();
 }
 
@@ -4358,6 +4370,7 @@ function sortMfTable(colIndex){
   if(mfSortField===colIndex) mfSortDir = -mfSortDir;
   else { mfSortField=colIndex; mfSortDir=1; }
   mfPage=1;
+  _saveSortState();
   renderMfTable();
 }
 
@@ -4494,6 +4507,7 @@ function filterLeads(){ leadsPage=1; renderLeadsTable(); }
 function sortLeadsTable(colIndex){
   if(leadsSortField===colIndex) leadsSortDir=-leadsSortDir;
   else { leadsSortField=colIndex; leadsSortDir=1; }
+  _saveSortState();
   renderLeadsTable();
 }
 
