@@ -15381,44 +15381,48 @@ window.QUIZ = (function(){
 
   function screenReveal(d){
     clearTimerRing();
-    var opts=d.options||[]; var ci=d.revealIndex;
-    // compact "correct answer" line (instead of full option grid, so winner stays centered)
-    var correctLine='';
-    if(d.type!=='buzzer' && opts.length && ci!=null && opts[ci]!=null){
-      correctLine='<div class="qs-pop" style="text-align:center;margin-top:2.5vh">'
-        + '<span style="display:inline-flex;align-items:center;gap:1vw;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:1.6vh;padding:1.8vh 3vw;font-size:2.8vw;font-weight:900;box-shadow:0 0 6vh rgba(34,197,94,.5)">'
-        + '✅ '+String.fromCharCode(65+ci)+'. '+esc(opts[ci])+'</span></div>';
+    var opts=d.options||[]; var ci=d.revealIndex; var cls=['qs-a','qs-b','qs-c','qs-d'];
+    // full option grid (compact) — correct glows green, others dimmed
+    var optHtml='';
+    if(d.type!=='buzzer' && opts.length){
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.6vh;margin-top:2vh">';
+      opts.forEach(function(o,i){
+        var ok=(i===ci);
+        optHtml+='<div class="qs-opt '+cls[i]+(ok?' qs-correct':' qs-dim')+'" style="padding:1.7vh 1.6vw;font-size:2.2vw">'
+              + '<span class="qs-badge" style="width:3.6vw;height:3.6vw;font-size:2vw">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+(ok?' ✅':'')+'</span></div>';
+      });
+      optHtml+='</div>';
     }
-    // podium ONLY when 2 or more ranked players
+    // winner card (name + seconds)
+    var winnerBlock = d.winnerName
+      ? '<div style="text-align:center;margin-top:2.6vh"><div class="qs-winner qs-pop" style="display:inline-block;padding:2.4vh 4vw">'
+        + '<div style="font-size:2vw;font-weight:900;opacity:.9">🏆 WINNER</div>'
+        + '<div style="font-size:4.6vw;font-weight:900;line-height:1.05">'+esc(d.winnerName)+'</div>'
+        + (d.winnerMs!=null?'<div style="font-size:1.9vw;font-weight:800;opacity:.85">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
+        + (d.prize?'<div style="font-size:2vw;font-weight:900;margin-top:.4vh">🎁 '+esc(d.prize)+'</div>':'')
+        + '</div></div>'
+      : '<div style="text-align:center;margin-top:2.6vh;font-size:2.6vw;color:#94a3b8;font-weight:800">🙌 No correct answer this time</div>';
+    // 2nd / 3rd place row (when available)
     var top='';
     if(d.results && d.results.length){
       var ranked=d.results.filter(function(r){ return r.rank; }).sort(function(a,b){ return a.rank-b.rank; }).slice(0,3);
-      if(ranked.length>=2){
-        var medals=['🥇','🥈','🥉']; var hh=['15vh','11.5vh','9vh']; var bg=['linear-gradient(135deg,#fbbf24,#f59e0b)','linear-gradient(135deg,#cbd5e1,#94a3b8)','linear-gradient(135deg,#d9955b,#b06e35)'];
-        var order=[1,0,2];
-        top='<div class="qs-podium">';
-        order.forEach(function(pos){ var r=ranked[pos]; if(!r) return;
-          top+='<div class="qs-pod qs-pop" style="background:'+bg[pos]+';height:'+hh[pos]+';min-width:13vw;animation-delay:'+(0.2+pos*0.12)+'s;color:#3b1d00">'
-             + '<div style="font-size:2.8vw">'+medals[pos]+'</div>'
-             + '<div style="font-size:1.9vw;font-weight:900">'+esc(r.name)+'</div>'
-             + (r.ms!=null?'<div style="font-size:1.3vw;opacity:.85">'+(r.ms/1000).toFixed(2)+'s</div>':'')+'</div>';
+      var rest=ranked.filter(function(r){ return r.rank>=2; });
+      if(rest.length){
+        var medals={2:'🥈',3:'🥉'};
+        top='<div style="display:flex;justify-content:center;gap:1.6vw;margin-top:2vh;flex-wrap:wrap">';
+        rest.forEach(function(r){
+          top+='<div class="qs-pop" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:1.2vh;padding:1vh 2vw;font-size:1.8vw;font-weight:700">'
+             + (medals[r.rank]||('#'+r.rank))+' '+esc(r.name)
+             + (r.ms!=null?' <span style="color:#94a3b8;font-size:1.4vw">'+(r.ms/1000).toFixed(2)+'s</span>':'')+'</div>';
         });
         top+='</div>';
       }
     }
-    var winnerBlock = d.winnerName
-      ? '<div style="text-align:center;margin-top:3.5vh"><div class="qs-winner qs-pop" style="display:inline-block">'
-        + '<div style="font-size:2.6vw;font-weight:900;opacity:.9">🏆 WINNER</div>'
-        + '<div style="font-size:7vw;font-weight:900;line-height:1.05">'+esc(d.winnerName)+'</div>'
-        + (d.winnerMs!=null?'<div style="font-size:2.1vw;font-weight:800;opacity:.85">⏱️ in '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
-        + (d.prize?'<div style="font-size:2.6vw;font-weight:900;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
-        + '</div></div>'
-      : '<div style="text-align:center;margin-top:3.5vh;font-size:3vw;color:#94a3b8;font-weight:800">🙌 No correct answer this time</div>';
     S().innerHTML =
       '<div class="qs-pop">'
       + screenHeader('reveal')
-      + (d.question?'<div style="font-size:2.6vw;font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
-      + correctLine + winnerBlock + top
+      + (d.question?'<div style="font-size:2.4vw;font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
+      + optHtml + winnerBlock + top
       + '</div>';
     if(d.winnerName) confettiBurst();
   }
