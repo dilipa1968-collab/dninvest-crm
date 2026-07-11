@@ -1073,6 +1073,7 @@ input:focus, select:focus, textarea:focus{
               <div style="font-weight:700;font-size:.95rem">➕ Question Bank (5) — pehle bhar lijiye, seminar me sirf "Push" dabaiye</div>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
               </div>
             </div>
@@ -14936,6 +14937,11 @@ window.QUIZ = (function(){
     try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}
     alert('5 sawaal save ho gaye. Ab jab chaahein "Push" dabaiye.');
   }
+  function clearBank(){
+    if(!confirm('Saare 5 sawaal khaali kar dein?')) return;
+    try{ localStorage.removeItem(BANK_KEY); }catch(e){}
+    renderBank();
+  }
   async function pushQuestion(n){
     saveBankSilent();
     var q=readBankRow(n);
@@ -15185,7 +15191,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, newSession:newSession, copyLink:copyLink
   };
 })();
