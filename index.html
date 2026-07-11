@@ -892,9 +892,6 @@ input:focus, select:focus, textarea:focus{
         <span class="icon">🎤</span> Seminars
         <span class="nav-badge" id="nb-seminars">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('seminar-quiz')" id="nav-seminar-quiz">
-        <span class="icon">🎯</span> Seminar Quiz
-      </div>
 
       <div class="sidebar-section" id="eq-nav-section">Equity</div>
       <div class="nav-item" onclick="showPage('eq-clients')" id="nav-eq-clients">
@@ -1052,6 +1049,7 @@ input:focus, select:focus, textarea:focus{
         <div class="page-hdr">
           <div class="page-title">🎯 Seminar Quiz <span style="font-size:.7rem;color:var(--gray);font-weight:500">— Live buzzer / MCQ for clients</span></div>
           <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="showPage('seminars')">← Seminars</button>
             <button class="btn btn-outline" onclick="QUIZ.newSession()" title="Naya quiz — players & jawab reset">🔄 Reset / New Quiz</button>
           </div>
         </div>
@@ -1952,6 +1950,7 @@ input:focus, select:focus, textarea:focus{
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" onclick="shareFeedbackLink()" style="color:#25D366;border-color:#25D366">💬 Feedback Link</button>
           <button class="btn btn-outline" onclick="openSeminarFeedback()" style="color:#673ab7;border-color:#673ab7">📋 Feedback</button>
+          <button class="btn btn-outline" onclick="openSeminarQuiz()" style="color:#0d9488;border-color:#0d9488">🎯 Live Quiz</button>
           <button class="btn btn-outline" onclick="exportSeminarAttendees()">⬇️ Export Excel</button>
           <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
         </div>
@@ -5944,6 +5943,10 @@ async function fbAllHaanToLeads(){
 // ── Feedback link share (WhatsApp) ──────────────────────────────
 function feedbackLinkFor(seminarId){
   return location.origin + '/dninvest-feedback.html' + (seminarId ? ('?s='+encodeURIComponent(seminarId)) : '');
+}
+function openSeminarQuiz(){
+  closeModal('seminarDetailModal');
+  showPage('seminar-quiz');
 }
 function shareFeedbackLink(){
   const seminars=DB.get('seminars')||[];
