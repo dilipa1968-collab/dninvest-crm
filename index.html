@@ -4221,6 +4221,13 @@ function _rzEnd(){
 }
 
 function renderEqTable(){
+  // Self-heal: if any path (client edit, call update, background sync) cleared the
+  // chosen sort, restore the user's last sort from localStorage so the table never
+  // silently reverts to default order.
+  if(eqSortField===null){
+    try{ const _ss=JSON.parse(localStorage.getItem('dninvest_sort_state')||'{}');
+      if(_ss.eqField!==undefined && _ss.eqField!==null){ eqSortField=_ss.eqField; eqSortDir=_ss.eqDir||1; } }catch(e){}
+  }
   let data = getMyEqClients();
   // Parse the RMS risk map ONCE per render (was being re-parsed per comparison
   // during sort → tens of thousands of JSON.parse of a 2700-entry object → hang).
@@ -4384,6 +4391,10 @@ function changePageSize(tab, val){
 }
 
 function renderMfTable(){
+  if(mfSortField===null){
+    try{ const _ss=JSON.parse(localStorage.getItem('dninvest_sort_state')||'{}');
+      if(_ss.mfField!==undefined && _ss.mfField!==null){ mfSortField=_ss.mfField; mfSortDir=_ss.mfDir||1; } }catch(e){}
+  }
   let data=getMyMfClients();
   const q=(document.getElementById('mf-search')||{value:''}).value.toLowerCase();
   const st=(document.getElementById('mf-status')||{value:''}).value;
@@ -4512,6 +4523,10 @@ function sortLeadsTable(colIndex){
 }
 
 function renderLeadsTable(){
+  if(leadsSortField===null){
+    try{ const _ss=JSON.parse(localStorage.getItem('dninvest_sort_state')||'{}');
+      if(_ss.leadsField!==undefined && _ss.leadsField!==null){ leadsSortField=_ss.leadsField; leadsSortDir=_ss.leadsDir||1; } }catch(e){}
+  }
   let data=getMyLeads();
   // Count calls logged per lead (from shared call_logs, seg='lead')
   const _leadCallCounts={};
