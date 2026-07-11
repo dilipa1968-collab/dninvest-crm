@@ -15263,7 +15263,10 @@ window.QUIZ = (function(){
       '@keyframes qsFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}',
       '.qs-podium{display:flex;align-items:flex-end;justify-content:center;gap:2vw;margin-top:5vh}',
       '.qs-pod{border-radius:1.6vh 1.6vh 0 0;padding:2vh 2.4vw;text-align:center;font-weight:800;color:#fff}',
-      '.qs-buzz{font-size:8vw;font-weight:900;text-align:center;background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;animation:qsPulse .7s ease-in-out infinite}'
+      '.qs-buzz{font-size:8vw;font-weight:900;text-align:center;background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;animation:qsPulse .7s ease-in-out infinite}',
+      '.qs-hero-emoji{font-size:6vh;line-height:1;animation:qsFloat 2.6s ease-in-out infinite}',
+      '@keyframes qsFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-1.2vh) rotate(4deg)}}',
+      '.qs-hero-band{display:inline-block;margin-top:.6vh;padding:.7vh 3vw;border-radius:99px;font-size:1.9vw;font-weight:900;letter-spacing:.2vw;color:#fff;background:linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b,#22d3ee);background-size:300% 100%;animation:qsBG 6s linear infinite;box-shadow:0 0 5vh rgba(99,102,241,.55)}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -15321,13 +15324,22 @@ window.QUIZ = (function(){
       + '</div>';
   }
 
+  function screenHeader(kind){
+    var icon = kind==='reveal' ? '🏆' : (kind==='buzzer' ? '🔔' : '🧠');
+    var tag  = kind==='reveal' ? 'RESULT' : 'QUIZ TIME';
+    return '<div class="qs-hero qs-pop" style="text-align:center;margin-bottom:2vh">'
+      + '<div class="qs-hero-emoji">'+icon+'</div>'
+      + '<div class="qs-hero-band">✨ D N INVESTMENT &nbsp;·&nbsp; '+tag+' ✨</div>'
+      + '</div>';
+  }
+
   function screenLive(d){
     var opts=d.options||[]; var cls=['qs-a','qs-b','qs-c','qs-d'];
     var optHtml='';
     if(d.type==='buzzer'){
       optHtml='<div class="qs-buzz" style="margin-top:5vh">🔔 BUZZ NOW!</div>';
     } else {
-      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:4vh">';
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:3.5vh">';
       opts.forEach(function(o,i){
         optHtml+='<div class="qs-opt '+cls[i]+' qs-pop" style="animation-delay:'+(0.1+i*0.09)+'s">'
               + '<span class="qs-badge">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+'</span></div>';
@@ -15337,11 +15349,12 @@ window.QUIZ = (function(){
     var prize=d.prize?'<div style="font-size:2.2vw;color:#fbbf24;text-align:center;margin-bottom:1.5vh;font-weight:700">🎁 '+esc(d.prize)+'</div>':'';
     S().innerHTML =
       '<div class="qs-pop">'
-      + '<div style="text-align:center;margin-bottom:2vh"><span class="qs-qpill">QUESTION '+(d.qIndex||'')+'</span></div>'
+      + screenHeader(d.type==='buzzer'?'buzzer':'live')
+      + '<div style="text-align:center;margin-bottom:1.5vh"><span class="qs-qpill">QUESTION '+(d.qIndex||'')+'</span></div>'
       + prize
-      + '<div style="font-size:4.4vw;font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
+      + '<div style="font-size:4.2vw;font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
       + optHtml
-      + '<div style="text-align:center;font-size:2.1vw;margin-top:4.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> answered</div>'
+      + '<div style="text-align:center;font-size:2.1vw;margin-top:3.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> answered</div>'
       + '</div>';
     // countdown ring
     if(d.timeSec && d.startedAt){
@@ -15371,7 +15384,7 @@ window.QUIZ = (function(){
     var opts=d.options||[]; var ci=d.revealIndex; var cls=['qs-a','qs-b','qs-c','qs-d'];
     var optHtml='';
     if(d.type!=='buzzer' && opts.length){
-      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:3vh">';
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2vh;margin-top:2.5vh">';
       opts.forEach(function(o,i){
         var ok=(i===ci);
         optHtml+='<div class="qs-opt '+cls[i]+(ok?' qs-correct':' qs-dim')+'">'
@@ -15379,32 +15392,35 @@ window.QUIZ = (function(){
       });
       optHtml+='</div>';
     }
+    // podium ONLY when 2 or more ranked players (avoid single redundant card)
     var top='';
     if(d.results && d.results.length){
       var ranked=d.results.filter(function(r){ return r.rank; }).sort(function(a,b){ return a.rank-b.rank; }).slice(0,3);
-      if(ranked.length){
-        var medals=['🥇','🥈','🥉']; var h=['16vh','12vh','9vh']; var bg=['linear-gradient(135deg,#fbbf24,#f59e0b)','linear-gradient(135deg,#cbd5e1,#94a3b8)','linear-gradient(135deg,#d9955b,#b06e35)'];
+      if(ranked.length>=2){
+        var medals=['🥇','🥈','🥉']; var h=['15vh','11.5vh','9vh']; var bg=['linear-gradient(135deg,#fbbf24,#f59e0b)','linear-gradient(135deg,#cbd5e1,#94a3b8)','linear-gradient(135deg,#d9955b,#b06e35)'];
+        var order=[1,0,2]; // silver, gold, bronze visual order
         top='<div class="qs-podium">';
-        ranked.forEach(function(r,i){
-          top+='<div class="qs-pod qs-pop" style="background:'+bg[i]+';height:'+h[i]+';min-width:14vw;animation-delay:'+(0.2+i*0.15)+'s">'
-             + '<div style="font-size:3vw">'+medals[i]+'</div>'
-             + '<div style="font-size:2vw">'+esc(r.name)+'</div>'
-             + (r.ms!=null?'<div style="font-size:1.4vw;opacity:.8">'+(r.ms/1000).toFixed(2)+'s</div>':'')+'</div>';
+        order.forEach(function(pos){ var r=ranked[pos]; if(!r) return;
+          top+='<div class="qs-pod qs-pop" style="background:'+bg[pos]+';height:'+h[pos]+';min-width:13vw;animation-delay:'+(0.2+pos*0.12)+'s;color:#3b1d00">'
+             + '<div style="font-size:2.8vw">'+medals[pos]+'</div>'
+             + '<div style="font-size:1.9vw;font-weight:900">'+esc(r.name)+'</div>'
+             + (r.ms!=null?'<div style="font-size:1.3vw;opacity:.85">'+(r.ms/1000).toFixed(2)+'s</div>':'')+'</div>';
         });
         top+='</div>';
       }
     }
     var winnerBlock = d.winnerName
-      ? '<div style="text-align:center;margin-top:4vh"><div class="qs-winner qs-pop" style="display:inline-block">'
-        + '<div style="font-size:2.2vw;font-weight:800;opacity:.85">🏆 WINNER</div>'
-        + '<div style="font-size:6.5vw;font-weight:900;line-height:1.1">'+esc(d.winnerName)+'</div>'
-        + (d.winnerMs!=null?'<div style="font-size:2vw;opacity:.85">⏱️ in '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
-        + (d.prize?'<div style="font-size:2.4vw;font-weight:800;margin-top:1vh">🎁 '+esc(d.prize)+'</div>':'')
+      ? '<div style="text-align:center;margin-top:3vh"><div class="qs-winner qs-pop" style="display:inline-block">'
+        + '<div style="font-size:2.4vw;font-weight:900;opacity:.9">🏆 WINNER</div>'
+        + '<div style="font-size:6.5vw;font-weight:900;line-height:1.05">'+esc(d.winnerName)+'</div>'
+        + (d.winnerMs!=null?'<div style="font-size:2vw;font-weight:700;opacity:.85">⏱️ in '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
+        + (d.prize?'<div style="font-size:2.4vw;font-weight:900;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
-      : '<div style="text-align:center;margin-top:4vh;font-size:3vw;color:#94a3b8">No winner this time</div>';
+      : '<div style="text-align:center;margin-top:3vh;font-size:3vw;color:#94a3b8">No winner this time</div>';
     S().innerHTML =
       '<div class="qs-pop">'
-      + (d.question?'<div style="font-size:3.2vw;font-weight:800;text-align:center;line-height:1.2">'+esc(d.question)+'</div>':'')
+      + screenHeader('reveal')
+      + (d.question?'<div style="font-size:2.8vw;font-weight:800;text-align:center;line-height:1.2;color:#e2e8f0">'+esc(d.question)+'</div>':'')
       + optHtml + winnerBlock + top
       + '</div>';
     if(d.winnerName) confettiBurst();
