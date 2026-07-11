@@ -15416,11 +15416,14 @@ window.QUIZ = (function(){
         + (d.prize?'<div style="font-size:2vw;font-weight:900;margin-top:.4vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
       : '<div style="text-align:center;margin-top:2.6vh;font-size:2.6vw;color:#94a3b8;font-weight:800">🙌 No correct answer this time</div>';
+    var diag = '<div style="text-align:center;margin-top:2.4vh;font-size:1.1vw;color:#64748b;font-weight:700">'
+      + 'build v3 &nbsp;·&nbsp; '+(((d.results&&d.results.length)||0))+' response(s) &nbsp;·&nbsp; '
+      + (d.winnerName?('winner recorded: '+esc(d.winnerName)):'no winner recorded')+'</div>';
     S().innerHTML =
       '<div class="qs-pop">'
       + screenHeader('reveal')
       + (d.question?'<div style="font-size:2.4vw;font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
-      + optHtml + winnerBlock
+      + optHtml + winnerBlock + diag
       + '</div>';
     if(d.winnerName) confettiBurst();
   }
