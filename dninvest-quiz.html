@@ -653,7 +653,7 @@ window.QUIZ = (function(){
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
 
-  function pointsForRank(rank){ var table=[100,80,60,40,20]; if(!rank) return 0; return rank<=5 ? table[rank-1] : 10; }
+  function medalFor(rank){ return rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'🎖️'; }
 
   async function reveal(){
     await window.waitForFdb(8000); if(!window.fdb) return;
@@ -677,27 +677,25 @@ window.QUIZ = (function(){
       if(host.type==='mcq'){
         var corrects=[], wrongs=[];
         rows.forEach(function(r){ (r.answer===host.correctIndex?corrects:wrongs).push(r); });
-        corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r),pts:pointsForRank(i+1)}); });
-        wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r),pts:0}); });
+        corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r)}); });
+        wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r)}); });
         winner = corrects.length?corrects[0]:null;
       } else {
-        rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r),pts:pointsForRank(i+1)}); });
+        rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r)}); });
         winner = rows.length?rows[0]:null;
       }
       var winMs = winner ? msOf(winner) : null;
-      var winPts = winner ? pointsForRank(1) : null;
       await DOC().set({
         state:'reveal',
         revealIndex:(host.type==='mcq'?host.correctIndex:null),
         winnerName:(winner?winner.name:null),
         winnerMs:winMs,
-        winnerPts:winPts,
+        winnerPts:null,
         results:results.slice(0,150)
       }, {merge:true});
       saveCurrentResults(); // persist this revealed question's results
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
-      tt += (winPts!=null) ? ' · ⭐ +'+winPts+' pts' : '';
       var cnt = ' · '+rows.length+' response'+(rows.length===1?'':'s');
       if(st) st.innerHTML = winner
         ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (First Correct Answer)':' (First To Buzz)')+tt+cnt
@@ -928,7 +926,7 @@ window.QUIZ = (function(){
         + '<div style="font-size:1.5rem;font-weight:800;color:#fff;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.3)">'+esc(player.name)+'</div>'
         + '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">You Won This Round!</div>'
         + (me.ms!=null?('<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
-        + (me.pts!=null?('<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">⭐ +'+me.pts+' Points</div>'):'')
+        + '<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">🥇 1st Place</div>'
         + (d.prize?('<div style="display:inline-block;margin-top:16px;padding:10px 22px;border-radius:99px;background:rgba(255,255,255,.25);font-size:1.15rem;font-weight:900;color:#fff">🎁 '+esc(d.prize)+'</div>')
                   :'<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:14px;opacity:.9">Great Job — Keep It Up!</div>')
         + '</div>';
@@ -943,9 +941,8 @@ window.QUIZ = (function(){
       '<div class="qp-pop qp-card-good">'
       + '<div style="font-size:3rem;line-height:1">👏</div>'
       + '<div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:8px">'+head+'</div>'
-      + '<div style="font-size:1.1rem;font-weight:800;color:#fef08a;margin-top:6px">You Finished '+esc(rankTxt)+'</div>'
+      + '<div style="font-size:1.1rem;font-weight:800;color:#fef08a;margin-top:6px">'+medalFor(me.rank)+' You Finished '+esc(rankTxt)+'</div>'
       + (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
-      + (me.pts!=null?('<div style="font-size:.9rem;font-weight:800;color:#fef08a;margin-top:6px">⭐ +'+me.pts+' Points</div>'):'')
       + '<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:16px">🏆 Winner: '+esc(d.winnerName||'-')+'</div>'
       + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">So Close — You Could Be Next!</div>'
       + '</div>';
@@ -1125,7 +1122,7 @@ window.QUIZ = (function(){
         + '<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;letter-spacing:.3vw;text-shadow:0 2px 8px rgba(0,0,0,.4)">🏆 WINNER 🏆</div>'
         + '<div style="font-size:clamp(28px,6vw,115px);font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
         + (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
-        + (d.winnerPts!=null?'<div style="font-size:clamp(17px,2.4vw,46px);font-weight:900;color:#fff;margin-top:.6vh;opacity:.95">⭐ +'+d.winnerPts+' Points</div>':'')
+        + '<div style="font-size:clamp(17px,2.4vw,46px);font-weight:900;color:#fff;margin-top:.6vh;opacity:.95">🥇 1st Place</div>'
         + (d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
       : '<div style="text-align:center;margin-top:3vh;font-size:clamp(18px,2.8vw,54px);color:#94a3b8;font-weight:800">🙌 No Correct Answer This Time</div>';
