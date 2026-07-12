@@ -64,6 +64,7 @@ input,select,textarea,button{font-family:inherit}
     </div>
     <div id="qp-content" style="flex:1"></div>
   </div>
+  <div id="qp-debug" style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:#64748b;font-family:monospace">📡 waiting…</div>
 </div>
 
 <!-- ══ SEMINAR QUIZ — BIG SCREEN (LCD / projector) ══ -->
@@ -231,6 +232,12 @@ window.QUIZ = (function(){
   function attachHostListeners(){
     if(host.unsubPlayers) host.unsubPlayers();
     if(host.unsubResp) host.unsubResp();
+    if(host.unsubDoc) host.unsubDoc();
+    host.unsubDoc = DOC().onSnapshot(function(doc){
+      var d=doc.data()||{};
+      var el=document.getElementById('quiz-conn');
+      if(el) el.textContent='🟢 Connected · live state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length);
+    }, function(){});
     host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
       var n=0; snap.forEach(function(doc){ if((doc.data().sessionId||'')===host.sessionId) n++; });
       var el=document.getElementById('quiz-player-count'); if(el) el.textContent=n;
@@ -618,6 +625,8 @@ window.QUIZ = (function(){
   }
 
   function renderPlayerState(d){
+    var dbg=document.getElementById('qp-debug');
+    if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
     if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
     // session changed by host reset → rejoin under new session
     if(d.sessionId && d.sessionId!==player.sessionId){
