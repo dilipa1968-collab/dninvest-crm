@@ -319,6 +319,7 @@ window.QUIZ = (function(){
       var box=document.getElementById('quiz-saved-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No saved results yet.</div>';
       var cnt=document.getElementById('quiz-saved-count'); if(cnt) cnt.textContent='';
     }catch(e){ alert('Delete failed: '+e.message); }
+  }
 
   function currentResponses(snap){
     var sid = host.liveSessionId || host.sessionId;
@@ -390,26 +391,6 @@ window.QUIZ = (function(){
         rows:logRows
       });
     }catch(e){}
-  }
-    var box=document.getElementById('quiz-results'); if(!box) return;
-    var rows = snap ? currentResponses(snap) : [];
-    if(!rows.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No answers yet.</div>'; return; }
-    var html='<div style="display:flex;flex-direction:column;gap:6px">';
-    rows.forEach(function(r,i){
-      var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
-      var badge = host.type==='buzzer'
-        ? '<span style="background:#3b82f6;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">BUZZ</span>'
-        : (correct ? '<span style="background:#16a34a;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✔ Correct</span>'
-                   : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Wrong</span>');
-      var tms = (r.at&&r.at.toMillis&&host.startedAtServerMs) ? (r.at.toMillis()-host.startedAtServerMs) : null;
-      var tstr = (tms!=null && tms>=0) ? '<span style="font-size:.72rem;color:#64748b;font-weight:600;min-width:52px;text-align:right">'+(tms/1000).toFixed(2)+'s</span>' : '';
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:'+(i===0?'#fef9c3':'#fff')+'">'
-          + '<span style="font-weight:700;width:20px">'+(i+1)+'</span>'
-          + '<span style="flex:1;font-weight:600">'+esc(r.name)+'</span>'
-          + tstr + badge + '</div>';
-    });
-    html+='</div>';
-    box.innerHTML=html;
   }
 
   function loadBank(){
