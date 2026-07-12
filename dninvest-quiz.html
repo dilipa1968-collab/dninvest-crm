@@ -759,7 +759,10 @@ window.QUIZ = (function(){
       '.qp-optbtn{width:100%;display:flex;align-items:center;gap:12px;padding:16px;font-size:1.05rem;font-weight:800;border:none;border-radius:16px;color:#fff;cursor:pointer;text-align:left;box-shadow:0 6px 16px rgba(0,0,0,.3);transition:transform .1s}',
       '.qp-optbtn:active{transform:scale(.96)}',
       '.qp-optletter{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;font-weight:900}',
-      '.qp-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qp-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qp-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qp-d{background:linear-gradient(135deg,#e0a800,#c08a00)}'
+      '.qp-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qp-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qp-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qp-d{background:linear-gradient(135deg,#e0a800,#c08a00)}',
+      '.qp-card-wrong{background:linear-gradient(135deg,#e21b3c,#b3132e);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 28px rgba(226,27,60,.4)}',
+      '.qp-card-good{background:linear-gradient(135deg,#1368ce,#0d4ea0);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 28px rgba(19,104,206,.4)}',
+      '.qp-card-neutral{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(236,72,153,.25));border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -873,8 +876,16 @@ window.QUIZ = (function(){
 
     // Didn't answer at all
     if(!me){
-      if(d.winnerName) C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>You Did Not Answer This Time. 😅<br>Do Try The Next One!');
-      else C().innerHTML=msgCard('No Winner This Time.<br><br>Get Ready For The Next Question!');
+      C().innerHTML =
+        '<div class="qp-pop qp-card-neutral">'
+        + '<div style="font-size:3rem;line-height:1">😅</div>'
+        + (d.winnerName
+            ? ('<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">🏆 Winner: '+esc(d.winnerName)+'</div>'
+               + (d.winnerMs!=null?('<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:4px;opacity:.85">⏱️ '+(d.winnerMs/1000).toFixed(2)+'s</div>'):''))
+            : '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">No Winner This Time</div>')
+        + '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:16px;opacity:.9">'+(d.winnerName?'You Did Not Answer This Time.':'Get Ready For The Next Question!')+'</div>'
+        + (d.winnerName?'<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:6px;opacity:.85">Do Try The Next One!</div>':'')
+        + '</div>';
       return;
     }
 
@@ -882,8 +893,16 @@ window.QUIZ = (function(){
     if(me.correct===false){
       var corrTxt='';
       if(d.revealIndex!=null && d.options && d.options[d.revealIndex]!=null)
-        corrTxt='<br><span style="font-size:.85rem;color:#94a3b8">Correct Answer: <b style="color:#fff">'+esc(d.options[d.revealIndex])+'</b></span>';
-      C().innerHTML=msgCard('<div style="font-size:2rem">❌</div><b style="font-size:1.2rem">Wrong Answer</b>'+corrTxt+myTime+'<br><br>'+(d.winnerName?'🏆 Winner: <b>'+esc(d.winnerName)+'</b>':'')+'<br>No Worries — Try The Next One!');
+        corrTxt='<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:12px;opacity:.9">Correct Answer:</div><div style="font-size:1.2rem;font-weight:900;color:#fff;margin-top:4px">'+esc(d.options[d.revealIndex])+'</div>';
+      C().innerHTML =
+        '<div class="qp-pop qp-card-wrong">'
+        + '<div style="font-size:3rem;line-height:1">❌</div>'
+        + '<div style="font-size:1.5rem;font-weight:900;color:#fff;margin-top:8px">Wrong Answer</div>'
+        + corrTxt
+        + (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:10px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+        + (d.winnerName?('<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:14px">🏆 Winner: '+esc(d.winnerName)+'</div>'):'')
+        + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">No Worries — Try The Next One!</div>'
+        + '</div>';
       return;
     }
 
@@ -906,9 +925,15 @@ window.QUIZ = (function(){
     // Correct/buzzed but not first — show rank
     var rankTxt = me.rank ? ordinal(me.rank)+' Place' : '';
     var head = (me.correct===true) ? '✅ Correct!' : '🔔 You Buzzed!';
-    C().innerHTML=msgCard('<div style="font-size:1.8rem">👏</div><b style="font-size:1.15rem">'+head+'</b><br>'
-      + '<span style="font-size:1rem;color:#fbbf24">You Finished '+esc(rankTxt)+'</span>'+myTime
-      + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>So Close — You Could Be Next!');
+    C().innerHTML =
+      '<div class="qp-pop qp-card-good">'
+      + '<div style="font-size:3rem;line-height:1">👏</div>'
+      + '<div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:8px">'+head+'</div>'
+      + '<div style="font-size:1.1rem;font-weight:800;color:#fef08a;margin-top:6px">You Finished '+esc(rankTxt)+'</div>'
+      + (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+      + '<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:16px">🏆 Winner: '+esc(d.winnerName||'-')+'</div>'
+      + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">So Close — You Could Be Next!</div>'
+      + '</div>';
   }
 
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
