@@ -330,9 +330,11 @@ window.QUIZ = (function(){
 
   function renderHostResults(snap){
     var box=document.getElementById('quiz-results'); if(!box) return;
+    var total = snap ? snap.size : 0;
     var rows = snap ? currentResponses(snap) : [];
-    if(!rows.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No answers yet.</div>'; return; }
-    var html='<div style="display:flex;flex-direction:column;gap:6px">';
+    var dbg='<div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;font-family:monospace">📥 DB total: '+total+' · matching (sess ...'+String(host.sessionId||'—').slice(-5)+' / q'+host.qIndex+'): '+rows.length+'</div>';
+    if(!rows.length){ box.innerHTML=dbg+'<div style="color:var(--gray);font-size:.82rem">No answers yet.</div>'; return; }
+    var html=dbg+'<div style="display:flex;flex-direction:column;gap:6px">';
     rows.forEach(function(r,i){
       var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
       var badge = host.type==='buzzer'
@@ -497,6 +499,7 @@ window.QUIZ = (function(){
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
       var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting for answers…</div>';
+      try{ var rs=await RESPONSES().get(); renderHostResults(rs); }catch(e){}
     }catch(e){
       if(_cs){ _cs.textContent='🔴 Push failed: '+(e&&e.message||e); _cs.style.color='#dc2626'; }
       alert('⚠️ Push failed:\n\n'+(e&&e.message||e)+'\n\n(Firestore write block ho sakta hai — rules check karo.)');
