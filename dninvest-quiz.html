@@ -815,6 +815,25 @@ window.QUIZ = (function(){
     }catch(e){}
     if(player.unsub) player.unsub();
     player.unsub = DOC().onSnapshot(function(doc){ renderPlayerState(doc.data()||{}); }, function(){});
+    attachPlayerRefreshGuards();
+  }
+
+  // Mobile browsers often suspend the realtime listener when the screen locks
+  // or the tab goes to background; when the player comes back, force a fresh
+  // SERVER read so an old/stuck question can never linger on screen.
+  var _playerRefreshAttached=false;
+  function attachPlayerRefreshGuards(){
+    if(_playerRefreshAttached) return; _playerRefreshAttached=true;
+    async function forceRefresh(){
+      if(!player.id) return;
+      try{ var d=await DOC().get({source:'server'}); renderPlayerState((d.data())||{}); }catch(e){}
+    }
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') forceRefresh(); });
+    window.addEventListener('pageshow', forceRefresh);
+    window.addEventListener('focus', forceRefresh);
+    window.addEventListener('online', forceRefresh);
+    // safety net in case the realtime listener silently stalls in the background
+    setInterval(function(){ if(document.visibilityState==='visible') forceRefresh(); }, 12000);
   }
 
   function renderPlayerState(d){
@@ -994,6 +1013,22 @@ window.QUIZ = (function(){
       qs.appendChild(s); setTimeout(function(){ s.remove(); },5200); })(i); }
   }
 
+  var _screenRefreshAttached=false;
+  function attachScreenRefreshGuards(){
+    if(_screenRefreshAttached) return; _screenRefreshAttached=true;
+    async function forceRefresh(){
+      if(screen.linkOpen===false) return;
+      try{ var d=await DOC().get({source:'server'}); renderScreen((d.data())||{}); }catch(e){}
+    }
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') forceRefresh(); });
+    window.addEventListener('pageshow', forceRefresh);
+    window.addEventListener('focus', forceRefresh);
+    window.addEventListener('online', forceRefresh);
+    // safety net: the LCD/projector stays open unattended for the whole seminar,
+    // so also re-sync periodically in case the realtime listener silently stalls
+    setInterval(forceRefresh, 15000);
+  }
+
   async function bootScreen(){
     document.getElementById('quizScreen').style.display='block';
     injectScreenCSS();
@@ -1005,6 +1040,7 @@ window.QUIZ = (function(){
     if(screen.unsubResp) screen.unsubResp();
     if(screen.unsubPlayers) screen.unsubPlayers();
     screen.unsubDoc = DOC().onSnapshot(function(doc){ if(screen.linkOpen===false){ return; } renderScreen(doc.data()||{}); }, function(){});
+    attachScreenRefreshGuards();
     screen.unsubPlayers = PLAYERS().onSnapshot(function(snap){
       var n=0; snap.forEach(function(doc){ var p=doc.data(); if((p.sessionId||'')===screen.sessionId) n++; });
       screen.joinedCount=n;
