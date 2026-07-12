@@ -882,15 +882,15 @@ window.QUIZ = (function(){
       '@keyframes qsBG{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}',
       '.qs-pop{opacity:0;transform:translateY(24px) scale(.96);animation:qsPop .5s cubic-bezier(.2,.9,.3,1.2) forwards}',
       '@keyframes qsPop{to{opacity:1;transform:none}}',
-      '.qs-qpill{display:inline-block;background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:.5vh 2.4vw;border-radius:99px;font-size:1.8vw;font-weight:800;letter-spacing:.15vw;box-shadow:0 0 30px rgba(139,92,246,.6)}',
-      '.qs-opt{position:relative;display:flex;align-items:center;gap:1.4vw;border-radius:2vh;padding:2.6vh 2vw;font-size:2.7vw;font-weight:800;color:#fff;box-shadow:0 1vh 3vh rgba(0,0,0,.35);overflow:hidden}',
-      '.qs-opt .qs-badge{flex-shrink:0;width:4.6vw;height:4.6vw;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:1.2vh;background:rgba(0,0,0,.25);font-weight:900;font-size:2.6vw}',
+      '.qs-qpill{display:inline-block;background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:.5vh 2.4vw;border-radius:99px;font-size:clamp(14px,1.8vw,38px);font-weight:800;letter-spacing:.15vw;box-shadow:0 0 30px rgba(139,92,246,.6)}',
+      '.qs-opt{position:relative;display:flex;align-items:center;gap:1.4vw;border-radius:2vh;padding:2.6vh 2vw;font-size:clamp(18px,2.7vw,58px);font-weight:800;color:#fff;box-shadow:0 1vh 3vh rgba(0,0,0,.35);overflow:hidden}',
+      '.qs-opt .qs-badge{flex-shrink:0;width:clamp(44px,4.6vw,100px);height:clamp(44px,4.6vw,100px);min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:1.2vh;background:rgba(0,0,0,.25);font-weight:900;font-size:clamp(16px,2.6vw,56px)}',
       '.qs-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qs-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qs-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qs-d{background:linear-gradient(135deg,#e0a800,#c08a00)}',
       '.qs-dim{opacity:.28;filter:grayscale(.7);box-shadow:none}',
       '.qs-correct{outline:.7vh solid #34d399;box-shadow:0 0 6vh rgba(52,211,153,.75);animation:qsGlow 1s ease-in-out infinite alternate}',
       '@keyframes qsGlow{to{box-shadow:0 0 9vh rgba(52,211,153,1)}}',
       '.qs-ring{position:fixed;top:3vh;right:3vw;width:11vh;height:11vh;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .3s}',
-      '.qs-ring-inner{width:8.6vh;height:8.6vh;border-radius:50%;background:#0b1220;display:flex;align-items:center;justify-content:center;font-size:4vh;font-weight:900;color:#fff}',
+      '.qs-ring-inner{width:8.6vh;height:8.6vh;border-radius:50%;background:#0b1220;display:flex;align-items:center;justify-content:center;font-size:clamp(24px,4vh,60px);font-weight:900;color:#fff}',
       '.qs-low .qs-ring-inner{color:#f87171}.qs-low{animation:qsPulse .6s ease-in-out infinite}',
       '@keyframes qsPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}',
       '.qs-winner{background:linear-gradient(135deg,#f59e0b,#fbbf24,#f59e0b);background-size:200% 200%;animation:qsBG 4s ease infinite;color:#3b1d00;border-radius:3vh;padding:4vh 5vw;box-shadow:0 0 10vh rgba(251,191,36,.6)}',
@@ -898,10 +898,10 @@ window.QUIZ = (function(){
       '@keyframes qsFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}',
       '.qs-podium{display:flex;align-items:flex-end;justify-content:center;gap:2vw;margin-top:5vh}',
       '.qs-pod{border-radius:1.6vh 1.6vh 0 0;padding:2vh 2.4vw;text-align:center;font-weight:800;color:#fff}',
-      '.qs-buzz{font-size:8vw;font-weight:900;text-align:center;background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;animation:qsPulse .7s ease-in-out infinite}',
-      '.qs-hero-emoji{font-size:6vh;line-height:1;animation:qsFloat 2.6s ease-in-out infinite}',
+      '.qs-buzz{font-size:clamp(36px,8vw,170px);font-weight:900;text-align:center;background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;animation:qsPulse .7s ease-in-out infinite}',
+      '.qs-hero-emoji{font-size:clamp(40px,6vh,90px);line-height:1;animation:qsFloat 2.6s ease-in-out infinite}',
       '@keyframes qsFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-1.2vh) rotate(4deg)}}',
-      '.qs-hero-band{display:inline-block;margin-top:.6vh;padding:.7vh 3vw;border-radius:99px;font-size:1.9vw;font-weight:900;letter-spacing:.2vw;color:#fff;background:linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b,#22d3ee);background-size:300% 100%;animation:qsBG 6s linear infinite;box-shadow:0 0 5vh rgba(99,102,241,.55)}'
+      '.qs-hero-band{display:inline-block;margin-top:.6vh;padding:.7vh 3vw;border-radius:99px;font-size:clamp(16px,1.9vw,40px);font-weight:900;letter-spacing:.2vw;color:#fff;background:linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b,#22d3ee);background-size:300% 100%;animation:qsBG 6s linear infinite;box-shadow:0 0 5vh rgba(99,102,241,.55)}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -957,12 +957,12 @@ window.QUIZ = (function(){
     var link=joinLink();
     S().innerHTML =
       '<div style="text-align:center" class="qs-pop">'
-      + '<div style="font-size:5.5vw;font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 D N Investment Quiz</div>'
-      + '<div style="font-size:2.4vw;color:#94a3b8;margin-bottom:4vh">Scan The QR To Join From Your Phone</div>'
-      + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:30vh;height:30vh;background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
-      + '<div style="font-size:2vw;margin-top:3vh;color:#e2e8f0">'+esc(link)+'</div>'
-      + '<div style="font-size:1.8vw;margin-top:3vh;color:#64748b">Waiting For The Quiz To Start…</div>'
-      + '<div style="font-size:2.2vw;margin-top:2vh;color:#34d399;font-weight:800">👥 <span id="qs-joined-count">'+(screen.joinedCount||0)+'</span> Joined</div>'
+      + '<div style="font-size:clamp(28px,5.5vw,106px);font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 D N Investment Quiz</div>'
+      + '<div style="font-size:clamp(16px,2.4vw,46px);color:#94a3b8;margin-bottom:4vh">Scan The QR To Join From Your Phone</div>'
+      + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:min(30vh,70vw);height:min(30vh,70vw);background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
+      + '<div style="font-size:clamp(12px,2vw,38px);margin-top:3vh;color:#e2e8f0;word-break:break-all;padding:0 4vw">'+esc(link)+'</div>'
+      + '<div style="font-size:clamp(14px,1.8vw,35px);margin-top:3vh;color:#64748b">Waiting For The Quiz To Start…</div>'
+      + '<div style="font-size:clamp(16px,2.2vw,42px);margin-top:2vh;color:#34d399;font-weight:800">👥 <span id="qs-joined-count">'+(screen.joinedCount||0)+'</span> Joined</div>'
       + '</div>';
   }
 
@@ -988,15 +988,15 @@ window.QUIZ = (function(){
       });
       optHtml+='</div>';
     }
-    var prize=d.prize?'<div style="font-size:2.2vw;color:#fbbf24;text-align:center;margin-bottom:1.5vh;font-weight:700">🎁 '+esc(d.prize)+'</div>':'';
+    var prize=d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);color:#fbbf24;text-align:center;margin-bottom:1.5vh;font-weight:700">🎁 '+esc(d.prize)+'</div>':'';
     S().innerHTML =
       '<div class="qs-pop">'
       + screenHeader(d.type==='buzzer'?'buzzer':'live')
       + '<div style="text-align:center;margin-bottom:1.5vh"><span class="qs-qpill">QUESTION '+(d.qIndex||'')+'</span></div>'
       + prize
-      + '<div style="font-size:4.2vw;font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
+      + '<div style="font-size:clamp(24px,4.2vw,80px);font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
       + optHtml
-      + '<div style="text-align:center;font-size:2.1vw;margin-top:3.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> Answered</div>'
+      + '<div style="text-align:center;font-size:clamp(15px,2.1vw,40px);margin-top:3.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> Answered</div>'
       + '</div>';
     // countdown ring
     if(d.timeSec && d.startedAt){
@@ -1030,8 +1030,8 @@ window.QUIZ = (function(){
       optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.6vh;margin-top:2vh">';
       opts.forEach(function(o,i){
         var ok=(i===ci);
-        optHtml+='<div class="qs-opt '+cls[i]+(ok?' qs-correct':' qs-dim')+'" style="padding:1.7vh 1.6vw;font-size:2.2vw">'
-              + '<span class="qs-badge" style="width:3.6vw;height:3.6vw;font-size:2vw">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+(ok?' ✅':'')+'</span></div>';
+        optHtml+='<div class="qs-opt '+cls[i]+(ok?' qs-correct':' qs-dim')+'" style="padding:1.7vh 1.6vw;font-size:clamp(15px,2.2vw,42px)">'
+              + '<span class="qs-badge" style="width:clamp(34px,3.6vw,70px);height:clamp(34px,3.6vw,70px);font-size:clamp(14px,2vw,38px)">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+(ok?' ✅':'')+'</span></div>';
       });
       optHtml+='</div>';
     }
@@ -1039,16 +1039,16 @@ window.QUIZ = (function(){
     var winnerBlock = d.winnerName
       ? '<div style="text-align:center;margin-top:3vh">'
         + '<div style="display:inline-block;padding:3vh 6vw;border-radius:3vh;background:linear-gradient(135deg,#f59e0b,#fbbf24,#fb7185,#a78bfa);background-size:300% 300%;animation:qsBG 5s ease infinite;box-shadow:0 0 12vh rgba(251,191,36,.7)">'
-        + '<div style="font-size:2.2vw;font-weight:900;color:#fff;letter-spacing:.3vw;text-shadow:0 2px 8px rgba(0,0,0,.4)">🏆 WINNER 🏆</div>'
-        + '<div style="font-size:6vw;font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
-        + (d.winnerMs!=null?'<div style="font-size:2.6vw;font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
-        + (d.prize?'<div style="font-size:2.2vw;font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
+        + '<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;letter-spacing:.3vw;text-shadow:0 2px 8px rgba(0,0,0,.4)">🏆 WINNER 🏆</div>'
+        + '<div style="font-size:clamp(28px,6vw,115px);font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
+        + (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
+        + (d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
-      : '<div style="text-align:center;margin-top:3vh;font-size:2.8vw;color:#94a3b8;font-weight:800">🙌 No Correct Answer This Time</div>';
+      : '<div style="text-align:center;margin-top:3vh;font-size:clamp(18px,2.8vw,54px);color:#94a3b8;font-weight:800">🙌 No Correct Answer This Time</div>';
     S().innerHTML =
       '<div class="qs-pop">'
       + screenHeader('reveal')
-      + (d.question?'<div style="font-size:2.4vw;font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
+      + (d.question?'<div style="font-size:clamp(17px,2.4vw,46px);font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
       + optHtml + winnerBlock
       + '</div>';
     if(d.winnerName) confettiBurst();
