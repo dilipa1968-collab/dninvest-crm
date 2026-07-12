@@ -724,7 +724,13 @@ window.QUIZ = (function(){
         winner = corrects.length?corrects[0]:null;
       } else if(host.type==='guess'){
         var validRows=rows.filter(function(r){ return typeof r.answer==='number' && !isNaN(r.answer); });
-        validRows.sort(function(a,b){ return Math.abs(a.answer-actualValue)-Math.abs(b.answer-actualValue); });
+        validRows.sort(function(a,b){
+          var da=Math.abs(a.answer-actualValue), db=Math.abs(b.answer-actualValue);
+          if(da!==db) return da-db;
+          // tie (same distance from actual value) — earliest submission wins
+          var ta=a.at&&a.at.toMillis?a.at.toMillis():Infinity, tb=b.at&&b.at.toMillis?b.at.toMillis():Infinity;
+          return ta-tb;
+        });
         validRows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r),guess:r.answer,diff:Math.abs(r.answer-actualValue)}); });
         winner = validRows.length?validRows[0]:null;
       } else {
