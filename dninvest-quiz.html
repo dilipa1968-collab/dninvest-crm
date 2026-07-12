@@ -91,6 +91,9 @@ input,select,textarea,button{font-family:inherit}
             <div style="flex:1;min-width:220px">
               <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 How Clients Join</div>
               <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Show The QR On Screen Or Share The Link. No Login — Just Enter A Name To Join.</div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;margin-bottom:8px;cursor:pointer">
+                <input type="checkbox" id="quiz-require-mobile" onchange="QUIZ.toggleRequireMobile()"> 📱 Require Mobile Number To Join (So You Can Identify The Winner)
+              </label>
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="text" id="quiz-join-link" readonly style="flex:1;min-width:180px;padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.78rem" onclick="QUIZ.copyLink()">📋 Copy</button>
@@ -339,6 +342,20 @@ window.QUIZ = (function(){
       alert('⚠️ Firestore Read/Write Blocked:\n\n'+(e&&e.message||e)+'\n\n(Security Rules Ya Internet Check Karo.)');
     }
     attachHostListeners();
+    if(host.unsubReqMobile) host.unsubReqMobile();
+    host.unsubReqMobile = LINKS().onSnapshot(function(d){
+      var v=d.data()||{};
+      var cb=document.getElementById('quiz-require-mobile');
+      if(cb) cb.checked = !!v.requireMobile;
+    }, function(){});
+  }
+
+  async function toggleRequireMobile(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var cb=document.getElementById('quiz-require-mobile');
+    var next = cb ? cb.checked : false;
+    try{ await LINKS().set({ requireMobile: next }, {merge:true}); }
+    catch(e){ alert('Update Failed: '+(e&&e.message||e)); if(cb) cb.checked=!next; }
   }
 
   function attachHostListeners(){
@@ -366,7 +383,7 @@ window.QUIZ = (function(){
     }, function(){});
     host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
       var n=0; var names=[];
-      snap.forEach(function(doc){ var p=doc.data(); if((p.sessionId||'')===host.sessionId){ n++; names.push(p.name||'(no name)'); } });
+      snap.forEach(function(doc){ var p=doc.data(); if((p.sessionId||'')===host.sessionId){ n++; names.push((p.name||'(no name)')+(p.mobile?' · 📱'+p.mobile:'')); } });
       var el=document.getElementById('quiz-player-count'); if(el) el.textContent=n;
       var el2=document.getElementById('quiz-player-count-2'); if(el2) el2.textContent=n;
       var nb=document.getElementById('quiz-player-names');
@@ -420,16 +437,16 @@ window.QUIZ = (function(){
     var entries=[]; snap.forEach(function(d){ entries.push(d.data()); });
     if(!entries.length){ alert('No Saved Results To Export Yet.'); return; }
     entries.sort(function(a,b){ var sa=a.savedAt&&a.savedAt.toMillis?a.savedAt.toMillis():0; var sb=b.savedAt&&b.savedAt.toMillis?b.savedAt.toMillis():0; return sa-sb; });
-    var aoa=[['Q#','Question','Correct Ans','Rank','Name','Answer','Result','Time (s)']];
+    var aoa=[['Q#','Question','Correct Ans','Rank','Name','Mobile','Answer','Result','Time (s)']];
     entries.forEach(function(e){
       (e.rows||[]).forEach(function(r,i){
-        aoa.push([ e.qIndex, e.question||'', e.correctLetter||'', i+1, r.name||'', r.answer||'',
+        aoa.push([ e.qIndex, e.question||'', e.correctLetter||'', i+1, r.name||'', r.mobile||'', r.answer||'',
           (r.correct===true?'Correct':(r.correct===false?'Wrong':'-')),
           (r.ms!=null?Number((r.ms/1000).toFixed(2)):'') ]);
       });
     });
     var ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:5},{wch:40},{wch:11},{wch:6},{wch:22},{wch:8},{wch:9},{wch:9}];
+    ws['!cols']=[{wch:5},{wch:40},{wch:11},{wch:6},{wch:22},{wch:14},{wch:8},{wch:9},{wch:9}];
     var wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Quiz Results');
     XLSX.writeFile(wb, 'DN_Quiz_Results_'+new Date().toISOString().slice(0,10)+'.xlsx');
@@ -484,10 +501,11 @@ window.QUIZ = (function(){
                    : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Wrong</span>');
       var tms = (r.at&&r.at.toMillis&&host.startedAtServerMs) ? (r.at.toMillis()-host.startedAtServerMs) : null;
       var tstr = (tms!=null && tms>=0) ? '<span style="font-size:.72rem;color:#64748b;font-weight:600;min-width:52px;text-align:right">'+(tms/1000).toFixed(2)+'s</span>' : '';
+      var mobStr = r.mobile ? '<span style="font-size:.7rem;color:#94a3b8;font-weight:600">📱'+esc(r.mobile)+'</span>' : '';
       html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:'+(i===0?'#fef9c3':'#fff')+'">'
           + '<span style="font-weight:700;width:20px">'+(i+1)+'</span>'
           + '<span style="flex:1;font-weight:600">'+esc(r.name)+'</span>'
-          + tstr + badge + '</div>';
+          + mobStr + tstr + badge + '</div>';
     });
     html+='</div>';
     box.innerHTML=html;
@@ -508,7 +526,7 @@ window.QUIZ = (function(){
       var logRows=rows.map(function(r){
         var isCorrect=(host.type==='mcq')?(r.answer===host.correctIndex):null;
         var ansLetter=(host.type==='mcq'&&typeof r.answer==='number')?String.fromCharCode(65+r.answer):(r.answer==='buzz'?'BUZZ':String(r.answer==null?'':r.answer));
-        return { name:r.name||'', answer:ansLetter, correct:isCorrect, ms:_ms(r) };
+        return { name:r.name||'', mobile:r.mobile||'', answer:ansLetter, correct:isCorrect, ms:_ms(r) };
       });
       var firstWinner;
       if(host.type==='guess'){
@@ -761,7 +779,7 @@ window.QUIZ = (function(){
   }
 
   // ─────────── CLIENT (PLAYER) ───────────
-  var player = { id:'', name:'', sessionId:'', qIndex:0, answered:false, unsub:null, state:'', lastGuess:null };
+  var player = { id:'', name:'', mobile:'', sessionId:'', qIndex:0, answered:false, unsub:null, state:'', lastGuess:null, requireMobile:false };
 
   function C(){ return document.getElementById('qp-content'); }
 
@@ -775,14 +793,17 @@ window.QUIZ = (function(){
     player.id = localStorage.getItem('dnquiz_pid') || ('p'+Date.now()+Math.floor(Math.random()*9999));
     localStorage.setItem('dnquiz_pid', player.id);
     player.name = localStorage.getItem('dnquiz_name') || '';
-    player.linkOpen = true; player.started = false;
+    player.mobile = localStorage.getItem('dnquiz_mobile') || '';
+    player.linkOpen = true; player.started = false; player.requireMobile = false;
     // watch open/close flag first
     LINKS().onSnapshot(function(d){
       var v=d.data()||{};
       player.linkOpen = v.quizOpen!==false;
+      player.requireMobile = !!v.requireMobile;
       if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
-      if(!player.started){ player.started=true; if(player.name){ joinAndListen(); } else { renderNameForm(); } }
-    }, function(){ if(!player.started){ player.started=true; if(player.name){ joinAndListen(); } else { renderNameForm(); } } });
+      var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
+      if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } }
+    }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } } });
   }
 
   function injectPlayerCSS(){
@@ -823,16 +844,26 @@ window.QUIZ = (function(){
   }
 
   function renderNameForm(){
+    var mobileField = player.requireMobile
+      ? '<input id="qp-mobile" type="tel" inputmode="numeric" placeholder="Mobile Number" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      : '';
     C().innerHTML =
       '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px">'
       + '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;text-align:center">Enter your name</div>'
       + '<input id="qp-name" placeholder="Name" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      + mobileField
       + '<button id="qp-join-btn" style="width:100%;padding:14px;font-size:1.1rem;font-weight:700;border:none;border-radius:12px;background:#14b8a6;color:#fff;cursor:pointer">Join Quiz →</button>'
       + '</div>';
     var inp=document.getElementById('qp-name'); if(inp) inp.focus();
     document.getElementById('qp-join-btn').onclick=async function(){
       var v=(document.getElementById('qp-name')||{}).value.trim();
       if(!v){ inp.focus(); return; }
+      if(player.requireMobile){
+        var mEl=document.getElementById('qp-mobile');
+        var mv=(mEl?mEl.value:'').replace(/\D/g,'');
+        if(mv.length<10){ if(mEl){ mEl.focus(); mEl.style.background='rgba(239,68,68,.25)'; } return; }
+        player.mobile=mv; localStorage.setItem('dnquiz_mobile', mv);
+      }
       player.name=v; localStorage.setItem('dnquiz_name', v);
       await joinAndListen();
     };
@@ -843,7 +874,7 @@ window.QUIZ = (function(){
     try{
       var d=await DOC().get();
       player.sessionId = (d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
-      await PLAYERS().doc(player.id).set({ name:player.name, sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() });
+      await PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() });
     }catch(e){}
     if(player.unsub) player.unsub();
     player.unsub = DOC().onSnapshot(function(doc){ renderPlayerState(doc.data()||{}); }, function(){});
@@ -875,7 +906,7 @@ window.QUIZ = (function(){
     // session changed by host reset → rejoin under new session
     if(d.sessionId && d.sessionId!==player.sessionId){
       player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
-      try{ PLAYERS().doc(player.id).set({ name:player.name, sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
+      try{ PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
     }
     if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; player.lastGuess=null; }
 
@@ -944,7 +975,7 @@ window.QUIZ = (function(){
     C().innerHTML=msgCard(confirmMsg);
     try{
       await RESPONSES().doc(player.sessionId+'_'+player.qIndex+'_'+player.id).set({
-        playerId:player.id, name:player.name, qIndex:player.qIndex, sessionId:player.sessionId,
+        playerId:player.id, name:player.name, mobile:player.mobile||'', qIndex:player.qIndex, sessionId:player.sessionId,
         answer:answer, at:firebase.firestore.FieldValue.serverTimestamp()
       });
     }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Could Not Send Your Answer, Please Try Again.'); }
@@ -1286,7 +1317,7 @@ window.QUIZ = (function(){
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
-    toggleLink:toggleLink, initLinkControl:initLinkControl
+    toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile
   };
 })();
 
