@@ -103,9 +103,10 @@ input,select,textarea,button{font-family:inherit}
           <!-- Question bank (up to 5, pre-filled — host just pushes) -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — fill these in advance, then just hit "Push" during the seminar</div>
-              <div style="display:flex;gap:6px">
+              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — fill these in advance, then just hit "Push" during the seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(auto-synced to all your devices)</span></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
@@ -155,7 +156,18 @@ window.QUIZ = (function(){
 
   // host-only working memory (correct answer never leaves the host until reveal)
   var host = { correctIndex:0, qIndex:0, type:'mcq', sessionId:'', startedAtServerMs:0, unsubPlayers:null, unsubResp:null };
-  var BANK_KEY='dnquiz_bank';
+  var BANK_KEY='dnquiz_bank';                       // legacy localStorage fallback (used only if Firestore unreachable)
+  var BANKDOC = function(){ return window.fdb.collection('quiz').doc('bank'); };
+  host.bankCache = null;                            // synced from Firestore so ALL admin devices see the same 5 questions
+  host.unsubBank = null;
+  function defaultBankArr(){
+    var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
+    return arr;
+  }
+  async function writeBankToFirestore(arr){
+    try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}   // offline backup only
+    try{ await BANKDOC().set({ arr:arr, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
+  }
   // ── Ready-made Mutual Fund / SIP question bank (correct answer is a[0]) ──
   var MF_QBANK=[
     {q:'What does SIP stand for?', a:['Systematic Investment Plan','Simple Interest Plan','Secure Income Plan','Stock Investment Product']},
@@ -179,18 +191,50 @@ window.QUIZ = (function(){
     {q:'Who professionally manages your money in a mutual fund?', a:['A fund manager','Your bank teller','SEBI','The government']},
     {q:'Mutual fund returns are?', a:['Market-linked, not guaranteed','Always fixed','Always positive','Government guaranteed']}
   ];
+  // ── Ready-made Share Market question bank (correct answer is a[0]) ──
+  var SHARE_QBANK=[
+    {q:'What does IPO stand for?', a:['Initial Public Offering','Internal Profit Order','Investor Purchase Option','Index Price Offer']},
+    {q:'Which body regulates the Indian stock market?', a:['SEBI','RBI','IRDAI','NABARD']},
+    {q:'A "bull market" means prices are generally?', a:['Rising','Falling','Frozen','Random']},
+    {q:'A "bear market" means prices are generally?', a:['Falling','Rising','Fixed','Doubling']},
+    {q:'NSE stands for?', a:['National Stock Exchange','New Share Exchange','National Savings Exchange','Net Share Estimate']},
+    {q:'BSE stands for?', a:['Bombay Stock Exchange','Bharat Stock Exchange','Bank Stock Exchange','Business Stock Exchange']},
+    {q:'A "blue chip" stock refers to?', a:['Shares of large, financially stable companies','Only IT company shares','Newly listed penny stocks','Government bonds']},
+    {q:'A Demat account is used to?', a:['Hold shares electronically','Take loans','Pay taxes','Book FD']},
+    {q:'The P/E ratio compares a stock\'s price to its?', a:['Earnings per share','Dividend amount','Face value','Market cap only']},
+    {q:'Buying and selling a stock on the same day is called?', a:['Intraday trading','Long-term investing','SIP','Demat holding']},
+    {q:'A company\'s dividend is?', a:['A share of profit paid to shareholders','A loan to the company','A type of tax','A stock split']},
+    {q:'Market capitalization of a company means?', a:['Total value of its shares outstanding','Its yearly profit','Its total debt','Its office locations']},
+    {q:'A stop-loss order is placed to?', a:['Limit a potential loss','Guarantee a profit','Avoid taxes','Buy more shares automatically']},
+    {q:'Nifty 50 tracks the top companies on which exchange?', a:['NSE','BSE','MCX','NCDEX']},
+    {q:'Sensex tracks the top companies on which exchange?', a:['BSE','NSE','MCX','NCDEX']},
+    {q:'Studying a company\'s financial health to invest is called?', a:['Fundamental analysis','Technical analysis','Astrology','Guesswork']},
+    {q:'Studying price charts and patterns is called?', a:['Technical analysis','Fundamental analysis','Tax planning','Insurance analysis']},
+    {q:'A "circuit breaker" in markets is used to?', a:['Halt trading and control volatility','Increase share price','Guarantee returns','Close the exchange permanently']},
+    {q:'Owning one share of a company means you own?', a:['A small part of that company','The whole company','A loan to the company','A government bond']},
+    {q:'"Volatility" in the stock market refers to?', a:['How much prices fluctuate','Guaranteed annual return','The dividend rate','The company\'s office size']}
+  ];
   function _qbShuffle(arr){ arr=arr.slice(); for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=arr[i];arr[i]=arr[j];arr[j]=t; } return arr; }
-  function loadMfBank(){
-    if(!confirm('Load 5 fresh Mutual Fund / SIP questions into the slots? This replaces the current 5.')) return;
-    var picked=_qbShuffle(MF_QBANK).slice(0,5);
-    var arr=picked.map(function(item){
+  function _buildBankFromTopic(QBANK){
+    var picked=_qbShuffle(QBANK).slice(0,5);
+    return picked.map(function(item){
       var correctText=item.a[0];
       var opts=_qbShuffle(item.a);           // shuffle so the answer isn't always "A"
       var correct=opts.indexOf(correctText);
       return { type:'mcq', text:item.q, opts:opts, correct:(correct<0?0:correct), time:20, prize:'' };
     });
-    try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}
-    renderBank();
+  }
+  async function loadMfBank(){
+    if(!confirm('Load 5 fresh Mutual Fund / SIP questions into the slots? This replaces the current 5 on ALL your devices.')) return;
+    var arr=_buildBankFromTopic(MF_QBANK);
+    host.bankCache=arr; renderBank();               // instant local update
+    await writeBankToFirestore(arr);                // syncs to every other admin device
+  }
+  async function loadShareBank(){
+    if(!confirm('Load 5 fresh Share Market questions into the slots? This replaces the current 5 on ALL your devices.')) return;
+    var arr=_buildBankFromTopic(SHARE_QBANK);
+    host.bankCache=arr; renderBank();
+    await writeBankToFirestore(arr);
   }
 
   function isPlayMode(){
@@ -236,6 +280,14 @@ window.QUIZ = (function(){
     if(host.unsubPlayers) host.unsubPlayers();
     if(host.unsubResp) host.unsubResp();
     if(host.unsubDoc) host.unsubDoc();
+    if(host.unsubBank) host.unsubBank();
+    // Question Bank sync: whichever admin device edits/loads a topic, every
+    // other admin device (laptop, mobile, etc.) sees the same 5 questions.
+    host.unsubBank = BANKDOC().onSnapshot(function(doc){
+      var d=doc.data()||{};
+      host.bankCache = (d.arr && d.arr.length) ? d.arr : defaultBankArr();
+      renderBank();
+    }, function(){});
     host.unsubDoc = DOC().onSnapshot(function(doc){
       var d=doc.data()||{};
       host.liveSessionId = d.sessionId || host.liveSessionId;
@@ -394,9 +446,9 @@ window.QUIZ = (function(){
   }
 
   function loadBank(){
+    if(host.bankCache && host.bankCache.length) return host.bankCache;   // synced from Firestore
     try{ var b=JSON.parse(localStorage.getItem(BANK_KEY)); if(b&&b.length) return b; }catch(e){}
-    var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
-    return arr;
+    return defaultBankArr();
   }
   function renderBank(){
     var host_bank=loadBank();
@@ -440,19 +492,22 @@ window.QUIZ = (function(){
       prize:((document.getElementById('qb'+n+'-prize')||{}).value||'').trim()
     };
   }
-  function saveBank(){
+  async function saveBank(){
     var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
-    try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}
-    alert('All 5 questions saved. Hit "Push" whenever you are ready.');
+    host.bankCache=arr;
+    await writeBankToFirestore(arr);
+    alert('All 5 questions saved and synced to all your devices. Hit "Push" whenever you are ready.');
   }
-  function clearBank(){
-    if(!confirm('Clear all 5 questions?')) return;
-    try{ localStorage.removeItem(BANK_KEY); }catch(e){}
+  async function clearBank(){
+    if(!confirm('Clear all 5 questions on ALL your devices?')) return;
+    var arr=defaultBankArr();
+    host.bankCache=arr;
+    await writeBankToFirestore(arr);
     renderBank();
   }
   async function pushQuestion(n){
     var _cs=document.getElementById('quiz-conn'); if(_cs){ _cs.textContent='⏳ Push Q'+(n+1)+' clicked — sending…'; _cs.style.color='#b45309'; }
-    saveBankSilent();
+    saveBankSilent();  // fire-and-forget sync; push proceeds immediately using current DOM values
     var q=readBankRow(n);
     if(!q.text){ alert('Q'+(n+1)+' is empty — please enter the question first.'); return; }
     var options=[];
@@ -463,9 +518,10 @@ window.QUIZ = (function(){
     }
     await launchQuestionObj({type:q.type, text:q.text, options:options, correct:q.correct, time:q.time, prize:q.prize});
   }
-  function saveBankSilent(){
+  async function saveBankSilent(){
     var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
-    try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}
+    host.bankCache=arr;
+    await writeBankToFirestore(arr);
   }
 
   async function launchQuestionObj(q){
@@ -961,7 +1017,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl
   };
