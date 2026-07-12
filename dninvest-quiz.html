@@ -78,9 +78,9 @@ input,select,textarea,button{font-family:inherit}
 <!-- ══ HOST CONTROLS (secret ?host link) ══ -->
 <div id="hostWrap">
   <div class="host-hdr">
-    <div class="host-title">🎯 Seminar Quiz <span>— Live MCQ / buzzer for clients · D N Investment</span><div id="quiz-conn" style="font-size:.75rem;font-weight:700;margin-top:3px;color:#5d6e8a">🔌 Connecting…</div></div>
+    <div class="host-title">🎯 Seminar Quiz <span>— Live MCQ / Buzzer For Clients · D N Investment</span><div id="quiz-conn" style="font-size:.75rem;font-weight:700;margin-top:3px;color:#5d6e8a">🔌 Connecting…</div></div>
     <div style="display:flex;gap:6px">
-      <button class="btn btn-outline" onclick="QUIZ.newSession()" title="New quiz — resets players & answers">🔄 Reset / New Quiz</button>
+      <button class="btn btn-outline" onclick="QUIZ.newSession()" title="New Quiz — Resets Players & Answers">🔄 Reset / New Quiz</button>
     </div>
   </div>
         <div id="quiz-host-body" style="display:flex;flex-direction:column;gap:14px">
@@ -89,13 +89,13 @@ input,select,textarea,button{font-family:inherit}
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
             <div id="quiz-qr-box" style="flex-shrink:0"></div>
             <div style="flex:1;min-width:220px">
-              <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 How clients join</div>
-              <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Show the QR on screen or share the link. No login — just enter a name to join.</div>
+              <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 How Clients Join</div>
+              <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Show The QR On Screen Or Share The Link. No Login — Just Enter A Name To Join.</div>
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="text" id="quiz-join-link" readonly style="flex:1;min-width:180px;padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.78rem" onclick="QUIZ.copyLink()">📋 Copy</button>
               </div>
-              <div style="margin-top:10px;font-size:.82rem">👥 Joined players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
+              <div style="margin-top:10px;font-size:.82rem">👥 Joined Players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
               <div id="quiz-player-names" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
               <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Open Big Screen (LCD)</button></div>
             </div>
@@ -104,7 +104,7 @@ input,select,textarea,button{font-family:inherit}
           <!-- Question bank (up to 5, pre-filled — host just pushes) -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — fill these in advance, then just hit "Push" during the seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(auto-synced to all your devices)</span></div>
+              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — Fill These In Advance, Then Just Hit "Push" During The Seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(Auto-Synced To All Your Devices)</span></div>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
@@ -119,13 +119,13 @@ input,select,textarea,button{font-family:inherit}
           <!-- Live results -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-              <div style="font-weight:700;font-size:.95rem">📊 Live results <span style="color:var(--teal);font-weight:800;font-size:.8rem">· 👥 <span id="quiz-player-count-2">0</span> joined</span></div>
+              <div style="font-weight:700;font-size:.95rem">📊 Live Results <span style="color:var(--teal);font-weight:800;font-size:.8rem">· 👥 <span id="quiz-player-count-2">0</span> Joined</span></div>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.8rem" onclick="QUIZ.clearResults()">🧹 Clear Results</button>
                 <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
               </div>
             </div>
-            <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">No question is live.</div>
+            <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">No Question Is Live.</div>
             <div id="quiz-results"></div>
           </div>
 
@@ -138,7 +138,7 @@ input,select,textarea,button{font-family:inherit}
                 <button class="btn btn-outline admin-only-inc" style="padding:6px 10px;font-size:.8rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteResultsLog()">🗑️ Delete All</button>
               </div>
             </div>
-            <div id="quiz-saved-results" style="font-size:.82rem;color:var(--gray)">No saved results yet. Push or reveal a question to save it here.</div>
+            <div id="quiz-saved-results" style="font-size:.82rem;color:var(--gray)">No Saved Results Yet. Push Or Reveal A Question To Save It Here.</div>
           </div>
 
         </div>
@@ -171,109 +171,109 @@ window.QUIZ = (function(){
   }
   // ── Ready-made Mutual Fund / SIP question bank (correct answer is a[0]) ──
   var MF_QBANK=[
-    {q:'What does SIP stand for?', a:['Systematic Investment Plan','Simple Interest Plan','Secure Income Plan','Stock Investment Product']},
-    {q:'What is a mutual fund?', a:['A pool of money from many people, invested together','A type of bank loan','A government pension scheme','A single company\'s stock']},
-    {q:'Which authority regulates mutual funds in India?', a:['SEBI','RBI','IRDAI','Post Office']},
-    {q:'What is NAV in a mutual fund?', a:['The price of one unit of a mutual fund','The name of a fund house','A type of tax','A bank account number']},
-    {q:'In a SIP, how do you invest money?', a:['A fixed amount every month','A lump sum only once','Only in gold','With no fixed schedule']},
-    {q:'What is the biggest benefit of SIP?', a:['You buy more units when prices are low','Guaranteed high returns','Zero risk always','Fixed monthly profit']},
-    {q:'What does an equity fund mainly invest in?', a:['Shares of companies','Government bonds','Gold','Bank fixed deposits']},
-    {q:'What does a debt fund mainly invest in?', a:['Bonds and fixed income','Company shares','Real estate','Gold']},
-    {q:'What is the main benefit of an ELSS fund?', a:['Saving tax','Getting a guaranteed return','Getting zero risk','Getting free insurance']},
-    {q:'What is the lock-in period of an ELSS fund?', a:['3 years','1 year','5 years','No lock-in']},
-    {q:'What does diversification mean?', a:['Spreading your money across different investments','Putting all money in one stock','Only buying gold','Avoiding equity completely']},
-    {q:'Which type of fund is usually the safest?', a:['Liquid fund','Small-cap fund','Sector fund','Mid-cap fund']},
-    {q:'What is an expense ratio?', a:['A yearly fee charged by the fund','Your profit from the fund','A one-time entry tax','A penalty for withdrawing']},
-    {q:'What does a large-cap fund mainly invest in?', a:['Big, well-known companies','New startups only','Only small companies','Foreign bonds']},
-    {q:'What does SWP stand for?', a:['Systematic Withdrawal Plan','Small Wealth Plan','Secure Wealth Product','Stock Weekly Plan']},
-    {q:'When is the best time to start investing?', a:['As early as possible','Only after age 50','Only during a market crash','Never']},
-    {q:'Why is KYC required?', a:['To start investing in mutual funds','To withdraw money only','To open a bank locker','To book train tickets']},
-    {q:'Who manages your money in a mutual fund?', a:['A fund manager','Your bank teller','SEBI','The government']},
-    {q:'Are mutual fund returns fixed or market-linked?', a:['Market-linked, not fixed','Always fixed','Always positive','Guaranteed by the government']},
-    {q:'What is compounding?', a:['Earning returns on your returns over time','A one-time bonus payment','A type of tax','A withdrawal penalty']},
-    {q:'What does AUM stand for in mutual funds?', a:['Total money managed by a fund','A type of tax form','A fixed deposit scheme','A government subsidy']},
-    {q:'What does a sector fund invest in?', a:['Just one industry, like banking or IT','All industries equally','Only gold','Only government bonds']},
-    {q:'What does a hybrid fund invest in?', a:['Both shares and bonds together','Only shares','Only bonds','Only gold']},
-    {q:'What does an index fund do?', a:['It copies a market index like Nifty','It picks stocks randomly','It invests only in banks','It guarantees fixed returns']},
-    {q:'What does it mean to redeem a mutual fund?', a:['Withdrawing your money from it','Adding more money to it','Changing the fund manager','Paying an extra tax']},
-    {q:'What is an exit load?', a:['A small fee for withdrawing too early','A bonus for staying invested','A type of insurance','A yearly tax refund']},
-    {q:'What is an AMC (fund house)?', a:['The company that manages the mutual fund','The company that regulates all banks','The company that prints currency notes','The company that collects income tax']},
-    {q:'What is a "unit" in a mutual fund?', a:['One small share of the fund you own','A type of loan','A tax certificate','A bank cheque']},
-    {q:'What is the advantage of a direct plan?', a:['It usually has a lower yearly fee','It usually has a higher yearly fee','It gives no returns at all','It gives extra insurance cover']},
-    {q:'What does a regular plan usually include?', a:['A commission paid to a distributor','Extra government tax','A free insurance policy','Zero fees']},
-    {q:'What does asset allocation mean?', a:['Deciding how to split money between shares, bonds, etc.','Buying only one stock','Avoiding all investments','Keeping all money in cash']},
-    {q:'Why should you start a SIP early?', a:['To get more benefit from compounding','To avoid paying any tax','To get a fixed guaranteed return','To skip the KYC process']},
-    {q:'What does STP stand for?', a:['Systematic Transfer Plan','Stock Transfer Process','Secure Trading Plan','Systematic Tax Plan']},
-    {q:'What is STP used for?', a:['Moving money slowly from one fund to another','Withdrawing all your money at once','Avoiding KYC','Getting a loan against shares']},
-    {q:'In a "growth option," what happens to your profits?', a:['They are reinvested back into the fund','They are paid out to you every month','They are taxed twice','They are sent to the government']},
-    {q:'Can a mutual fund\'s NAV go down?', a:['Yes, it can fall with the market','No, it always goes up','No, it is fixed by SEBI','Only on weekends']},
-    {q:'What does goal-based investing mean?', a:['Investing with a clear target, like a house or education','Investing without any plan','Only investing in gold','Investing for one day only']},
-    {q:'What does a multi-cap fund invest in?', a:['Big, medium and small companies together','Only big companies','Only small companies','Only government bonds']},
-    {q:'Can you stop a SIP anytime?', a:['Yes, usually with no penalty','No, it is locked for life','Only after 10 years','Only with SEBI\'s permission']},
-    {q:'What is a folio number?', a:['Your unique mutual fund account number','A type of tax form','A bank IFSC code','A stock ticker symbol']},
-    {q:'What does AMFI stand for?', a:['Association of Mutual Funds in India','All India Money Fund Institute','Asset Management Fund of India','Authorized Mutual Fund Investors']},
-    {q:'What is a child plan fund meant for?', a:['Long-term goals like a child\'s education','Daily expenses','Buying gold only','Short-term trading']},
-    {q:'What does the Riskometer show?', a:['How risky a fund is','The fund\'s office address','The fund manager\'s salary','The tax rate on the fund']},
-    {q:'Why should you diversify your investments?', a:['To reduce your overall risk','To guarantee higher returns','To avoid KYC','To pay less tax']},
-    {q:'What does a gold fund mainly invest in?', a:['Gold and gold-related assets','Company shares','Government bonds only','Real estate']},
-    {q:'What does an international fund invest in?', a:['Companies outside India','Only Indian companies','Only gold','Only government schemes']},
-    {q:'What does a mutual fund\'s fact sheet show?', a:['Its performance and portfolio details','Only its office address','The fund manager\'s personal details','Tax slabs']},
-    {q:'What does rebalancing a portfolio mean?', a:['Adjusting it back to your original plan','Withdrawing everything','Doubling your investment','Switching to only cash']},
-    {q:'What is a liquid fund usually used for?', a:['Parking money for a short time','Long-term retirement planning','Buying a house','Paying insurance premiums']},
-    {q:'What is the main goal of long-term investing?', a:['To grow wealth over many years','To make quick money in a week','To avoid all risk completely','To get a government job']}
+    {q:'What Does SIP Stand For?', a:['Systematic Investment Plan','Simple Interest Plan','Secure Income Plan','Stock Investment Product']},
+    {q:'What Is A Mutual Fund?', a:['A Pool Of Money From Many People, Invested Together','A Type Of Bank Loan','A Government Pension Scheme','A Single Company\'s Stock']},
+    {q:'Which Authority Regulates Mutual Funds In India?', a:['SEBI','RBI','IRDAI','Post Office']},
+    {q:'What Is NAV In A Mutual Fund?', a:['The Price Of One Unit Of A Mutual Fund','The Name Of A Fund House','A Type Of Tax','A Bank Account Number']},
+    {q:'In A SIP, How Do You Invest Money?', a:['A Fixed Amount Every Month','A Lump Sum Only Once','Only In Gold','With No Fixed Schedule']},
+    {q:'What Is The Biggest Benefit Of SIP?', a:['You Buy More Units When Prices Are Low','Guaranteed High Returns','Zero Risk Always','Fixed Monthly Profit']},
+    {q:'What Does An Equity Fund Mainly Invest In?', a:['Shares Of Companies','Government Bonds','Gold','Bank Fixed Deposits']},
+    {q:'What Does A Debt Fund Mainly Invest In?', a:['Bonds And Fixed Income','Company Shares','Real Estate','Gold']},
+    {q:'What Is The Main Benefit Of An ELSS Fund?', a:['Saving Tax','Getting A Guaranteed Return','Getting Zero Risk','Getting Free Insurance']},
+    {q:'What Is The Lock-In Period Of An ELSS Fund?', a:['3 Years','1 Year','5 Years','No Lock-In']},
+    {q:'What Does Diversification Mean?', a:['Spreading Your Money Across Different Investments','Putting All Money In One Stock','Only Buying Gold','Avoiding Equity Completely']},
+    {q:'Which Type Of Fund Is Usually The Safest?', a:['Liquid Fund','Small-Cap Fund','Sector Fund','Mid-Cap Fund']},
+    {q:'What Is An Expense Ratio?', a:['A Yearly Fee Charged By The Fund','Your Profit From The Fund','A One-Time Entry Tax','A Penalty For Withdrawing']},
+    {q:'What Does A Large-Cap Fund Mainly Invest In?', a:['Big, Well-Known Companies','New Startups Only','Only Small Companies','Foreign Bonds']},
+    {q:'What Does SWP Stand For?', a:['Systematic Withdrawal Plan','Small Wealth Plan','Secure Wealth Product','Stock Weekly Plan']},
+    {q:'When Is The Best Time To Start Investing?', a:['As Early As Possible','Only After Age 50','Only During A Market Crash','Never']},
+    {q:'Why Is KYC Required?', a:['To Start Investing In Mutual Funds','To Withdraw Money Only','To Open A Bank Locker','To Book Train Tickets']},
+    {q:'Who Manages Your Money In A Mutual Fund?', a:['A Fund Manager','Your Bank Teller','SEBI','The Government']},
+    {q:'Are Mutual Fund Returns Fixed Or Market-Linked?', a:['Market-Linked, Not Fixed','Always Fixed','Always Positive','Guaranteed By The Government']},
+    {q:'What Is Compounding?', a:['Earning Returns On Your Returns Over Time','A One-Time Bonus Payment','A Type Of Tax','A Withdrawal Penalty']},
+    {q:'What Does AUM Stand For In Mutual Funds?', a:['Total Money Managed By A Fund','A Type Of Tax Form','A Fixed Deposit Scheme','A Government Subsidy']},
+    {q:'What Does A Sector Fund Invest In?', a:['Just One Industry, Like Banking Or IT','All Industries Equally','Only Gold','Only Government Bonds']},
+    {q:'What Does A Hybrid Fund Invest In?', a:['Both Shares And Bonds Together','Only Shares','Only Bonds','Only Gold']},
+    {q:'What Does An Index Fund Do?', a:['It Copies A Market Index Like Nifty','It Picks Stocks Randomly','It Invests Only In Banks','It Guarantees Fixed Returns']},
+    {q:'What Does It Mean To Redeem A Mutual Fund?', a:['Withdrawing Your Money From It','Adding More Money To It','Changing The Fund Manager','Paying An Extra Tax']},
+    {q:'What Is An Exit Load?', a:['A Small Fee For Withdrawing Too Early','A Bonus For Staying Invested','A Type Of Insurance','A Yearly Tax Refund']},
+    {q:'What Is An AMC (Fund House)?', a:['The Company That Manages The Mutual Fund','The Company That Regulates All Banks','The Company That Prints Currency Notes','The Company That Collects Income Tax']},
+    {q:'What Is A "Unit" In A Mutual Fund?', a:['One Small Share Of The Fund You Own','A Type Of Loan','A Tax Certificate','A Bank Cheque']},
+    {q:'What Is The Advantage Of A Direct Plan?', a:['It Usually Has A Lower Yearly Fee','It Usually Has A Higher Yearly Fee','It Gives No Returns At All','It Gives Extra Insurance Cover']},
+    {q:'What Does A Regular Plan Usually Include?', a:['A Commission Paid To A Distributor','Extra Government Tax','A Free Insurance Policy','Zero Fees']},
+    {q:'What Does Asset Allocation Mean?', a:['Deciding How To Split Money Between Shares, Bonds, Etc.','Buying Only One Stock','Avoiding All Investments','Keeping All Money In Cash']},
+    {q:'Why Should You Start A SIP Early?', a:['To Get More Benefit From Compounding','To Avoid Paying Any Tax','To Get A Fixed Guaranteed Return','To Skip The KYC Process']},
+    {q:'What Does STP Stand For?', a:['Systematic Transfer Plan','Stock Transfer Process','Secure Trading Plan','Systematic Tax Plan']},
+    {q:'What Is STP Used For?', a:['Moving Money Slowly From One Fund To Another','Withdrawing All Your Money At Once','Avoiding KYC','Getting A Loan Against Shares']},
+    {q:'In A "Growth Option," What Happens To Your Profits?', a:['They Are Reinvested Back Into The Fund','They Are Paid Out To You Every Month','They Are Taxed Twice','They Are Sent To The Government']},
+    {q:'Can A Mutual Fund\'s NAV Go Down?', a:['Yes, It Can Fall With The Market','No, It Always Goes Up','No, It Is Fixed By SEBI','Only On Weekends']},
+    {q:'What Does Goal-Based Investing Mean?', a:['Investing With A Clear Target, Like A House Or Education','Investing Without Any Plan','Only Investing In Gold','Investing For One Day Only']},
+    {q:'What Does A Multi-Cap Fund Invest In?', a:['Big, Medium And Small Companies Together','Only Big Companies','Only Small Companies','Only Government Bonds']},
+    {q:'Can You Stop A SIP Anytime?', a:['Yes, Usually With No Penalty','No, It Is Locked For Life','Only After 10 Years','Only With SEBI\'s Permission']},
+    {q:'What Is A Folio Number?', a:['Your Unique Mutual Fund Account Number','A Type Of Tax Form','A Bank IFSC Code','A Stock Ticker Symbol']},
+    {q:'What Does AMFI Stand For?', a:['Association Of Mutual Funds In India','All India Money Fund Institute','Asset Management Fund Of India','Authorized Mutual Fund Investors']},
+    {q:'What Is A Child Plan Fund Meant For?', a:['Long-Term Goals Like A Child\'s Education','Daily Expenses','Buying Gold Only','Short-Term Trading']},
+    {q:'What Does The Riskometer Show?', a:['How Risky A Fund Is','The Fund\'s Office Address','The Fund Manager\'s Salary','The Tax Rate On The Fund']},
+    {q:'Why Should You Diversify Your Investments?', a:['To Reduce Your Overall Risk','To Guarantee Higher Returns','To Avoid KYC','To Pay Less Tax']},
+    {q:'What Does A Gold Fund Mainly Invest In?', a:['Gold And Gold-Related Assets','Company Shares','Government Bonds Only','Real Estate']},
+    {q:'What Does An International Fund Invest In?', a:['Companies Outside India','Only Indian Companies','Only Gold','Only Government Schemes']},
+    {q:'What Does A Mutual Fund\'s Fact Sheet Show?', a:['Its Performance And Portfolio Details','Only Its Office Address','The Fund Manager\'s Personal Details','Tax Slabs']},
+    {q:'What Does Rebalancing A Portfolio Mean?', a:['Adjusting It Back To Your Original Plan','Withdrawing Everything','Doubling Your Investment','Switching To Only Cash']},
+    {q:'What Is A Liquid Fund Usually Used For?', a:['Parking Money For A Short Time','Long-Term Retirement Planning','Buying A House','Paying Insurance Premiums']},
+    {q:'What Is The Main Goal Of Long-Term Investing?', a:['To Grow Wealth Over Many Years','To Make Quick Money In A Week','To Avoid All Risk Completely','To Get A Government Job']}
   ];
   // ── Ready-made Share Market question bank (correct answer is a[0]) ──
   var SHARE_QBANK=[
-    {q:'What does IPO stand for?', a:['Initial Public Offering','Internal Profit Order','Investor Purchase Option','Index Price Offer']},
-    {q:'Which body regulates the Indian stock market?', a:['SEBI','RBI','IRDAI','NABARD']},
-    {q:'What does a "bull market" mean?', a:['Prices are generally rising','Prices are generally falling','Prices are frozen','Prices move randomly']},
-    {q:'What does a "bear market" mean?', a:['Prices are generally falling','Prices are generally rising','Prices are fixed','Prices are doubling']},
-    {q:'What does NSE stand for?', a:['National Stock Exchange','New Share Exchange','National Savings Exchange','Net Share Estimate']},
-    {q:'What does BSE stand for?', a:['Bombay Stock Exchange','Bharat Stock Exchange','Bank Stock Exchange','Business Stock Exchange']},
-    {q:'What is a "blue chip" stock?', a:['A share of a large, financially stable company','An IT company share only','A newly listed penny stock','A government bond']},
-    {q:'What is a Demat account used for?', a:['Holding shares electronically','Taking loans','Paying taxes','Booking a fixed deposit']},
-    {q:'What does the P/E ratio compare?', a:['A stock\'s price to its earnings per share','A stock\'s price to its dividend','A stock\'s price to its face value','A stock\'s market cap only']},
-    {q:'What is it called when you buy and sell a stock on the same day?', a:['Intraday trading','Long-term investing','SIP','Demat holding']},
-    {q:'What is a dividend?', a:['A share of profit paid to shareholders','A loan to the company','A type of tax','A stock split']},
-    {q:'What does market capitalization mean?', a:['The total value of a company\'s shares','Its yearly profit','Its total debt','Its office locations']},
-    {q:'Why do investors place a stop-loss order?', a:['To limit a potential loss','To guarantee a profit','To avoid taxes','To automatically buy more shares']},
-    {q:'Which exchange does Nifty 50 track?', a:['NSE','BSE','MCX','NCDEX']},
-    {q:'Which exchange does Sensex track?', a:['BSE','NSE','MCX','NCDEX']},
-    {q:'What is it called when you study a company\'s financial health before investing?', a:['Fundamental analysis','Technical analysis','Astrology','Guesswork']},
-    {q:'What is it called when you study price charts and patterns?', a:['Technical analysis','Fundamental analysis','Tax planning','Insurance analysis']},
-    {q:'What is a "circuit breaker" used for in the stock market?', a:['To halt trading and control volatility','To increase share price','To guarantee returns','To close the exchange permanently']},
-    {q:'What do you own when you buy one share of a company?', a:['A small part of that company','The whole company','A loan to the company','A government bond']},
-    {q:'What does "volatility" mean in the stock market?', a:['How much prices fluctuate','A guaranteed annual return','The dividend rate','The company\'s office size']},
-    {q:'What is a stock exchange?', a:['A marketplace to buy and sell shares','A government tax office','A type of bank','An insurance company']},
-    {q:'What does a stockbroker do?', a:['Buys and sells shares on your behalf','Prints share certificates','Regulates all banks','Fixes share prices']},
-    {q:'What is brokerage?', a:['A fee charged for buying or selling shares','A type of dividend','A government subsidy','A stock split']},
-    {q:'What is a "portfolio"?', a:['Your collection of investments','A single stock only','A bank passbook','A tax return form']},
-    {q:'What is a "bonus share"?', a:['An extra free share given to existing shareholders','A cash prize from the company','A type of loan','A government grant']},
-    {q:'What does a "stock split" mean?', a:['One share is divided into multiple shares','Two companies merge','The company shuts down','Shares are cancelled']},
-    {q:'What is the "face value" of a share?', a:['Its original printed value','Its current market price','Its highest ever price','Its dividend amount']},
-    {q:'What is a "penny stock"?', a:['A very low-priced, risky stock','A stock worth crores','A government bond','A gold-backed security']},
-    {q:'What does "short selling" mean?', a:['Selling a stock you don\'t own, hoping the price falls','Buying a stock for the long term','Selling gold','Buying shares in bulk']},
-    {q:'What is a "listed company"?', a:['A company whose shares trade on a stock exchange','A company owned only by the founder','A company that cannot be bought or sold','A company that gives away shares for free']},
-    {q:'What does an index like Nifty or Sensex represent?', a:['A group of stocks representing the market','A single company\'s stock','A type of mutual fund','A government scheme']},
-    {q:'What does "trading volume" mean?', a:['The number of shares traded in a period','The price of one share','The company\'s total profit','The number of employees']},
-    {q:'What is a candlestick chart used for?', a:['Showing how a stock\'s price moved over time','Showing a company\'s office locations','Showing tax records','Showing dividend history']},
-    {q:'What does "support" mean in a stock chart?', a:['A price level where a stock tends to stop falling','A price level where a stock tends to stop rising','A level where a stock always doubles','A level where a stock gets delisted']},
-    {q:'What does "resistance" mean in a stock chart?', a:['A price level where a stock tends to stop rising','A price level where a stock tends to stop falling','A level where a stock gets delisted','A level where a stock splits automatically']},
-    {q:'What does "arbitrage" mean?', a:['Profiting from price differences of the same asset in different markets','Getting a government subsidy','Earning only from dividends','Printing currency']},
-    {q:'What is a "derivative"?', a:['A contract whose value depends on another asset','A contract with no value','A type of gold coin','A company\'s office lease']},
-    {q:'What does an "option" give you in trading?', a:['The right, but not the obligation, to buy or sell','A guaranteed profit','Free shares','A bank loan']},
-    {q:'What is a "futures contract"?', a:['An agreement to buy or sell at a fixed price on a future date','An agreement to buy shares at any price later','A way to avoid paying tax','A way to get a dividend early']},
-    {q:'What does "margin trading" mean?', a:['Borrowing money to buy more shares','Buying only with your own cash','Avoiding the stock market','Investing only in mutual funds']},
-    {q:'What is a "trading account" used for?', a:['Placing buy and sell orders in the stock market','Storing gold','Paying income tax','Applying for a loan']},
-    {q:'What is the difference between a Demat account and a trading account?', a:['A Demat account holds shares, a trading account is for buy/sell orders','They are exactly the same','A Demat account is for gold only','A trading account is for filing tax']},
-    {q:'What does "settlement" mean in stock trading?', a:['Transferring shares and money after a trade','Cancelling a trade','Paying tax on dividends','Closing your Demat account']},
-    {q:'What does "T+1 settlement" mean?', a:['A trade settles one working day after the transaction','A trade settles instantly','A trade settles after one month','A trade settles after one year']},
-    {q:'What does "dividend yield" mean?', a:['Dividend as a percentage of the share price','The company\'s total profit','The number of shares issued','The stock\'s face value']},
-    {q:'What is "insider trading"?', a:['Illegal trading using secret company information','A legal way to buy shares cheap','A type of mutual fund','A government scheme']},
-    {q:'What is a "market order"?', a:['An order to buy or sell immediately at the current price','An order to buy at a fixed future date only','An order with no price limit forever','An order to cancel all pending trades']},
-    {q:'What is a "limit order"?', a:['An order to buy or sell only at a specific price or better','An order to buy at any price immediately','An order to buy only from one broker','An order to sell only on Fridays']},
-    {q:'What is it called when you buy shares for many years, expecting them to grow?', a:['Long-term investing','Intraday trading','Short selling','Arbitrage']},
-    {q:'What does a "rights issue" allow existing shareholders to do?', a:['Buy new shares at a discounted price','Get free cash immediately','Avoid paying tax forever','Become the company\'s owner instantly']}
+    {q:'What Does IPO Stand For?', a:['Initial Public Offering','Internal Profit Order','Investor Purchase Option','Index Price Offer']},
+    {q:'Which Body Regulates The Indian Stock Market?', a:['SEBI','RBI','IRDAI','NABARD']},
+    {q:'What Does A "Bull Market" Mean?', a:['Prices Are Generally Rising','Prices Are Generally Falling','Prices Are Frozen','Prices Move Randomly']},
+    {q:'What Does A "Bear Market" Mean?', a:['Prices Are Generally Falling','Prices Are Generally Rising','Prices Are Fixed','Prices Are Doubling']},
+    {q:'What Does NSE Stand For?', a:['National Stock Exchange','New Share Exchange','National Savings Exchange','Net Share Estimate']},
+    {q:'What Does BSE Stand For?', a:['Bombay Stock Exchange','Bharat Stock Exchange','Bank Stock Exchange','Business Stock Exchange']},
+    {q:'What Is A "Blue Chip" Stock?', a:['A Share Of A Large, Financially Stable Company','An IT Company Share Only','A Newly Listed Penny Stock','A Government Bond']},
+    {q:'What Is A Demat Account Used For?', a:['Holding Shares Electronically','Taking Loans','Paying Taxes','Booking A Fixed Deposit']},
+    {q:'What Does The P/E Ratio Compare?', a:['A Stock\'s Price To Its Earnings Per Share','A Stock\'s Price To Its Dividend','A Stock\'s Price To Its Face Value','A Stock\'s Market Cap Only']},
+    {q:'What Is It Called When You Buy And Sell A Stock On The Same Day?', a:['Intraday Trading','Long-Term Investing','SIP','Demat Holding']},
+    {q:'What Is A Dividend?', a:['A Share Of Profit Paid To Shareholders','A Loan To The Company','A Type Of Tax','A Stock Split']},
+    {q:'What Does Market Capitalization Mean?', a:['The Total Value Of A Company\'s Shares','Its Yearly Profit','Its Total Debt','Its Office Locations']},
+    {q:'Why Do Investors Place A Stop-Loss Order?', a:['To Limit A Potential Loss','To Guarantee A Profit','To Avoid Taxes','To Automatically Buy More Shares']},
+    {q:'Which Exchange Does Nifty 50 Track?', a:['NSE','BSE','MCX','NCDEX']},
+    {q:'Which Exchange Does Sensex Track?', a:['BSE','NSE','MCX','NCDEX']},
+    {q:'What Is It Called When You Study A Company\'s Financial Health Before Investing?', a:['Fundamental Analysis','Technical Analysis','Astrology','Guesswork']},
+    {q:'What Is It Called When You Study Price Charts And Patterns?', a:['Technical Analysis','Fundamental Analysis','Tax Planning','Insurance Analysis']},
+    {q:'What Is A "Circuit Breaker" Used For In The Stock Market?', a:['To Halt Trading And Control Volatility','To Increase Share Price','To Guarantee Returns','To Close The Exchange Permanently']},
+    {q:'What Do You Own When You Buy One Share Of A Company?', a:['A Small Part Of That Company','The Whole Company','A Loan To The Company','A Government Bond']},
+    {q:'What Does "Volatility" Mean In The Stock Market?', a:['How Much Prices Fluctuate','A Guaranteed Annual Return','The Dividend Rate','The Company\'s Office Size']},
+    {q:'What Is A Stock Exchange?', a:['A Marketplace To Buy And Sell Shares','A Government Tax Office','A Type Of Bank','An Insurance Company']},
+    {q:'What Does A Stockbroker Do?', a:['Buys And Sells Shares On Your Behalf','Prints Share Certificates','Regulates All Banks','Fixes Share Prices']},
+    {q:'What Is Brokerage?', a:['A Fee Charged For Buying Or Selling Shares','A Type Of Dividend','A Government Subsidy','A Stock Split']},
+    {q:'What Is A "Portfolio"?', a:['Your Collection Of Investments','A Single Stock Only','A Bank Passbook','A Tax Return Form']},
+    {q:'What Is A "Bonus Share"?', a:['An Extra Free Share Given To Existing Shareholders','A Cash Prize From The Company','A Type Of Loan','A Government Grant']},
+    {q:'What Does A "Stock Split" Mean?', a:['One Share Is Divided Into Multiple Shares','Two Companies Merge','The Company Shuts Down','Shares Are Cancelled']},
+    {q:'What Is The "Face Value" Of A Share?', a:['Its Original Printed Value','Its Current Market Price','Its Highest Ever Price','Its Dividend Amount']},
+    {q:'What Is A "Penny Stock"?', a:['A Very Low-Priced, Risky Stock','A Stock Worth Crores','A Government Bond','A Gold-Backed Security']},
+    {q:'What Does "Short Selling" Mean?', a:['Selling A Stock You Don\'t Own, Hoping The Price Falls','Buying A Stock For The Long Term','Selling Gold','Buying Shares In Bulk']},
+    {q:'What Is A "Listed Company"?', a:['A Company Whose Shares Trade On A Stock Exchange','A Company Owned Only By The Founder','A Company That Cannot Be Bought Or Sold','A Company That Gives Away Shares For Free']},
+    {q:'What Does An Index Like Nifty Or Sensex Represent?', a:['A Group Of Stocks Representing The Market','A Single Company\'s Stock','A Type Of Mutual Fund','A Government Scheme']},
+    {q:'What Does "Trading Volume" Mean?', a:['The Number Of Shares Traded In A Period','The Price Of One Share','The Company\'s Total Profit','The Number Of Employees']},
+    {q:'What Is A Candlestick Chart Used For?', a:['Showing How A Stock\'s Price Moved Over Time','Showing A Company\'s Office Locations','Showing Tax Records','Showing Dividend History']},
+    {q:'What Does "Support" Mean In A Stock Chart?', a:['A Price Level Where A Stock Tends To Stop Falling','A Price Level Where A Stock Tends To Stop Rising','A Level Where A Stock Always Doubles','A Level Where A Stock Gets Delisted']},
+    {q:'What Does "Resistance" Mean In A Stock Chart?', a:['A Price Level Where A Stock Tends To Stop Rising','A Price Level Where A Stock Tends To Stop Falling','A Level Where A Stock Gets Delisted','A Level Where A Stock Splits Automatically']},
+    {q:'What Does "Arbitrage" Mean?', a:['Profiting From Price Differences Of The Same Asset In Different Markets','Getting A Government Subsidy','Earning Only From Dividends','Printing Currency']},
+    {q:'What Is A "Derivative"?', a:['A Contract Whose Value Depends On Another Asset','A Contract With No Value','A Type Of Gold Coin','A Company\'s Office Lease']},
+    {q:'What Does An "Option" Give You In Trading?', a:['The Right, But Not The Obligation, To Buy Or Sell','A Guaranteed Profit','Free Shares','A Bank Loan']},
+    {q:'What Is A "Futures Contract"?', a:['An Agreement To Buy Or Sell At A Fixed Price On A Future Date','An Agreement To Buy Shares At Any Price Later','A Way To Avoid Paying Tax','A Way To Get A Dividend Early']},
+    {q:'What Does "Margin Trading" Mean?', a:['Borrowing Money To Buy More Shares','Buying Only With Your Own Cash','Avoiding The Stock Market','Investing Only In Mutual Funds']},
+    {q:'What Is A "Trading Account" Used For?', a:['Placing Buy And Sell Orders In The Stock Market','Storing Gold','Paying Income Tax','Applying For A Loan']},
+    {q:'What Is The Difference Between A Demat Account And A Trading Account?', a:['A Demat Account Holds Shares, A Trading Account Is For Buy/Sell Orders','They Are Exactly The Same','A Demat Account Is For Gold Only','A Trading Account Is For Filing Tax']},
+    {q:'What Does "Settlement" Mean In Stock Trading?', a:['Transferring Shares And Money After A Trade','Cancelling A Trade','Paying Tax On Dividends','Closing Your Demat Account']},
+    {q:'What Does "T+1 Settlement" Mean?', a:['A Trade Settles One Working Day After The Transaction','A Trade Settles Instantly','A Trade Settles After One Month','A Trade Settles After One Year']},
+    {q:'What Does "Dividend Yield" Mean?', a:['Dividend As A Percentage Of The Share Price','The Company\'s Total Profit','The Number Of Shares Issued','The Stock\'s Face Value']},
+    {q:'What Is "Insider Trading"?', a:['Illegal Trading Using Secret Company Information','A Legal Way To Buy Shares Cheap','A Type Of Mutual Fund','A Government Scheme']},
+    {q:'What Is A "Market Order"?', a:['An Order To Buy Or Sell Immediately At The Current Price','An Order To Buy At A Fixed Future Date Only','An Order With No Price Limit Forever','An Order To Cancel All Pending Trades']},
+    {q:'What Is A "Limit Order"?', a:['An Order To Buy Or Sell Only At A Specific Price Or Better','An Order To Buy At Any Price Immediately','An Order To Buy Only From One Broker','An Order To Sell Only On Fridays']},
+    {q:'What Is It Called When You Buy Shares For Many Years, Expecting Them To Grow?', a:['Long-Term Investing','Intraday Trading','Short Selling','Arbitrage']},
+    {q:'What Does A "Rights Issue" Allow Existing Shareholders To Do?', a:['Buy New Shares At A Discounted Price','Get Free Cash Immediately','Avoid Paying Tax Forever','Become The Company\'s Owner Instantly']}
   ];
   function _qbShuffle(arr){ arr=arr.slice(); for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=arr[i];arr[i]=arr[j];arr[j]=t; } return arr; }
   function _buildBankFromTopic(QBANK){
@@ -286,13 +286,13 @@ window.QUIZ = (function(){
     });
   }
   async function loadMfBank(){
-    if(!confirm('Load 5 fresh Mutual Fund / SIP questions into the slots? This replaces the current 5 on ALL your devices.')) return;
+    if(!confirm('Load 5 Fresh Mutual Fund / SIP Questions Into The Slots? This Replaces The Current 5 On ALL Your Devices.')) return;
     var arr=_buildBankFromTopic(MF_QBANK);
     host.bankCache=arr; renderBank();               // instant local update
     await writeBankToFirestore(arr);                // syncs to every other admin device
   }
   async function loadShareBank(){
-    if(!confirm('Load 5 fresh Share Market questions into the slots? This replaces the current 5 on ALL your devices.')) return;
+    if(!confirm('Load 5 Fresh Share Market Questions Into The Slots? This Replaces The Current 5 On ALL Your Devices.')) return;
     var arr=_buildBankFromTopic(SHARE_QBANK);
     host.bankCache=arr; renderBank();
     await writeBankToFirestore(arr);
@@ -313,7 +313,7 @@ window.QUIZ = (function(){
   async function hostInit(){
     setConnStatus('🔌 Connecting…','#b45309');
     await window.waitForFdb(8000);
-    if(!window.fdb){ setConnStatus('🔴 Firebase not connected'+(window.__fbErr?(' — '+window.__fbErr):''),'#dc2626'); alert('⚠️ Firebase connect nahi hua.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet check karo, phir page reload karo.')); return; }
+    if(!window.fdb){ setConnStatus('🔴 Firebase Not Connected'+(window.__fbErr?(' — '+window.__fbErr):''),'#dc2626'); alert('⚠️ Firebase Connect Nahi Hua.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet Check Karo, Phir Page Reload Karo.')); return; }
     // join link + QR
     var li=document.getElementById('quiz-join-link'); if(li) li.value=joinLink();
     var qr=document.getElementById('quiz-qr-box');
@@ -329,10 +329,10 @@ window.QUIZ = (function(){
         var dd=d.data();
         host.sessionId=dd.sessionId; host.qIndex=dd.qIndex||0; host.type=dd.type||'mcq';
       }
-      setConnStatus('🟢 Connected — ready','#16a34a');
+      setConnStatus('🟢 Connected — Ready','#16a34a');
     }catch(e){
-      setConnStatus('🔴 Firestore blocked: '+(e&&e.message||e),'#dc2626');
-      alert('⚠️ Firestore read/write blocked:\n\n'+(e&&e.message||e)+'\n\n(Security rules ya internet check karo.)');
+      setConnStatus('🔴 Firestore Blocked: '+(e&&e.message||e),'#dc2626');
+      alert('⚠️ Firestore Read/Write Blocked:\n\n'+(e&&e.message||e)+'\n\n(Security Rules Ya Internet Check Karo.)');
     }
     attachHostListeners();
   }
@@ -385,7 +385,7 @@ window.QUIZ = (function(){
     entries.sort(function(a,b){ var sa=a.savedAt&&a.savedAt.toMillis?a.savedAt.toMillis():0; var sb=b.savedAt&&b.savedAt.toMillis?b.savedAt.toMillis():0; return sa-sb; });
     var cnt=document.getElementById('quiz-saved-count');
     if(cnt) cnt.textContent=entries.length?('· '+entries.length+' question'+(entries.length===1?'':'s')):'';
-    if(!entries.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No saved results yet. Push or reveal a question to save it here.</div>'; return; }
+    if(!entries.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No Saved Results Yet. Push Or Reveal A Question To Save It Here.</div>'; return; }
     var html='';
     entries.forEach(function(e){
       html+='<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">';
@@ -407,11 +407,11 @@ window.QUIZ = (function(){
   }
 
   async function exportResults(){
-    if(typeof XLSX==='undefined'){ alert('Excel library not loaded — check internet and retry.'); return; }
+    if(typeof XLSX==='undefined'){ alert('Excel Library Not Loaded — Check Internet And Retry.'); return; }
     await window.waitForFdb(8000); if(!window.fdb) return;
-    var snap; try{ snap=await RESULTSLOG().get(); }catch(e){ alert('Could not load saved results.'); return; }
+    var snap; try{ snap=await RESULTSLOG().get(); }catch(e){ alert('Could Not Load Saved Results.'); return; }
     var entries=[]; snap.forEach(function(d){ entries.push(d.data()); });
-    if(!entries.length){ alert('No saved results to export yet.'); return; }
+    if(!entries.length){ alert('No Saved Results To Export Yet.'); return; }
     entries.sort(function(a,b){ var sa=a.savedAt&&a.savedAt.toMillis?a.savedAt.toMillis():0; var sb=b.savedAt&&b.savedAt.toMillis?b.savedAt.toMillis():0; return sa-sb; });
     var aoa=[['Q#','Question','Correct Ans','Rank','Name','Answer','Result','Time (s)']];
     entries.forEach(function(e){
@@ -429,17 +429,17 @@ window.QUIZ = (function(){
   }
 
   async function deleteResultsLog(){
-    if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ alert('Admin only.'); return; }
-    if(!confirm('Delete ALL saved quiz results? This cannot be undone.')) return;
+    if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ alert('Admin Only.'); return; }
+    if(!confirm('Delete ALL Saved Quiz Results? This Cannot Be Undone.')) return;
     await window.waitForFdb(8000); if(!window.fdb) return;
     try{
       var snap=await RESULTSLOG().get();
       var batch=window.fdb.batch(); var n=0;
       snap.forEach(function(d){ batch.delete(d.ref); n++; });
       if(n) await batch.commit();
-      var box=document.getElementById('quiz-saved-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No saved results yet.</div>';
+      var box=document.getElementById('quiz-saved-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No Saved Results Yet.</div>';
       var cnt=document.getElementById('quiz-saved-count'); if(cnt) cnt.textContent='';
-    }catch(e){ alert('Delete failed: '+e.message); }
+    }catch(e){ alert('Delete Failed: '+e.message); }
   }
 
   function currentResponses(snap){
@@ -465,7 +465,7 @@ window.QUIZ = (function(){
     var rows = snap ? currentResponses(snap) : [];
     var sid=host.liveSessionId||host.sessionId; var qi=(host.liveQIndex!=null)?host.liveQIndex:host.qIndex;
     var dbg='<div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;font-family:monospace">📥 DB total: '+total+' · matching (sess ...'+String(sid||'—').slice(-5)+' / q'+qi+'): '+rows.length+'</div>';
-    if(!rows.length){ box.innerHTML=dbg+'<div style="color:var(--gray);font-size:.82rem">No answers yet.</div>'; return; }
+    if(!rows.length){ box.innerHTML=dbg+'<div style="color:var(--gray);font-size:.82rem">No Answers Yet.</div>'; return; }
     var html=dbg+'<div style="display:flex;flex-direction:column;gap:6px">';
     rows.forEach(function(r,i){
       var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
@@ -534,12 +534,12 @@ window.QUIZ = (function(){
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
         + '<span style="font-weight:800;color:var(--teal)">Q'+(n+1)+'</span>'
         + '<select id="qb'+n+'-type" onchange="QUIZ.bankTypeChange('+n+')" style="padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">'
-        +   '<option value="mcq"'+(q.type==='mcq'?' selected':'')+'>MCQ (auto)</option>'
+        +   '<option value="mcq"'+(q.type==='mcq'?' selected':'')+'>MCQ (Auto)</option>'
         +   '<option value="buzzer"'+(q.type==='buzzer'?' selected':'')+'>Buzzer</option></select>'
         + '<label style="font-size:.75rem">⏱️<input type="number" id="qb'+n+'-time" value="'+(q.time||20)+'" min="5" max="120" style="width:50px;padding:4px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;margin-left:2px"> sec</label>'
         + '<label style="font-size:.75rem;flex:1;min-width:120px">🎁<input type="text" id="qb'+n+'-prize" value="'+esc(q.prize||'')+'" placeholder="Prize" style="width:100%;padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px"></label>'
         + '</div>'
-        + '<input type="text" id="qb'+n+'-text" value="'+esc(q.text||'')+'" placeholder="Question '+(n+1)+' text…" style="width:100%;box-sizing:border-box;padding:7px;font-size:.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">'
+        + '<input type="text" id="qb'+n+'-text" value="'+esc(q.text||'')+'" placeholder="Question '+(n+1)+' Text…" style="width:100%;box-sizing:border-box;padding:7px;font-size:.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">'
         + '<div id="qb'+n+'-opts" style="display:'+(q.type==='mcq'?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+optRows+'</div>'
         + '<button class="btn btn-teal" style="padding:6px 14px;font-size:.82rem" onclick="QUIZ.pushQuestion('+n+')">🚀 Push Q'+(n+1)+'</button>'
         + '</div>';
@@ -565,10 +565,10 @@ window.QUIZ = (function(){
     var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
     host.bankCache=arr;
     await writeBankToFirestore(arr);
-    alert('All 5 questions saved and synced to all your devices. Hit "Push" whenever you are ready.');
+    alert('All 5 Questions Saved And Synced To All Your Devices. Hit "Push" Whenever You Are Ready.');
   }
   async function clearBank(){
-    if(!confirm('Clear all 5 questions on ALL your devices?')) return;
+    if(!confirm('Clear All 5 Questions On ALL Your Devices?')) return;
     var arr=defaultBankArr();
     host.bankCache=arr;
     await writeBankToFirestore(arr);
@@ -578,12 +578,12 @@ window.QUIZ = (function(){
     var _cs=document.getElementById('quiz-conn'); if(_cs){ _cs.textContent='⏳ Push Q'+(n+1)+' clicked — sending…'; _cs.style.color='#b45309'; }
     saveBankSilent();  // fire-and-forget sync; push proceeds immediately using current DOM values
     var q=readBankRow(n);
-    if(!q.text){ alert('Q'+(n+1)+' is empty — please enter the question first.'); return; }
+    if(!q.text){ alert('Q'+(n+1)+' Is Empty — Please Enter The Question First.'); return; }
     var options=[];
     if(q.type==='mcq'){
       for(var i=0;i<4;i++){ if((q.opts[i]||'').trim()) options.push(q.opts[i].trim()); }
-      if(options.length<2){ alert('Q'+(n+1)+': add at least 2 options.'); return; }
-      if(q.correct>=options.length){ alert('Q'+(n+1)+': the correct-option slot is empty.'); return; }
+      if(options.length<2){ alert('Q'+(n+1)+': Add At Least 2 Options.'); return; }
+      if(q.correct>=options.length){ alert('Q'+(n+1)+': The Correct-Option Slot Is Empty.'); return; }
     }
     await launchQuestionObj({type:q.type, text:q.text, options:options, correct:q.correct, time:q.time, prize:q.prize});
   }
@@ -596,7 +596,7 @@ window.QUIZ = (function(){
   async function launchQuestionObj(q){
     var _cs=document.getElementById('quiz-conn');
     await window.waitForFdb(8000);
-    if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Firebase connect nahi hua.'); return; }
+    if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Firebase Connect Nahi Hua.'); return; }
     try{ await saveCurrentResults(); }catch(e){}   // never let this block the push
     // continue the SAME live session/sequence (survives reloads & multiple host tabs)
     try{ var cur=(await DOC().get()).data()||{}; if(cur.sessionId) host.sessionId=cur.sessionId; host.qIndex=(cur.qIndex||0); }catch(e){}
@@ -616,11 +616,11 @@ window.QUIZ = (function(){
       try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs }); }catch(e){}
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
-      var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting for answers…</div>';
+      var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting For Answers…</div>';
       try{ var rs=await RESPONSES().get(); renderHostResults(rs); }catch(e){}
     }catch(e){
-      if(_cs){ _cs.textContent='🔴 Push failed: '+(e&&e.message||e); _cs.style.color='#dc2626'; }
-      alert('⚠️ Push failed:\n\n'+(e&&e.message||e)+'\n\n(Firestore write block ho sakta hai — rules check karo.)');
+      if(_cs){ _cs.textContent='🔴 Push Failed: '+(e&&e.message||e); _cs.style.color='#dc2626'; }
+      alert('⚠️ Push Failed:\n\n'+(e&&e.message||e)+'\n\n(Firestore Write Block Ho Sakta Hai — Rules Check Karo.)');
     }
   }
 
@@ -634,14 +634,14 @@ window.QUIZ = (function(){
       if(cnt) await batch.commit();
       await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true});
     }catch(e){}
-    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No question is live.';
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
 
   async function closeQuestion(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
-    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No question is live.';
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
 
@@ -687,14 +687,14 @@ window.QUIZ = (function(){
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
       var cnt = ' · '+rows.length+' response'+(rows.length===1?'':'s');
       if(st) st.innerHTML = winner
-        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (first correct answer)':' (first to buzz)')+tt+cnt
-        : (rows.length? 'No correct answer — '+rows.length+' response'+(rows.length===1?'':'s')+' received.' : 'No responses received. Ask players to answer before Reveal.');
-    }catch(e){ alert('Reveal fail: '+e.message); }
+        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (First Correct Answer)':' (First To Buzz)')+tt+cnt
+        : (rows.length? 'No Correct Answer — '+rows.length+' Response'+(rows.length===1?'':'s')+' Received.' : 'No Responses Received. Ask Players To Answer Before Reveal.');
+    }catch(e){ alert('Reveal Fail: '+e.message); }
   }
 
   async function newSession(){
     await window.waitForFdb(8000); if(!window.fdb) return;
-    if(!confirm('Start a new quiz? Current players and answers will be cleared.')) return;
+    if(!confirm('Start A New Quiz? Current Players And Answers Will Be Cleared.')) return;
     try{
       // delete old players + responses (seminar scale — few dozen docs)
       var ps=await PLAYERS().get(); var b1=window.fdb.batch(); ps.forEach(function(d){ b1.delete(d.ref); }); await b1.commit();
@@ -703,7 +703,7 @@ window.QUIZ = (function(){
     host.sessionId='s'+Date.now(); host.qIndex=0;
     try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
-    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New quiz ready. Ask players to join.';
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New Quiz Ready. Ask Players To Join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
     var pc=document.getElementById('quiz-player-count'); if(pc) pc.textContent='0';
     var pc2=document.getElementById('quiz-player-count-2'); if(pc2) pc2.textContent='0';
@@ -714,7 +714,7 @@ window.QUIZ = (function(){
     var li=document.getElementById('quiz-join-link'); if(!li) return;
     li.select(); try{ document.execCommand('copy'); }catch(e){}
     try{ navigator.clipboard && navigator.clipboard.writeText(joinLink()); }catch(e){}
-    alert('Link copied!');
+    alert('Link Copied!');
   }
 
   // ─────────── CLIENT (PLAYER) ───────────
@@ -727,7 +727,7 @@ window.QUIZ = (function(){
     var app=document.getElementById('app'); if(app) app.style.display='none';
     var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
     await window.waitForFdb(9000);
-    if(!window.fdb){ C().innerHTML=msgCard('⚠️ Could not connect. Please check your network and refresh.'); return; }
+    if(!window.fdb){ C().innerHTML=msgCard('⚠️ Could Not Connect. Please Check Your Network And Refresh.'); return; }
     player.id = localStorage.getItem('dnquiz_pid') || ('p'+Date.now()+Math.floor(Math.random()*9999));
     localStorage.setItem('dnquiz_pid', player.id);
     player.name = localStorage.getItem('dnquiz_name') || '';
@@ -785,12 +785,12 @@ window.QUIZ = (function(){
 
     if(d.state==='live'){ renderLiveQuestion(d); }
     else if(d.state==='reveal'){ renderReveal(d); }
-    else { C().innerHTML=msgCard('👋 Hi <b>'+esc(player.name)+'</b>!<br><br>Waiting for the quiz to start…'); }
+    else { C().innerHTML=msgCard('👋 Hi <b>'+esc(player.name)+'</b>!<br><br>Waiting For The Quiz To Start…'); }
   }
 
   function renderLiveQuestion(d){
     if(player.answered){
-      C().innerHTML=msgCard('✅ Your answer is locked in!<br><br>Waiting for the result…');
+      C().innerHTML=msgCard('✅ Your Answer Is Locked In!<br><br>Waiting For The Result…');
       return;
     }
     var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
@@ -821,13 +821,13 @@ window.QUIZ = (function(){
   async function submitAnswer(d, answer){
     if(player.answered) return;
     player.answered=true;
-    C().innerHTML=msgCard('✅ Answer submitted!<br><br>Waiting for the result…');
+    C().innerHTML=msgCard('✅ Answer Submitted!<br><br>Waiting For The Result…');
     try{
       await RESPONSES().doc(player.sessionId+'_'+player.qIndex+'_'+player.id).set({
         playerId:player.id, name:player.name, qIndex:player.qIndex, sessionId:player.sessionId,
         answer:answer, at:firebase.firestore.FieldValue.serverTimestamp()
       });
-    }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Could not send your answer, please try again.'); }
+    }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Could Not Send Your Answer, Please Try Again.'); }
   }
 
   function ordinal(n){ var s=["th","st","nd","rd"],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
@@ -836,12 +836,12 @@ window.QUIZ = (function(){
     var wt = (d.winnerMs!=null) ? '<br><span style="font-size:.8rem;color:#94a3b8">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec me</span>' : '';
     var me=null;
     if(d.results && d.results.length){ for(var i=0;i<d.results.length;i++){ if(d.results[i].id===player.id){ me=d.results[i]; break; } } }
-    var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Your time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
+    var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Your Time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
 
     // Didn't answer at all
     if(!me){
-      if(d.winnerName) C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>You did not answer this time. 😅<br>Do try the next one!');
-      else C().innerHTML=msgCard('No winner this time.<br><br>Get ready for the next question!');
+      if(d.winnerName) C().innerHTML=msgCard('🏆 Winner: <b>'+esc(d.winnerName)+'</b>'+wt+'<br><br>You Did Not Answer This Time. 😅<br>Do Try The Next One!');
+      else C().innerHTML=msgCard('No Winner This Time.<br><br>Get Ready For The Next Question!');
       return;
     }
 
@@ -849,23 +849,23 @@ window.QUIZ = (function(){
     if(me.correct===false){
       var corrTxt='';
       if(d.revealIndex!=null && d.options && d.options[d.revealIndex]!=null)
-        corrTxt='<br><span style="font-size:.85rem;color:#94a3b8">Correct answer: <b style="color:#fff">'+esc(d.options[d.revealIndex])+'</b></span>';
-      C().innerHTML=msgCard('<div style="font-size:2rem">❌</div><b style="font-size:1.2rem">Wrong answer</b>'+corrTxt+myTime+'<br><br>'+(d.winnerName?'🏆 Winner: <b>'+esc(d.winnerName)+'</b>':'')+'<br>No worries — try the next one!');
+        corrTxt='<br><span style="font-size:.85rem;color:#94a3b8">Correct Answer: <b style="color:#fff">'+esc(d.options[d.revealIndex])+'</b></span>';
+      C().innerHTML=msgCard('<div style="font-size:2rem">❌</div><b style="font-size:1.2rem">Wrong Answer</b>'+corrTxt+myTime+'<br><br>'+(d.winnerName?'🏆 Winner: <b>'+esc(d.winnerName)+'</b>':'')+'<br>No Worries — Try The Next One!');
       return;
     }
 
     // Winner (rank 1)
     if(me.rank===1){
-      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">You won!</b>'+myTime+'<br><br>'+(d.prize?'🎁 '+esc(d.prize):'Congratulations!'));
+      C().innerHTML=msgCard('🎉🏆<br><br><b style="font-size:1.4rem">You Won!</b>'+myTime+'<br><br>'+(d.prize?'🎁 '+esc(d.prize):'Congratulations!'));
       return;
     }
 
     // Correct/buzzed but not first — show rank
-    var rankTxt = me.rank ? ordinal(me.rank)+' place' : '';
-    var head = (me.correct===true) ? '✅ Correct!' : '🔔 You buzzed!';
+    var rankTxt = me.rank ? ordinal(me.rank)+' Place' : '';
+    var head = (me.correct===true) ? '✅ Correct!' : '🔔 You Buzzed!';
     C().innerHTML=msgCard('<div style="font-size:1.8rem">👏</div><b style="font-size:1.15rem">'+head+'</b><br>'
-      + '<span style="font-size:1rem;color:#fbbf24">You finished '+esc(rankTxt)+'</span>'+myTime
-      + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>So close — you could be next!');
+      + '<span style="font-size:1rem;color:#fbbf24">You Finished '+esc(rankTxt)+'</span>'+myTime
+      + '<br><br>🏆 Winner: <b>'+esc(d.winnerName||'-')+'</b><br>So Close — You Could Be Next!');
   }
 
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
@@ -920,7 +920,7 @@ window.QUIZ = (function(){
     var app=document.getElementById('app'); if(app) app.style.display='none';
     var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
     await window.waitForFdb(9000);
-    if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Could not connect. Please check the network and refresh.</div>'; return; }
+    if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Could Not Connect. Please Check The Network And Refresh.</div>'; return; }
     if(screen.unsubDoc) screen.unsubDoc();
     if(screen.unsubResp) screen.unsubResp();
     if(screen.unsubPlayers) screen.unsubPlayers();
@@ -932,7 +932,7 @@ window.QUIZ = (function(){
     }, function(){});
     LINKS().onSnapshot(function(d){
       var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false;
-      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz is currently closed</div></div>'; }
+      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz Is Currently Closed</div></div>'; }
       else { DOC().get().then(function(dd){ renderScreen(dd.data()||{}); }); }
     }, function(){});
     screen.unsubResp = RESPONSES().onSnapshot(function(snap){
@@ -958,11 +958,11 @@ window.QUIZ = (function(){
     S().innerHTML =
       '<div style="text-align:center" class="qs-pop">'
       + '<div style="font-size:5.5vw;font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 D N Investment Quiz</div>'
-      + '<div style="font-size:2.4vw;color:#94a3b8;margin-bottom:4vh">Scan the QR to join from your phone</div>'
+      + '<div style="font-size:2.4vw;color:#94a3b8;margin-bottom:4vh">Scan The QR To Join From Your Phone</div>'
       + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:30vh;height:30vh;background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
       + '<div style="font-size:2vw;margin-top:3vh;color:#e2e8f0">'+esc(link)+'</div>'
-      + '<div style="font-size:1.8vw;margin-top:3vh;color:#64748b">Waiting for the quiz to start…</div>'
-      + '<div style="font-size:2.2vw;margin-top:2vh;color:#34d399;font-weight:800">👥 <span id="qs-joined-count">'+(screen.joinedCount||0)+'</span> joined</div>'
+      + '<div style="font-size:1.8vw;margin-top:3vh;color:#64748b">Waiting For The Quiz To Start…</div>'
+      + '<div style="font-size:2.2vw;margin-top:2vh;color:#34d399;font-weight:800">👥 <span id="qs-joined-count">'+(screen.joinedCount||0)+'</span> Joined</div>'
       + '</div>';
   }
 
@@ -996,7 +996,7 @@ window.QUIZ = (function(){
       + prize
       + '<div style="font-size:4.2vw;font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
       + optHtml
-      + '<div style="text-align:center;font-size:2.1vw;margin-top:3.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> answered</div>'
+      + '<div style="text-align:center;font-size:2.1vw;margin-top:3.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> Answered</div>'
       + '</div>';
     // countdown ring
     if(d.timeSec && d.startedAt){
@@ -1044,7 +1044,7 @@ window.QUIZ = (function(){
         + (d.winnerMs!=null?'<div style="font-size:2.6vw;font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
         + (d.prize?'<div style="font-size:2.2vw;font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
-      : '<div style="text-align:center;margin-top:3vh;font-size:2.8vw;color:#94a3b8;font-weight:800">🙌 No correct answer this time</div>';
+      : '<div style="text-align:center;margin-top:3vh;font-size:2.8vw;color:#94a3b8;font-weight:800">🙌 No Correct Answer This Time</div>';
     S().innerHTML =
       '<div class="qs-pop">'
       + screenHeader('reveal')
@@ -1078,16 +1078,16 @@ window.QUIZ = (function(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     var key = which==='feedback' ? 'feedbackOpen' : 'quizOpen';
     var next = which==='feedback' ? !linksState.feedbackOpen : !linksState.quizOpen;
-    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' link? Clients will see "closed".')) return;
+    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' Link? Clients Will See "Closed".')) return;
     var upd={}; upd[key]=next;
-    try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update failed: '+e.message); }
+    try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update Failed: '+e.message); }
   }
 
   function closedCard(what){
     return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:30px;text-align:center">'
       + '<div style="font-size:2.4rem;margin-bottom:10px">🔒</div>'
-      + '<b style="font-size:1.2rem">'+what+' is currently closed</b><br><br>'
-      + '<span style="color:#94a3b8;font-size:.9rem">This link opens during the seminar. Thank you! 🙏</span></div>';
+      + '<b style="font-size:1.2rem">'+what+' Is Currently Closed</b><br><br>'
+      + '<span style="color:#94a3b8;font-size:.9rem">This Link Opens During The Seminar. Thank You! 🙏</span></div>';
   }
 
   // boot: play / screen mode run immediately; host inits when its page opens
