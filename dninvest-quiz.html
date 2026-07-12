@@ -17,7 +17,7 @@ const firebaseConfig = {
   messagingSenderId: "331999342266",
   appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
 };
-try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
+try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){ window.__fbErr=(e&&e.message)||String(e); }
 // poll helper — quiz code waits for Firestore to be ready
 window.waitForFdb = function(maxMs){
   maxMs = maxMs || 8000; var step=100, waited=0;
@@ -74,7 +74,7 @@ input,select,textarea,button{font-family:inherit}
 <!-- ══ HOST CONTROLS (secret ?host link) ══ -->
 <div id="hostWrap">
   <div class="host-hdr">
-    <div class="host-title">🎯 Seminar Quiz <span>— Live MCQ / buzzer for clients · D N Investment</span></div>
+    <div class="host-title">🎯 Seminar Quiz <span>— Live MCQ / buzzer for clients · D N Investment</span><div id="quiz-conn" style="font-size:.75rem;font-weight:700;margin-top:3px;color:#5d6e8a">🔌 Connecting…</div></div>
     <div style="display:flex;gap:6px">
       <button class="btn btn-outline" onclick="QUIZ.newSession()" title="New quiz — resets players & answers">🔄 Reset / New Quiz</button>
     </div>
@@ -198,15 +198,19 @@ window.QUIZ = (function(){
   }
 
   // ─────────── HOST ───────────
+  function setConnStatus(txt,color){
+    var el=document.getElementById('quiz-conn'); if(el){ el.textContent=txt; el.style.color=color||'#5d6e8a'; }
+  }
   async function hostInit(){
+    setConnStatus('🔌 Connecting…','#b45309');
     await window.waitForFdb(8000);
-    if(!window.fdb) return;
+    if(!window.fdb){ setConnStatus('🔴 Firebase not connected'+(window.__fbErr?(' — '+window.__fbErr):''),'#dc2626'); alert('⚠️ Firebase connect nahi hua.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet check karo, phir page reload karo.')); return; }
     // join link + QR
     var li=document.getElementById('quiz-join-link'); if(li) li.value=joinLink();
     var qr=document.getElementById('quiz-qr-box');
     if(qr){ qr.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(joinLink())+'" width="160" height="160" style="border-radius:10px;background:#fff;padding:6px" alt="Join QR">'; }
     renderBank();
-    // ensure live doc exists
+    // ensure live doc exists (also acts as a live connectivity test)
     try{
       var d=await DOC().get();
       if(!d.exists || !d.data() || !d.data().sessionId){
@@ -216,7 +220,11 @@ window.QUIZ = (function(){
         var dd=d.data();
         host.sessionId=dd.sessionId; host.qIndex=dd.qIndex||0; host.type=dd.type||'mcq';
       }
-    }catch(e){}
+      setConnStatus('🟢 Connected — ready','#16a34a');
+    }catch(e){
+      setConnStatus('🔴 Firestore blocked: '+(e&&e.message||e),'#dc2626');
+      alert('⚠️ Firestore read/write blocked:\n\n'+(e&&e.message||e)+'\n\n(Security rules ya internet check karo.)');
+    }
     attachHostListeners();
   }
 
@@ -438,7 +446,8 @@ window.QUIZ = (function(){
   }
 
   async function launchQuestionObj(q){
-    await window.waitForFdb(8000); if(!window.fdb) return;
+    await window.waitForFdb(8000);
+    if(!window.fdb){ alert('⚠️ Firebase connect nahi hua — question push nahi ho sakta.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet check karo aur page reload karo.')); return; }
     await saveCurrentResults(); // persist the outgoing question before moving on
     host.qIndex=(host.qIndex||0)+1;
     host.type=q.type; host.correctIndex=q.correct; host.startedAtServerMs=0;
