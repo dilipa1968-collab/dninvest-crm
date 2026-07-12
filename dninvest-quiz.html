@@ -436,6 +436,7 @@ window.QUIZ = (function(){
     renderBank();
   }
   async function pushQuestion(n){
+    var _st=document.getElementById('quiz-live-status'); if(_st) _st.innerHTML='⏳ Pushing Q'+(n+1)+'… (button working ✔)';
     saveBankSilent();
     var q=readBankRow(n);
     if(!q.text){ alert('Q'+(n+1)+' is empty — please enter the question first.'); return; }
