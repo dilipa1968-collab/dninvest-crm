@@ -1892,7 +1892,7 @@ input:focus, select:focus, textarea:focus{
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" onclick="shareFeedbackLink()" style="color:#25D366;border-color:#25D366">💬 Feedback Link</button>
           <button class="btn btn-outline" onclick="openSeminarFeedback()" style="color:#673ab7;border-color:#673ab7">📋 Feedback</button>
-          <button class="btn btn-outline" onclick="openSeminarQuiz()" style="color:#0d9488;border-color:#0d9488">🎯 Live Quiz</button>
+          <button class="btn btn-outline" id="seminarLiveQuizBtn" onclick="openSeminarQuiz()" style="color:#0d9488;border-color:#0d9488">🎯 Live Quiz</button>
           <button class="btn btn-outline" onclick="exportSeminarAttendees()">⬇️ Export Excel</button>
           <button class="btn btn-teal" onclick="openAddAttendee()">+ Add Attendee</button>
         </div>
@@ -5274,6 +5274,8 @@ function openSeminarDetail(id){
   if(!s) return;
   document.getElementById('seminarDetailTitle').textContent=s.name;
   document.getElementById('seminarDetailSub').textContent=`Date: ${fmtDate(s.date)}${s.notes?' · '+s.notes:''}`;
+  const _lqBtn=document.getElementById('seminarLiveQuizBtn');
+  if(_lqBtn) _lqBtn.style.display = (typeof CU!=='undefined' && CU && CU.role==='admin') ? '' : 'none';
   clearSemFilters();
   document.getElementById('seminarDetailModal').classList.add('open');
 }
@@ -5886,6 +5888,7 @@ function feedbackLinkFor(seminarId){
   return location.origin + '/dninvest-feedback.html' + (seminarId ? ('?s='+encodeURIComponent(seminarId)) : '');
 }
 function openSeminarQuiz(){
+  if(!(typeof CU!=='undefined' && CU && CU.role==='admin')) return;
   closeModal('seminarDetailModal');
   window.open(location.origin + '/dninvest-quiz.html?host=1', '_blank');
 }
