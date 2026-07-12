@@ -118,9 +118,13 @@ input,select,textarea,button{font-family:inherit}
 
           <!-- Live results -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
               <div style="font-weight:700;font-size:.95rem">📊 Live Results <span style="color:var(--teal);font-weight:800;font-size:.8rem">· 👥 <span id="quiz-player-count-2">0</span> Joined</span></div>
-              <div style="display:flex;gap:6px">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <div id="quiz-actual-wrap" style="display:none;align-items:center;gap:4px">
+                  <span style="font-size:.75rem;font-weight:700;color:#b45309">🎯 Actual Value:</span>
+                  <input type="text" id="quiz-actual-value" placeholder="e.g. 81234.56" style="width:110px;padding:5px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">
+                </div>
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.8rem" onclick="QUIZ.clearResults()">🧹 Clear Results</button>
                 <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
               </div>
@@ -355,6 +359,9 @@ window.QUIZ = (function(){
       if(d.qIndex!=null) host.liveQIndex = d.qIndex;
       var el=document.getElementById('quiz-conn');
       if(el) el.textContent='🟢 Connected · live state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length);
+      var aw=document.getElementById('quiz-actual-wrap');
+      if(aw) aw.style.display=(d.type==='guess' && d.state==='live')?'flex':'none';
+      if(d.state==='live'){ var av=document.getElementById('quiz-actual-value'); if(av) av.value=''; }
       if(host.lastRespSnap) renderHostResults(host.lastRespSnap);  // re-filter with the live question
     }, function(){});
     host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
@@ -471,6 +478,8 @@ window.QUIZ = (function(){
       var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
       var badge = host.type==='buzzer'
         ? '<span style="background:#3b82f6;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">BUZZ</span>'
+        : host.type==='guess'
+        ? '<span style="background:#a855f7;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">🎯 '+esc(String(r.answer))+'</span>'
         : (correct ? '<span style="background:#16a34a;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✔ Correct</span>'
                    : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Wrong</span>');
       var tms = (r.at&&r.at.toMillis&&host.startedAtServerMs) ? (r.at.toMillis()-host.startedAtServerMs) : null;
@@ -495,17 +504,23 @@ window.QUIZ = (function(){
       if(!rows.length) return;
       rows.sort(function(a,b){ var ta=a.at&&a.at.toMillis?a.at.toMillis():Infinity; var tb=b.at&&b.at.toMillis?b.at.toMillis():Infinity; return ta-tb; });
       function _ms(r){ return (r.at&&r.at.toMillis&&host.startedAtServerMs)?Math.max(0,r.at.toMillis()-host.startedAtServerMs):null; }
+      var live={}; try{ live=(await DOC().get()).data()||{}; }catch(e){}
       var logRows=rows.map(function(r){
         var isCorrect=(host.type==='mcq')?(r.answer===host.correctIndex):null;
         var ansLetter=(host.type==='mcq'&&typeof r.answer==='number')?String.fromCharCode(65+r.answer):(r.answer==='buzz'?'BUZZ':String(r.answer==null?'':r.answer));
         return { name:r.name||'', answer:ansLetter, correct:isCorrect, ms:_ms(r) };
       });
-      var firstWinner=''; for(var i=0;i<logRows.length;i++){ if(host.type!=='mcq' || logRows[i].correct===true){ firstWinner=logRows[i].name; break; } }
-      var live={}; try{ live=(await DOC().get()).data()||{}; }catch(e){}
+      var firstWinner;
+      if(host.type==='guess'){
+        // use the already-computed reveal winner (closest guess), not just the first responder
+        firstWinner = live.winnerName || '';
+      } else {
+        firstWinner=''; for(var i=0;i<logRows.length;i++){ if(host.type!=='mcq' || logRows[i].correct===true){ firstWinner=logRows[i].name; break; } }
+      }
       await RESULTSLOG().doc(host.sessionId+'_q'+host.qIndex).set({
         qIndex:host.qIndex, sessionId:host.sessionId,
         question:live.question||('Question '+host.qIndex),
-        correctLetter:(host.type==='mcq'&&host.correctIndex!=null)?String.fromCharCode(65+host.correctIndex):'',
+        correctLetter:(host.type==='mcq'&&host.correctIndex!=null)?String.fromCharCode(65+host.correctIndex):(host.type==='guess'&&live.actualValue!=null?String(live.actualValue):''),
         type:host.type||'mcq',
         winnerName:firstWinner,
         savedAt:firebase.firestore.FieldValue.serverTimestamp(),
@@ -535,7 +550,8 @@ window.QUIZ = (function(){
         + '<span style="font-weight:800;color:var(--teal)">Q'+(n+1)+'</span>'
         + '<select id="qb'+n+'-type" onchange="QUIZ.bankTypeChange('+n+')" style="padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">'
         +   '<option value="mcq"'+(q.type==='mcq'?' selected':'')+'>MCQ (Auto)</option>'
-        +   '<option value="buzzer"'+(q.type==='buzzer'?' selected':'')+'>Buzzer</option></select>'
+        +   '<option value="buzzer"'+(q.type==='buzzer'?' selected':'')+'>Buzzer</option>'
+        +   '<option value="guess"'+(q.type==='guess'?' selected':'')+'>🎯 Guess The Number</option></select>'
         + '<label style="font-size:.75rem">⏱️<input type="number" id="qb'+n+'-time" value="'+(q.time||20)+'" min="5" max="120" style="width:50px;padding:4px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;margin-left:2px"> sec</label>'
         + '<label style="font-size:.75rem;flex:1;min-width:120px">🎁<input type="text" id="qb'+n+'-prize" value="'+esc(q.prize||'')+'" placeholder="Prize" style="width:100%;padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px"></label>'
         + '</div>'
@@ -608,7 +624,7 @@ window.QUIZ = (function(){
         state:'live', type:q.type, qIndex:host.qIndex, sessionId:host.sessionId,
         question:q.text, options:(q.type==='mcq'?q.options:[]), prize:(q.prize||''), timeSec:(q.time||20),
         startedAt:Date.now(), startedAtServer:firebase.firestore.FieldValue.serverTimestamp(),
-        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null
+        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null
       }, {merge:true});
       // read back from the SERVER (not cache) so the resolved serverTimestamp is captured;
       // a fresh write's serverTimestamp can still be pending/null in a cached read, retry a few times
@@ -640,7 +656,7 @@ window.QUIZ = (function(){
       var batch=window.fdb.batch(); var cnt=0;
       rs.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===host.sessionId){ batch.delete(d.ref); cnt++; } });
       if(cnt) await batch.commit();
-      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, revealIndex:null, results:[] }, {merge:true});
+      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, revealIndex:null, results:[] }, {merge:true});
     }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -648,7 +664,7 @@ window.QUIZ = (function(){
 
   async function closeQuestion(){
     await window.waitForFdb(8000); if(!window.fdb) return;
-    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
@@ -668,6 +684,14 @@ window.QUIZ = (function(){
           }
         }
       }catch(e){}
+      var actualValue=null;
+      if(host.type==='guess'){
+        var avEl=document.getElementById('quiz-actual-value');
+        var raw=(avEl?avEl.value:'').trim().replace(/,/g,'');
+        if(!raw){ alert('🎯 Guess Question — Please Enter The Actual Value First (e.g. Today\'s Sensex Closing), Then Hit Reveal.'); return; }
+        actualValue=parseFloat(raw);
+        if(isNaN(actualValue)){ alert('Please Enter A Valid Number For The Actual Value.'); return; }
+      }
       var snap=await RESPONSES().orderBy('at').get();
       var rows=[];
       snap.forEach(function(doc){ var r=doc.data(); if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r); });
@@ -680,6 +704,11 @@ window.QUIZ = (function(){
         corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r)}); });
         wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r)}); });
         winner = corrects.length?corrects[0]:null;
+      } else if(host.type==='guess'){
+        var validRows=rows.filter(function(r){ return typeof r.answer==='number' && !isNaN(r.answer); });
+        validRows.sort(function(a,b){ return Math.abs(a.answer-actualValue)-Math.abs(b.answer-actualValue); });
+        validRows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r),guess:r.answer,diff:Math.abs(r.answer-actualValue)}); });
+        winner = validRows.length?validRows[0]:null;
       } else {
         rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r)}); });
         winner = rows.length?rows[0]:null;
@@ -691,15 +720,18 @@ window.QUIZ = (function(){
         winnerName:(winner?winner.name:null),
         winnerMs:winMs,
         winnerPts:null,
+        actualValue:(host.type==='guess'?actualValue:null),
+        winnerGuess:(host.type==='guess'&&winner?winner.answer:null),
         results:results.slice(0,150)
       }, {merge:true});
       saveCurrentResults(); // persist this revealed question's results
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
       var cnt = ' · '+rows.length+' response'+(rows.length===1?'':'s');
+      var kindTxt = host.type==='mcq' ? ' (First Correct Answer)' : (host.type==='guess' ? ' (Closest Guess: '+(winner?winner.answer:'')+' vs Actual '+actualValue+')' : ' (First To Buzz)');
       if(st) st.innerHTML = winner
-        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (First Correct Answer)':' (First To Buzz)')+tt+cnt
-        : (rows.length? 'No Correct Answer — '+rows.length+' Response'+(rows.length===1?'':'s')+' Received.' : 'No Responses Received. Ask Players To Answer Before Reveal.');
+        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+kindTxt+tt+cnt
+        : (rows.length? 'No Valid Responses — '+rows.length+' Response'+(rows.length===1?'':'s')+' Received.' : 'No Responses Received. Ask Players To Answer Before Reveal.');
     }catch(e){ alert('Reveal Fail: '+e.message); }
   }
 
@@ -712,7 +744,7 @@ window.QUIZ = (function(){
       var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
     }catch(e){}
     host.sessionId='s'+Date.now(); host.qIndex=0;
-    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, winnerPts:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New Quiz Ready. Ask Players To Join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -864,6 +896,11 @@ window.QUIZ = (function(){
       + '<div style="font-size:1.25rem;font-weight:800;text-align:center;line-height:1.35;color:#fff">'+esc(d.question)+'</div></div>';
     if(d.type==='buzzer'){
       html+='<button id="qp-buzz" style="width:100%;padding:40px 0;font-size:1.8rem;font-weight:900;border:none;border-radius:20px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(239,68,68,.5)">🔔 BUZZ!</button>';
+    } else if(d.type==='guess'){
+      html+='<div style="display:flex;flex-direction:column;gap:14px">'
+        + '<input id="qp-guess-input" type="number" inputmode="decimal" step="any" placeholder="Enter Your Guess…" style="width:100%;box-sizing:border-box;padding:16px;font-size:1.4rem;font-weight:800;text-align:center;border-radius:14px;border:none;background:rgba(255,255,255,.12);color:#fff">'
+        + '<button id="qp-guess-submit" style="width:100%;padding:16px 0;font-size:1.15rem;font-weight:900;border:none;border-radius:16px;background:linear-gradient(135deg,#14b8a6,#0ea5a5);color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(20,184,166,.4)">🎯 Submit Guess</button>'
+        + '</div>';
     } else {
       var cls=['qp-a','qp-b','qp-c','qp-d'];
       html+='<div style="display:flex;flex-direction:column;gap:12px">';
@@ -877,6 +914,16 @@ window.QUIZ = (function(){
     C().innerHTML=html;
     if(d.type==='buzzer'){
       document.getElementById('qp-buzz').onclick=function(){ submitAnswer(d,'buzz'); };
+    } else if(d.type==='guess'){
+      var gi=document.getElementById('qp-guess-input');
+      var doSubmit=function(){
+        var v=parseFloat((gi.value||'').trim());
+        if(isNaN(v)){ gi.focus(); return; }
+        submitAnswer(d, v);
+      };
+      document.getElementById('qp-guess-submit').onclick=doSubmit;
+      gi.addEventListener('keydown', function(ev){ if(ev.key==='Enter') doSubmit(); });
+      gi.focus();
     } else {
       Array.prototype.forEach.call(document.querySelectorAll('.qp-opt'),function(b){
         b.onclick=function(){ submitAnswer(d, parseInt(b.getAttribute('data-i'),10)); };
@@ -903,6 +950,9 @@ window.QUIZ = (function(){
     var me=null;
     if(d.results && d.results.length){ for(var i=0;i<d.results.length;i++){ if(d.results[i].id===player.id){ me=d.results[i]; break; } } }
     var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Your Time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
+    var isGuess = d.type==='guess';
+    var actualLine = (isGuess && d.actualValue!=null) ? '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">Actual Value: <b>'+esc(String(d.actualValue))+'</b></div>' : '';
+    var winGuessLine = (isGuess && d.winnerGuess!=null) ? '<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">🏆 Winning Guess: '+esc(String(d.winnerGuess))+'</div>' : '';
 
     // Didn't answer at all
     if(!me){
@@ -911,7 +961,8 @@ window.QUIZ = (function(){
         + '<div style="font-size:3rem;line-height:1">😅</div>'
         + (d.winnerName
             ? ('<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">🏆 Winner: '+esc(d.winnerName)+'</div>'
-               + (d.winnerMs!=null?('<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:4px;opacity:.85">⏱️ '+(d.winnerMs/1000).toFixed(2)+'s</div>'):''))
+               + (d.winnerMs!=null?('<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:4px;opacity:.85">⏱️ '+(d.winnerMs/1000).toFixed(2)+'s</div>'):'')
+               + winGuessLine + actualLine)
             : '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">No Winner This Time</div>')
         + '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:16px;opacity:.9">'+(d.winnerName?'You Did Not Answer This Time.':'Get Ready For The Next Question!')+'</div>'
         + (d.winnerName?'<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:6px;opacity:.85">Do Try The Next One!</div>':'')
@@ -944,7 +995,11 @@ window.QUIZ = (function(){
         + '<div style="font-size:1.9rem;font-weight:900;color:#fff;letter-spacing:.5px;text-shadow:0 2px 10px rgba(0,0,0,.35);margin-top:6px">🎉 Congratulations! 🎉</div>'
         + '<div style="font-size:1.5rem;font-weight:800;color:#fff;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.3)">'+esc(player.name)+'</div>'
         + '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">You Won This Round!</div>'
-        + (me.ms!=null?('<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+        + (isGuess
+            ? ('<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:10px;opacity:.95">🎯 Your Guess: '+esc(String(me.guess))+'</div>'
+               + (d.actualValue!=null?'<div style="font-size:.95rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.9">Actual Value: '+esc(String(d.actualValue))+'</div>':'')
+               + (me.diff!=null?'<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By Just '+esc(String(me.diff))+'</div>':''))
+            : (me.ms!=null?('<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):''))
         + '<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">🥇 1st Place</div>'
         + (d.prize?('<div style="display:inline-block;margin-top:16px;padding:10px 22px;border-radius:99px;background:rgba(255,255,255,.25);font-size:1.15rem;font-weight:900;color:#fff">🎁 '+esc(d.prize)+'</div>')
                   :'<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:14px;opacity:.9">Great Job — Keep It Up!</div>')
@@ -955,13 +1010,18 @@ window.QUIZ = (function(){
 
     // Correct/buzzed but not first — show rank
     var rankTxt = me.rank ? ordinal(me.rank)+' Place' : '';
-    var head = (me.correct===true) ? '✅ Correct!' : '🔔 You Buzzed!';
+    var head = isGuess ? '🎯 Guess Submitted' : ((me.correct===true) ? '✅ Correct!' : '🔔 You Buzzed!');
     C().innerHTML =
       '<div class="qp-pop qp-card-good">'
       + '<div style="font-size:3rem;line-height:1">👏</div>'
       + '<div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:8px">'+head+'</div>'
       + '<div style="font-size:1.1rem;font-weight:800;color:#fef08a;margin-top:6px">'+medalFor(me.rank)+' You Finished '+esc(rankTxt)+'</div>'
-      + (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+      + (isGuess
+          ? ('<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:10px">🎯 Your Guess: '+esc(String(me.guess))+'</div>'
+             + (d.actualValue!=null?'<div style="font-size:.88rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.9">Actual Value: '+esc(String(d.actualValue))+'</div>':'')
+             + (me.diff!=null?'<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By '+esc(String(me.diff))+'</div>':'')
+             + winGuessLine)
+          : (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):''))
       + '<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:16px">🏆 Winner: '+esc(d.winnerName||'-')+'</div>'
       + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">So Close — You Could Be Next!</div>'
       + '</div>';
@@ -1083,7 +1143,7 @@ window.QUIZ = (function(){
   }
 
   function screenHeader(kind){
-    var icon = kind==='reveal' ? '🏆' : (kind==='buzzer' ? '🔔' : '🧠');
+    var icon = kind==='reveal' ? '🏆' : (kind==='buzzer' ? '🔔' : (kind==='guess' ? '🎯' : '🧠'));
     var tag  = kind==='reveal' ? 'RESULT' : 'QUIZ TIME';
     return '<div class="qs-hero qs-pop" style="text-align:center;margin-bottom:2vh">'
       + '<div class="qs-hero-emoji">'+icon+'</div>'
@@ -1096,6 +1156,8 @@ window.QUIZ = (function(){
     var optHtml='';
     if(d.type==='buzzer'){
       optHtml='<div class="qs-buzz" style="margin-top:5vh">🔔 BUZZ NOW!</div>';
+    } else if(d.type==='guess'){
+      optHtml='<div class="qs-buzz" style="margin-top:5vh">🎯 TYPE YOUR GUESS ON YOUR PHONE!</div>';
     } else {
       optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:3.5vh">';
       opts.forEach(function(o,i){
@@ -1107,7 +1169,7 @@ window.QUIZ = (function(){
     var prize=d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);color:#fbbf24;text-align:center;margin-bottom:1.5vh;font-weight:700">🎁 '+esc(d.prize)+'</div>':'';
     S().innerHTML =
       '<div class="qs-pop">'
-      + screenHeader(d.type==='buzzer'?'buzzer':'live')
+      + screenHeader(d.type==='buzzer'?'buzzer':(d.type==='guess'?'guess':'live'))
       + '<div style="text-align:center;margin-bottom:1.5vh"><span class="qs-qpill">QUESTION '+(d.qIndex||'')+'</span></div>'
       + prize
       + '<div style="font-size:clamp(24px,4.2vw,80px);font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
@@ -1157,7 +1219,10 @@ window.QUIZ = (function(){
         + '<div style="display:inline-block;padding:3vh 6vw;border-radius:3vh;background:linear-gradient(135deg,#f59e0b,#fbbf24,#fb7185,#a78bfa);background-size:300% 300%;animation:qsBG 5s ease infinite;box-shadow:0 0 12vh rgba(251,191,36,.7)">'
         + '<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;letter-spacing:.3vw;text-shadow:0 2px 8px rgba(0,0,0,.4)">🏆 WINNER 🏆</div>'
         + '<div style="font-size:clamp(28px,6vw,115px);font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
-        + (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
+        + (d.type==='guess'
+            ? ((d.winnerGuess!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">🎯 Guessed: '+esc(String(d.winnerGuess))+'</div>':'')
+               + (d.actualValue!=null?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:700;color:#fff;margin-top:.4vh;opacity:.9">Actual: '+esc(String(d.actualValue))+'</div>':''))
+            : (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':''))
         + '<div style="font-size:clamp(17px,2.4vw,46px);font-weight:900;color:#fff;margin-top:.6vh;opacity:.95">🥇 1st Place</div>'
         + (d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
