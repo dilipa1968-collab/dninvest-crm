@@ -1086,6 +1086,7 @@ input:focus, select:focus, textarea:focus{
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
               <div style="font-weight:700;font-size:.95rem">Question Bank (5) — fill these in advance, then just hit "Push" during the seminar</div>
               <div style="display:flex;gap:6px">
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
@@ -14842,6 +14843,42 @@ window.QUIZ = (function(){
   // host-only working memory (correct answer never leaves the host until reveal)
   var host = { correctIndex:0, qIndex:0, type:'mcq', sessionId:'', startedAtServerMs:0, unsubPlayers:null, unsubResp:null };
   var BANK_KEY='dnquiz_bank';
+  // ── Ready-made Mutual Fund / SIP question bank (correct answer is a[0]) ──
+  var MF_QBANK=[
+    {q:'What does SIP stand for?', a:['Systematic Investment Plan','Simple Interest Plan','Secure Income Plan','Stock Investment Product']},
+    {q:'Which of these is a benefit of SIP?', a:['Rupee cost averaging','Guaranteed returns','No market risk','Fixed monthly profit']},
+    {q:'Mutual funds in India are regulated by?', a:['SEBI','RBI','IRDAI','Post Office']},
+    {q:'ELSS funds are mainly known for?', a:['Tax saving under 80C','Guaranteed capital','Zero risk','Fixed interest']},
+    {q:'Lock-in period of an ELSS fund is?', a:['3 years','1 year','5 years','No lock-in']},
+    {q:'NAV stands for?', a:['Net Asset Value','New Account Value','National Asset Volume','Net Annual Value']},
+    {q:'Which fund invests mostly in shares?', a:['Equity fund','Liquid fund','Debt fund','Gilt fund']},
+    {q:'Power of compounding works best when you?', a:['Stay invested for the long term','Withdraw early','Time the market','Invest only once']},
+    {q:'A debt fund mainly invests in?', a:['Bonds & fixed income','Company shares','Gold','Real estate']},
+    {q:'Diversification means?', a:['Spreading money across assets','Putting all in one stock','Only buying gold','Avoiding equity']},
+    {q:'Which is generally the LOWEST risk?', a:['Liquid fund','Small-cap fund','Sector fund','Mid-cap fund']},
+    {q:'Expense ratio is?', a:['Annual fee charged by the fund','Your profit','An entry tax','An exit penalty']},
+    {q:'SIP lets you invest?', a:['A fixed amount regularly','A lump sum only','Only in gold','Randomly']},
+    {q:'Rupee cost averaging means you buy?', a:['More units when prices are low','Fewer units always','Only at market highs','Units at a fixed price']},
+    {q:'A large-cap fund invests mainly in?', a:['Top 100 companies','Startups','Only small companies','Foreign bonds']},
+    {q:'SWP stands for?', a:['Systematic Withdrawal Plan','Small Wealth Plan','Secure Wealth Product','Stock Weekly Plan']},
+    {q:'Best time to start investing is?', a:['As early as possible','Only after age 50','During a crash only','Never']},
+    {q:'KYC is required to?', a:['Start investing in mutual funds','Withdraw money only','Do nothing','Book train tickets']},
+    {q:'Who professionally manages your money in a mutual fund?', a:['A fund manager','Your bank teller','SEBI','The government']},
+    {q:'Mutual fund returns are?', a:['Market-linked, not guaranteed','Always fixed','Always positive','Government guaranteed']}
+  ];
+  function _qbShuffle(arr){ arr=arr.slice(); for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=arr[i];arr[i]=arr[j];arr[j]=t; } return arr; }
+  function loadMfBank(){
+    if(!confirm('Load 5 fresh Mutual Fund / SIP questions into the slots? This replaces the current 5.')) return;
+    var picked=_qbShuffle(MF_QBANK).slice(0,5);
+    var arr=picked.map(function(item){
+      var correctText=item.a[0];
+      var opts=_qbShuffle(item.a);           // shuffle so the answer isn't always "A"
+      var correct=opts.indexOf(correctText);
+      return { type:'mcq', text:item.q, opts:opts, correct:(correct<0?0:correct), time:20, prize:'' };
+    });
+    try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}
+    renderBank();
+  }
 
   function isPlayMode(){
     try{ return new URLSearchParams(location.search).has('play'); }catch(e){ return false; }
@@ -15576,7 +15613,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl
   };
