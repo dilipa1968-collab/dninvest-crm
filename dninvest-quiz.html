@@ -608,11 +608,19 @@ window.QUIZ = (function(){
         state:'live', type:q.type, qIndex:host.qIndex, sessionId:host.sessionId,
         question:q.text, options:(q.type==='mcq'?q.options:[]), prize:(q.prize||''), timeSec:(q.time||20),
         startedAt:Date.now(), startedAtServer:firebase.firestore.FieldValue.serverTimestamp(),
-        revealIndex:null, winnerName:null, winnerMs:null
+        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null
       }, {merge:true});
-      var d=await DOC().get();
-      if(d.exists && d.data() && d.data().startedAtServer && d.data().startedAtServer.toMillis)
-        host.startedAtServerMs=d.data().startedAtServer.toMillis();
+      // read back from the SERVER (not cache) so the resolved serverTimestamp is captured;
+      // a fresh write's serverTimestamp can still be pending/null in a cached read, retry a few times
+      for(var _try=0; _try<5 && !host.startedAtServerMs; _try++){
+        try{
+          var d=await DOC().get({source:'server'});
+          if(d.exists && d.data() && d.data().startedAtServer && d.data().startedAtServer.toMillis)
+            host.startedAtServerMs=d.data().startedAtServer.toMillis();
+        }catch(e){}
+        if(!host.startedAtServerMs) await new Promise(function(r){ setTimeout(r,250); });
+      }
+      if(!host.startedAtServerMs) host.startedAtServerMs=Date.now(); // fallback so timing still shows (may be slightly off)
       try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs }); }catch(e){}
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
@@ -632,7 +640,7 @@ window.QUIZ = (function(){
       var batch=window.fdb.batch(); var cnt=0;
       rs.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===host.sessionId){ batch.delete(d.ref); cnt++; } });
       if(cnt) await batch.commit();
-      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true});
+      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, revealIndex:null, results:[] }, {merge:true});
     }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -640,10 +648,12 @@ window.QUIZ = (function(){
 
   async function closeQuestion(){
     await window.waitForFdb(8000); if(!window.fdb) return;
-    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
+
+  function pointsForRank(rank){ var table=[100,80,60,40,20]; if(!rank) return 0; return rank<=5 ? table[rank-1] : 10; }
 
   async function reveal(){
     await window.waitForFdb(8000); if(!window.fdb) return;
@@ -667,24 +677,27 @@ window.QUIZ = (function(){
       if(host.type==='mcq'){
         var corrects=[], wrongs=[];
         rows.forEach(function(r){ (r.answer===host.correctIndex?corrects:wrongs).push(r); });
-        corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r)}); });
-        wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r)}); });
+        corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r),pts:pointsForRank(i+1)}); });
+        wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r),pts:0}); });
         winner = corrects.length?corrects[0]:null;
       } else {
-        rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r)}); });
+        rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r),pts:pointsForRank(i+1)}); });
         winner = rows.length?rows[0]:null;
       }
       var winMs = winner ? msOf(winner) : null;
+      var winPts = winner ? pointsForRank(1) : null;
       await DOC().set({
         state:'reveal',
         revealIndex:(host.type==='mcq'?host.correctIndex:null),
         winnerName:(winner?winner.name:null),
         winnerMs:winMs,
+        winnerPts:winPts,
         results:results.slice(0,150)
       }, {merge:true});
       saveCurrentResults(); // persist this revealed question's results
       var st=document.getElementById('quiz-live-status');
       var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
+      tt += (winPts!=null) ? ' · ⭐ +'+winPts+' pts' : '';
       var cnt = ' · '+rows.length+' response'+(rows.length===1?'':'s');
       if(st) st.innerHTML = winner
         ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+(host.type==='mcq'?' (First Correct Answer)':' (First To Buzz)')+tt+cnt
@@ -701,7 +714,7 @@ window.QUIZ = (function(){
       var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
     }catch(e){}
     host.sessionId='s'+Date.now(); host.qIndex=0;
-    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, winnerPts:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New Quiz Ready. Ask Players To Join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -915,6 +928,7 @@ window.QUIZ = (function(){
         + '<div style="font-size:1.5rem;font-weight:800;color:#fff;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.3)">'+esc(player.name)+'</div>'
         + '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">You Won This Round!</div>'
         + (me.ms!=null?('<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+        + (me.pts!=null?('<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">⭐ +'+me.pts+' Points</div>'):'')
         + (d.prize?('<div style="display:inline-block;margin-top:16px;padding:10px 22px;border-radius:99px;background:rgba(255,255,255,.25);font-size:1.15rem;font-weight:900;color:#fff">🎁 '+esc(d.prize)+'</div>')
                   :'<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:14px;opacity:.9">Great Job — Keep It Up!</div>')
         + '</div>';
@@ -931,6 +945,7 @@ window.QUIZ = (function(){
       + '<div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:8px">'+head+'</div>'
       + '<div style="font-size:1.1rem;font-weight:800;color:#fef08a;margin-top:6px">You Finished '+esc(rankTxt)+'</div>'
       + (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+      + (me.pts!=null?('<div style="font-size:.9rem;font-weight:800;color:#fef08a;margin-top:6px">⭐ +'+me.pts+' Points</div>'):'')
       + '<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:16px">🏆 Winner: '+esc(d.winnerName||'-')+'</div>'
       + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">So Close — You Could Be Next!</div>'
       + '</div>';
@@ -1110,6 +1125,7 @@ window.QUIZ = (function(){
         + '<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;letter-spacing:.3vw;text-shadow:0 2px 8px rgba(0,0,0,.4)">🏆 WINNER 🏆</div>'
         + '<div style="font-size:clamp(28px,6vw,115px);font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
         + (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':'')
+        + (d.winnerPts!=null?'<div style="font-size:clamp(17px,2.4vw,46px);font-weight:900;color:#fff;margin-top:.6vh;opacity:.95">⭐ +'+d.winnerPts+' Points</div>':'')
         + (d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
         + '</div></div>'
       : '<div style="text-align:center;margin-top:3vh;font-size:clamp(18px,2.8vw,54px);color:#94a3b8;font-weight:800">🙌 No Correct Answer This Time</div>';
