@@ -809,7 +809,7 @@ window.QUIZ = (function(){
   }
 
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
-  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, timer:null, ansCount:0, linkOpen:true };
+  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, unsubPlayers:null, timer:null, ansCount:0, joinedCount:0, linkOpen:true };
   function isScreenMode(){ try{ return new URLSearchParams(location.search).has('screen'); }catch(e){ return false; } }
   function openScreen(){ window.open(location.origin+location.pathname+'?screen=1','_blank'); }
   function S(){ return document.getElementById('qs-content'); }
@@ -863,7 +863,13 @@ window.QUIZ = (function(){
     if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Could not connect. Please check the network and refresh.</div>'; return; }
     if(screen.unsubDoc) screen.unsubDoc();
     if(screen.unsubResp) screen.unsubResp();
+    if(screen.unsubPlayers) screen.unsubPlayers();
     screen.unsubDoc = DOC().onSnapshot(function(doc){ if(screen.linkOpen===false){ return; } renderScreen(doc.data()||{}); }, function(){});
+    screen.unsubPlayers = PLAYERS().onSnapshot(function(snap){
+      var n=0; snap.forEach(function(doc){ var p=doc.data(); if((p.sessionId||'')===screen.sessionId) n++; });
+      screen.joinedCount=n;
+      var el=document.getElementById('qs-joined-count'); if(el) el.textContent=n;
+    }, function(){});
     LINKS().onSnapshot(function(d){
       var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false;
       if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz is currently closed</div></div>'; }
@@ -896,6 +902,7 @@ window.QUIZ = (function(){
       + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:30vh;height:30vh;background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
       + '<div style="font-size:2vw;margin-top:3vh;color:#e2e8f0">'+esc(link)+'</div>'
       + '<div style="font-size:1.8vw;margin-top:3vh;color:#64748b">Waiting for the quiz to start…</div>'
+      + '<div style="font-size:2.2vw;margin-top:2vh;color:#34d399;font-weight:800">👥 <span id="qs-joined-count">'+(screen.joinedCount||0)+'</span> joined</div>'
       + '</div>';
   }
 
