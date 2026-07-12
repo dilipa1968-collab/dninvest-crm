@@ -436,7 +436,7 @@ window.QUIZ = (function(){
     renderBank();
   }
   async function pushQuestion(n){
-    var _st=document.getElementById('quiz-live-status'); if(_st) _st.innerHTML='⏳ Pushing Q'+(n+1)+'… (button working ✔)';
+    var _cs=document.getElementById('quiz-conn'); if(_cs){ _cs.textContent='⏳ Push Q'+(n+1)+' clicked — sending…'; _cs.style.color='#b45309'; }
     saveBankSilent();
     var q=readBankRow(n);
     if(!q.text){ alert('Q'+(n+1)+' is empty — please enter the question first.'); return; }
@@ -454,29 +454,31 @@ window.QUIZ = (function(){
   }
 
   async function launchQuestionObj(q){
+    var _cs=document.getElementById('quiz-conn');
     await window.waitForFdb(8000);
-    if(!window.fdb){ alert('⚠️ Firebase connect nahi hua — question push nahi ho sakta.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet check karo aur page reload karo.')); return; }
-    await saveCurrentResults(); // persist the outgoing question before moving on
+    if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Firebase connect nahi hua.'); return; }
+    try{ await saveCurrentResults(); }catch(e){}   // never let this block the push
     host.qIndex=(host.qIndex||0)+1;
     host.type=q.type; host.correctIndex=q.correct; host.startedAtServerMs=0;
     try{
-      // correct answer NOT written to live doc; startedAtServer for fair timing
+      if(_cs){ _cs.textContent='⏳ Writing Q'+host.qIndex+' to Firestore…'; _cs.style.color='#b45309'; }
       await DOC().set({
         state:'live', type:q.type, qIndex:host.qIndex, sessionId:host.sessionId,
-        question:q.text, options:(q.type==='mcq'?q.options:[]), prize:q.prize, timeSec:q.time,
+        question:q.text, options:(q.type==='mcq'?q.options:[]), prize:(q.prize||''), timeSec:(q.time||20),
         startedAt:Date.now(), startedAtServer:firebase.firestore.FieldValue.serverTimestamp(),
         revealIndex:null, winnerName:null, winnerMs:null
       }, {merge:true});
-      // read back the resolved server start time for elapsed calculation
       var d=await DOC().get();
       if(d.exists && d.data() && d.data().startedAtServer && d.data().startedAtServer.toMillis)
         host.startedAtServerMs=d.data().startedAtServer.toMillis();
-      // store correct answer in a SEPARATE doc (players never read it) so reveal is reload-proof
       try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs }); }catch(e){}
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
       var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting for answers…</div>';
-    }catch(e){ alert('Launch failed: '+e.message); }
+    }catch(e){
+      if(_cs){ _cs.textContent='🔴 Push failed: '+(e&&e.message||e); _cs.style.color='#dc2626'; }
+      alert('⚠️ Push failed:\n\n'+(e&&e.message||e)+'\n\n(Firestore write block ho sakta hai — rules check karo.)');
+    }
   }
 
   async function clearResults(){
