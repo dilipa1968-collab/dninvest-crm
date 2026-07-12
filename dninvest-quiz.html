@@ -753,7 +753,13 @@ window.QUIZ = (function(){
       '.qp-trophy{display:inline-block;animation:qpBounce 1.1s ease-in-out infinite}',
       '@keyframes qpBounce{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-10px) rotate(6deg)}}',
       '.qp-conf{position:fixed;top:-8vh;font-size:1.8rem;animation:qpFall linear forwards;pointer-events:none;z-index:99999}',
-      '@keyframes qpFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}'
+      '@keyframes qpFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}',
+      '.qp-qcard{background:linear-gradient(135deg,rgba(99,102,241,.25),rgba(236,72,153,.2));border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:22px 18px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,.25)}',
+      '.qp-badge{display:inline-block;padding:4px 14px;border-radius:99px;font-size:.7rem;font-weight:900;letter-spacing:.05em;color:#fff;background:linear-gradient(90deg,#6366f1,#8b5cf6);margin-bottom:10px}',
+      '.qp-optbtn{width:100%;display:flex;align-items:center;gap:12px;padding:16px;font-size:1.05rem;font-weight:800;border:none;border-radius:16px;color:#fff;cursor:pointer;text-align:left;box-shadow:0 6px 16px rgba(0,0,0,.3);transition:transform .1s}',
+      '.qp-optbtn:active{transform:scale(.96)}',
+      '.qp-optletter{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;font-weight:900}',
+      '.qp-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qp-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qp-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qp-d{background:linear-gradient(135deg,#e0a800,#c08a00)}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -818,17 +824,19 @@ window.QUIZ = (function(){
       C().innerHTML=msgCard('✅ Your Answer Is Locked In!<br><br>Waiting For The Result…');
       return;
     }
-    var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
-    var html='<div>'+prize
-      + '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:20px;margin-bottom:16px">'
-      + '<div style="font-size:1.2rem;font-weight:700;text-align:center">'+esc(d.question)+'</div></div>';
+    var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;font-weight:800;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
+    var html='<div class="qp-pop">'+prize
+      + '<div class="qp-qcard">'
+      + '<div style="text-align:center"><span class="qp-badge">🧠 QUESTION</span></div>'
+      + '<div style="font-size:1.25rem;font-weight:800;text-align:center;line-height:1.35;color:#fff">'+esc(d.question)+'</div></div>';
     if(d.type==='buzzer'){
-      html+='<button id="qp-buzz" style="width:100%;padding:40px 0;font-size:1.8rem;font-weight:900;border:none;border-radius:20px;background:#ef4444;color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(239,68,68,.4)">🔔 BUZZ!</button>';
+      html+='<button id="qp-buzz" style="width:100%;padding:40px 0;font-size:1.8rem;font-weight:900;border:none;border-radius:20px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(239,68,68,.5)">🔔 BUZZ!</button>';
     } else {
-      html+='<div style="display:flex;flex-direction:column;gap:10px">';
+      var cls=['qp-a','qp-b','qp-c','qp-d'];
+      html+='<div style="display:flex;flex-direction:column;gap:12px">';
       (d.options||[]).forEach(function(opt,i){
-        html+='<button class="qp-opt" data-i="'+i+'" style="width:100%;padding:16px;font-size:1.05rem;font-weight:600;border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;text-align:left">'
-            + String.fromCharCode(65+i)+'. '+esc(opt)+'</button>';
+        html+='<button class="qp-opt qp-optbtn '+cls[i]+'" data-i="'+i+'">'
+            + '<span class="qp-optletter">'+String.fromCharCode(65+i)+'</span><span>'+esc(opt)+'</span></button>';
       });
       html+='</div>';
     }
