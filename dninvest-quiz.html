@@ -761,7 +761,7 @@ window.QUIZ = (function(){
   }
 
   // ─────────── CLIENT (PLAYER) ───────────
-  var player = { id:'', name:'', sessionId:'', qIndex:0, answered:false, unsub:null, state:'' };
+  var player = { id:'', name:'', sessionId:'', qIndex:0, answered:false, unsub:null, state:'', lastGuess:null };
 
   function C(){ return document.getElementById('qp-content'); }
 
@@ -877,7 +877,7 @@ window.QUIZ = (function(){
       player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
       try{ PLAYERS().doc(player.id).set({ name:player.name, sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
     }
-    if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; }
+    if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; player.lastGuess=null; }
 
     if(d.state==='live'){ renderLiveQuestion(d); }
     else if(d.state==='reveal'){ renderReveal(d); }
@@ -886,7 +886,10 @@ window.QUIZ = (function(){
 
   function renderLiveQuestion(d){
     if(player.answered){
-      C().innerHTML=msgCard('✅ Your Answer Is Locked In!<br><br>Waiting For The Result…');
+      var lockedMsg = (d.type==='guess' && player.lastGuess!=null)
+        ? '✅ Your Guess Is Locked In!<br><br><span style="font-size:1.4rem;font-weight:900">🎯 '+esc(String(player.lastGuess))+'</span><br><br>Waiting For The Result…'
+        : '✅ Your Answer Is Locked In!<br><br>Waiting For The Result…';
+      C().innerHTML=msgCard(lockedMsg);
       return;
     }
     var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;font-weight:800;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
@@ -934,7 +937,11 @@ window.QUIZ = (function(){
   async function submitAnswer(d, answer){
     if(player.answered) return;
     player.answered=true;
-    C().innerHTML=msgCard('✅ Answer Submitted!<br><br>Waiting For The Result…');
+    if(d.type==='guess') player.lastGuess=answer;
+    var confirmMsg = (d.type==='guess')
+      ? '✅ Guess Submitted!<br><br><span style="font-size:1.4rem;font-weight:900">🎯 '+esc(String(answer))+'</span><br><br>Waiting For The Result…'
+      : '✅ Answer Submitted!<br><br>Waiting For The Result…';
+    C().innerHTML=msgCard(confirmMsg);
     try{
       await RESPONSES().doc(player.sessionId+'_'+player.qIndex+'_'+player.id).set({
         playerId:player.id, name:player.name, qIndex:player.qIndex, sessionId:player.sessionId,
