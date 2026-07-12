@@ -118,7 +118,7 @@ input,select,textarea,button{font-family:inherit}
           <!-- Live results -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-              <div style="font-weight:700;font-size:.95rem">📊 Live results <span style="color:#16a34a;font-size:.7rem;font-weight:800">· build 7</span></div>
+              <div style="font-weight:700;font-size:.95rem">📊 Live results <span style="color:#16a34a;font-size:.7rem;font-weight:800">· build 7</span> <span style="color:var(--teal);font-weight:800;font-size:.8rem">· 👥 <span id="quiz-player-count-2">0</span> joined</span></div>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-outline" style="padding:6px 10px;font-size:.8rem" onclick="QUIZ.clearResults()">🧹 Clear Results</button>
                 <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
@@ -299,6 +299,7 @@ window.QUIZ = (function(){
     host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
       var n=0; snap.forEach(function(doc){ if((doc.data().sessionId||'')===host.sessionId) n++; });
       var el=document.getElementById('quiz-player-count'); if(el) el.textContent=n;
+      var el2=document.getElementById('quiz-player-count-2'); if(el2) el2.textContent=n;
     }, function(){});
     host.unsubResp = RESPONSES().onSnapshot(function(snap){
       host.lastRespSnap = snap;
@@ -637,6 +638,7 @@ window.QUIZ = (function(){
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New quiz ready. Ask players to join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
     var pc=document.getElementById('quiz-player-count'); if(pc) pc.textContent='0';
+    var pc2=document.getElementById('quiz-player-count-2'); if(pc2) pc2.textContent='0';
   }
 
   function copyLink(){
