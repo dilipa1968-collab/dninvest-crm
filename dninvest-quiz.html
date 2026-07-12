@@ -642,7 +642,7 @@ window.QUIZ = (function(){
         state:'live', type:q.type, qIndex:host.qIndex, sessionId:host.sessionId,
         question:q.text, options:(q.type==='mcq'?q.options:[]), prize:(q.prize||''), timeSec:(q.time||20),
         startedAt:Date.now(), startedAtServer:firebase.firestore.FieldValue.serverTimestamp(),
-        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null
+        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null
       }, {merge:true});
       // read back from the SERVER (not cache) so the resolved serverTimestamp is captured;
       // a fresh write's serverTimestamp can still be pending/null in a cached read, retry a few times
@@ -674,7 +674,7 @@ window.QUIZ = (function(){
       var batch=window.fdb.batch(); var cnt=0;
       rs.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===host.sessionId){ batch.delete(d.ref); cnt++; } });
       if(cnt) await batch.commit();
-      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, revealIndex:null, results:[] }, {merge:true});
+      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null, revealIndex:null, results:[] }, {merge:true});
     }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -682,7 +682,7 @@ window.QUIZ = (function(){
 
   async function closeQuestion(){
     await window.waitForFdb(8000); if(!window.fdb) return;
-    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
   }
@@ -733,6 +733,9 @@ window.QUIZ = (function(){
         });
         validRows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r),guess:r.answer,diff:Math.abs(r.answer-actualValue)}); });
         winner = validRows.length?validRows[0]:null;
+        var winnerDiff = winner ? Math.abs(winner.answer-actualValue) : null;
+        var tieCount = winner ? validRows.filter(function(r){ return Math.abs(r.answer-actualValue)===winnerDiff; }).length : 0;
+        var wasTie = tieCount>1;
       } else {
         rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r)}); });
         winner = rows.length?rows[0]:null;
@@ -746,6 +749,7 @@ window.QUIZ = (function(){
         winnerPts:null,
         actualValue:(host.type==='guess'?actualValue:null),
         winnerGuess:(host.type==='guess'&&winner?winner.answer:null),
+        winnerTie:(host.type==='guess'?!!wasTie:null),
         results:results.slice(0,150)
       }, {merge:true});
       saveCurrentResults(); // persist this revealed question's results
@@ -768,7 +772,7 @@ window.QUIZ = (function(){
       var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
     }catch(e){}
     host.sessionId='s'+Date.now(); host.qIndex=0;
-    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
     attachHostListeners();
     var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New Quiz Ready. Ask Players To Join.';
     var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
@@ -997,6 +1001,7 @@ window.QUIZ = (function(){
     var isGuess = d.type==='guess';
     var actualLine = (isGuess && d.actualValue!=null) ? '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">Actual Value: <b>'+esc(String(d.actualValue))+'</b></div>' : '';
     var winGuessLine = (isGuess && d.winnerGuess!=null) ? '<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">🏆 Winning Guess: '+esc(String(d.winnerGuess))+'</div>' : '';
+    var tieNote = (isGuess && d.winnerTie) ? '<div style="font-size:.82rem;font-weight:700;color:#fde68a;margin-top:6px;opacity:.95">⏱️ Same Guess — Winner Decided By Submission Time</div>' : '';
 
     // Didn't answer at all
     if(!me){
@@ -1006,7 +1011,7 @@ window.QUIZ = (function(){
         + (d.winnerName
             ? ('<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">🏆 Winner: '+esc(d.winnerName)+'</div>'
                + (d.winnerMs!=null?('<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:4px;opacity:.85">⏱️ '+(d.winnerMs/1000).toFixed(2)+'s</div>'):'')
-               + winGuessLine + actualLine)
+               + winGuessLine + actualLine + tieNote)
             : '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">No Winner This Time</div>')
         + '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:16px;opacity:.9">'+(d.winnerName?'You Did Not Answer This Time.':'Get Ready For The Next Question!')+'</div>'
         + (d.winnerName?'<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:6px;opacity:.85">Do Try The Next One!</div>':'')
@@ -1042,7 +1047,9 @@ window.QUIZ = (function(){
         + (isGuess
             ? ('<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:10px;opacity:.95">🎯 Your Guess: '+esc(String(me.guess))+'</div>'
                + (d.actualValue!=null?'<div style="font-size:.95rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.9">Actual Value: '+esc(String(d.actualValue))+'</div>':'')
-               + (me.diff!=null?'<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By Just '+esc(String(me.diff))+'</div>':''))
+               + (me.diff!=null?'<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By Just '+esc(String(me.diff))+'</div>':'')
+               + (me.ms!=null?'<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:6px;opacity:.85">⏱️ Submitted At: '+(me.ms/1000).toFixed(2)+'s</div>':'')
+               + tieNote)
             : (me.ms!=null?('<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):''))
         + '<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">🥇 1st Place</div>'
         + (d.prize?('<div style="display:inline-block;margin-top:16px;padding:10px 22px;border-radius:99px;background:rgba(255,255,255,.25);font-size:1.15rem;font-weight:900;color:#fff">🎁 '+esc(d.prize)+'</div>')
@@ -1064,7 +1071,9 @@ window.QUIZ = (function(){
           ? ('<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:10px">🎯 Your Guess: '+esc(String(me.guess))+'</div>'
              + (d.actualValue!=null?'<div style="font-size:.88rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.9">Actual Value: '+esc(String(d.actualValue))+'</div>':'')
              + (me.diff!=null?'<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By '+esc(String(me.diff))+'</div>':'')
-             + winGuessLine)
+             + (me.ms!=null?'<div style="font-size:.8rem;font-weight:700;color:#e2e8f0;margin-top:6px;opacity:.8">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>':'')
+             + (d.winnerMs!=null?'<div style="font-size:.8rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.8">⏱️ Winner\'s Time: '+(d.winnerMs/1000).toFixed(2)+'s</div>':'')
+             + winGuessLine + tieNote)
           : (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):''))
       + '<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:16px">🏆 Winner: '+esc(d.winnerName||'-')+'</div>'
       + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">So Close — You Could Be Next!</div>'
@@ -1265,7 +1274,9 @@ window.QUIZ = (function(){
         + '<div style="font-size:clamp(28px,6vw,115px);font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
         + (d.type==='guess'
             ? ((d.winnerGuess!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">🎯 Guessed: '+esc(String(d.winnerGuess))+'</div>':'')
-               + (d.actualValue!=null?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:700;color:#fff;margin-top:.4vh;opacity:.9">Actual: '+esc(String(d.actualValue))+'</div>':''))
+               + (d.actualValue!=null?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:700;color:#fff;margin-top:.4vh;opacity:.9">Actual: '+esc(String(d.actualValue))+'</div>':'')
+               + (d.winnerMs!=null?'<div style="font-size:clamp(15px,2vw,38px);font-weight:700;color:#fff;margin-top:.4vh;opacity:.85">⏱️ Submitted At: '+(d.winnerMs/1000).toFixed(2)+'s</div>':'')
+               + (d.winnerTie?'<div style="font-size:clamp(14px,1.9vw,34px);font-weight:800;color:#fff9c4;margin-top:.6vh">⏱️ Same Guess — Winner Decided By Submission Time</div>':''))
             : (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':''))
         + '<div style="font-size:clamp(17px,2.4vw,46px);font-weight:900;color:#fff;margin-top:.6vh;opacity:.95">🥇 1st Place</div>'
         + (d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
