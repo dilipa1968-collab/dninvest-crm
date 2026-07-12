@@ -238,14 +238,18 @@ window.QUIZ = (function(){
     if(host.unsubDoc) host.unsubDoc();
     host.unsubDoc = DOC().onSnapshot(function(doc){
       var d=doc.data()||{};
+      host.liveSessionId = d.sessionId || host.liveSessionId;
+      if(d.qIndex!=null) host.liveQIndex = d.qIndex;
       var el=document.getElementById('quiz-conn');
       if(el) el.textContent='🟢 Connected · live state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length);
+      if(host.lastRespSnap) renderHostResults(host.lastRespSnap);  // re-filter with the live question
     }, function(){});
     host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
       var n=0; snap.forEach(function(doc){ if((doc.data().sessionId||'')===host.sessionId) n++; });
       var el=document.getElementById('quiz-player-count'); if(el) el.textContent=n;
     }, function(){});
     host.unsubResp = RESPONSES().onSnapshot(function(snap){
+      host.lastRespSnap = snap;
       renderHostResults(snap);
     }, function(){});
     if(host.unsubSaved) host.unsubSaved();
@@ -317,10 +321,12 @@ window.QUIZ = (function(){
     }catch(e){ alert('Delete failed: '+e.message); }
 
   function currentResponses(snap){
+    var sid = host.liveSessionId || host.sessionId;
+    var qi = (host.liveQIndex!=null) ? host.liveQIndex : host.qIndex;
     var rows=[];
     snap.forEach(function(doc){
       var r=doc.data();
-      if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r);
+      if((r.sessionId||'')===sid && (r.qIndex||0)===qi) rows.push(r);
     });
     // order by server timestamp (nulls — pending writes — go last)
     rows.sort(function(a,b){
@@ -335,7 +341,8 @@ window.QUIZ = (function(){
     var box=document.getElementById('quiz-results'); if(!box) return;
     var total = snap ? snap.size : 0;
     var rows = snap ? currentResponses(snap) : [];
-    var dbg='<div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;font-family:monospace">📥 DB total: '+total+' · matching (sess ...'+String(host.sessionId||'—').slice(-5)+' / q'+host.qIndex+'): '+rows.length+'</div>';
+    var sid=host.liveSessionId||host.sessionId; var qi=(host.liveQIndex!=null)?host.liveQIndex:host.qIndex;
+    var dbg='<div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;font-family:monospace">📥 DB total: '+total+' · matching (sess ...'+String(sid||'—').slice(-5)+' / q'+qi+'): '+rows.length+'</div>';
     if(!rows.length){ box.innerHTML=dbg+'<div style="color:var(--gray);font-size:.82rem">No answers yet.</div>'; return; }
     var html=dbg+'<div style="display:flex;flex-direction:column;gap:6px">';
     rows.forEach(function(r,i){
@@ -485,6 +492,8 @@ window.QUIZ = (function(){
     await window.waitForFdb(8000);
     if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Firebase connect nahi hua.'); return; }
     try{ await saveCurrentResults(); }catch(e){}   // never let this block the push
+    // continue the SAME live session/sequence (survives reloads & multiple host tabs)
+    try{ var cur=(await DOC().get()).data()||{}; if(cur.sessionId) host.sessionId=cur.sessionId; host.qIndex=(cur.qIndex||0); }catch(e){}
     host.qIndex=(host.qIndex||0)+1;
     host.type=q.type; host.correctIndex=q.correct; host.startedAtServerMs=0;
     try{
