@@ -89,6 +89,87 @@ input[type=text],input[type=tel]{max-width:420px}
 .chip{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500}
 .chip.yes{background:#e6f4ea;color:#137333}.chip.maybe{background:#fef7e0;color:#b06000}.chip.no{background:#fce8e6;color:#c5221f}
 @media(max-width:480px){.card{padding:18px 16px}.form-title{font-size:23px}}
+/* ============ Colorful multi-accent theme ============ */
+#formWrap .card{
+  border:1px solid var(--border);
+  border-left:7px solid var(--accent,var(--purple));
+  border-radius:14px;
+  box-shadow:0 3px 14px rgba(16,24,40,.06);
+  transition:box-shadow .2s, transform .12s;
+}
+#formWrap .card:focus-within{ box-shadow:0 7px 24px rgba(16,24,40,.13); }
+#formWrap .card.focus-ring:focus-within{ border-left:7px solid var(--accent,var(--purple)); padding-left:18px; }
+#formWrap .card .q-label{ color:var(--accent,var(--text)); font-weight:700; }
+#formWrap .card .q-label .star{ color:var(--red); }
+/* per-question accent (head card is nth-of-type 1) */
+#formWrap .card:nth-of-type(2){--accent:#7C3AED;--accent-bg:#F3EEFF}
+#formWrap .card:nth-of-type(3){--accent:#0D9488;--accent-bg:#E6F5F3}
+#formWrap .card:nth-of-type(4){--accent:#2563EB;--accent-bg:#E8F0FE}
+#formWrap .card:nth-of-type(5){--accent:#16A34A;--accent-bg:#E7F7EC}
+#formWrap .card:nth-of-type(6){--accent:#0891B2;--accent-bg:#E4F5FA}
+#formWrap .card:nth-of-type(7){--accent:#DB2777;--accent-bg:#FCE7F3}
+#formWrap .card:nth-of-type(8){--accent:#D97706;--accent-bg:#FEF3E2}
+#formWrap .card:nth-of-type(9){--accent:#4F46E5;--accent-bg:#EEF0FF}
+#formWrap .card:nth-of-type(10){--accent:#0D9488;--accent-bg:#E6F5F3}
+#formWrap .card:nth-of-type(11){--accent:#DB2777;--accent-bg:#FCE7F3}
+
+input[type=text]:focus,input[type=tel]:focus,textarea:focus{ border-bottom:2px solid var(--accent,var(--purple)); }
+select:focus{ border-color:var(--accent,var(--purple)); box-shadow:0 0 0 3px var(--accent-bg,var(--purple-light)); }
+
+.radio-row input{ accent-color:var(--accent,var(--purple)); }
+.radio-row.sel{ border-color:var(--accent,var(--purple)); background:var(--accent-bg,var(--purple-light)); box-shadow:0 0 0 1px var(--accent,var(--purple)) inset; }
+
+/* ---- Color pill rating scale ---- */
+.scale-ends{ display:none; }
+.pill-scale{ display:flex; flex-wrap:wrap; gap:9px; margin-top:4px; }
+.pill-cell{ flex:0 0 auto; }
+.pill-cell input{ display:none; }
+.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:11px 18px; border-radius:999px;
+  border:2px solid var(--c); color:var(--c); background:#fff;
+  font-size:14.5px; font-weight:700; cursor:pointer; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1), background .15s, box-shadow .15s, color .15s;
+}
+.pill:active{ transform:scale(.9); }
+.pill-cell input:checked + .pill{
+  background:var(--c); color:#fff;
+  box-shadow:0 6px 16px -4px var(--c);
+  transform:translateY(-2px) scale(1.04);
+  animation:pillPop .32s cubic-bezier(.34,1.56,.64,1);
+}
+.pill-cell input:checked + .pill::before{ content:"✓"; font-weight:900; }
+@keyframes pillPop{ 0%{transform:scale(.85)} 60%{transform:scale(1.13)} 100%{transform:translateY(-2px) scale(1.04)} }
+
+/* ---- Submit / buttons ---- */
+.btn-submit{
+  background:linear-gradient(135deg,#7C3AED,#2563EB);
+  border-radius:12px; box-shadow:0 6px 18px -4px rgba(37,99,235,.5);
+  transition:transform .12s, box-shadow .2s, filter .2s;
+}
+.btn-submit:hover{ filter:brightness(1.06); box-shadow:0 9px 24px -4px rgba(37,99,235,.6); }
+.btn-submit:active{ transform:scale(.97); }
+.btn-clear{ color:#7C3AED; }
+.btn-addref{ border-color:var(--accent,#7C3AED); color:var(--accent,#7C3AED); }
+.btn-addref:hover{ background:var(--accent-bg,#F3EEFF); }
+
+/* ---- Header gradient bar + gradient title ---- */
+#formWrap .card.head, #done .card.head{ border-top:none; border-left:none; overflow:hidden; }
+.card.head::before{ content:""; position:absolute; top:0; left:0; right:0; height:10px;
+  background:linear-gradient(90deg,#7C3AED,#2563EB,#0D9488,#16A34A,#DB2777); }
+.form-title{ font-weight:700; background:linear-gradient(135deg,#7C3AED,#2563EB);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+/* ---- Thank-you success tick ---- */
+#done .card.head{ text-align:center; }
+.done-tick{ width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,#16A34A,#0D9488);
+  display:flex;align-items:center;justify-content:center;margin:6px auto 18px;
+  box-shadow:0 10px 26px -6px rgba(22,163,74,.6); animation:tickPop .5s cubic-bezier(.34,1.56,.64,1); }
+.done-tick svg{ width:46px;height:46px;stroke:#fff;stroke-width:5;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:48;stroke-dashoffset:48;animation:tickDraw .5s .18s forwards ease-out; }
+@keyframes tickPop{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes tickDraw{to{stroke-dashoffset:0}}
 </style>
 </head>
 <body>
@@ -188,6 +269,7 @@ input[type=text],input[type=tel]{max-width:420px}
 
 <div class="wrap" id="done">
   <div class="card head">
+    <div class="done-tick"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-16"/></svg></div>
     <h2>Thank you! 🙏</h2>
     <p>Your response has been recorded. Thank you very much for attending our seminar.</p>
     <p style="margin-top:8px">For any investment-related information, feel free to contact us.</p>
@@ -211,14 +293,29 @@ input[type=text],input[type=tel]{max-width:420px}
 </div>
 
 <script>
-// ── Build 1-5 scales ─────────────────────────────────────────────
-['rating','content'].forEach(k=>{
+// ── Build rating scales as colour pills (values stay 1–5) ────────
+const SCALE_DEF={
+  rating:[
+    {v:1,label:'Poor',c:'#DC2626'},
+    {v:2,label:'Average',c:'#F59E0B'},
+    {v:3,label:'Good',c:'#2563EB'},
+    {v:4,label:'Very Good',c:'#0D9488'},
+    {v:5,label:'Excellent',c:'#16A34A'}
+  ],
+  content:[
+    {v:1,label:'Not Useful',c:'#DC2626'},
+    {v:2,label:'Slightly',c:'#F59E0B'},
+    {v:3,label:'Useful',c:'#2563EB'},
+    {v:4,label:'Very Useful',c:'#0D9488'},
+    {v:5,label:'Extremely',c:'#16A34A'}
+  ]
+};
+Object.keys(SCALE_DEF).forEach(k=>{
   const el=document.getElementById('scale-'+k);
-  let h='';
-  for(let i=1;i<=5;i++){
-    h+=`<label class="cell"><input type="radio" name="f-${k}" value="${i}"><span class="num">${i}</span></label>`;
-  }
-  el.innerHTML=h;
+  el.className='pill-scale';
+  el.innerHTML=SCALE_DEF[k].map(o=>
+    `<label class="pill-cell"><input type="radio" name="f-${k}" value="${o.v}"><span class="pill" style="--c:${o.c}">${o.label}</span></label>`
+  ).join('');
 });
 
 // Radio/checkbox option cards: select hone par purple highlight
