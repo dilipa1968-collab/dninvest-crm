@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>D N Investment — Seminar Feedback</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>D N Investment — Seminar Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx-js-style.min.js"></script>
@@ -17,545 +20,1620 @@ const firebaseConfig = {
   messagingSenderId: "331999342266",
   appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
 };
-try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
+try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){ window.__fbErr=(e&&e.message)||String(e); }
+// poll helper — quiz code waits for Firestore to be ready
+window.waitForFdb = function(maxMs){
+  maxMs = maxMs || 8000; var step=100, waited=0;
+  return new Promise(function(res){
+    (function chk(){
+      if(window.fdb) return res(true);
+      waited+=step; if(waited>=maxMs) return res(false);
+      setTimeout(chk, step);
+    })();
+  });
+};
+// this standalone host page is reached only via the secret ?host link → treat as admin
+window.CU = { role:'admin', name:'Host' };
 </script>
 <style>
 :root{
-  --purple:#673ab7; --purple-dark:#5e35b1; --purple-light:#f0ebf8;
-  --red:#d93025; --text:#202124; --text2:#5f6368; --border:#dadce0;
+  --navy:#0f1f3d;--navy2:#162b54;
+  --green:#0f7a45;--red:#c0392b;
+  --teal:#0891b2;--gold:#c9a227;
+  --bg:#eef2f9;--white:#fff;
+  --border:#dde3f0;--gray:#5d6e8a;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Roboto',Arial,sans-serif;background:var(--purple-light);color:var(--text);padding:12px 0 80px}
-.wrap{max-width:640px;margin:0 auto;padding:0 12px}
-.card{background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;padding:22px 24px;position:relative}
-.card.head{border-top:10px solid var(--purple);padding-top:20px}
-.card.focus-ring:focus-within{border-left:6px solid var(--purple);padding-left:19px}
-.form-title{font-size:28px;font-weight:400;margin-bottom:8px}
-.form-sub{font-size:13px;color:var(--text2);line-height:1.5}
-.req-note{font-size:13px;color:var(--red);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
-.q-label{font-size:15px;font-weight:500;margin-bottom:14px;line-height:1.45}
-.q-label .star{color:var(--red);margin-left:3px}
-input[type=text],input[type=tel],select,textarea{
-  width:100%;border:none;border-bottom:1px solid var(--border);font-size:16px;font-family:inherit;
-  padding:10px 0;background:transparent;outline:none;color:var(--text);transition:border-color .2s;
-}
-input[type=text]:focus,input[type=tel]:focus,textarea:focus{border-bottom:2px solid var(--purple)}
-select{border:1.5px solid var(--border);border-radius:8px;padding:13px 10px;background:#fff;cursor:pointer;font-size:15px}
-textarea{resize:vertical;min-height:26px;border-bottom:1px solid var(--border)}
-input[type=text],input[type=tel]{max-width:420px}
-@media(max-width:480px){input[type=text],input[type=tel]{max-width:100%}}
-.radio-row{display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all .15s;-webkit-tap-highlight-color:transparent}
-.radio-row:active{transform:scale(.985)}
-.radio-row.sel{border-color:var(--purple);background:var(--purple-light);box-shadow:0 0 0 1px var(--purple) inset}
-.radio-row input{width:20px;height:20px;accent-color:var(--purple);cursor:pointer;flex-shrink:0}
-.radio-row span{font-size:15px;line-height:1.4}
-.scale{display:flex;justify-content:space-between;gap:8px;max-width:420px;margin-top:6px}
-.scale .cell{flex:1}
-.scale .num{
-  display:flex;align-items:center;justify-content:center;width:100%;height:52px;
-  border:1.5px solid var(--border);border-radius:10px;font-size:17px;font-weight:500;color:var(--text2);
-  cursor:pointer;transition:all .15s;user-select:none;-webkit-tap-highlight-color:transparent;
-}
-.scale .num:active{transform:scale(.94)}
-.scale input{display:none}
-.scale input:checked + .num{background:var(--purple);border-color:var(--purple);color:#fff;font-weight:700}
-.scale-ends{display:flex;justify-content:space-between;max-width:420px;font-size:12px;color:var(--text2);margin-top:8px}
-.err{display:none;color:var(--red);font-size:12px;margin-top:10px;align-items:center;gap:6px}
-.card.error{border:1px solid var(--red)}
-.card.error .err{display:flex}
-.footer-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
-.btn-submit{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:14px 32px;font-size:16px;font-weight:500;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
-@media(max-width:480px){.footer-row{flex-direction:column;gap:4px}.btn-submit{width:100%;padding:16px}}
-.btn-submit:hover{background:var(--purple-dark);box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.btn-submit:disabled{opacity:.6;cursor:not-allowed}
-.btn-clear{background:none;border:none;color:var(--purple);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;padding:10px}
-.brand{font-size:11px;color:var(--text2);text-align:center;margin-top:20px}
-.brand b{color:var(--purple)}
-.ref-row{display:flex;gap:10px;margin-bottom:10px}
-.ref-row input{flex:1;max-width:none}
-.btn-addref{background:none;border:1.5px dashed var(--purple);color:var(--purple);border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit;margin-top:4px;-webkit-tap-highlight-color:transparent}
-.btn-addref:disabled{opacity:.4;cursor:not-allowed}
-@media(max-width:480px){.ref-row{flex-direction:column;gap:4px;border-bottom:1px dashed var(--border);padding-bottom:8px}}
-/* Confirmation */
-#done{display:none}
-#done .card{padding:28px 24px}
-#done h2{font-size:22px;font-weight:400;margin-bottom:10px}
-#done p{font-size:14px;color:var(--text2);line-height:1.6}
-#done a{color:var(--purple);font-size:14px;display:inline-block;margin-top:16px;text-decoration:none}
-#done a:hover{text-decoration:underline}
-/* Responses (admin) view */
-.resp-table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
-.resp-table th{background:var(--purple);color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0}
-.resp-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
-.chip{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500}
-.chip.yes{background:#e6f4ea;color:#137333}.chip.maybe{background:#fef7e0;color:#b06000}.chip.no{background:#fce8e6;color:#c5221f}
-@media(max-width:480px){.card{padding:18px 16px}.form-title{font-size:23px}}
-/* ============ Colorful multi-accent theme ============ */
-#formWrap .card{
-  border:1px solid var(--border);
-  border-left:7px solid var(--accent,var(--purple));
-  border-radius:14px;
-  box-shadow:0 3px 14px rgba(16,24,40,.06);
-  transition:box-shadow .2s, transform .12s;
-}
-#formWrap .card:focus-within{ box-shadow:0 7px 24px rgba(16,24,40,.13); }
-#formWrap .card.focus-ring:focus-within{ border-left:7px solid var(--accent,var(--purple)); padding-left:18px; }
-#formWrap .card .q-label{ color:var(--accent,var(--text)); font-weight:700; }
-#formWrap .card .q-label .star{ color:var(--red); }
-/* per-question accent (head card is nth-of-type 1) */
-#formWrap .card:nth-of-type(2){--accent:#7C3AED;--accent-bg:#F3EEFF}
-#formWrap .card:nth-of-type(3){--accent:#0D9488;--accent-bg:#E6F5F3}
-#formWrap .card:nth-of-type(4){--accent:#2563EB;--accent-bg:#E8F0FE}
-#formWrap .card:nth-of-type(5){--accent:#16A34A;--accent-bg:#E7F7EC}
-#formWrap .card:nth-of-type(6){--accent:#0891B2;--accent-bg:#E4F5FA}
-#formWrap .card:nth-of-type(7){--accent:#DB2777;--accent-bg:#FCE7F3}
-#formWrap .card:nth-of-type(8){--accent:#D97706;--accent-bg:#FEF3E2}
-#formWrap .card:nth-of-type(9){--accent:#4F46E5;--accent-bg:#EEF0FF}
-#formWrap .card:nth-of-type(10){--accent:#0D9488;--accent-bg:#E6F5F3}
-#formWrap .card:nth-of-type(11){--accent:#DB2777;--accent-bg:#FCE7F3}
-
-input[type=text]:focus,input[type=tel]:focus,textarea:focus{ border-bottom:2px solid var(--accent,var(--purple)); }
-select:focus{ border-color:var(--accent,var(--purple)); box-shadow:0 0 0 3px var(--accent-bg,var(--purple-light)); }
-
-.radio-row input{ accent-color:var(--accent,var(--purple)); }
-.radio-row.sel{ border-color:var(--accent,var(--purple)); background:var(--accent-bg,var(--purple-light)); box-shadow:0 0 0 1px var(--accent,var(--purple)) inset; }
-
-/* ---- Color pill rating scale ---- */
-.scale-ends{ display:none; }
-.pill-scale{ display:flex; flex-wrap:wrap; gap:9px; margin-top:4px; }
-.pill-cell{ flex:0 0 auto; }
-.pill-cell input{ display:none; }
-.pill{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:11px 18px; border-radius:999px;
-  border:2px solid var(--c); color:var(--c); background:#fff;
-  font-size:14.5px; font-weight:700; cursor:pointer; user-select:none;
-  -webkit-tap-highlight-color:transparent;
-  transition:transform .12s cubic-bezier(.34,1.56,.64,1), background .15s, box-shadow .15s, color .15s;
-}
-.pill:active{ transform:scale(.9); }
-.pill-cell input:checked + .pill{
-  background:var(--c); color:#fff;
-  box-shadow:0 6px 16px -4px var(--c);
-  transform:translateY(-2px) scale(1.04);
-  animation:pillPop .32s cubic-bezier(.34,1.56,.64,1);
-}
-.pill-cell input:checked + .pill::before{ content:"✓"; font-weight:900; }
-@keyframes pillPop{ 0%{transform:scale(.85)} 60%{transform:scale(1.13)} 100%{transform:translateY(-2px) scale(1.04)} }
-
-/* ---- Submit / buttons ---- */
-.btn-submit{
-  background:linear-gradient(135deg,#7C3AED,#2563EB);
-  border-radius:12px; box-shadow:0 6px 18px -4px rgba(37,99,235,.5);
-  transition:transform .12s, box-shadow .2s, filter .2s;
-}
-.btn-submit:hover{ filter:brightness(1.06); box-shadow:0 9px 24px -4px rgba(37,99,235,.6); }
-.btn-submit:active{ transform:scale(.97); }
-.btn-clear{ color:#7C3AED; }
-.btn-addref{ border-color:var(--accent,#7C3AED); color:var(--accent,#7C3AED); }
-.btn-addref:hover{ background:var(--accent-bg,#F3EEFF); }
-
-/* ---- Header gradient bar + gradient title ---- */
-#formWrap .card.head, #done .card.head{ border-top:none; border-left:none; overflow:hidden; }
-.card.head::before{ content:""; position:absolute; top:0; left:0; right:0; height:10px;
-  background:linear-gradient(90deg,#7C3AED,#2563EB,#0D9488,#16A34A,#DB2777); }
-.form-title{ font-weight:700; background:linear-gradient(135deg,#7C3AED,#2563EB);
-  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-
-/* ---- Thank-you success tick ---- */
-#done .card.head{ text-align:center; }
-.done-tick{ width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,#16A34A,#0D9488);
-  display:flex;align-items:center;justify-content:center;margin:6px auto 18px;
-  box-shadow:0 10px 26px -6px rgba(22,163,74,.6); animation:tickPop .5s cubic-bezier(.34,1.56,.64,1); }
-.done-tick svg{ width:46px;height:46px;stroke:#fff;stroke-width:5;fill:none;stroke-linecap:round;stroke-linejoin:round;
-  stroke-dasharray:48;stroke-dashoffset:48;animation:tickDraw .5s .18s forwards ease-out; }
-@keyframes tickPop{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
-@keyframes tickDraw{to{stroke-dashoffset:0}}
+body{font-family:'Inter',system-ui,Arial,sans-serif;background:var(--bg);color:var(--navy)}
+.btn{padding:7px 14px;border-radius:10px;cursor:pointer;font-size:.78rem;font-weight:700;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:5px;box-shadow:0 1px 2px rgba(16,30,60,.12)}
+.btn-success{background:var(--green);color:#fff}.btn-success:hover{background:#155d37}
+.btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--border)}.btn-outline:hover{background:var(--bg)}
+.btn-teal{background:var(--teal);color:#fff}.btn-teal:hover{background:#0771a0}
+#hostWrap{display:none;max-width:820px;margin:0 auto;padding:16px 14px 60px}
+.host-hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.host-title{font-size:1.35rem;font-weight:900;color:var(--navy)}
+.host-title span{font-size:.72rem;color:var(--gray);font-weight:600}
+input,select,textarea,button{font-family:inherit}
 </style>
 </head>
 <body>
 
-<div class="wrap" id="formWrap">
-  <div class="card head">
-    <div class="form-title">Seminar Feedback</div>
-    <div class="form-sub"><b>D N Investment</b>, Jamshedpur &middot; Your feedback is very important to us. Please take a minute to fill this form.</div>
-    <div class="req-note">* Required</div>
-  </div>
-
-  <div class="card focus-ring" id="q-name">
-    <div class="q-label">Your Name<span class="star">*</span></div>
-    <input type="text" id="f-name" placeholder="Your answer" maxlength="80">
-    <div class="err">⚠ This field is required</div>
-  </div>
-
-  <div class="card focus-ring" id="q-mobile">
-    <div class="q-label">Mobile Number<span class="star">*</span></div>
-    <input type="tel" id="f-mobile" placeholder="10 digit number" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
-    <div class="err">⚠ Please enter a valid 10-digit mobile number</div>
-  </div>
-
-  <div class="card focus-ring" id="q-seminar">
-    <div class="q-label">Which seminar did you attend?<span class="star">*</span></div>
-    <select id="f-seminar"><option value="">Loading...</option></select>
-    <div class="err">⚠ Please select a seminar</div>
-  </div>
-
-  <div class="card" id="q-rating">
-    <div class="q-label">How was your overall seminar experience?<span class="star">*</span></div>
-    <div class="scale" id="scale-rating"></div>
-    <div class="scale-ends"><span>Average</span><span>Excellent</span></div>
-    <div class="err">⚠ Please select an option</div>
-  </div>
-
-  <div class="card" id="q-content">
-    <div class="q-label">How useful was the information shared?<span class="star">*</span></div>
-    <div class="scale" id="scale-content"></div>
-    <div class="scale-ends"><span>Not very useful</span><span>Very useful</span></div>
-    <div class="err">⚠ Please select an option</div>
-  </div>
-
-  <div class="card" id="q-interest">
-    <div class="q-label">Are you interested in starting / increasing your investments?<span class="star">*</span></div>
-    <label class="radio-row"><input type="radio" name="f-interest" value="Haan"><span>Yes, please contact me</span></label>
-    <label class="radio-row"><input type="radio" name="f-interest" value="Shayad"><span>Maybe, I will think about it</span></label>
-    <label class="radio-row"><input type="radio" name="f-interest" value="Nahi"><span>Not right now</span></label>
-    <div class="err">⚠ Please select an option</div>
-  </div>
-
-  <div class="card" id="q-products">
-    <div class="q-label">Which products are you interested in? <span style="font-weight:400;font-size:12px;color:var(--text2)">(you can select multiple)</span></div>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="SIP"><span>SIP (Systematic Investment Plan)</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="Lumpsum"><span>Lumpsum (Mutual Fund one-time investment)</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="Equity Trading"><span>Equity Trading (Share Market)</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="Loan against Equity/MF"><span>Loan against Equity / Mutual Fund</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="Life Insurance"><span>Life Insurance</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-products" value="Health Insurance"><span>Health Insurance</span></label>
-    <label class="radio-row" id="prod-other-row"><input type="checkbox" name="f-products" value="__other" onchange="document.getElementById('prod-other-box').style.display=this.checked?'block':'none';if(this.checked)document.getElementById('f-product-other').focus()"><span>Other (please specify)</span></label>
-    <div id="prod-other-box" style="display:none;margin-top:4px;padding-left:4px">
-      <input type="text" id="f-product-other" placeholder="Your product interest" maxlength="120">
+<!-- ══ SEMINAR QUIZ — CLIENT (PLAYER) VIEW ══ -->
+<div id="quizPlayer" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);color:#fff;overflow-y:auto;padding:20px;box-sizing:border-box;font-family:inherit">
+  <div style="max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column">
+    <div style="text-align:center;margin:20px 0 24px">
+      <div style="font-size:1.6rem;font-weight:800;letter-spacing:.5px">🎯 D N Investment</div>
+      <div style="font-size:.85rem;color:#94a3b8;margin-top:2px">Seminar Quiz</div>
     </div>
+    <div id="qp-content" style="flex:1"></div>
   </div>
-
-  <div class="card" id="q-refs">
-    <div class="q-label">Would you like to refer a friend or family member who may benefit from our services? <span style="font-weight:400;font-size:12px;color:var(--text2)">(optional — you can add up to 3)</span></div>
-    <div id="refRows">
-      <div class="ref-row">
-        <input type="text" class="ref-name" placeholder="Reference name" maxlength="80">
-        <input type="tel" class="ref-mobile" placeholder="Mobile number (10 digits)" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
-      </div>
-    </div>
-    <button type="button" class="btn-addref" id="btnAddRef" onclick="addRefRow()">＋ Add another reference</button>
-    <div class="err">⚠ Please enter a valid 10-digit mobile number for each reference (or leave it blank)</div>
-  </div>
-
-  <div class="footer-row">
-    <button class="btn-submit" id="btnSubmit" onclick="submitForm()">Submit</button>
-    <button class="btn-clear" onclick="clearForm()">Clear form</button>
-  </div>
-  <div class="brand">This form is created by <b>D N Investment</b> (ARN-67217) &middot; Your information is safe with us</div>
+  <div id="qp-debug" style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:#64748b;font-family:monospace">📡 waiting…</div>
 </div>
 
-<div class="wrap" id="done">
-  <div class="card head">
-    <div class="done-tick"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-16"/></svg></div>
-    <h2>Thank you! 🙏</h2>
-    <p>Your response has been recorded. Thank you very much for attending our seminar.</p>
-    <p style="margin-top:8px">For any investment-related information, feel free to contact us.</p>
-    <a href="javascript:location.reload()">Submit another response</a>
-  </div>
-  <div class="brand">D N Investment (ARN-67217), Jamshedpur</div>
+<!-- ══ SEMINAR QUIZ — BIG SCREEN (LCD / projector) ══ -->
+<div id="quizScreen" style="display:none;position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at 50% 0%,#1e293b,#0f172a 70%);color:#fff;overflow-y:auto;padding:3vh 4vw;box-sizing:border-box;font-family:inherit">
+  <div id="qs-content" style="min-height:100%;display:flex;flex-direction:column;justify-content:center"></div>
 </div>
 
-<div class="wrap" id="respWrap" style="display:none;max-width:960px">
-  <div class="card head">
-    <div class="form-title" style="font-size:22px">Feedback Responses</div>
-    <div class="form-sub" id="respCount">Loading...</div>
-    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <select id="respFilter" onchange="renderResponses()" style="max-width:280px"><option value="">All seminars</option></select>
-      <button class="btn-submit" onclick="exportExcel()" style="padding:8px 16px">⬇ Export Excel</button>
+<!-- ══ HOST CONTROLS (secret ?host link) ══ -->
+<div id="hostWrap">
+  <div class="host-hdr">
+    <div class="host-title">🎯 Seminar Quiz <span>— Live MCQ / Buzzer For Clients · D N Investment</span><div id="quiz-conn" style="font-size:.75rem;font-weight:700;margin-top:3px;color:#5d6e8a">🔌 Connecting…</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline" onclick="QUIZ.newSession()" title="New Quiz — Resets Players & Answers">🔄 Reset / New Quiz</button>
     </div>
   </div>
-  <div class="card" style="padding:0;overflow:auto;max-height:70vh">
-    <table class="resp-table" id="respTable"></table>
-  </div>
+        <div id="quiz-host-body" style="display:flex;flex-direction:column;gap:14px">
+
+          <!-- Join info -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+            <div id="quiz-qr-box" style="flex-shrink:0"></div>
+            <div style="flex:1;min-width:220px">
+              <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📲 How Clients Join</div>
+              <div style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Show The QR On Screen Or Share The Link. No Login — Just Enter A Name To Join.</div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;margin-bottom:8px;cursor:pointer">
+                <input type="checkbox" id="quiz-require-mobile" onchange="QUIZ.toggleRequireMobile()"> 📱 Require Mobile Number To Join (So You Can Identify The Winner)
+              </label>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <input type="text" id="quiz-join-link" readonly style="flex:1;min-width:180px;padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+                <button class="btn btn-outline" style="padding:6px 10px;font-size:.78rem" onclick="QUIZ.copyLink()">📋 Copy</button>
+              </div>
+              <div style="margin-top:10px;font-size:.82rem">👥 Joined Players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
+              <div id="quiz-player-names" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
+              <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Open Big Screen (LCD)</button></div>
+            </div>
+          </div>
+
+          <!-- Question bank (up to 5, pre-filled — host just pushes) -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — Fill These In Advance, Then Just Hit "Push" During The Seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(Auto-Synced To All Your Devices)</span></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
+              </div>
+            </div>
+            <div id="quiz-bank"></div>
+          </div>
+
+          <!-- Live results -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+              <div style="font-weight:700;font-size:.95rem">📊 Live Results <span style="color:var(--teal);font-weight:800;font-size:.8rem">· 👥 <span id="quiz-player-count-2">0</span> Joined</span></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <div id="quiz-actual-wrap" style="display:none;align-items:center;gap:4px">
+                  <span style="font-size:.75rem;font-weight:700;color:#b45309">🎯 Actual Value:</span>
+                  <input type="text" id="quiz-actual-value" placeholder="e.g. 81234.56" style="width:110px;padding:5px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">
+                </div>
+                <button class="btn btn-outline" style="padding:6px 10px;font-size:.8rem" onclick="QUIZ.clearResults()">🧹 Clear Results</button>
+                <button class="btn btn-success" onclick="QUIZ.reveal()">🏆 Reveal Winner</button>
+              </div>
+            </div>
+            <div id="quiz-live-status" style="font-size:.82rem;color:var(--gray);margin-bottom:10px">No Question Is Live.</div>
+            <div id="quiz-results"></div>
+          </div>
+
+          <!-- Saved results (persist across questions) -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+              <div style="font-weight:700;font-size:.95rem">📋 Saved Results <span id="quiz-saved-count" style="color:var(--gray);font-weight:500;font-size:.8rem"></span></div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-teal" style="padding:6px 12px;font-size:.8rem" onclick="QUIZ.exportResults()">📊 Export Excel</button>
+                <button class="btn btn-teal" style="padding:6px 12px;font-size:.8rem;background:#7c3aed" onclick="QUIZ.resultImage()">🏆 Result Image</button>
+                <button class="btn btn-outline admin-only-inc" style="padding:6px 10px;font-size:.8rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteResultsLog()">🗑️ Delete All</button>
+              </div>
+            </div>
+            <div id="quiz-saved-results" style="font-size:.82rem;color:var(--gray)">No Saved Results Yet. Push Or Reveal A Question To Save It Here.</div>
+          </div>
+
+        </div>
 </div>
 
 <script>
-// ── Build rating scales as colour pills (values stay 1–5) ────────
-const SCALE_DEF={
-  rating:[
-    {v:1,label:'Poor',c:'#DC2626'},
-    {v:2,label:'Average',c:'#F59E0B'},
-    {v:3,label:'Good',c:'#2563EB'},
-    {v:4,label:'Very Good',c:'#0D9488'},
-    {v:5,label:'Excellent',c:'#16A34A'}
-  ],
-  content:[
-    {v:1,label:'Not Useful',c:'#DC2626'},
-    {v:2,label:'Slightly',c:'#F59E0B'},
-    {v:3,label:'Useful',c:'#2563EB'},
-    {v:4,label:'Very Useful',c:'#0D9488'},
-    {v:5,label:'Extremely',c:'#16A34A'}
-  ]
-};
-Object.keys(SCALE_DEF).forEach(k=>{
-  const el=document.getElementById('scale-'+k);
-  el.className='pill-scale';
-  el.innerHTML=SCALE_DEF[k].map(o=>
-    `<label class="pill-cell"><input type="radio" name="f-${k}" value="${o.v}"><span class="pill" style="--c:${o.c}">${o.label}</span></label>`
-  ).join('');
-});
+window.QUIZ = (function(){
+  var DOC = function(){ return window.fdb.collection('quiz').doc('live'); };
+  var PLAYERS = function(){ return DOC().collection('players'); };
+  var RESPONSES = function(){ return DOC().collection('responses'); };
+  var LINKS = function(){ return window.fdb.collection('app_settings').doc('links'); };
+  var ANSWERKEY = function(){ return window.fdb.collection('quiz').doc('answerkey'); };
+  var RESULTSLOG = function(){ return DOC().collection('resultsLog'); };
+  var linksState = { feedbackOpen:true, quizOpen:true };
+  var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
 
-// Radio/checkbox option cards: select hone par purple highlight
-document.addEventListener('change',e=>{
-  const inp=e.target;
-  if(!inp.matches('.radio-row input')) return;
-  if(inp.type==='radio'){
-    document.querySelectorAll(`input[name="${inp.name}"]`).forEach(r=>r.closest('.radio-row').classList.toggle('sel', r.checked));
-  } else {
-    inp.closest('.radio-row').classList.toggle('sel', inp.checked);
+  // host-only working memory (correct answer never leaves the host until reveal)
+  var host = { correctIndex:0, qIndex:0, type:'mcq', sessionId:'', startedAtServerMs:0, unsubPlayers:null, unsubResp:null };
+  var BANK_KEY='dnquiz_bank';                       // legacy localStorage fallback (used only if Firestore unreachable)
+  var BANKDOC = function(){ return window.fdb.collection('quiz').doc('bank'); };
+  host.bankCache = null;                            // synced from Firestore so ALL admin devices see the same 5 questions
+  host.unsubBank = null;
+  function defaultBankArr(){
+    var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
+    return arr;
   }
-});
-
-// ── Load seminars from CRM Firestore (crm_data/seminars) ─────────
-let SEMINARS=[];
-async function loadSeminars(){
-  const sel=document.getElementById('f-seminar');
-  try{
-    const doc=await fdb.collection('crm_data').doc('seminars').get();
-    SEMINARS=(doc.exists && Array.isArray(doc.data().data))?doc.data().data:[];
-    // Latest date first
-    SEMINARS.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    const fmtD=d=>{ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); };
-    const pre=new URLSearchParams(location.search).get('s');
-    const linked=pre?SEMINARS.find(x=>String(x.id)===pre):null;
-
-    if(linked){
-      // Link ek specific seminar ka hai → sirf wahi dikhe, locked
-      sel.innerHTML=`<option value="${linked.id}" selected>${(linked.name||'Seminar')} — ${fmtD(linked.date)}</option>`;
-      sel.value=linked.id;
-      sel.disabled=true;
-      sel.style.background='#f3f4f6';
-      sel.style.cursor='not-allowed';
-    } else {
-      // General link → saare seminars chunne ka option
-      sel.innerHTML='<option value="">-- Select seminar --</option>'+
-        SEMINARS.map(s=>`<option value="${s.id}">${(s.name||'Seminar')} — ${fmtD(s.date)}</option>`).join('')+
-        '<option value="__other">Other / don\'t remember</option>';
-    }
-  }catch(e){
-    sel.outerHTML='<input type="text" id="f-seminar" placeholder="Enter seminar name / date" maxlength="100">';
+  async function writeBankToFirestore(arr){
+    try{ localStorage.setItem(BANK_KEY, JSON.stringify(arr)); }catch(e){}   // offline backup only
+    try{ await BANKDOC().set({ arr:arr, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
   }
-}
-
-// ── Reference rows (max 3) ───────────────────────────────────────
-function addRefRow(){
-  const box=document.getElementById('refRows');
-  if(box.querySelectorAll('.ref-row').length>=3) return;
-  const div=document.createElement('div');
-  div.className='ref-row';
-  div.innerHTML='<input type="text" class="ref-name" placeholder="Reference name" maxlength="80">'
-    +'<input type="tel" class="ref-mobile" placeholder="Mobile number (10 digits)" maxlength="10" inputmode="numeric" oninput="this.value=this.value.replace(/\\D/g,\'\')">';
-  box.appendChild(div);
-  if(box.querySelectorAll('.ref-row').length>=3) document.getElementById('btnAddRef').disabled=true;
-  div.querySelector('.ref-name').focus();
-}
-
-// ── Validation + submit ──────────────────────────────────────────
-function markErr(id,bad){ document.getElementById(id).classList.toggle('error',bad); return bad; }
-async function submitForm(){
-  const name=document.getElementById('f-name').value.trim();
-  const mobile=document.getElementById('f-mobile').value.trim();
-  const semEl=document.getElementById('f-seminar');
-  const semVal=(semEl.value||'').trim();
-  const rating=(document.querySelector('input[name=f-rating]:checked')||{}).value||'';
-  const content=(document.querySelector('input[name=f-content]:checked')||{}).value||'';
-  const interest=(document.querySelector('input[name=f-interest]:checked')||{}).value||'';
-  let products=[...document.querySelectorAll('input[name=f-products]:checked')].map(c=>c.value);
-  const otherProduct=document.getElementById('f-product-other').value.trim();
-  if(products.includes('__other')){ products=products.filter(p=>p!=='__other'); if(otherProduct) products.push('Other: '+otherProduct); }
-
-  // References (optional): keep rows that have a name; mobile must be 10 digits if provided
-  const references=[]; let refBad=false;
-  document.querySelectorAll('#refRows .ref-row').forEach(row=>{
-    const rn=row.querySelector('.ref-name').value.trim();
-    const rmb=row.querySelector('.ref-mobile').value.trim();
-    if(!rn && !rmb) return;
-    if(rmb && rmb.length!==10){ refBad=true; return; }
-    if(rn) references.push({name:rn, mobile:rmb});
-  });
-
-  let bad=false;
-  bad=markErr('q-refs',refBad)||bad;
-  bad=markErr('q-name',!name)||bad;
-  bad=markErr('q-mobile',!(mobile.length===10))||bad;
-  bad=markErr('q-seminar',!semVal)||bad;
-  bad=markErr('q-rating',!rating)||bad;
-  bad=markErr('q-content',!content)||bad;
-  bad=markErr('q-interest',!interest)||bad;
-  if(bad){ document.querySelector('.card.error').scrollIntoView({behavior:'smooth',block:'center'}); return; }
-
-  const sem=SEMINARS.find(x=>String(x.id)===semVal);
-  const rec={
-    name, mobile,
-    seminarId: sem?sem.id:'',
-    seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
-    rating:Number(rating), contentRating:Number(content),
-    interested:interest, products,
-    references,
-    ts:new Date().toISOString()
-  };
-
-  const btn=document.getElementById('btnSubmit');
-  btn.disabled=true; btn.textContent='Submitting...';
-  try{
-    await fdb.collection('seminar_feedback').add(rec);
-    document.getElementById('formWrap').style.display='none';
-    document.getElementById('done').style.display='block';
-    window.scrollTo(0,0);
-  }catch(e){
-    alert('Could not submit — please check your internet and try again.');
-    btn.disabled=false; btn.textContent='Submit';
-  }
-}
-function clearForm(){
-  if(!confirm('Clear the form?')) return;
-  document.getElementById('f-name').value='';
-  document.getElementById('f-mobile').value='';
-  const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
-  const pob=document.getElementById('f-product-other'); if(pob) pob.value='';
-  const pobx=document.getElementById('prod-other-box'); if(pobx) pobx.style.display='none';
-  document.querySelectorAll('#refRows .ref-row').forEach((row,i)=>{ if(i===0){ row.querySelectorAll('input').forEach(inp=>inp.value=''); } else row.remove(); });
-  const bar=document.getElementById('btnAddRef'); if(bar) bar.disabled=false;
-  document.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(r=>r.checked=false);
-  document.querySelectorAll('.radio-row.sel').forEach(r=>r.classList.remove('sel'));
-  document.querySelectorAll('.card.error').forEach(c=>c.classList.remove('error'));
-}
-
-// ── Admin responses view (?view=responses) ───────────────────────
-let RESP=[];
-async function loadResponses(){
-  document.getElementById('formWrap').style.display='none';
-  document.getElementById('respWrap').style.display='block';
-  document.title='Feedback Responses — D N Investment';
-  try{
-    const snap=await fdb.collection('seminar_feedback').orderBy('ts','desc').get();
-    RESP=snap.docs.map(d=>d.data());
-  }catch(e){
-    try{ const snap=await fdb.collection('seminar_feedback').get();
-      RESP=snap.docs.map(d=>d.data()).sort((a,b)=>(b.ts||'').localeCompare(a.ts||'')); }catch(e2){ RESP=[]; }
-  }
-  const sems=[...new Set(RESP.map(r=>r.seminarName).filter(Boolean))];
-  document.getElementById('respFilter').innerHTML='<option value="">All seminars</option>'+sems.map(s=>`<option>${s}</option>`).join('');
-  renderResponses();
-}
-function renderResponses(){
-  const f=document.getElementById('respFilter').value;
-  const list=f?RESP.filter(r=>r.seminarName===f):RESP;
-  const esc=t=>String(t||'').replace(/</g,'&lt;');
-  const chip=v=>v==='Haan'?'<span class="chip yes">Yes ✓</span>':(v==='Shayad'?'<span class="chip maybe">Maybe</span>':'<span class="chip no">No</span>');
-  const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
-  document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
-  document.getElementById('respTable').innerHTML=
-    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>References</th></tr>'+
-    (list.map(r=>`<tr>
-      <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
-      <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
-      <td style="color:#f59e0b;white-space:nowrap">${stars(r.rating)}</td>
-      <td style="color:#f59e0b;white-space:nowrap">${stars(r.contentRating)}</td>
-      <td>${chip(r.interested)}</td>
-      <td style="font-size:11.5px">${(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
-      <td style="font-size:11.5px">${(r.references||[]).map(rf=>'<span style="display:inline-block;background:#fdf2f8;color:#be185d;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(rf.name)+(rf.mobile?' · '+esc(rf.mobile):'')+'</span>').join('')||''}</td>
-    </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
-}
-function _valStyle(v){
-  return ({5:{bg:'DCFCE7',tx:'166534'},4:{bg:'CCFBF1',tx:'115E59'},3:{bg:'DBEAFE',tx:'1E40AF'},2:{bg:'FEF3C7',tx:'92400E'},1:{bg:'FEE2E2',tx:'991B1B'}})[v]||null;
-}
-function exportExcel(){
-  if(typeof XLSX==='undefined'){ return exportCSVFallback(); }
-  const f=document.getElementById('respFilter').value;
-  const list=f?RESP.filter(r=>r.seminarName===f):RESP;
-  const EXPL={5:'Excellent',4:'Very Good',3:'Good',2:'Average',1:'Poor'};
-  const CONL={5:'Extremely',4:'Very Useful',3:'Useful',2:'Slightly',1:'Not Useful'};
-  const INT={Haan:{l:'Yes ✓',bg:'DCFCE7',tx:'166534'},Shayad:{l:'Maybe',bg:'FEF3C7',tx:'92400E'},Nahi:{l:'No',bg:'FEE2E2',tx:'991B1B'}};
-  const thin={style:'thin',color:{rgb:'E2E8F0'}}, border={top:thin,bottom:thin,left:thin,right:thin};
-
-  const headers=['Date','Name','Mobile','Seminar','Experience','Content','Interested','Products','References'];
-  const aoa=[headers]; const sMap={}; const put=(r,c,s)=>sMap[r+'_'+c]=s;
-  // header style
-  headers.forEach((h,c)=>put(0,c,{font:{bold:true,sz:11,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'1E3A8A'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:border}));
-
-  list.forEach((r,i)=>{
-    const R=i+1;
-    const expL=(EXPL[r.rating]?EXPL[r.rating]+' ('+r.rating+')':(r.rating||''));
-    const conL=(CONL[r.contentRating]?CONL[r.contentRating]+' ('+r.contentRating+')':(r.contentRating||''));
-    const intO=INT[r.interested]||null;
-    aoa.push([
-      r.ts?new Date(r.ts).toLocaleString('en-IN'):'',
-      r.name||'', r.mobile||'', r.seminarName||'',
-      expL, conL, (intO?intO.l:(r.interested||'')),
-      (r.products||[]).join(', '),
-      (r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')
-    ]);
-    // zebra base for whole row
-    const zebra=(i%2===1)?'F8FAFC':'FFFFFF';
-    for(let c=0;c<headers.length;c++){
-      put(R,c,{fill:{patternType:'solid',fgColor:{rgb:zebra}},font:{sz:10,color:{rgb:'1F2937'}},alignment:{vertical:'center',wrapText:(c>=7),horizontal:(c===0||c===2?'center':'left')},border:border});
-    }
-    // colored cells: Experience(4), Content(5), Interested(6)
-    const es=_valStyle(r.rating); if(es) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:es.bg}},font:{sz:10,bold:true,color:{rgb:es.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
-    const cs=_valStyle(r.contentRating); if(cs) put(R,5,{fill:{patternType:'solid',fgColor:{rgb:cs.bg}},font:{sz:10,bold:true,color:{rgb:cs.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
-    if(intO) put(R,6,{fill:{patternType:'solid',fgColor:{rgb:intO.bg}},font:{sz:10,bold:true,color:{rgb:intO.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
-  });
-
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:18},{wch:20},{wch:13},{wch:26},{wch:14},{wch:14},{wch:10},{wch:36},{wch:34}];
-  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:aoa.length-1,c:headers.length-1}})};
-  ws['!freeze']={xSplit:0,ySplit:1};
-  Object.keys(sMap).forEach(k=>{ const p=k.split('_'); const a=XLSX.utils.encode_cell({r:+p[0],c:+p[1]}); if(!ws[a])ws[a]={t:'s',v:''}; ws[a].s=sMap[k]; });
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Feedback');
-  XLSX.writeFile(wb,'DN_Seminar_Feedback_'+new Date().toISOString().slice(0,10)+'.xlsx');
-}
-function exportCSVFallback(){
-  const f=document.getElementById('respFilter').value;
-  const list=f?RESP.filter(r=>r.seminarName===f):RESP;
-  const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','References']]
-    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')]));
-  const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='seminar-feedback.csv'; a.click();
-}
-
-// ── Feedback link open/close (controlled from CRM → Seminars → Link Control) ──
-async function checkFeedbackOpen(){
-  try{
-    const d=await fdb.collection('app_settings').doc('links').get();
-    const v=d.exists?(d.data()||{}):{};
-    if(v.feedbackOpen===false){ showFeedbackClosed(); return; }
-  }catch(e){}
-  loadSeminars();
-  // keep watching — if admin closes while page is open, show closed live
-  try{
-    fdb.collection('app_settings').doc('links').onSnapshot(s=>{
-      const v=s.data()||{};
-      if(v.feedbackOpen===false) showFeedbackClosed();
+  // ── Ready-made Mutual Fund / SIP question bank (correct answer is a[0]) ──
+  var MF_QBANK=[
+    {q:'What Does SIP Stand For?', a:['Systematic Investment Plan','Simple Interest Plan','Secure Income Plan','Stock Investment Product']},
+    {q:'What Is A Mutual Fund?', a:['A Pool Of Money From Many People, Invested Together','A Type Of Bank Loan','A Government Pension Scheme','A Single Company\'s Stock']},
+    {q:'Which Authority Regulates Mutual Funds In India?', a:['SEBI','RBI','IRDAI','Post Office']},
+    {q:'What Is NAV In A Mutual Fund?', a:['The Price Of One Unit Of A Mutual Fund','The Name Of A Fund House','A Type Of Tax','A Bank Account Number']},
+    {q:'In A SIP, How Do You Invest Money?', a:['A Fixed Amount Every Month','A Lump Sum Only Once','Only In Gold','With No Fixed Schedule']},
+    {q:'What Is The Biggest Benefit Of SIP?', a:['You Buy More Units When Prices Are Low','Guaranteed High Returns','Zero Risk Always','Fixed Monthly Profit']},
+    {q:'What Does An Equity Fund Mainly Invest In?', a:['Shares Of Companies','Government Bonds','Gold','Bank Fixed Deposits']},
+    {q:'What Does A Debt Fund Mainly Invest In?', a:['Bonds And Fixed Income','Company Shares','Real Estate','Gold']},
+    {q:'What Is The Main Benefit Of An ELSS Fund?', a:['Saving Tax','Getting A Guaranteed Return','Getting Zero Risk','Getting Free Insurance']},
+    {q:'What Is The Lock-In Period Of An ELSS Fund?', a:['3 Years','1 Year','5 Years','No Lock-In']},
+    {q:'What Does Diversification Mean?', a:['Spreading Your Money Across Different Investments','Putting All Money In One Stock','Only Buying Gold','Avoiding Equity Completely']},
+    {q:'Which Type Of Fund Is Usually The Safest?', a:['Liquid Fund','Small-Cap Fund','Sector Fund','Mid-Cap Fund']},
+    {q:'What Is An Expense Ratio?', a:['A Yearly Fee Charged By The Fund','Your Profit From The Fund','A One-Time Entry Tax','A Penalty For Withdrawing']},
+    {q:'What Does A Large-Cap Fund Mainly Invest In?', a:['Big, Well-Known Companies','New Startups Only','Only Small Companies','Foreign Bonds']},
+    {q:'What Does SWP Stand For?', a:['Systematic Withdrawal Plan','Small Wealth Plan','Secure Wealth Product','Stock Weekly Plan']},
+    {q:'When Is The Best Time To Start Investing?', a:['As Early As Possible','Only After Age 50','Only During A Market Crash','Never']},
+    {q:'Why Is KYC Required?', a:['To Start Investing In Mutual Funds','To Withdraw Money Only','To Open A Bank Locker','To Book Train Tickets']},
+    {q:'Who Manages Your Money In A Mutual Fund?', a:['A Fund Manager','Your Bank Teller','SEBI','The Government']},
+    {q:'Are Mutual Fund Returns Fixed Or Market-Linked?', a:['Market-Linked, Not Fixed','Always Fixed','Always Positive','Guaranteed By The Government']},
+    {q:'What Is Compounding?', a:['Earning Returns On Your Returns Over Time','A One-Time Bonus Payment','A Type Of Tax','A Withdrawal Penalty']},
+    {q:'What Does AUM Stand For In Mutual Funds?', a:['Total Money Managed By A Fund','A Type Of Tax Form','A Fixed Deposit Scheme','A Government Subsidy']},
+    {q:'What Does A Sector Fund Invest In?', a:['Just One Industry, Like Banking Or IT','All Industries Equally','Only Gold','Only Government Bonds']},
+    {q:'What Does A Hybrid Fund Invest In?', a:['Both Shares And Bonds Together','Only Shares','Only Bonds','Only Gold']},
+    {q:'What Does An Index Fund Do?', a:['It Copies A Market Index Like Nifty','It Picks Stocks Randomly','It Invests Only In Banks','It Guarantees Fixed Returns']},
+    {q:'What Does It Mean To Redeem A Mutual Fund?', a:['Withdrawing Your Money From It','Adding More Money To It','Changing The Fund Manager','Paying An Extra Tax']},
+    {q:'What Is An Exit Load?', a:['A Small Fee For Withdrawing Too Early','A Bonus For Staying Invested','A Type Of Insurance','A Yearly Tax Refund']},
+    {q:'What Is An AMC (Fund House)?', a:['The Company That Manages The Mutual Fund','The Company That Regulates All Banks','The Company That Prints Currency Notes','The Company That Collects Income Tax']},
+    {q:'What Is A "Unit" In A Mutual Fund?', a:['One Small Share Of The Fund You Own','A Type Of Loan','A Tax Certificate','A Bank Cheque']},
+    {q:'What Is The Advantage Of A Direct Plan?', a:['It Usually Has A Lower Yearly Fee','It Usually Has A Higher Yearly Fee','It Gives No Returns At All','It Gives Extra Insurance Cover']},
+    {q:'What Does A Regular Plan Usually Include?', a:['A Commission Paid To A Distributor','Extra Government Tax','A Free Insurance Policy','Zero Fees']},
+    {q:'What Does Asset Allocation Mean?', a:['Deciding How To Split Money Between Shares, Bonds, Etc.','Buying Only One Stock','Avoiding All Investments','Keeping All Money In Cash']},
+    {q:'Why Should You Start A SIP Early?', a:['To Get More Benefit From Compounding','To Avoid Paying Any Tax','To Get A Fixed Guaranteed Return','To Skip The KYC Process']},
+    {q:'What Does STP Stand For?', a:['Systematic Transfer Plan','Stock Transfer Process','Secure Trading Plan','Systematic Tax Plan']},
+    {q:'What Is STP Used For?', a:['Moving Money Slowly From One Fund To Another','Withdrawing All Your Money At Once','Avoiding KYC','Getting A Loan Against Shares']},
+    {q:'In A "Growth Option," What Happens To Your Profits?', a:['They Are Reinvested Back Into The Fund','They Are Paid Out To You Every Month','They Are Taxed Twice','They Are Sent To The Government']},
+    {q:'Can A Mutual Fund\'s NAV Go Down?', a:['Yes, It Can Fall With The Market','No, It Always Goes Up','No, It Is Fixed By SEBI','Only On Weekends']},
+    {q:'What Does Goal-Based Investing Mean?', a:['Investing With A Clear Target, Like A House Or Education','Investing Without Any Plan','Only Investing In Gold','Investing For One Day Only']},
+    {q:'What Does A Multi-Cap Fund Invest In?', a:['Big, Medium And Small Companies Together','Only Big Companies','Only Small Companies','Only Government Bonds']},
+    {q:'Can You Stop A SIP Anytime?', a:['Yes, Usually With No Penalty','No, It Is Locked For Life','Only After 10 Years','Only With SEBI\'s Permission']},
+    {q:'What Is A Folio Number?', a:['Your Unique Mutual Fund Account Number','A Type Of Tax Form','A Bank IFSC Code','A Stock Ticker Symbol']},
+    {q:'What Does AMFI Stand For?', a:['Association Of Mutual Funds In India','All India Money Fund Institute','Asset Management Fund Of India','Authorized Mutual Fund Investors']},
+    {q:'What Is A Child Plan Fund Meant For?', a:['Long-Term Goals Like A Child\'s Education','Daily Expenses','Buying Gold Only','Short-Term Trading']},
+    {q:'What Does The Riskometer Show?', a:['How Risky A Fund Is','The Fund\'s Office Address','The Fund Manager\'s Salary','The Tax Rate On The Fund']},
+    {q:'Why Should You Diversify Your Investments?', a:['To Reduce Your Overall Risk','To Guarantee Higher Returns','To Avoid KYC','To Pay Less Tax']},
+    {q:'What Does A Gold Fund Mainly Invest In?', a:['Gold And Gold-Related Assets','Company Shares','Government Bonds Only','Real Estate']},
+    {q:'What Does An International Fund Invest In?', a:['Companies Outside India','Only Indian Companies','Only Gold','Only Government Schemes']},
+    {q:'What Does A Mutual Fund\'s Fact Sheet Show?', a:['Its Performance And Portfolio Details','Only Its Office Address','The Fund Manager\'s Personal Details','Tax Slabs']},
+    {q:'What Does Rebalancing A Portfolio Mean?', a:['Adjusting It Back To Your Original Plan','Withdrawing Everything','Doubling Your Investment','Switching To Only Cash']},
+    {q:'What Is A Liquid Fund Usually Used For?', a:['Parking Money For A Short Time','Long-Term Retirement Planning','Buying A House','Paying Insurance Premiums']},
+    {q:'What Is The Main Goal Of Long-Term Investing?', a:['To Grow Wealth Over Many Years','To Make Quick Money In A Week','To Avoid All Risk Completely','To Get A Government Job']}
+  ];
+  // ── Ready-made Share Market question bank (correct answer is a[0]) ──
+  var SHARE_QBANK=[
+    {q:'What Does IPO Stand For?', a:['Initial Public Offering','Internal Profit Order','Investor Purchase Option','Index Price Offer']},
+    {q:'Which Body Regulates The Indian Stock Market?', a:['SEBI','RBI','IRDAI','NABARD']},
+    {q:'What Does A "Bull Market" Mean?', a:['Prices Are Generally Rising','Prices Are Generally Falling','Prices Are Frozen','Prices Move Randomly']},
+    {q:'What Does A "Bear Market" Mean?', a:['Prices Are Generally Falling','Prices Are Generally Rising','Prices Are Fixed','Prices Are Doubling']},
+    {q:'What Does NSE Stand For?', a:['National Stock Exchange','New Share Exchange','National Savings Exchange','Net Share Estimate']},
+    {q:'What Does BSE Stand For?', a:['Bombay Stock Exchange','Bharat Stock Exchange','Bank Stock Exchange','Business Stock Exchange']},
+    {q:'What Is A "Blue Chip" Stock?', a:['A Share Of A Large, Financially Stable Company','An IT Company Share Only','A Newly Listed Penny Stock','A Government Bond']},
+    {q:'What Is A Demat Account Used For?', a:['Holding Shares Electronically','Taking Loans','Paying Taxes','Booking A Fixed Deposit']},
+    {q:'What Does The P/E Ratio Compare?', a:['A Stock\'s Price To Its Earnings Per Share','A Stock\'s Price To Its Dividend','A Stock\'s Price To Its Face Value','A Stock\'s Market Cap Only']},
+    {q:'What Is It Called When You Buy And Sell A Stock On The Same Day?', a:['Intraday Trading','Long-Term Investing','SIP','Demat Holding']},
+    {q:'What Is A Dividend?', a:['A Share Of Profit Paid To Shareholders','A Loan To The Company','A Type Of Tax','A Stock Split']},
+    {q:'What Does Market Capitalization Mean?', a:['The Total Value Of A Company\'s Shares','Its Yearly Profit','Its Total Debt','Its Office Locations']},
+    {q:'Why Do Investors Place A Stop-Loss Order?', a:['To Limit A Potential Loss','To Guarantee A Profit','To Avoid Taxes','To Automatically Buy More Shares']},
+    {q:'Which Exchange Does Nifty 50 Track?', a:['NSE','BSE','MCX','NCDEX']},
+    {q:'Which Exchange Does Sensex Track?', a:['BSE','NSE','MCX','NCDEX']},
+    {q:'What Is It Called When You Study A Company\'s Financial Health Before Investing?', a:['Fundamental Analysis','Technical Analysis','Astrology','Guesswork']},
+    {q:'What Is It Called When You Study Price Charts And Patterns?', a:['Technical Analysis','Fundamental Analysis','Tax Planning','Insurance Analysis']},
+    {q:'What Is A "Circuit Breaker" Used For In The Stock Market?', a:['To Halt Trading And Control Volatility','To Increase Share Price','To Guarantee Returns','To Close The Exchange Permanently']},
+    {q:'What Do You Own When You Buy One Share Of A Company?', a:['A Small Part Of That Company','The Whole Company','A Loan To The Company','A Government Bond']},
+    {q:'What Does "Volatility" Mean In The Stock Market?', a:['How Much Prices Fluctuate','A Guaranteed Annual Return','The Dividend Rate','The Company\'s Office Size']},
+    {q:'What Is A Stock Exchange?', a:['A Marketplace To Buy And Sell Shares','A Government Tax Office','A Type Of Bank','An Insurance Company']},
+    {q:'What Does A Stockbroker Do?', a:['Buys And Sells Shares On Your Behalf','Prints Share Certificates','Regulates All Banks','Fixes Share Prices']},
+    {q:'What Is Brokerage?', a:['A Fee Charged For Buying Or Selling Shares','A Type Of Dividend','A Government Subsidy','A Stock Split']},
+    {q:'What Is A "Portfolio"?', a:['Your Collection Of Investments','A Single Stock Only','A Bank Passbook','A Tax Return Form']},
+    {q:'What Is A "Bonus Share"?', a:['An Extra Free Share Given To Existing Shareholders','A Cash Prize From The Company','A Type Of Loan','A Government Grant']},
+    {q:'What Does A "Stock Split" Mean?', a:['One Share Is Divided Into Multiple Shares','Two Companies Merge','The Company Shuts Down','Shares Are Cancelled']},
+    {q:'What Is The "Face Value" Of A Share?', a:['Its Original Printed Value','Its Current Market Price','Its Highest Ever Price','Its Dividend Amount']},
+    {q:'What Is A "Penny Stock"?', a:['A Very Low-Priced, Risky Stock','A Stock Worth Crores','A Government Bond','A Gold-Backed Security']},
+    {q:'What Does "Short Selling" Mean?', a:['Selling A Stock You Don\'t Own, Hoping The Price Falls','Buying A Stock For The Long Term','Selling Gold','Buying Shares In Bulk']},
+    {q:'What Is A "Listed Company"?', a:['A Company Whose Shares Trade On A Stock Exchange','A Company Owned Only By The Founder','A Company That Cannot Be Bought Or Sold','A Company That Gives Away Shares For Free']},
+    {q:'What Does An Index Like Nifty Or Sensex Represent?', a:['A Group Of Stocks Representing The Market','A Single Company\'s Stock','A Type Of Mutual Fund','A Government Scheme']},
+    {q:'What Does "Trading Volume" Mean?', a:['The Number Of Shares Traded In A Period','The Price Of One Share','The Company\'s Total Profit','The Number Of Employees']},
+    {q:'What Is A Candlestick Chart Used For?', a:['Showing How A Stock\'s Price Moved Over Time','Showing A Company\'s Office Locations','Showing Tax Records','Showing Dividend History']},
+    {q:'What Does "Support" Mean In A Stock Chart?', a:['A Price Level Where A Stock Tends To Stop Falling','A Price Level Where A Stock Tends To Stop Rising','A Level Where A Stock Always Doubles','A Level Where A Stock Gets Delisted']},
+    {q:'What Does "Resistance" Mean In A Stock Chart?', a:['A Price Level Where A Stock Tends To Stop Rising','A Price Level Where A Stock Tends To Stop Falling','A Level Where A Stock Gets Delisted','A Level Where A Stock Splits Automatically']},
+    {q:'What Does "Arbitrage" Mean?', a:['Profiting From Price Differences Of The Same Asset In Different Markets','Getting A Government Subsidy','Earning Only From Dividends','Printing Currency']},
+    {q:'What Is A "Derivative"?', a:['A Contract Whose Value Depends On Another Asset','A Contract With No Value','A Type Of Gold Coin','A Company\'s Office Lease']},
+    {q:'What Does An "Option" Give You In Trading?', a:['The Right, But Not The Obligation, To Buy Or Sell','A Guaranteed Profit','Free Shares','A Bank Loan']},
+    {q:'What Is A "Futures Contract"?', a:['An Agreement To Buy Or Sell At A Fixed Price On A Future Date','An Agreement To Buy Shares At Any Price Later','A Way To Avoid Paying Tax','A Way To Get A Dividend Early']},
+    {q:'What Does "Margin Trading" Mean?', a:['Borrowing Money To Buy More Shares','Buying Only With Your Own Cash','Avoiding The Stock Market','Investing Only In Mutual Funds']},
+    {q:'What Is A "Trading Account" Used For?', a:['Placing Buy And Sell Orders In The Stock Market','Storing Gold','Paying Income Tax','Applying For A Loan']},
+    {q:'What Is The Difference Between A Demat Account And A Trading Account?', a:['A Demat Account Holds Shares, A Trading Account Is For Buy/Sell Orders','They Are Exactly The Same','A Demat Account Is For Gold Only','A Trading Account Is For Filing Tax']},
+    {q:'What Does "Settlement" Mean In Stock Trading?', a:['Transferring Shares And Money After A Trade','Cancelling A Trade','Paying Tax On Dividends','Closing Your Demat Account']},
+    {q:'What Does "T+1 Settlement" Mean?', a:['A Trade Settles One Working Day After The Transaction','A Trade Settles Instantly','A Trade Settles After One Month','A Trade Settles After One Year']},
+    {q:'What Does "Dividend Yield" Mean?', a:['Dividend As A Percentage Of The Share Price','The Company\'s Total Profit','The Number Of Shares Issued','The Stock\'s Face Value']},
+    {q:'What Is "Insider Trading"?', a:['Illegal Trading Using Secret Company Information','A Legal Way To Buy Shares Cheap','A Type Of Mutual Fund','A Government Scheme']},
+    {q:'What Is A "Market Order"?', a:['An Order To Buy Or Sell Immediately At The Current Price','An Order To Buy At A Fixed Future Date Only','An Order With No Price Limit Forever','An Order To Cancel All Pending Trades']},
+    {q:'What Is A "Limit Order"?', a:['An Order To Buy Or Sell Only At A Specific Price Or Better','An Order To Buy At Any Price Immediately','An Order To Buy Only From One Broker','An Order To Sell Only On Fridays']},
+    {q:'What Is It Called When You Buy Shares For Many Years, Expecting Them To Grow?', a:['Long-Term Investing','Intraday Trading','Short Selling','Arbitrage']},
+    {q:'What Does A "Rights Issue" Allow Existing Shareholders To Do?', a:['Buy New Shares At A Discounted Price','Get Free Cash Immediately','Avoid Paying Tax Forever','Become The Company\'s Owner Instantly']}
+  ];
+  function _qbShuffle(arr){ arr=arr.slice(); for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=arr[i];arr[i]=arr[j];arr[j]=t; } return arr; }
+  function _buildBankFromTopic(QBANK){
+    var picked=_qbShuffle(QBANK).slice(0,5);
+    return picked.map(function(item){
+      var correctText=item.a[0];
+      var opts=_qbShuffle(item.a);           // shuffle so the answer isn't always "A"
+      var correct=opts.indexOf(correctText);
+      return { type:'mcq', text:item.q, opts:opts, correct:(correct<0?0:correct), time:20, prize:'' };
     });
-  }catch(e){}
-}
-function showFeedbackClosed(){
-  const w=document.getElementById('formWrap');
-  if(w) w.innerHTML='<div class="card head" style="text-align:center;padding:40px 24px">'
-    +'<div style="font-size:44px;margin-bottom:12px">🔒</div>'
-    +'<div class="form-title">Feedback is currently closed</div>'
-    +'<div class="form-sub" style="margin-top:8px">This link opens during the seminar.<br>Thank you! 🙏<br><br><b>D N Investment</b>, Jamshedpur</div>'
-    +'</div>';
-}
+  }
+  async function loadMfBank(){
+    if(!confirm('Load 5 Fresh Mutual Fund / SIP Questions Into The Slots? This Replaces The Current 5 On ALL Your Devices.')) return;
+    var arr=_buildBankFromTopic(MF_QBANK);
+    host.bankCache=arr; renderBank();               // instant local update
+    await writeBankToFirestore(arr);                // syncs to every other admin device
+  }
+  async function loadShareBank(){
+    if(!confirm('Load 5 Fresh Share Market Questions Into The Slots? This Replaces The Current 5 On ALL Your Devices.')) return;
+    var arr=_buildBankFromTopic(SHARE_QBANK);
+    host.bankCache=arr; renderBank();
+    await writeBankToFirestore(arr);
+  }
 
-// ── Init ─────────────────────────────────────────────────────────
-if(new URLSearchParams(location.search).get('view')==='responses'){ loadResponses(); }
-else{ checkFeedbackOpen(); }
+  function isPlayMode(){
+    try{ return new URLSearchParams(location.search).has('play'); }catch(e){ return false; }
+  }
+
+  function joinLink(){
+    return location.origin + location.pathname + '?play=1';
+  }
+
+  // ─────────── HOST ───────────
+  function setConnStatus(txt,color){
+    var el=document.getElementById('quiz-conn'); if(el){ el.textContent=txt; el.style.color=color||'#5d6e8a'; }
+  }
+  async function hostInit(){
+    setConnStatus('🔌 Connecting…','#b45309');
+    await window.waitForFdb(8000);
+    if(!window.fdb){ setConnStatus('🔴 Firebase Not Connected'+(window.__fbErr?(' — '+window.__fbErr):''),'#dc2626'); alert('⚠️ Firebase Connect Nahi Hua.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet Check Karo, Phir Page Reload Karo.')); return; }
+    // join link + QR
+    var li=document.getElementById('quiz-join-link'); if(li) li.value=joinLink();
+    var qr=document.getElementById('quiz-qr-box');
+    if(qr){ qr.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(joinLink())+'" width="160" height="160" style="border-radius:10px;background:#fff;padding:6px" alt="Join QR">'; }
+    renderBank();
+    // ensure live doc exists (also acts as a live connectivity test)
+    try{
+      var d=await DOC().get();
+      if(!d.exists || !d.data() || !d.data().sessionId){
+        host.sessionId = 's'+Date.now();
+        await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId }, {merge:true});
+      } else {
+        var dd=d.data();
+        host.sessionId=dd.sessionId; host.qIndex=dd.qIndex||0; host.type=dd.type||'mcq';
+      }
+      setConnStatus('🟢 Connected — Ready','#16a34a');
+    }catch(e){
+      setConnStatus('🔴 Firestore Blocked: '+(e&&e.message||e),'#dc2626');
+      alert('⚠️ Firestore Read/Write Blocked:\n\n'+(e&&e.message||e)+'\n\n(Security Rules Ya Internet Check Karo.)');
+    }
+    attachHostListeners();
+    if(host.unsubReqMobile) host.unsubReqMobile();
+    host.unsubReqMobile = LINKS().onSnapshot(function(d){
+      var v=d.data()||{};
+      var cb=document.getElementById('quiz-require-mobile');
+      if(cb) cb.checked = !!v.requireMobile;
+    }, function(){});
+  }
+
+  async function toggleRequireMobile(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var cb=document.getElementById('quiz-require-mobile');
+    var next = cb ? cb.checked : false;
+    try{ await LINKS().set({ requireMobile: next }, {merge:true}); }
+    catch(e){ alert('Update Failed: '+(e&&e.message||e)); if(cb) cb.checked=!next; }
+  }
+
+  function attachHostListeners(){
+    if(host.unsubPlayers) host.unsubPlayers();
+    if(host.unsubResp) host.unsubResp();
+    if(host.unsubDoc) host.unsubDoc();
+    if(host.unsubBank) host.unsubBank();
+    // Question Bank sync: whichever admin device edits/loads a topic, every
+    // other admin device (laptop, mobile, etc.) sees the same 5 questions.
+    host.unsubBank = BANKDOC().onSnapshot(function(doc){
+      var d=doc.data()||{};
+      host.bankCache = (d.arr && d.arr.length) ? d.arr : defaultBankArr();
+      renderBank();
+    }, function(){});
+    host.unsubDoc = DOC().onSnapshot(function(doc){
+      var d=doc.data()||{};
+      host.liveSessionId = d.sessionId || host.liveSessionId;
+      if(d.qIndex!=null) host.liveQIndex = d.qIndex;
+      var el=document.getElementById('quiz-conn');
+      if(el) el.textContent='🟢 Connected · live state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length);
+      var aw=document.getElementById('quiz-actual-wrap');
+      if(aw) aw.style.display=(d.type==='guess' && d.state==='live')?'flex':'none';
+      if(d.state==='live'){ var av=document.getElementById('quiz-actual-value'); if(av) av.value=''; }
+      if(host.lastRespSnap) renderHostResults(host.lastRespSnap);  // re-filter with the live question
+    }, function(){});
+    host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
+      var n=0; var names=[];
+      snap.forEach(function(doc){ var p=doc.data(); if((p.sessionId||'')===host.sessionId){ n++; names.push((p.name||'(no name)')+(p.mobile?' · 📱'+p.mobile:'')); } });
+      var el=document.getElementById('quiz-player-count'); if(el) el.textContent=n;
+      var el2=document.getElementById('quiz-player-count-2'); if(el2) el2.textContent=n;
+      var nb=document.getElementById('quiz-player-names');
+      if(nb){
+        nb.innerHTML = names.map(function(nm){
+          return '<span style="background:var(--teal2,#e0f7fc);color:var(--teal);padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:700">'+esc(nm)+'</span>';
+        }).join('');
+      }
+    }, function(){});
+    host.unsubResp = RESPONSES().onSnapshot(function(snap){
+      host.lastRespSnap = snap;
+      renderHostResults(snap);
+    }, function(){});
+    if(host.unsubSaved) host.unsubSaved();
+    host.unsubSaved = RESULTSLOG().onSnapshot(function(snap){
+      renderSavedResults(snap);
+    }, function(){});
+  }
+
+  function renderSavedResults(snap){
+    var box=document.getElementById('quiz-saved-results'); if(!box) return;
+    var entries=[]; snap.forEach(function(d){ entries.push(d.data()); });
+    entries.sort(function(a,b){ var sa=a.savedAt&&a.savedAt.toMillis?a.savedAt.toMillis():0; var sb=b.savedAt&&b.savedAt.toMillis?b.savedAt.toMillis():0; return sa-sb; });
+    var cnt=document.getElementById('quiz-saved-count');
+    if(cnt) cnt.textContent=entries.length?('· '+entries.length+' question'+(entries.length===1?'':'s')):'';
+    if(!entries.length){ box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No Saved Results Yet. Push Or Reveal A Question To Save It Here.</div>'; return; }
+    var html='';
+    entries.forEach(function(e){
+      html+='<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">';
+      html+='<div style="font-weight:700;color:#111;margin-bottom:6px;font-size:.86rem">Q'+e.qIndex+'. '+esc(e.question||'')
+        +(e.correctLetter?' <span style="color:#16a34a;font-weight:800">(Ans: '+e.correctLetter+')</span>':'')
+        +(e.winnerName?' · 🏆 <span style="color:var(--teal)">'+esc(e.winnerName)+'</span>':'')+'</div>';
+      (e.rows||[]).forEach(function(r,i){
+        var badge = r.correct===true?'<span style="color:#16a34a;font-weight:800">✔</span>':(r.correct===false?'<span style="color:#dc2626">✘</span>':'');
+        html+='<div style="display:flex;gap:8px;align-items:center;padding:2px 0;font-size:.82rem">'
+          +'<span style="width:16px;color:var(--gray)">'+(i+1)+'</span>'
+          +'<span style="flex:1;font-weight:600;color:#111">'+esc(r.name)+'</span>'
+          +'<span style="color:var(--gray);min-width:22px">'+esc(r.answer||'')+'</span>'
+          +(r.ms!=null?'<span style="color:#64748b;min-width:46px;text-align:right">'+(r.ms/1000).toFixed(2)+'s</span>':'<span style="min-width:46px"></span>')
+          +' '+badge+'</div>';
+      });
+      html+='</div>';
+    });
+    box.innerHTML=html;
+  }
+
+  async function exportResults(){
+    if(typeof XLSX==='undefined'){ alert('Excel Library Not Loaded — Check Internet And Retry.'); return; }
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var snap; try{ snap=await RESULTSLOG().get(); }catch(e){ alert('Could Not Load Saved Results.'); return; }
+    var entries=[]; snap.forEach(function(d){ entries.push(d.data()); });
+    if(!entries.length){ alert('No Saved Results To Export Yet.'); return; }
+    entries.sort(function(a,b){ var sa=a.savedAt&&a.savedAt.toMillis?a.savedAt.toMillis():0; var sb=b.savedAt&&b.savedAt.toMillis?b.savedAt.toMillis():0; return sa-sb; });
+
+    // Rotating colour palette per question — {hd:header bg, ht:header text, band:row band bg}
+    var PAL=[
+      {hd:'1E3A8A',ht:'FFFFFF',band:'EAF1FB'}, // blue
+      {hd:'B45309',ht:'FFFFFF',band:'FEF3E2'}, // amber
+      {hd:'0F766E',ht:'FFFFFF',band:'E6F4F1'}, // teal
+      {hd:'6D28D9',ht:'FFFFFF',band:'F1EAFB'}, // purple
+      {hd:'BE123C',ht:'FFFFFF',band:'FCE8EC'}  // rose
+    ];
+    var GREEN_BG='DCFCE7', GREEN_TX='166534', RED_BG='FEE2E2', RED_TX='991B1B';
+    var thin={style:'thin',color:{rgb:'D9D9D9'}};
+    var border={top:thin,bottom:thin,left:thin,right:thin};
+
+    var aoa=[], merges=[], sMap={};
+    function put(r,c,s){ sMap[r+'_'+c]=s; }
+    var R=0;
+
+    // Title
+    aoa.push(['DN Investment — Quiz Results','','','','','']);
+    merges.push({s:{r:R,c:0},e:{r:R,c:5}});
+    put(R,0,{font:{bold:true,sz:15,color:{rgb:'0B1F3A'}},alignment:{horizontal:'left',vertical:'center'}});
+    R++;
+    aoa.push(['Generated: '+new Date().toLocaleString('en-IN'),'','','','','']);
+    merges.push({s:{r:R,c:0},e:{r:R,c:5}});
+    put(R,0,{font:{italic:true,sz:9,color:{rgb:'777777'}}});
+    R++;
+    aoa.push(['','','','','','']); R++; // spacer
+
+    entries.forEach(function(e,qi){
+      var pal=PAL[qi%PAL.length];
+      var qno=(e.qIndex!=null? e.qIndex : (qi+1));
+
+      // ---- Question header (merged band) ----
+      var hdr='Q'+qno+'  ·  '+(e.question||'')+'      Correct Answer:  '+(e.correctLetter||'-');
+      aoa.push([hdr,'','','','','']);
+      merges.push({s:{r:R,c:0},e:{r:R,c:5}});
+      put(R,0,{font:{bold:true,sz:12,color:{rgb:pal.ht}},fill:{patternType:'solid',fgColor:{rgb:pal.hd}},alignment:{horizontal:'left',vertical:'center',wrapText:false},border:border});
+      for(var c=1;c<6;c++) put(R,c,{fill:{patternType:'solid',fgColor:{rgb:pal.hd}},border:border});
+      R++;
+
+      // ---- Column sub-header ----
+      var sub=['Rank','Name','Mobile','Answer','Result','Time (s)'];
+      aoa.push(sub);
+      for(var c2=0;c2<6;c2++) put(R,c2,{font:{bold:true,sz:10,color:{rgb:'333333'}},fill:{patternType:'solid',fgColor:{rgb:'F1F1F1'}},alignment:{horizontal:(c2===1?'left':'center'),vertical:'center'},border:border});
+      R++;
+
+      // ---- Player rows: correct first, fastest (lowest ms) on top ----
+      var rows=(e.rows||[]).slice();
+      rows.sort(function(a,b){
+        var ac=a.correct===true, bc=b.correct===true;
+        if(ac!==bc) return ac?-1:1;                 // correct block first
+        var am=(a.ms!=null?a.ms:Infinity), bm=(b.ms!=null?b.ms:Infinity);
+        return am-bm;                               // faster first
+      });
+      var firstCorrect=-1;
+      for(var fi=0;fi<rows.length;fi++){ if(rows[fi].correct===true){ firstCorrect=fi; break; } }
+
+      rows.forEach(function(r,idx){
+        var isC=r.correct===true, isW=r.correct===false;
+        var fastest=(idx===firstCorrect);
+        var tStr=(r.ms!=null? Number((r.ms/1000).toFixed(2)) : '');
+        var nameCell=(fastest?'⚡ ':'')+(r.name||'');
+        aoa.push([ idx+1, nameCell, r.mobile||'', (r.answer||''), (isC?'Correct':(isW?'Wrong':'-')), tStr ]);
+
+        // base band style for the row
+        for(var cc=0;cc<6;cc++){
+          put(R,cc,{fill:{patternType:'solid',fgColor:{rgb:pal.band}},
+            font:{sz:10,bold:(fastest?true:false),color:{rgb:'1A1A1A'}},
+            alignment:{horizontal:(cc===1?'left':'center'),vertical:'center'},border:border});
+        }
+        // Answer cell (D) → green if this player was correct
+        if(isC) put(R,3,{fill:{patternType:'solid',fgColor:{rgb:GREEN_BG}},font:{sz:10,bold:true,color:{rgb:GREEN_TX}},alignment:{horizontal:'center',vertical:'center'},border:border});
+        // Result cell (E) → green / red
+        if(isC) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:GREEN_BG}},font:{sz:10,bold:true,color:{rgb:GREEN_TX}},alignment:{horizontal:'center',vertical:'center'},border:border});
+        else if(isW) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:RED_BG}},font:{sz:10,bold:true,color:{rgb:RED_TX}},alignment:{horizontal:'center',vertical:'center'},border:border});
+        R++;
+      });
+
+      aoa.push(['','','','','','']); R++; // spacer between questions
+    });
+
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']=[{wch:6},{wch:26},{wch:14},{wch:9},{wch:10},{wch:10}];
+    ws['!merges']=merges;
+    // apply collected styles
+    Object.keys(sMap).forEach(function(k){
+      var p=k.split('_'), addr=XLSX.utils.encode_cell({r:+p[0],c:+p[1]});
+      if(!ws[addr]) ws[addr]={t:'s',v:''};
+      ws[addr].s=sMap[k];
+    });
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Quiz Results');
+    XLSX.writeFile(wb, 'DN_Quiz_Results_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  }
+
+  // ===== Colourful posters (PNG): Leaderboard + one per question → WhatsApp =====
+  function _rr(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+  function _wrap(g,text,maxW){
+    var words=String(text||'').split(/\s+/), lines=[], line='';
+    for(var i=0;i<words.length;i++){
+      var t=line?line+' '+words[i]:words[i];
+      if(g.measureText(t).width>maxW && line){ lines.push(line); line=words[i]; }
+      else line=t;
+    }
+    if(line) lines.push(line);
+    return lines.length?lines:[''];
+  }
+  function _cvToFile(cv,name){
+    return new Promise(function(res){
+      cv.toBlob(function(b){ res({ blob:b, url:URL.createObjectURL(b), file:new File([b],name,{type:'image/png'}), name:name }); },'image/png');
+    });
+  }
+  function _leaderboardCanvas(board,totalQ){
+    var TOP=10, shown=board.slice(0,TOP), extra=board.length-shown.length;
+    var W=1080, rowH=118, headH=340, footH=90;
+    var H=headH + shown.length*rowH + (extra>0?70:0) + footH;
+    var cv=document.createElement('canvas'); cv.width=W; cv.height=H; var g=cv.getContext('2d');
+    g.fillStyle='#F4F6FB'; g.fillRect(0,0,W,H);
+    var grd=g.createLinearGradient(0,0,W,headH); grd.addColorStop(0,'#0B1F3A'); grd.addColorStop(1,'#1E3A8A');
+    g.fillStyle=grd; g.fillRect(0,0,W,headH);
+    g.textAlign='center';
+    g.fillStyle='#FBBF24'; g.font='900 40px Arial'; g.fillText('DN INVESTMENT', W/2, 78);
+    g.fillStyle='#FFFFFF'; g.font='900 64px Arial'; g.fillText('🏆 QUIZ LEADERBOARD', W/2, 168);
+    g.fillStyle='#CBD5E1'; g.font='500 30px Arial';
+    var dstr=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    g.fillText(dstr+'   ·   '+totalQ+' Questions   ·   '+board.length+' Players', W/2, 232);
+    var MED=[{bg:'#FEF3C7',bar:'#F59E0B',txt:'#92400E',ico:'🥇'},{bg:'#E5E7EB',bar:'#9CA3AF',txt:'#374151',ico:'🥈'},{bg:'#FDE7D3',bar:'#D97706',txt:'#7C2D12',ico:'🥉'}];
+    var ALT=[{bg:'#EAF1FB',bar:'#3B82F6'},{bg:'#E6F4F1',bar:'#0F766E'}];
+    var y=headH+22;
+    shown.forEach(function(p,i){
+      var m=(i<3)?MED[i]:null, alt=ALT[i%2], bg=m?m.bg:alt.bg, bar=m?m.bar:alt.bar;
+      g.fillStyle=bg; _rr(g,40,y,W-80,rowH-20,20); g.fill();
+      g.fillStyle=bar; _rr(g,40,y,16,rowH-20,8); g.fill();
+      g.textAlign='center'; g.textBaseline='middle';
+      if(m){ g.font='64px Arial'; g.fillText(m.ico,120,y+(rowH-20)/2); }
+      else { g.fillStyle=bar; g.font='900 46px Arial'; g.fillText(String(i+1),120,y+(rowH-20)/2); }
+      g.textAlign='left'; g.fillStyle=m?m.txt:'#1F2937'; g.font='800 44px Arial';
+      var nm=p.name||'Guest'; if(nm.length>22) nm=nm.slice(0,21)+'…';
+      g.fillText(nm,200,y+(rowH-20)/2-4);
+      g.textAlign='right'; g.fillStyle=bar; g.font='900 50px Arial';
+      g.fillText(p.correct+' / '+totalQ, W-70, y+(rowH-20)/2-8);
+      g.fillStyle='#6B7280'; g.font='600 24px Arial';
+      var sec=p.ms?(p.ms/1000).toFixed(1)+'s':''; g.fillText(sec?('⏱ '+sec):'', W-70, y+(rowH-20)/2+30);
+      g.textBaseline='alphabetic'; y+=rowH;
+    });
+    if(extra>0){ g.textAlign='center'; g.fillStyle='#6B7280'; g.font='600 30px Arial'; g.fillText('…and '+extra+' more player'+(extra>1?'s':''), W/2, y+34); y+=70; }
+    g.fillStyle='#0B1F3A'; g.fillRect(0,H-footH,W,footH);
+    g.textAlign='center'; g.fillStyle='#CBD5E1'; g.font='600 26px Arial'; g.fillText('Powered by DN Investment  ·  ARN-67217', W/2, H-34);
+    return cv;
+  }
+  function _questionCanvas(e,qi){
+    var QPAL=[
+      {d1:'#0B1F3A',d2:'#1E40AF',bar:'#3B82F6'}, // blue
+      {d1:'#7C2D12',d2:'#B45309',bar:'#D97706'}, // amber
+      {d1:'#134E4A',d2:'#0F766E',bar:'#14B8A6'}, // teal
+      {d1:'#4C1D95',d2:'#6D28D9',bar:'#8B5CF6'}, // purple
+      {d1:'#881337',d2:'#BE123C',bar:'#F43F5E'}  // rose
+    ];
+    var pal=QPAL[qi%QPAL.length];
+    var qno=(e.qIndex!=null?e.qIndex:(qi+1));
+    var W=1080, footH=80;
+
+    // sort rows: correct first, fastest first
+    var rows=(e.rows||[]).slice().sort(function(a,b){
+      var ac=a.correct===true, bc=b.correct===true;
+      if(ac!==bc) return ac?-1:1;
+      var am=(a.ms!=null?a.ms:Infinity), bm=(b.ms!=null?b.ms:Infinity);
+      return am-bm;
+    });
+    var CAP=12, shown=rows.slice(0,CAP), extra=rows.length-shown.length;
+
+    // measure header height (wrap question text)
+    var tmp=document.createElement('canvas').getContext('2d');
+    tmp.font='800 46px Arial';
+    var qLines=_wrap(tmp,(e.question||'Question '+qno),W-120);
+    var headH=180 + qLines.length*58 + 70;
+    var rowH=104;
+    var H=headH + shown.length*rowH + (extra>0?60:0) + footH;
+
+    var cv=document.createElement('canvas'); cv.width=W; cv.height=H; var g=cv.getContext('2d');
+    g.fillStyle='#F4F6FB'; g.fillRect(0,0,W,H);
+    // header gradient
+    var grd=g.createLinearGradient(0,0,W,headH); grd.addColorStop(0,pal.d1); grd.addColorStop(1,pal.d2);
+    g.fillStyle=grd; g.fillRect(0,0,W,headH);
+    g.textAlign='left';
+    g.fillStyle='#FBBF24'; g.font='900 34px Arial'; g.fillText('QUESTION '+qno, 60, 80);
+    g.fillStyle='#FFFFFF'; g.font='800 46px Arial';
+    var qy=140;
+    qLines.forEach(function(ln){ g.fillText(ln,60,qy); qy+=58; });
+    // correct answer pill
+    var caTxt='Correct Answer:  '+(e.correctLetter||'-');
+    g.font='800 30px Arial'; var pw=g.measureText(caTxt).width+44;
+    g.fillStyle='rgba(255,255,255,.18)'; _rr(g,60,qy-4,pw,50,25); g.fill();
+    g.fillStyle='#FDE68A'; g.fillText(caTxt, 82, qy+30);
+
+    var y=headH+18;
+    shown.forEach(function(r,i){
+      var isC=r.correct===true, isW=r.correct===false;
+      var bg = isC?'#ECFDF3':(isW?'#FEF2F2':'#EEF2F7');
+      var bar= isC?'#16A34A':(isW?'#DC2626':pal.bar);
+      var isWinner=(i===0 && isC);
+      g.fillStyle=bg; _rr(g,40,y,W-80,rowH-16,18); g.fill();
+      g.fillStyle=bar; _rr(g,40,y,14,rowH-16,7); g.fill();
+      // rank badge (medal for correct top3)
+      g.textAlign='center'; g.textBaseline='middle'; var cy=y+(rowH-16)/2;
+      if(isC && i<3){ g.font='50px Arial'; g.fillText(['🥇','🥈','🥉'][i],110,cy); }
+      else { g.fillStyle=bar; g.font='900 40px Arial'; g.fillText(String(i+1),110,cy); }
+      // name
+      g.textAlign='left'; g.fillStyle='#1F2937'; g.font='800 40px Arial';
+      var nm=r.name||'Guest'; if(nm.length>20) nm=nm.slice(0,19)+'…';
+      g.fillText(nm,180,cy-2);
+      if(isWinner){ g.fillStyle=bar; g.font='800 22px Arial'; g.fillText('🏆 Fastest Correct', 182, cy+30); }
+      // answer chip + result on the right
+      g.textAlign='right';
+      var tSec=r.ms?(r.ms/1000).toFixed(1)+'s':'';
+      g.fillStyle=isC?'#166534':(isW?'#991B1B':'#374151'); g.font='900 34px Arial';
+      g.fillText((isC?'✓ ':(isW?'✗ ':''))+(r.answer||'—'), W-70, cy-4);
+      g.fillStyle='#6B7280'; g.font='600 22px Arial'; g.fillText(tSec?('⏱ '+tSec):'', W-70, cy+28);
+      g.textBaseline='alphabetic'; y+=rowH;
+    });
+    if(extra>0){ g.textAlign='center'; g.fillStyle='#6B7280'; g.font='600 26px Arial'; g.fillText('…and '+extra+' more', W/2, y+30); y+=60; }
+    g.fillStyle=pal.d1; g.fillRect(0,H-footH,W,footH);
+    g.textAlign='center'; g.fillStyle='#E5E7EB'; g.font='600 24px Arial'; g.fillText('DN Investment Quiz  ·  ARN-67217', W/2, H-30);
+    return cv;
+  }
+
+  async function resultImage(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var snap; try{ snap=await RESULTSLOG().get(); }catch(e){ alert('Could Not Load Saved Results.'); return; }
+    var entries=[]; snap.forEach(function(d){ entries.push(d.data()); });
+    if(!entries.length){ alert('No Saved Results To Export Yet.'); return; }
+    // keep question order stable (by qIndex if present, else saved order)
+    entries.sort(function(a,b){ return ((a.qIndex!=null?a.qIndex:0)-(b.qIndex!=null?b.qIndex:0)); });
+
+    // aggregate for leaderboard
+    var agg={}, totalQ=entries.length;
+    entries.forEach(function(e){
+      (e.rows||[]).forEach(function(r){
+        var key=((r.name||'').trim().toLowerCase())+'|'+((r.mobile||'').trim());
+        if(!agg[key]) agg[key]={name:(r.name||'Guest'), correct:0, answered:0, ms:0};
+        agg[key].answered++;
+        if(r.correct===true){ agg[key].correct++; if(r.ms!=null) agg[key].ms+=r.ms; }
+      });
+    });
+    var board=Object.keys(agg).map(function(k){return agg[k];})
+      .sort(function(a,b){ return (b.correct-a.correct)||(a.ms-b.ms)||a.name.localeCompare(b.name); });
+
+    var ds=new Date().toISOString().slice(0,10);
+    var jobs=[ _cvToFile(_leaderboardCanvas(board,totalQ), 'DN_Quiz_Leaderboard_'+ds+'.png').then(function(o){ o.label='🏆 Overall Leaderboard'; return o; }) ];
+    entries.forEach(function(e,qi){
+      var qno=(e.qIndex!=null?e.qIndex:(qi+1));
+      jobs.push(_cvToFile(_questionCanvas(e,qi),'DN_Quiz_Q'+qno+'_'+ds+'.png').then(function(o){ o.label='Q'+qno+' · '+((e.question||'').slice(0,40)); return o; }));
+    });
+    var items=await Promise.all(jobs);
+    var allFiles=items.map(function(o){return o.file;});
+    var canShareOne=(navigator.canShare && (function(){ try{ return navigator.canShare({files:[items[0].file]}); }catch(e){ return false; } })());
+    var canShareAll=(navigator.canShare && (function(){ try{ return navigator.canShare({files:allFiles}); }catch(e){ return false; } })());
+
+    // ---- Gallery modal ----
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.82);display:flex;flex-direction:column;align-items:center;padding:14px;gap:14px;overflow:auto';
+    var top=document.createElement('div');
+    top.style.cssText='position:sticky;top:0;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:6px;z-index:2';
+    top.innerHTML=
+      (canShareAll?'<button id="_shareAll" style="padding:12px 20px;border:0;border-radius:10px;background:#25D366;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📤 Share All to WhatsApp</button>':'')+
+      '<button id="_clAll" style="padding:12px 20px;border:0;border-radius:10px;background:#374151;color:#fff;font-weight:800;font-size:15px;cursor:pointer">✖ Close</button>';
+    ov.appendChild(top);
+    if(!canShareOne){
+      var hint=document.createElement('div');
+      hint.style.cssText='color:#e5e7eb;font-size:12px;text-align:center;max-width:460px';
+      hint.textContent='Desktop pe direct WhatsApp attach nahi hota — poster download karke WhatsApp group me bhej do. Mobile pe 📤 Share button aata hai (ek saath sab bhi).';
+      ov.appendChild(hint);
+    }
+    items.forEach(function(o){
+      var card=document.createElement('div');
+      card.style.cssText='background:#fff;border-radius:14px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:min(94vw,480px)';
+      card.innerHTML='<div style="font-weight:800;color:#0B1F3A;font-size:14px;align-self:flex-start">'+o.label+'</div>'+
+        '<img src="'+o.url+'" style="max-width:100%;border-radius:10px">'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'+
+          (canShareOne?'<button class="_shOne" style="padding:9px 16px;border:0;border-radius:9px;background:#25D366;color:#fff;font-weight:700;font-size:13px;cursor:pointer">📤 Share</button>':'')+
+          '<button class="_dlOne" style="padding:9px 16px;border:0;border-radius:9px;background:#7c3aed;color:#fff;font-weight:700;font-size:13px;cursor:pointer">⬇️ Download</button>'+
+        '</div>';
+      var dl=card.querySelector('._dlOne'); dl.onclick=function(){ var a=document.createElement('a'); a.href=o.url; a.download=o.name; a.click(); };
+      var sh=card.querySelector('._shOne'); if(sh) sh.onclick=async function(){ try{ await navigator.share({files:[o.file], title:'DN Investment Quiz', text:o.label}); }catch(e){} };
+      ov.appendChild(card);
+    });
+    document.body.appendChild(ov);
+    function closeAll(){ items.forEach(function(o){ URL.revokeObjectURL(o.url); }); ov.remove(); }
+    top.querySelector('#_clAll').onclick=closeAll;
+    var sa=top.querySelector('#_shareAll');
+    if(sa) sa.onclick=async function(){ try{ await navigator.share({files:allFiles, title:'DN Investment Quiz Results', text:'🏆 Quiz Results — DN Investment'}); }catch(e){} };
+    ov.addEventListener('click', function(ev){ if(ev.target===ov) closeAll(); });
+  }
+
+  async function deleteResultsLog(){
+    if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ alert('Admin Only.'); return; }
+    if(!confirm('Delete ALL Saved Quiz Results? This Cannot Be Undone.')) return;
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{
+      var snap=await RESULTSLOG().get();
+      var batch=window.fdb.batch(); var n=0;
+      snap.forEach(function(d){ batch.delete(d.ref); n++; });
+      if(n) await batch.commit();
+      var box=document.getElementById('quiz-saved-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">No Saved Results Yet.</div>';
+      var cnt=document.getElementById('quiz-saved-count'); if(cnt) cnt.textContent='';
+    }catch(e){ alert('Delete Failed: '+e.message); }
+  }
+
+  function currentResponses(snap){
+    var sid = host.liveSessionId || host.sessionId;
+    var qi = (host.liveQIndex!=null) ? host.liveQIndex : host.qIndex;
+    var rows=[];
+    snap.forEach(function(doc){
+      var r=doc.data();
+      if((r.sessionId||'')===sid && (r.qIndex||0)===qi) rows.push(r);
+    });
+    // order by server timestamp (nulls — pending writes — go last)
+    rows.sort(function(a,b){
+      var ta=a.at&&a.at.toMillis?a.at.toMillis():Infinity;
+      var tb=b.at&&b.at.toMillis?b.at.toMillis():Infinity;
+      return ta-tb;
+    });
+    return rows;
+  }
+
+  function renderHostResults(snap){
+    var box=document.getElementById('quiz-results'); if(!box) return;
+    var total = snap ? snap.size : 0;
+    var rows = snap ? currentResponses(snap) : [];
+    var sid=host.liveSessionId||host.sessionId; var qi=(host.liveQIndex!=null)?host.liveQIndex:host.qIndex;
+    var dbg='<div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;font-family:monospace">📥 DB total: '+total+' · matching (sess ...'+String(sid||'—').slice(-5)+' / q'+qi+'): '+rows.length+'</div>';
+    if(!rows.length){ box.innerHTML=dbg+'<div style="color:var(--gray);font-size:.82rem">No Answers Yet.</div>'; return; }
+    var html=dbg+'<div style="display:flex;flex-direction:column;gap:6px">';
+    rows.forEach(function(r,i){
+      var correct = (host.type==='mcq') ? (r.answer===host.correctIndex) : null;
+      var badge = host.type==='buzzer'
+        ? '<span style="background:#3b82f6;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">BUZZ</span>'
+        : host.type==='guess'
+        ? '<span style="background:#a855f7;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">🎯 '+esc(String(r.answer))+'</span>'
+        : (correct ? '<span style="background:#16a34a;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✔ Correct</span>'
+                   : '<span style="background:#dc2626;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem">✘ Wrong</span>');
+      var tms = (r.at&&r.at.toMillis&&host.startedAtServerMs) ? (r.at.toMillis()-host.startedAtServerMs) : null;
+      var tstr = (tms!=null && tms>=0) ? '<span style="font-size:.72rem;color:#64748b;font-weight:600;min-width:52px;text-align:right">'+(tms/1000).toFixed(2)+'s</span>' : '';
+      var mobStr = r.mobile ? '<span style="font-size:.7rem;color:#94a3b8;font-weight:600">📱'+esc(r.mobile)+'</span>' : '';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:'+(i===0?'#fef9c3':'#fff')+'">'
+          + '<span style="font-weight:700;width:20px">'+(i+1)+'</span>'
+          + '<span style="flex:1;font-weight:600">'+esc(r.name)+'</span>'
+          + mobStr + tstr + badge + '</div>';
+    });
+    html+='</div>';
+    box.innerHTML=html;
+  }
+
+  // Save the CURRENT question's responses into the persistent resultsLog so they
+  // are never lost when the next question is pushed. Idempotent (keyed by q).
+  async function saveCurrentResults(){
+    try{
+      if(!host.sessionId || !host.qIndex) return;
+      var snap=await RESPONSES().get();
+      var rows=[];
+      snap.forEach(function(doc){ var r=doc.data(); if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r); });
+      if(!rows.length) return;
+      rows.sort(function(a,b){ var ta=a.at&&a.at.toMillis?a.at.toMillis():Infinity; var tb=b.at&&b.at.toMillis?b.at.toMillis():Infinity; return ta-tb; });
+      function _ms(r){ return (r.at&&r.at.toMillis&&host.startedAtServerMs)?Math.max(0,r.at.toMillis()-host.startedAtServerMs):null; }
+      var live={}; try{ live=(await DOC().get()).data()||{}; }catch(e){}
+      var logRows=rows.map(function(r){
+        var isCorrect=(host.type==='mcq')?(r.answer===host.correctIndex):null;
+        var ansLetter=(host.type==='mcq'&&typeof r.answer==='number')?String.fromCharCode(65+r.answer):(r.answer==='buzz'?'BUZZ':String(r.answer==null?'':r.answer));
+        return { name:r.name||'', mobile:r.mobile||'', answer:ansLetter, correct:isCorrect, ms:_ms(r) };
+      });
+      var firstWinner;
+      if(host.type==='guess'){
+        // use the already-computed reveal winner (closest guess), not just the first responder
+        firstWinner = live.winnerName || '';
+      } else {
+        firstWinner=''; for(var i=0;i<logRows.length;i++){ if(host.type!=='mcq' || logRows[i].correct===true){ firstWinner=logRows[i].name; break; } }
+      }
+      await RESULTSLOG().doc(host.sessionId+'_q'+host.qIndex).set({
+        qIndex:host.qIndex, sessionId:host.sessionId,
+        question:live.question||('Question '+host.qIndex),
+        correctLetter:(host.type==='mcq'&&host.correctIndex!=null)?String.fromCharCode(65+host.correctIndex):(host.type==='guess'&&live.actualValue!=null?String(live.actualValue):''),
+        type:host.type||'mcq',
+        winnerName:firstWinner,
+        savedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        rows:logRows
+      });
+    }catch(e){}
+  }
+
+  function loadBank(){
+    if(host.bankCache && host.bankCache.length) return host.bankCache;   // synced from Firestore
+    try{ var b=JSON.parse(localStorage.getItem(BANK_KEY)); if(b&&b.length) return b; }catch(e){}
+    return defaultBankArr();
+  }
+  function renderBank(){
+    var host_bank=loadBank();
+    var box=document.getElementById('quiz-bank'); if(!box) return;
+    var html='';
+    for(var n=0;n<5;n++){
+      var q=host_bank[n]||{type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''};
+      var optRows='';
+      for(var i=0;i<4;i++){
+        optRows+='<label style="display:flex;align-items:center;gap:6px"><input type="radio" name="qb'+n+'-correct" value="'+i+'"'+(q.correct===i?' checked':'')+'>'
+              + '<input type="text" id="qb'+n+'-opt'+i+'" value="'+esc(q.opts[i]||'')+'" placeholder="Option '+String.fromCharCode(65+i)+'" style="flex:1;padding:5px;font-size:.8rem;border:1px solid var(--border);border-radius:6px"></label>';
+      }
+      html+='<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:#f8fafc">'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+        + '<span style="font-weight:800;color:var(--teal)">Q'+(n+1)+'</span>'
+        + '<select id="qb'+n+'-type" onchange="QUIZ.bankTypeChange('+n+')" style="padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px">'
+        +   '<option value="mcq"'+(q.type==='mcq'?' selected':'')+'>MCQ (Auto)</option>'
+        +   '<option value="buzzer"'+(q.type==='buzzer'?' selected':'')+'>Buzzer</option>'
+        +   '<option value="guess"'+(q.type==='guess'?' selected':'')+'>🎯 Guess The Number</option></select>'
+        + '<label style="font-size:.75rem">⏱️<input type="number" id="qb'+n+'-time" value="'+(q.time||20)+'" min="5" max="120" style="width:50px;padding:4px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;margin-left:2px"> sec</label>'
+        + '<label style="font-size:.75rem;flex:1;min-width:120px">🎁<input type="text" id="qb'+n+'-prize" value="'+esc(q.prize||'')+'" placeholder="Prize" style="width:100%;padding:4px 6px;font-size:.78rem;border:1px solid var(--border);border-radius:6px"></label>'
+        + '</div>'
+        + '<input type="text" id="qb'+n+'-text" value="'+esc(q.text||'')+'" placeholder="Question '+(n+1)+' Text…" style="width:100%;box-sizing:border-box;padding:7px;font-size:.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">'
+        + '<div id="qb'+n+'-opts" style="display:'+(q.type==='mcq'?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+optRows+'</div>'
+        + '<button class="btn btn-teal" style="padding:6px 14px;font-size:.82rem" onclick="QUIZ.pushQuestion('+n+')">🚀 Push Q'+(n+1)+'</button>'
+        + '</div>';
+    }
+    box.innerHTML=html;
+  }
+  function bankTypeChange(n){
+    var t=(document.getElementById('qb'+n+'-type')||{}).value||'mcq';
+    var o=document.getElementById('qb'+n+'-opts'); if(o) o.style.display=(t==='mcq')?'grid':'none';
+  }
+  function readBankRow(n){
+    var opts=[]; for(var i=0;i<4;i++){ opts.push(((document.getElementById('qb'+n+'-opt'+i)||{}).value||'')); }
+    var sel=document.querySelector('input[name="qb'+n+'-correct"]:checked');
+    return {
+      type:(document.getElementById('qb'+n+'-type')||{}).value||'mcq',
+      text:((document.getElementById('qb'+n+'-text')||{}).value||'').trim(),
+      opts:opts, correct:sel?parseInt(sel.value,10):0,
+      time:parseInt((document.getElementById('qb'+n+'-time')||{}).value,10)||20,
+      prize:((document.getElementById('qb'+n+'-prize')||{}).value||'').trim()
+    };
+  }
+  async function saveBank(){
+    var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
+    host.bankCache=arr;
+    await writeBankToFirestore(arr);
+    alert('All 5 Questions Saved And Synced To All Your Devices. Hit "Push" Whenever You Are Ready.');
+  }
+  async function clearBank(){
+    if(!confirm('Clear All 5 Questions On ALL Your Devices?')) return;
+    var arr=defaultBankArr();
+    host.bankCache=arr;
+    await writeBankToFirestore(arr);
+    renderBank();
+  }
+  async function pushQuestion(n){
+    var _cs=document.getElementById('quiz-conn'); if(_cs){ _cs.textContent='⏳ Push Q'+(n+1)+' clicked — sending…'; _cs.style.color='#b45309'; }
+    saveBankSilent();  // fire-and-forget sync; push proceeds immediately using current DOM values
+    var q=readBankRow(n);
+    if(!q.text){ alert('Q'+(n+1)+' Is Empty — Please Enter The Question First.'); return; }
+    var options=[];
+    if(q.type==='mcq'){
+      for(var i=0;i<4;i++){ if((q.opts[i]||'').trim()) options.push(q.opts[i].trim()); }
+      if(options.length<2){ alert('Q'+(n+1)+': Add At Least 2 Options.'); return; }
+      if(q.correct>=options.length){ alert('Q'+(n+1)+': The Correct-Option Slot Is Empty.'); return; }
+    }
+    await launchQuestionObj({type:q.type, text:q.text, options:options, correct:q.correct, time:q.time, prize:q.prize});
+  }
+  async function saveBankSilent(){
+    var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
+    host.bankCache=arr;
+    await writeBankToFirestore(arr);
+  }
+
+  async function launchQuestionObj(q){
+    var _cs=document.getElementById('quiz-conn');
+    await window.waitForFdb(8000);
+    if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Firebase Connect Nahi Hua.'); return; }
+    try{ await saveCurrentResults(); }catch(e){}   // never let this block the push
+    // continue the SAME live session/sequence (survives reloads & multiple host tabs)
+    try{ var cur=(await DOC().get()).data()||{}; if(cur.sessionId) host.sessionId=cur.sessionId; host.qIndex=(cur.qIndex||0); }catch(e){}
+    host.qIndex=(host.qIndex||0)+1;
+    host.type=q.type; host.correctIndex=q.correct; host.startedAtServerMs=0;
+    try{
+      if(_cs){ _cs.textContent='⏳ Writing Q'+host.qIndex+' to Firestore…'; _cs.style.color='#b45309'; }
+      await DOC().set({
+        state:'live', type:q.type, qIndex:host.qIndex, sessionId:host.sessionId,
+        question:q.text, options:(q.type==='mcq'?q.options:[]), prize:(q.prize||''), timeSec:(q.time||20),
+        startedAt:Date.now(), startedAtServer:firebase.firestore.FieldValue.serverTimestamp(),
+        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null
+      }, {merge:true});
+      // read back from the SERVER (not cache) so the resolved serverTimestamp is captured;
+      // a fresh write's serverTimestamp can still be pending/null in a cached read, retry a few times
+      for(var _try=0; _try<5 && !host.startedAtServerMs; _try++){
+        try{
+          var d=await DOC().get({source:'server'});
+          if(d.exists && d.data() && d.data().startedAtServer && d.data().startedAtServer.toMillis)
+            host.startedAtServerMs=d.data().startedAtServer.toMillis();
+        }catch(e){}
+        if(!host.startedAtServerMs) await new Promise(function(r){ setTimeout(r,250); });
+      }
+      if(!host.startedAtServerMs) host.startedAtServerMs=Date.now(); // fallback so timing still shows (may be slightly off)
+      try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs }); }catch(e){}
+      var st=document.getElementById('quiz-live-status');
+      if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
+      var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting For Answers…</div>';
+      try{ var rs=await RESPONSES().get(); renderHostResults(rs); }catch(e){}
+    }catch(e){
+      if(_cs){ _cs.textContent='🔴 Push Failed: '+(e&&e.message||e); _cs.style.color='#dc2626'; }
+      alert('⚠️ Push Failed:\n\n'+(e&&e.message||e)+'\n\n(Firestore Write Block Ho Sakta Hai — Rules Check Karo.)');
+    }
+  }
+
+  async function clearResults(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{
+      // delete this question's responses so results box truly empties
+      var rs=await RESPONSES().get();
+      var batch=window.fdb.batch(); var cnt=0;
+      rs.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===host.sessionId){ batch.delete(d.ref); cnt++; } });
+      if(cnt) await batch.commit();
+      await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null, revealIndex:null, results:[] }, {merge:true});
+    }catch(e){}
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
+    var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
+  }
+
+  async function closeQuestion(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{ await DOC().set({ state:'lobby', winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='No Question Is Live.';
+    var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
+  }
+
+  function medalFor(rank){ return rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'🎖️'; }
+
+  async function reveal(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    try{
+      // recover the correct answer + timing from the answer-key doc (reload-proof)
+      try{
+        var ak=await ANSWERKEY().get();
+        if(ak.exists){ var a=ak.data()||{};
+          if((a.sessionId||'')===host.sessionId && (a.qIndex||0)===host.qIndex){
+            host.correctIndex=a.correctIndex; host.type=a.type||host.type;
+            if(a.startedAtServerMs) host.startedAtServerMs=a.startedAtServerMs;
+          }
+        }
+      }catch(e){}
+      var actualValue=null;
+      if(host.type==='guess'){
+        var avEl=document.getElementById('quiz-actual-value');
+        var raw=(avEl?avEl.value:'').trim().replace(/,/g,'');
+        if(!raw){ alert('🎯 Guess Question — Please Enter The Actual Value First (e.g. Today\'s Sensex Closing), Then Hit Reveal.'); return; }
+        actualValue=parseFloat(raw);
+        if(isNaN(actualValue)){ alert('Please Enter A Valid Number For The Actual Value.'); return; }
+      }
+      var snap=await RESPONSES().orderBy('at').get();
+      var rows=[];
+      snap.forEach(function(doc){ var r=doc.data(); if((r.sessionId||'')===host.sessionId && (r.qIndex||0)===host.qIndex) rows.push(r); });
+      var winner=null;
+      var results=[];
+      function msOf(r){ return (r.at&&r.at.toMillis&&host.startedAtServerMs)?Math.max(0,r.at.toMillis()-host.startedAtServerMs):null; }
+      if(host.type==='mcq'){
+        var corrects=[], wrongs=[];
+        rows.forEach(function(r){ (r.answer===host.correctIndex?corrects:wrongs).push(r); });
+        corrects.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:true,rank:i+1,ms:msOf(r)}); });
+        wrongs.forEach(function(r){ results.push({id:r.playerId,name:r.name,correct:false,rank:null,ms:msOf(r)}); });
+        winner = corrects.length?corrects[0]:null;
+      } else if(host.type==='guess'){
+        var validRows=rows.filter(function(r){ return typeof r.answer==='number' && !isNaN(r.answer); });
+        validRows.sort(function(a,b){
+          var da=Math.abs(a.answer-actualValue), db=Math.abs(b.answer-actualValue);
+          if(da!==db) return da-db;
+          // tie (same distance from actual value) — earliest submission wins
+          var ta=a.at&&a.at.toMillis?a.at.toMillis():Infinity, tb=b.at&&b.at.toMillis?b.at.toMillis():Infinity;
+          return ta-tb;
+        });
+        validRows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r),guess:r.answer,diff:Math.abs(r.answer-actualValue)}); });
+        winner = validRows.length?validRows[0]:null;
+        var winnerDiff = winner ? Math.abs(winner.answer-actualValue) : null;
+        var tieCount = winner ? validRows.filter(function(r){ return Math.abs(r.answer-actualValue)===winnerDiff; }).length : 0;
+        var wasTie = tieCount>1;
+      } else {
+        rows.forEach(function(r,i){ results.push({id:r.playerId,name:r.name,correct:null,rank:i+1,ms:msOf(r)}); });
+        winner = rows.length?rows[0]:null;
+      }
+      var winMs = winner ? msOf(winner) : null;
+      await DOC().set({
+        state:'reveal',
+        revealIndex:(host.type==='mcq'?host.correctIndex:null),
+        winnerName:(winner?winner.name:null),
+        winnerMs:winMs,
+        winnerPts:null,
+        actualValue:(host.type==='guess'?actualValue:null),
+        winnerGuess:(host.type==='guess'&&winner?winner.answer:null),
+        winnerTie:(host.type==='guess'?!!wasTie:null),
+        results:results.slice(0,150)
+      }, {merge:true});
+      saveCurrentResults(); // persist this revealed question's results
+      var st=document.getElementById('quiz-live-status');
+      var tt = (winMs!=null) ? ' — ⏱️ '+(winMs/1000).toFixed(2)+'s' : '';
+      var cnt = ' · '+rows.length+' response'+(rows.length===1?'':'s');
+      var kindTxt = host.type==='mcq' ? ' (First Correct Answer)' : (host.type==='guess' ? ' (Closest Guess: '+(winner?winner.answer:'')+' vs Actual '+actualValue+')' : ' (First To Buzz)');
+      if(st) st.innerHTML = winner
+        ? '🏆 Winner: <b style="color:var(--teal)">'+esc(winner.name)+'</b>'+kindTxt+tt+cnt
+        : (rows.length? 'No Valid Responses — '+rows.length+' Response'+(rows.length===1?'':'s')+' Received.' : 'No Responses Received. Ask Players To Answer Before Reveal.');
+    }catch(e){ alert('Reveal Fail: '+e.message); }
+  }
+
+  async function newSession(){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    if(!confirm('Start A New Quiz? Current Players And Answers Will Be Cleared.')) return;
+    try{
+      // delete old players + responses (seminar scale — few dozen docs)
+      var ps=await PLAYERS().get(); var b1=window.fdb.batch(); ps.forEach(function(d){ b1.delete(d.ref); }); await b1.commit();
+      var rs=await RESPONSES().get(); var b2=window.fdb.batch(); rs.forEach(function(d){ b2.delete(d.ref); }); await b2.commit();
+    }catch(e){}
+    host.sessionId='s'+Date.now(); host.qIndex=0;
+    try{ await DOC().set({ state:'lobby', type:'mcq', qIndex:0, sessionId:host.sessionId, question:null, options:[], winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null, revealIndex:null, results:[] }, {merge:true}); }catch(e){}
+    attachHostListeners();
+    var st=document.getElementById('quiz-live-status'); if(st) st.textContent='New Quiz Ready. Ask Players To Join.';
+    var box=document.getElementById('quiz-results'); if(box) box.innerHTML='';
+    var pc=document.getElementById('quiz-player-count'); if(pc) pc.textContent='0';
+    var pc2=document.getElementById('quiz-player-count-2'); if(pc2) pc2.textContent='0';
+    var pn=document.getElementById('quiz-player-names'); if(pn) pn.innerHTML='';
+  }
+
+  function copyLink(){
+    var li=document.getElementById('quiz-join-link'); if(!li) return;
+    li.select(); try{ document.execCommand('copy'); }catch(e){}
+    try{ navigator.clipboard && navigator.clipboard.writeText(joinLink()); }catch(e){}
+    alert('Link Copied!');
+  }
+
+  // ─────────── CLIENT (PLAYER) ───────────
+  var player = { id:'', name:'', mobile:'', sessionId:'', qIndex:0, answered:false, unsub:null, state:'', lastGuess:null, requireMobile:false };
+
+  function C(){ return document.getElementById('qp-content'); }
+
+  async function bootPlayer(){
+    document.getElementById('quizPlayer').style.display='block';
+    injectPlayerCSS();
+    var app=document.getElementById('app'); if(app) app.style.display='none';
+    var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
+    await window.waitForFdb(9000);
+    if(!window.fdb){ C().innerHTML=msgCard('⚠️ Could Not Connect. Please Check Your Network And Refresh.'); return; }
+    player.id = localStorage.getItem('dnquiz_pid') || ('p'+Date.now()+Math.floor(Math.random()*9999));
+    localStorage.setItem('dnquiz_pid', player.id);
+    player.name = localStorage.getItem('dnquiz_name') || '';
+    player.mobile = localStorage.getItem('dnquiz_mobile') || '';
+    player.linkOpen = true; player.started = false; player.requireMobile = false;
+    // watch open/close flag first
+    LINKS().onSnapshot(function(d){
+      var v=d.data()||{};
+      player.linkOpen = v.quizOpen!==false;
+      player.requireMobile = !!v.requireMobile;
+      if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
+      var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
+      if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } }
+    }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } } });
+  }
+
+  function injectPlayerCSS(){
+    if(document.getElementById('qp-css')) return;
+    var st=document.createElement('style'); st.id='qp-css';
+    st.textContent=[
+      '.qp-winbg{background:linear-gradient(135deg,#f59e0b,#fbbf24,#fb7185,#a78bfa,#f59e0b);background-size:300% 300%;animation:qpBG 4s ease infinite}',
+      '@keyframes qpBG{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}',
+      '.qp-pop{opacity:0;transform:translateY(18px) scale(.94);animation:qpPop .5s cubic-bezier(.2,.9,.3,1.2) forwards}',
+      '@keyframes qpPop{to{opacity:1;transform:none}}',
+      '.qp-trophy{display:inline-block;animation:qpBounce 1.1s ease-in-out infinite}',
+      '@keyframes qpBounce{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-10px) rotate(6deg)}}',
+      '.qp-conf{position:fixed;top:-8vh;font-size:1.8rem;animation:qpFall linear forwards;pointer-events:none;z-index:99999}',
+      '@keyframes qpFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}',
+      '.qp-qcard{background:linear-gradient(135deg,rgba(99,102,241,.25),rgba(236,72,153,.2));border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:22px 18px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,.25)}',
+      '.qp-badge{display:inline-block;padding:4px 14px;border-radius:99px;font-size:.7rem;font-weight:900;letter-spacing:.05em;color:#fff;background:linear-gradient(90deg,#6366f1,#8b5cf6);margin-bottom:10px}',
+      '.qp-optbtn{width:100%;display:flex;align-items:center;gap:12px;padding:16px;font-size:1.05rem;font-weight:800;border:none;border-radius:16px;color:#fff;cursor:pointer;text-align:left;box-shadow:0 6px 16px rgba(0,0,0,.3);transition:transform .1s}',
+      '.qp-optbtn:active{transform:scale(.96)}',
+      '.qp-optletter{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;font-weight:900}',
+      '.qp-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qp-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qp-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qp-d{background:linear-gradient(135deg,#e0a800,#c08a00)}',
+      '.qp-card-wrong{background:linear-gradient(135deg,#e21b3c,#b3132e);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 28px rgba(226,27,60,.4)}',
+      '.qp-card-good{background:linear-gradient(135deg,#1368ce,#0d4ea0);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 28px rgba(19,104,206,.4)}',
+      '.qp-card-neutral{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(236,72,153,.25));border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+  function playerConfettiBurst(){
+    var qp=document.getElementById('quizPlayer'); if(!qp) return;
+    var emo=['🎉','🎊','⭐','🏆','✨','🎈'];
+    for(var i=0;i<24;i++){ (function(i){ var s=document.createElement('div'); s.className='qp-conf';
+      s.textContent=emo[i%emo.length]; s.style.left=(Math.random()*100)+'vw';
+      s.style.animationDuration=(2.2+Math.random()*2)+'s'; s.style.animationDelay=(Math.random()*.6)+'s';
+      qp.appendChild(s); setTimeout(function(){ s.remove(); },5200); })(i); }
+  }
+
+  function msgCard(html){
+    return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px;text-align:center;font-size:1rem">'+html+'</div>';
+  }
+
+  function renderNameForm(){
+    var mobileField = player.requireMobile
+      ? '<input id="qp-mobile" type="tel" inputmode="numeric" placeholder="Mobile Number" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      : '';
+    C().innerHTML =
+      '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px">'
+      + '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;text-align:center">Enter your name</div>'
+      + '<input id="qp-name" placeholder="Name" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      + mobileField
+      + '<button id="qp-join-btn" style="width:100%;padding:14px;font-size:1.1rem;font-weight:700;border:none;border-radius:12px;background:#14b8a6;color:#fff;cursor:pointer">Join Quiz →</button>'
+      + '</div>';
+    var inp=document.getElementById('qp-name'); if(inp) inp.focus();
+    document.getElementById('qp-join-btn').onclick=async function(){
+      var v=(document.getElementById('qp-name')||{}).value.trim();
+      if(!v){ inp.focus(); return; }
+      if(player.requireMobile){
+        var mEl=document.getElementById('qp-mobile');
+        var mv=(mEl?mEl.value:'').replace(/\D/g,'');
+        if(mv.length<10){ if(mEl){ mEl.focus(); mEl.style.background='rgba(239,68,68,.25)'; } return; }
+        player.mobile=mv; localStorage.setItem('dnquiz_mobile', mv);
+      }
+      player.name=v; localStorage.setItem('dnquiz_name', v);
+      await joinAndListen();
+    };
+  }
+
+  async function joinAndListen(){
+    C().innerHTML=msgCard('⏳ Joining…');
+    try{
+      var d=await DOC().get();
+      player.sessionId = (d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
+      await PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() });
+    }catch(e){}
+    if(player.unsub) player.unsub();
+    player.unsub = DOC().onSnapshot(function(doc){ renderPlayerState(doc.data()||{}); }, function(){});
+    attachPlayerRefreshGuards();
+  }
+
+  // Mobile browsers often suspend the realtime listener when the screen locks
+  // or the tab goes to background; when the player comes back, force a fresh
+  // SERVER read so an old/stuck question can never linger on screen.
+  var _playerRefreshAttached=false;
+  function attachPlayerRefreshGuards(){
+    if(_playerRefreshAttached) return; _playerRefreshAttached=true;
+    async function forceRefresh(){
+      if(!player.id) return;
+      try{ var d=await DOC().get({source:'server'}); renderPlayerState((d.data())||{}); }catch(e){}
+    }
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') forceRefresh(); });
+    window.addEventListener('pageshow', forceRefresh);
+    window.addEventListener('focus', forceRefresh);
+    window.addEventListener('online', forceRefresh);
+    // safety net in case the realtime listener silently stalls in the background
+    setInterval(function(){ if(document.visibilityState==='visible') forceRefresh(); }, 12000);
+  }
+
+  function renderPlayerState(d){
+    var dbg=document.getElementById('qp-debug');
+    if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
+    if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
+    // session changed by host reset → rejoin under new session
+    if(d.sessionId && d.sessionId!==player.sessionId){
+      player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
+      try{ PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
+    }
+    if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; player.lastGuess=null; }
+
+    if(d.state==='live'){ renderLiveQuestion(d); }
+    else if(d.state==='reveal'){ renderReveal(d); }
+    else { C().innerHTML=msgCard('👋 Hi <b>'+esc(player.name)+'</b>!<br><br>Waiting For The Quiz To Start…'); }
+  }
+
+  function renderLiveQuestion(d){
+    if(player.answered){
+      var lockedMsg = (d.type==='guess' && player.lastGuess!=null)
+        ? '✅ Your Guess Is Locked In!<br><br><span style="font-size:1.4rem;font-weight:900">🎯 '+esc(String(player.lastGuess))+'</span><br><br>Waiting For The Result…'
+        : '✅ Your Answer Is Locked In!<br><br>Waiting For The Result…';
+      C().innerHTML=msgCard(lockedMsg);
+      return;
+    }
+    var prize = d.prize ? '<div style="text-align:center;color:#fbbf24;font-size:.85rem;font-weight:800;margin-bottom:10px">🎁 Prize: '+esc(d.prize)+'</div>' : '';
+    var html='<div class="qp-pop">'+prize
+      + '<div class="qp-qcard">'
+      + '<div style="text-align:center"><span class="qp-badge">🧠 QUESTION</span></div>'
+      + '<div style="font-size:1.25rem;font-weight:800;text-align:center;line-height:1.35;color:#fff">'+esc(d.question)+'</div></div>';
+    if(d.type==='buzzer'){
+      html+='<button id="qp-buzz" style="width:100%;padding:40px 0;font-size:1.8rem;font-weight:900;border:none;border-radius:20px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(239,68,68,.5)">🔔 BUZZ!</button>';
+    } else if(d.type==='guess'){
+      html+='<div style="display:flex;flex-direction:column;gap:14px">'
+        + '<input id="qp-guess-input" type="number" inputmode="decimal" step="any" placeholder="Enter Your Guess…" style="width:100%;box-sizing:border-box;padding:16px;font-size:1.4rem;font-weight:800;text-align:center;border-radius:14px;border:none;background:rgba(255,255,255,.12);color:#fff">'
+        + '<button id="qp-guess-submit" style="width:100%;padding:16px 0;font-size:1.15rem;font-weight:900;border:none;border-radius:16px;background:linear-gradient(135deg,#14b8a6,#0ea5a5);color:#fff;cursor:pointer;box-shadow:0 8px 20px rgba(20,184,166,.4)">🎯 Submit Guess</button>'
+        + '</div>';
+    } else {
+      var cls=['qp-a','qp-b','qp-c','qp-d'];
+      html+='<div style="display:flex;flex-direction:column;gap:12px">';
+      (d.options||[]).forEach(function(opt,i){
+        html+='<button class="qp-opt qp-optbtn '+cls[i]+'" data-i="'+i+'">'
+            + '<span class="qp-optletter">'+String.fromCharCode(65+i)+'</span><span>'+esc(opt)+'</span></button>';
+      });
+      html+='</div>';
+    }
+    html+='</div>';
+    C().innerHTML=html;
+    if(d.type==='buzzer'){
+      document.getElementById('qp-buzz').onclick=function(){ submitAnswer(d,'buzz'); };
+    } else if(d.type==='guess'){
+      var gi=document.getElementById('qp-guess-input');
+      var doSubmit=function(){
+        var v=parseFloat((gi.value||'').trim());
+        if(isNaN(v)){ gi.focus(); return; }
+        submitAnswer(d, v);
+      };
+      document.getElementById('qp-guess-submit').onclick=doSubmit;
+      gi.addEventListener('keydown', function(ev){ if(ev.key==='Enter') doSubmit(); });
+      gi.focus();
+    } else {
+      Array.prototype.forEach.call(document.querySelectorAll('.qp-opt'),function(b){
+        b.onclick=function(){ submitAnswer(d, parseInt(b.getAttribute('data-i'),10)); };
+      });
+    }
+  }
+
+  async function submitAnswer(d, answer){
+    if(player.answered) return;
+    player.answered=true;
+    if(d.type==='guess') player.lastGuess=answer;
+    var confirmMsg = (d.type==='guess')
+      ? '✅ Guess Submitted!<br><br><span style="font-size:1.4rem;font-weight:900">🎯 '+esc(String(answer))+'</span><br><br>Waiting For The Result…'
+      : '✅ Answer Submitted!<br><br>Waiting For The Result…';
+    C().innerHTML=msgCard(confirmMsg);
+    try{
+      await RESPONSES().doc(player.sessionId+'_'+player.qIndex+'_'+player.id).set({
+        playerId:player.id, name:player.name, mobile:player.mobile||'', qIndex:player.qIndex, sessionId:player.sessionId,
+        answer:answer, at:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){ player.answered=false; C().innerHTML=msgCard('⚠️ Could Not Send Your Answer, Please Try Again.'); }
+  }
+
+  function ordinal(n){ var s=["th","st","nd","rd"],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+
+  function renderReveal(d){
+    var wt = (d.winnerMs!=null) ? '<br><span style="font-size:.8rem;color:#94a3b8">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec me</span>' : '';
+    var me=null;
+    if(d.results && d.results.length){ for(var i=0;i<d.results.length;i++){ if(d.results[i].id===player.id){ me=d.results[i]; break; } } }
+    var myTime = (me && me.ms!=null) ? '<br><span style="font-size:.78rem;color:#94a3b8">Your Time: '+(me.ms/1000).toFixed(2)+'s</span>' : '';
+    var isGuess = d.type==='guess';
+    var actualLine = (isGuess && d.actualValue!=null) ? '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">Actual Value: <b>'+esc(String(d.actualValue))+'</b></div>' : '';
+    var winGuessLine = (isGuess && d.winnerGuess!=null) ? '<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">🏆 Winning Guess: '+esc(String(d.winnerGuess))+'</div>' : '';
+    var tieNote = (isGuess && d.winnerTie) ? '<div style="font-size:.82rem;font-weight:700;color:#fde68a;margin-top:6px;opacity:.95">⏱️ Same Guess — Winner Decided By Submission Time</div>' : '';
+
+    // Didn't answer at all
+    if(!me){
+      C().innerHTML =
+        '<div class="qp-pop qp-card-neutral">'
+        + '<div style="font-size:3rem;line-height:1">😅</div>'
+        + (d.winnerName
+            ? ('<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">🏆 Winner: '+esc(d.winnerName)+'</div>'
+               + (d.winnerMs!=null?('<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:4px;opacity:.85">⏱️ '+(d.winnerMs/1000).toFixed(2)+'s</div>'):'')
+               + winGuessLine + actualLine + tieNote)
+            : '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:10px">No Winner This Time</div>')
+        + '<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:16px;opacity:.9">'+(d.winnerName?'You Did Not Answer This Time.':'Get Ready For The Next Question!')+'</div>'
+        + (d.winnerName?'<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:6px;opacity:.85">Do Try The Next One!</div>':'')
+        + '</div>';
+      return;
+    }
+
+    // MCQ — wrong answer
+    if(me.correct===false){
+      var corrTxt='';
+      if(d.revealIndex!=null && d.options && d.options[d.revealIndex]!=null)
+        corrTxt='<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:12px;opacity:.9">Correct Answer:</div><div style="font-size:1.2rem;font-weight:900;color:#fff;margin-top:4px">'+esc(d.options[d.revealIndex])+'</div>';
+      C().innerHTML =
+        '<div class="qp-pop qp-card-wrong">'
+        + '<div style="font-size:3rem;line-height:1">❌</div>'
+        + '<div style="font-size:1.5rem;font-weight:900;color:#fff;margin-top:8px">Wrong Answer</div>'
+        + corrTxt
+        + (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:10px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):'')
+        + (d.winnerName?('<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:14px">🏆 Winner: '+esc(d.winnerName)+'</div>'):'')
+        + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">No Worries — Try The Next One!</div>'
+        + '</div>';
+      return;
+    }
+
+    // Winner (rank 1) — big, colourful, mobile-first celebration screen
+    if(me.rank===1){
+      C().innerHTML =
+        '<div class="qp-pop qp-winbg" style="border-radius:24px;padding:36px 20px;text-align:center;box-shadow:0 0 60px rgba(251,191,36,.55)">'
+        + '<div class="qp-trophy" style="font-size:4rem;line-height:1">🏆</div>'
+        + '<div style="font-size:1.9rem;font-weight:900;color:#fff;letter-spacing:.5px;text-shadow:0 2px 10px rgba(0,0,0,.35);margin-top:6px">🎉 Congratulations! 🎉</div>'
+        + '<div style="font-size:1.5rem;font-weight:800;color:#fff;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.3)">'+esc(player.name)+'</div>'
+        + '<div style="font-size:1.15rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">You Won This Round!</div>'
+        + (isGuess
+            ? ('<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:10px;opacity:.95">🎯 Your Guess: '+esc(String(me.guess))+'</div>'
+               + (d.actualValue!=null?'<div style="font-size:.95rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.9">Actual Value: '+esc(String(d.actualValue))+'</div>':'')
+               + (me.diff!=null?'<div style="font-size:.9rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By Just '+esc(String(me.diff))+'</div>':'')
+               + (me.ms!=null?'<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:6px;opacity:.85">⏱️ Submitted At: '+(me.ms/1000).toFixed(2)+'s</div>':'')
+               + tieNote)
+            : (me.ms!=null?('<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:10px;opacity:.9">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):''))
+        + '<div style="font-size:1.05rem;font-weight:800;color:#fff;margin-top:6px;opacity:.95">🥇 1st Place</div>'
+        + (d.prize?('<div style="display:inline-block;margin-top:16px;padding:10px 22px;border-radius:99px;background:rgba(255,255,255,.25);font-size:1.15rem;font-weight:900;color:#fff">🎁 '+esc(d.prize)+'</div>')
+                  :'<div style="font-size:1rem;font-weight:700;color:#fff;margin-top:14px;opacity:.9">Great Job — Keep It Up!</div>')
+        + '</div>';
+      try{ playerConfettiBurst(); }catch(e){}
+      return;
+    }
+
+    // Correct/buzzed but not first — show rank
+    var rankTxt = me.rank ? ordinal(me.rank)+' Place' : '';
+    var head = isGuess ? '🎯 Guess Submitted' : ((me.correct===true) ? '✅ Correct!' : '🔔 You Buzzed!');
+    C().innerHTML =
+      '<div class="qp-pop qp-card-good">'
+      + '<div style="font-size:3rem;line-height:1">👏</div>'
+      + '<div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:8px">'+head+'</div>'
+      + '<div style="font-size:1.1rem;font-weight:800;color:#fef08a;margin-top:6px">'+medalFor(me.rank)+' You Finished '+esc(rankTxt)+'</div>'
+      + (isGuess
+          ? ('<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:10px">🎯 Your Guess: '+esc(String(me.guess))+'</div>'
+             + (d.actualValue!=null?'<div style="font-size:.88rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.9">Actual Value: '+esc(String(d.actualValue))+'</div>':'')
+             + (me.diff!=null?'<div style="font-size:.85rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.85">Off By '+esc(String(me.diff))+'</div>':'')
+             + (me.ms!=null?'<div style="font-size:.8rem;font-weight:700;color:#e2e8f0;margin-top:6px;opacity:.8">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>':'')
+             + (d.winnerMs!=null?'<div style="font-size:.8rem;font-weight:700;color:#e2e8f0;margin-top:2px;opacity:.8">⏱️ Winner\'s Time: '+(d.winnerMs/1000).toFixed(2)+'s</div>':'')
+             + winGuessLine + tieNote)
+          : (me.ms!=null?('<div style="font-size:.85rem;font-weight:700;color:#fff;margin-top:8px;opacity:.85">⏱️ Your Time: '+(me.ms/1000).toFixed(2)+'s</div>'):''))
+      + '<div style="font-size:1rem;font-weight:800;color:#fff;margin-top:16px">🏆 Winner: '+esc(d.winnerName||'-')+'</div>'
+      + '<div style="font-size:.95rem;font-weight:700;color:#fff;margin-top:8px;opacity:.9">So Close — You Could Be Next!</div>'
+      + '</div>';
+  }
+
+  // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
+  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, unsubPlayers:null, timer:null, ansCount:0, joinedCount:0, linkOpen:true };
+  function isScreenMode(){ try{ return new URLSearchParams(location.search).has('screen'); }catch(e){ return false; } }
+  function openScreen(){ window.open(location.origin+location.pathname+'?screen=1','_blank'); }
+  function S(){ return document.getElementById('qs-content'); }
+
+  function injectScreenCSS(){
+    if(document.getElementById('qs-css')) return;
+    var st=document.createElement('style'); st.id='qs-css';
+    st.textContent=[
+      '#quizScreen{background:linear-gradient(135deg,#0b1220,#131c33 40%,#1a1140 100%);background-size:200% 200%;animation:qsBG 18s ease infinite}',
+      '@keyframes qsBG{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}',
+      '.qs-pop{opacity:0;transform:translateY(24px) scale(.96);animation:qsPop .5s cubic-bezier(.2,.9,.3,1.2) forwards}',
+      '@keyframes qsPop{to{opacity:1;transform:none}}',
+      '.qs-qpill{display:inline-block;background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:.5vh 2.4vw;border-radius:99px;font-size:clamp(14px,1.8vw,38px);font-weight:800;letter-spacing:.15vw;box-shadow:0 0 30px rgba(139,92,246,.6)}',
+      '.qs-opt{position:relative;display:flex;align-items:center;gap:1.4vw;border-radius:2vh;padding:2.6vh 2vw;font-size:clamp(18px,2.7vw,58px);font-weight:800;color:#fff;box-shadow:0 1vh 3vh rgba(0,0,0,.35);overflow:hidden}',
+      '.qs-opt .qs-badge{flex-shrink:0;width:clamp(44px,4.6vw,100px);height:clamp(44px,4.6vw,100px);min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:1.2vh;background:rgba(0,0,0,.25);font-weight:900;font-size:clamp(16px,2.6vw,56px)}',
+      '.qs-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qs-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qs-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qs-d{background:linear-gradient(135deg,#e0a800,#c08a00)}',
+      '.qs-dim{opacity:.28;filter:grayscale(.7);box-shadow:none}',
+      '.qs-correct{outline:.7vh solid #34d399;box-shadow:0 0 6vh rgba(52,211,153,.75);animation:qsGlow 1s ease-in-out infinite alternate}',
+      '@keyframes qsGlow{to{box-shadow:0 0 9vh rgba(52,211,153,1)}}',
+      '.qs-ring{position:fixed;top:3vh;right:3vw;width:11vh;height:11vh;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .3s}',
+      '.qs-ring-inner{width:8.6vh;height:8.6vh;border-radius:50%;background:#0b1220;display:flex;align-items:center;justify-content:center;font-size:clamp(24px,4vh,60px);font-weight:900;color:#fff}',
+      '.qs-low .qs-ring-inner{color:#f87171}.qs-low{animation:qsPulse .6s ease-in-out infinite}',
+      '@keyframes qsPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}',
+      '.qs-winner{background:linear-gradient(135deg,#f59e0b,#fbbf24,#f59e0b);background-size:200% 200%;animation:qsBG 4s ease infinite;color:#3b1d00;border-radius:3vh;padding:4vh 5vw;box-shadow:0 0 10vh rgba(251,191,36,.6)}',
+      '.qs-conf{position:fixed;top:-6vh;font-size:3vh;animation:qsFall linear forwards;pointer-events:none;z-index:5}',
+      '@keyframes qsFall{to{transform:translateY(112vh) rotate(540deg);opacity:.9}}',
+      '.qs-podium{display:flex;align-items:flex-end;justify-content:center;gap:2vw;margin-top:5vh}',
+      '.qs-pod{border-radius:1.6vh 1.6vh 0 0;padding:2vh 2.4vw;text-align:center;font-weight:800;color:#fff}',
+      '.qs-buzz{font-size:clamp(36px,8vw,170px);font-weight:900;text-align:center;background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent;animation:qsPulse .7s ease-in-out infinite}',
+      '.qs-hero-emoji{font-size:clamp(40px,6vh,90px);line-height:1;animation:qsFloat 2.6s ease-in-out infinite}',
+      '@keyframes qsFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-1.2vh) rotate(4deg)}}',
+      '.qs-hero-band{display:inline-block;margin-top:.6vh;padding:.7vh 3vw;border-radius:99px;font-size:clamp(16px,1.9vw,40px);font-weight:900;letter-spacing:.2vw;color:#fff;background:linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b,#22d3ee);background-size:300% 100%;animation:qsBG 6s linear infinite;box-shadow:0 0 5vh rgba(99,102,241,.55)}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+  function confettiBurst(){
+    var qs=document.getElementById('quizScreen'); if(!qs) return;
+    var emo=['🎉','🎊','⭐','🏆','✨','🎈'];
+    for(var i=0;i<28;i++){ (function(i){ var s=document.createElement('div'); s.className='qs-conf';
+      s.textContent=emo[i%emo.length]; s.style.left=(Math.random()*100)+'vw';
+      s.style.animationDuration=(2.2+Math.random()*2)+'s'; s.style.animationDelay=(Math.random()*.6)+'s';
+      qs.appendChild(s); setTimeout(function(){ s.remove(); },5200); })(i); }
+  }
+
+  var _screenRefreshAttached=false;
+  function attachScreenRefreshGuards(){
+    if(_screenRefreshAttached) return; _screenRefreshAttached=true;
+    async function forceRefresh(){
+      if(screen.linkOpen===false) return;
+      try{ var d=await DOC().get({source:'server'}); renderScreen((d.data())||{}); }catch(e){}
+    }
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') forceRefresh(); });
+    window.addEventListener('pageshow', forceRefresh);
+    window.addEventListener('focus', forceRefresh);
+    window.addEventListener('online', forceRefresh);
+    // safety net: the LCD/projector stays open unattended for the whole seminar,
+    // so also re-sync periodically in case the realtime listener silently stalls
+    setInterval(forceRefresh, 15000);
+  }
+
+  async function bootScreen(){
+    document.getElementById('quizScreen').style.display='block';
+    injectScreenCSS();
+    var app=document.getElementById('app'); if(app) app.style.display='none';
+    var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
+    await window.waitForFdb(9000);
+    if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Could Not Connect. Please Check The Network And Refresh.</div>'; return; }
+    if(screen.unsubDoc) screen.unsubDoc();
+    if(screen.unsubResp) screen.unsubResp();
+    if(screen.unsubPlayers) screen.unsubPlayers();
+    screen.unsubDoc = DOC().onSnapshot(function(doc){ if(screen.linkOpen===false){ return; } renderScreen(doc.data()||{}); }, function(){});
+    attachScreenRefreshGuards();
+    screen.unsubPlayers = PLAYERS().onSnapshot(function(snap){
+      var n=0; snap.forEach(function(doc){ var p=doc.data(); if((p.sessionId||'')===screen.sessionId) n++; });
+      screen.joinedCount=n;
+      var el=document.getElementById('qs-joined-count'); if(el) el.textContent=n;
+    }, function(){});
+    LINKS().onSnapshot(function(d){
+      var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false;
+      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz Is Currently Closed</div></div>'; }
+      else { DOC().get().then(function(dd){ renderScreen(dd.data()||{}); }); }
+    }, function(){});
+    screen.unsubResp = RESPONSES().onSnapshot(function(snap){
+      var n=0; snap.forEach(function(d){ var r=d.data(); if((r.sessionId||'')===screen.sessionId && (r.qIndex||0)===screen.qIndex) n++; });
+      screen.ansCount=n; var el=document.getElementById('qs-ans-count'); if(el) el.textContent=n;
+    }, function(){});
+  }
+  function clearTimerRing(){ var w=document.getElementById('qs-ring-wrap'); if(w) w.remove(); }
+
+
+  function renderScreen(d){
+    screen.sessionId=d.sessionId||screen.sessionId;
+    if(d.qIndex!==screen.qIndex){ screen.qIndex=d.qIndex||0; screen.ansCount=0; }
+    if(screen.timer){ clearInterval(screen.timer); screen.timer=null; }
+    clearTimerRing();
+    if(d.state==='live') screenLive(d);
+    else if(d.state==='reveal') screenReveal(d);
+    else screenLobby(d);
+  }
+
+  function screenLobby(d){
+    var link=joinLink();
+    S().innerHTML =
+      '<div style="text-align:center" class="qs-pop">'
+      + '<div style="font-size:clamp(28px,5.5vw,106px);font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 D N Investment Quiz</div>'
+      + '<div style="font-size:clamp(16px,2.4vw,46px);color:#94a3b8;margin-bottom:4vh">Scan The QR To Join From Your Phone</div>'
+      + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:min(30vh,70vw);height:min(30vh,70vw);background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
+      + '<div style="font-size:clamp(12px,2vw,38px);margin-top:3vh;color:#e2e8f0;word-break:break-all;padding:0 4vw">'+esc(link)+'</div>'
+      + '<div style="font-size:clamp(14px,1.8vw,35px);margin-top:3vh;color:#64748b">Waiting For The Quiz To Start…</div>'
+      + '<div style="font-size:clamp(16px,2.2vw,42px);margin-top:2vh;color:#34d399;font-weight:800">👥 <span id="qs-joined-count">'+(screen.joinedCount||0)+'</span> Joined</div>'
+      + '</div>';
+  }
+
+  function screenHeader(kind){
+    var icon = kind==='reveal' ? '🏆' : (kind==='buzzer' ? '🔔' : (kind==='guess' ? '🎯' : '🧠'));
+    var tag  = kind==='reveal' ? 'RESULT' : 'QUIZ TIME';
+    return '<div class="qs-hero qs-pop" style="text-align:center;margin-bottom:2vh">'
+      + '<div class="qs-hero-emoji">'+icon+'</div>'
+      + '<div class="qs-hero-band">✨ D N INVESTMENT &nbsp;·&nbsp; '+tag+' ✨</div>'
+      + '</div>';
+  }
+
+  function screenLive(d){
+    var opts=d.options||[]; var cls=['qs-a','qs-b','qs-c','qs-d'];
+    var optHtml='';
+    if(d.type==='buzzer'){
+      optHtml='<div class="qs-buzz" style="margin-top:5vh">🔔 BUZZ NOW!</div>';
+    } else if(d.type==='guess'){
+      optHtml='<div class="qs-buzz" style="margin-top:5vh">🎯 TYPE YOUR GUESS ON YOUR PHONE!</div>';
+    } else {
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.4vh;margin-top:3.5vh">';
+      opts.forEach(function(o,i){
+        optHtml+='<div class="qs-opt '+cls[i]+' qs-pop" style="animation-delay:'+(0.1+i*0.09)+'s">'
+              + '<span class="qs-badge">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+'</span></div>';
+      });
+      optHtml+='</div>';
+    }
+    var prize=d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);color:#fbbf24;text-align:center;margin-bottom:1.5vh;font-weight:700">🎁 '+esc(d.prize)+'</div>':'';
+    S().innerHTML =
+      '<div class="qs-pop">'
+      + screenHeader(d.type==='buzzer'?'buzzer':(d.type==='guess'?'guess':'live'))
+      + '<div style="text-align:center;margin-bottom:1.5vh"><span class="qs-qpill">QUESTION '+(d.qIndex||'')+'</span></div>'
+      + prize
+      + '<div style="font-size:clamp(24px,4.2vw,80px);font-weight:900;text-align:center;line-height:1.2;text-shadow:0 2px 20px rgba(0,0,0,.4)">'+esc(d.question)+'</div>'
+      + optHtml
+      + '<div style="text-align:center;font-size:clamp(15px,2.1vw,40px);margin-top:3.5vh;color:#cbd5e1">👥 <b id="qs-ans-count" style="color:#34d399">'+screen.ansCount+'</b> Answered</div>'
+      + '</div>';
+    // countdown ring
+    if(d.timeSec && d.startedAt){
+      var endAt = d.startedAt + d.timeSec*1000, total=d.timeSec;
+      var wrap=document.createElement('div'); wrap.id='qs-ring-wrap';
+      wrap.innerHTML='<div class="qs-ring" id="qs-ring" style="background:conic-gradient(#f59e0b 100%, rgba(255,255,255,.12) 0)"><div class="qs-ring-inner"><span id="qs-timer">'+total+'</span></div></div>';
+      document.getElementById('quizScreen').appendChild(wrap);
+      var tick=function(){
+        var remMs=Math.max(0,endAt-Date.now());
+        var rem=Math.ceil(remMs/1000);
+        var pct=Math.max(0,Math.min(100,(remMs/(total*1000))*100));
+        var t=document.getElementById('qs-timer'); if(t) t.textContent=rem;
+        var ring=document.getElementById('qs-ring');
+        if(ring){
+          var col = rem<=5 ? '#ef4444' : (rem<=10 ? '#f59e0b' : '#34d399');
+          ring.style.background='conic-gradient('+col+' '+pct+'%, rgba(255,255,255,.12) 0)';
+          ring.classList.toggle('qs-low', rem<=5);
+        }
+        if(remMs<=0 && screen.timer){ clearInterval(screen.timer); screen.timer=null; }
+      };
+      screen.timer=setInterval(tick,200); tick();
+    }
+  }
+
+  function screenReveal(d){
+    clearTimerRing();
+    var opts=d.options||[]; var ci=d.revealIndex; var cls=['qs-a','qs-b','qs-c','qs-d'];
+    // full option grid (compact) — correct glows green, others dimmed
+    var optHtml='';
+    if(d.type!=='buzzer' && opts.length){
+      optHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.6vh;margin-top:2vh">';
+      opts.forEach(function(o,i){
+        var ok=(i===ci);
+        optHtml+='<div class="qs-opt '+cls[i]+(ok?' qs-correct':' qs-dim')+'" style="padding:1.7vh 1.6vw;font-size:clamp(15px,2.2vw,42px)">'
+              + '<span class="qs-badge" style="width:clamp(34px,3.6vw,70px);height:clamp(34px,3.6vw,70px);font-size:clamp(14px,2vw,38px)">'+String.fromCharCode(65+i)+'</span><span>'+esc(o)+(ok?' ✅':'')+'</span></div>';
+      });
+      optHtml+='</div>';
+    }
+    // winner card — big & colourful (no qs-pop so it can never stay invisible)
+    var winnerBlock = d.winnerName
+      ? '<div style="text-align:center;margin-top:3vh">'
+        + '<div style="display:inline-block;padding:3vh 6vw;border-radius:3vh;background:linear-gradient(135deg,#f59e0b,#fbbf24,#fb7185,#a78bfa);background-size:300% 300%;animation:qsBG 5s ease infinite;box-shadow:0 0 12vh rgba(251,191,36,.7)">'
+        + '<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;letter-spacing:.3vw;text-shadow:0 2px 8px rgba(0,0,0,.4)">🏆 WINNER 🏆</div>'
+        + '<div style="font-size:clamp(28px,6vw,115px);font-weight:900;line-height:1.05;color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.5);margin-top:.6vh">'+esc(d.winnerName)+'</div>'
+        + (d.type==='guess'
+            ? ((d.winnerGuess!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">🎯 Guessed: '+esc(String(d.winnerGuess))+'</div>':'')
+               + (d.actualValue!=null?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:700;color:#fff;margin-top:.4vh;opacity:.9">Actual: '+esc(String(d.actualValue))+'</div>':'')
+               + (d.winnerMs!=null?'<div style="font-size:clamp(15px,2vw,38px);font-weight:700;color:#fff;margin-top:.4vh;opacity:.85">⏱️ Submitted At: '+(d.winnerMs/1000).toFixed(2)+'s</div>':'')
+               + (d.winnerTie?'<div style="font-size:clamp(14px,1.9vw,34px);font-weight:800;color:#fff9c4;margin-top:.6vh">⏱️ Same Guess — Winner Decided By Submission Time</div>':''))
+            : (d.winnerMs!=null?'<div style="font-size:clamp(18px,2.6vw,50px);font-weight:800;color:#fff;margin-top:1vh;opacity:.95">⏱️ '+(d.winnerMs/1000).toFixed(2)+' sec</div>':''))
+        + '<div style="font-size:clamp(17px,2.4vw,46px);font-weight:900;color:#fff;margin-top:.6vh;opacity:.95">🥇 1st Place</div>'
+        + (d.prize?'<div style="font-size:clamp(16px,2.2vw,42px);font-weight:900;color:#fff;margin-top:.6vh">🎁 '+esc(d.prize)+'</div>':'')
+        + '</div></div>'
+      : '<div style="text-align:center;margin-top:3vh;font-size:clamp(18px,2.8vw,54px);color:#94a3b8;font-weight:800">🙌 No Correct Answer This Time</div>';
+    S().innerHTML =
+      '<div class="qs-pop">'
+      + screenHeader('reveal')
+      + (d.question?'<div style="font-size:clamp(17px,2.4vw,46px);font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
+      + optHtml + winnerBlock
+      + '</div>';
+    if(d.winnerName) confettiBurst();
+  }
+
+  // ─────────── LINK OPEN/CLOSE (admin) ───────────
+  var lcUnsub=null;
+  async function initLinkControl(){
+    var panel=document.getElementById('link-control'); if(!panel) return;
+    if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ panel.style.display='none'; return; }
+    panel.style.display='flex';
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    if(lcUnsub) lcUnsub();
+    lcUnsub = LINKS().onSnapshot(function(d){
+      var v=d.data()||{};
+      linksState.feedbackOpen = v.feedbackOpen!==false;
+      linksState.quizOpen = v.quizOpen!==false;
+      paintLinkButtons();
+    }, function(){ paintLinkButtons(); });
+  }
+  function paintLinkButtons(){
+    var fb=document.getElementById('lc-feedback'), qz=document.getElementById('lc-quiz');
+    if(fb){ var o=linksState.feedbackOpen; fb.textContent=o?'🟢 OPEN':'🔴 CLOSED'; fb.style.background=o?'#16a34a':'#dc2626'; fb.style.color='#fff'; }
+    if(qz){ var o2=linksState.quizOpen; qz.textContent=o2?'🟢 OPEN':'🔴 CLOSED'; qz.style.background=o2?'#16a34a':'#dc2626'; qz.style.color='#fff'; }
+  }
+  async function toggleLink(which){
+    await window.waitForFdb(8000); if(!window.fdb) return;
+    var key = which==='feedback' ? 'feedbackOpen' : 'quizOpen';
+    var next = which==='feedback' ? !linksState.feedbackOpen : !linksState.quizOpen;
+    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' Link? Clients Will See "Closed".')) return;
+    var upd={}; upd[key]=next;
+    try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update Failed: '+e.message); }
+  }
+
+  function closedCard(what){
+    return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:30px;text-align:center">'
+      + '<div style="font-size:2.4rem;margin-bottom:10px">🔒</div>'
+      + '<b style="font-size:1.2rem">'+what+' Is Currently Closed</b><br><br>'
+      + '<span style="color:#94a3b8;font-size:.9rem">This Link Opens During The Seminar. Thank You! 🙏</span></div>';
+  }
+
+  // boot: play / screen mode run immediately; host inits when its page opens
+  function boot(){ if(isPlayMode()) bootPlayer(); else if(isScreenMode()) bootScreen(); }
+
+  return {
+    isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, pushQuestion:pushQuestion,
+    closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
+    toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile
+  };
+})();
+
+// ── ROUTER: ?host = admin controls (secret) · ?screen = big screen · else = player ──
+(function(){
+  var p; try{ p=new URLSearchParams(location.search); }catch(e){ p=new URLSearchParams(''); }
+  if(p.has('host')){
+    var hw=document.getElementById('hostWrap'); if(hw) hw.style.display='block';
+    document.title='Quiz Host — D N Investment';
+    QUIZ.hostInit();
+  } else if(p.has('screen')){
+    QUIZ.boot();               // big screen (LCD/projector)
+  } else if(p.has('play')){
+    QUIZ.boot();               // player
+  } else {
+    // bare link → send clients to the player join screen
+    location.replace(location.pathname+'?play=1');
+  }
+})();
 </script>
 </body>
 </html>
