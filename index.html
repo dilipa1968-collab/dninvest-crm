@@ -90,7 +90,7 @@ window.dnStatusColor = function(v){
 window.dnXlsxBook = function(filename, sheets){
   if(typeof XLSX==='undefined'){ alert('Excel library not loaded — please check your internet and try again.'); return; }
   const wb = XLSX.utils.book_new();
-  const thin   = {style:'thin', color:{rgb:'FFD9DEE6'}};
+  const thin   = {style:'thin', color:{rgb:'FFB9C0CC'}};
   const border = {top:thin, bottom:thin, left:thin, right:thin};
   const num = v => (v===''||v==null) ? null : (isNaN(Number(String(v).replace(/[₹,%\s]/g,''))) ? v : Math.round(Number(String(v).replace(/[₹,%\s]/g,''))*100)/100);
 
@@ -5809,14 +5809,14 @@ function fbExportExcel(){
       headerHeight:34,
       title:upc('Feedback Responses — '+(sem.name||'')+' | Total: '+list.length),
       columns:[
-        {header:'DATE', width:13},
-        {header:'NAME', width:22},
-        {header:'MOBILE', width:13},
+        {header:'DATE', width:13, align:'center', color:()=>({bg:'FFEFF3F8',font:'FF334155'})},
+        {header:'NAME', width:22, color:()=>({bg:'FFF0EBF8',font:'FF4C2889'})},
+        {header:'MOBILE', width:13, align:'center', color:()=>({bg:'FFE8F0FE',font:'FF1E40AF'})},
         {header:'OVERALL EXPERIENCE\nHOW WAS THE SEMINAR? (1\u20135 \u2605)', width:24, align:'center', color:ratingColor},
         {header:'CONTENT QUALITY\nHOW USEFUL WAS THE CONTENT? (1\u20135 \u2605)', width:26, align:'center', color:ratingColor},
         {header:'INTERESTED', width:13, align:'center', color:intColor},
-        {header:'PRODUCTS', width:34},
-        {header:'REFERENCES', width:34, color:v=>v?{bg:'FFFCE7F3',font:'FF9D174D'}:null}
+        {header:'PRODUCTS', width:34, color:()=>({bg:'FFF3EEFB',font:'FF5B21B6'})},
+        {header:'REFERENCES', width:34, color:()=>({bg:'FFFCE7F3',font:'FF9D174D'})}
       ],
       rows:UP(respRows)
     }
