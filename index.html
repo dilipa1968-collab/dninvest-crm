@@ -5741,6 +5741,7 @@ function fbExportExcel(){
   const list=window._semFbList||[];
   if(!list.length){ toast('No feedback responses to export','error'); return; }
   const sem=window._semFbSeminar||{};
+  const UP=a=>a.map(row=>row.map(v=>typeof v==='string'?upc(v):v));
 
   const haan=list.filter(r=>fbIntLabel(r.interested)==='Yes').length;
   const shayad=list.filter(r=>fbIntLabel(r.interested)==='Maybe').length;
@@ -5760,13 +5761,13 @@ function fbExportExcel(){
   const GREEN={bg:'FFC6EFCE',font:'FF006100'}, AMBER={bg:'FFFFEB9C',font:'FF9C6500'}, RED={bg:'FFFFC7CE',font:'FF9C0006'};
   const starTxt=n=>{ n=Number(n)||0; return n?('\u2605'.repeat(n)+'\u2606'.repeat(5-n)):''; };
   const ratingColor=v=>{ const n=(String(v||'').match(/\u2605/g)||[]).length || (Number(v)||0); return n>=4?GREEN:(n===3?AMBER:(n>0?RED:null)); };
-  const intColor=v=>v==='Yes'?GREEN:(v==='Maybe'?AMBER:(v?RED:null));
+  const intColor=v=>{v=String(v||'').toUpperCase();return v==='YES'?GREEN:(v==='MAYBE'?AMBER:(v?RED:null));};
   const summaryColor=(v,row)=>{
     const m=String(row[0]||'');
-    if(/— Yes/.test(m)) return GREEN;
-    if(/— Maybe/.test(m)) return AMBER;
-    if(/— No/.test(m)) return RED;
-    if(/Avg/.test(m)) return ratingColor(v);
+    if(/— Yes/i.test(m)) return GREEN;
+    if(/— Maybe/i.test(m)) return AMBER;
+    if(/— No/i.test(m)) return RED;
+    if(/Avg/i.test(m)) return ratingColor(v);
     return null;
   };
 
@@ -5797,27 +5798,27 @@ function fbExportExcel(){
 
   dnXlsxBook(fname,[
     { name:'Summary',
-      title:'D N Investment — Seminar Feedback Summary: '+(sem.name||'')+(sem.date?' ('+fmtDate(sem.date)+')':''),
+      title:upc('D N Investment — Seminar Feedback Summary: '+(sem.name||'')+(sem.date?' ('+fmtDate(sem.date)+')':'')),
       columns:[
         {header:'METRIC', width:36},
         {header:'VALUE', width:22, align:'center', color:summaryColor}
       ],
-      rows:summaryRows
+      rows:UP(summaryRows)
     },
     { name:'Responses',
       headerHeight:34,
-      title:'Feedback Responses — '+(sem.name||'')+' | Total: '+list.length,
+      title:upc('Feedback Responses — '+(sem.name||'')+' | Total: '+list.length),
       columns:[
         {header:'DATE', width:13},
         {header:'NAME', width:22},
         {header:'MOBILE', width:13},
-        {header:'OVERALL EXPERIENCE\nHow was the seminar? (1\u20135 \u2605)', width:24, align:'center', color:ratingColor},
-        {header:'CONTENT QUALITY\nHow useful was the content? (1\u20135 \u2605)', width:26, align:'center', color:ratingColor},
+        {header:'OVERALL EXPERIENCE\nHOW WAS THE SEMINAR? (1\u20135 \u2605)', width:24, align:'center', color:ratingColor},
+        {header:'CONTENT QUALITY\nHOW USEFUL WAS THE CONTENT? (1\u20135 \u2605)', width:26, align:'center', color:ratingColor},
         {header:'INTERESTED', width:13, align:'center', color:intColor},
         {header:'PRODUCTS', width:34},
         {header:'REFERENCES', width:34, color:v=>v?{bg:'FFFCE7F3',font:'FF9D174D'}:null}
       ],
-      rows:respRows
+      rows:UP(respRows)
     }
   ]);
   toast('Excel report downloaded!','success');
