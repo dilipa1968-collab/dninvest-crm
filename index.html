@@ -5344,13 +5344,11 @@ function renderSeminarAttendees(){
           ${_allRMs.map(r=>`<option ${r.trim().toLowerCase()===(a.rm||'').trim().toLowerCase()?'selected':''}>${r}</option>`).join('')}
         </select>`
         : (a.rm||'—')}</td>
-      <td>${(a.source_id && CU.role!=='admin')
-        ? `<span class="att-type-locked" data-id="${a.id}" data-type="${a.type}" title="Client record se linked — type locked" style="display:inline-block;padding:4px 10px;font-size:.72rem;font-weight:600;border-radius:6px;background:${a.type==='equity'?'#E6F1FB':'#EAF3DE'};color:${a.type==='equity'?'#185FA5':'#3B6D11'}">${a.type==='equity'?'Equity':'MF'} 🔒</span>`
-        : `<select class="att-type" data-id="${a.id}" data-prev="${a.type||'guest'}" ${dis} onchange="onAttTypeChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
+      <td><select class="att-type" data-id="${a.id}" data-prev="${a.type||'guest'}" ${dis} onchange="onAttTypeChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="equity" ${a.type==='equity'?'selected':''}>Equity</option>
         <option value="mf" ${a.type==='mf'?'selected':''}>MF</option>
         <option value="guest" ${(!a.type||a.type==='guest')?'selected':''}>Guest</option>
-      </select>`}</td>
+      </select></td>
       <td><select class="att-rsvp" ${dis} style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
         <option value="" ${!a.rsvp?'selected':''}>—</option>
         <option value="Yes" ${a.rsvp==='Yes'?'selected':''}>Yes</option>
