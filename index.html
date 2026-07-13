@@ -5603,47 +5603,54 @@ function exportSeminarAttendees(){
   if(!s) return;
   const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!attendees.length){ toast('No attendees to export','error'); return; }
-  if(typeof dnXlsx!=='function'){ toast('Excel engine not loaded — check internet','error'); return; }
 
-  const willCome    = attendees.filter(x=>x.rsvp==='Yes').length;
-  const waitCount   = attendees.filter(x=>x.rsvp==='Wait').length;
-  const expectedTotal = attendees.reduce((sum,x)=>sum+(x.expected_count||0),0);
-  const attended    = attendees.filter(x=>x.status==='Attended').length;
-
-  // Type cell colour (Equity=blue, MF=green, Guest=grey)
-  const typeColor = v=>{ v=String(v||'').toLowerCase();
-    if(v==='equity') return {bg:'FFDDEBF7', font:'FF1F4E79'};
-    if(v==='mf')     return {bg:'FFE2EFDA', font:'FF375623'};
-    if(v==='guest')  return {bg:'FFF2F2F2', font:'FF7F7F7F'};
-    return null; };
-
-  const cols=[
-    {header:'#',        width:5,  align:'center', num:true},
-    {header:'Name',     width:26, align:'left'},
-    {header:'Mobile',   width:14, align:'center'},
-    {header:'RM',       width:12, align:'center'},
-    {header:'Type',     width:10, align:'center', color:typeColor},
-    {header:'Response', width:12, align:'center', color:dnStatusColor},
-    {header:'Headcount',width:11, align:'center', num:true},
-    {header:'Status',   width:12, align:'center', color:dnStatusColor},
-    {header:'Remarks',  width:32, align:'left'}
-  ];
+  const headers=['#','Name','Mobile','RM','Type','Response','Headcount','Status','Remarks'];
   const rows=attendees.map((a,i)=>[
-    i+1,
-    upc(a.name),
-    a.mobile||'',
-    upc(a.rm||'—'),
-    a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
-    a.rsvp||'—',
-    a.expected_count!=null?a.expected_count:'',
-    a.status||'Pending',
-    upc(a.remarks||'')
+    i+1, upc(a.name), upc(a.mobile), upc(a.rm), upc(a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'),
+    upc(a.rsvp||'—'), a.expected_count!=null?a.expected_count:'', upc(a.status||'Pending'), upc(a.remarks)
   ]);
-  const totalRow=['Σ','Total: '+attendees.length,'','','','Yes '+willCome+' · Wait '+waitCount, expectedTotal, 'Attended '+attended, ''];
+  const willCome = attendees.filter(x=>x.rsvp==='Yes').length;
+  const waitCount = attendees.filter(x=>x.rsvp==='Wait').length;
+  const expectedTotal = attendees.reduce((sum,x)=>sum+(x.expected_count||0),0);
+  const attended = attendees.filter(x=>x.status==='Attended').length;
+  const colCount = headers.length;
 
-  const title = (s.name||'Seminar')+'  —  '+(fmtDate(s.date)||'—')+(s.notes?'   ·   '+s.notes:'');
-  const filename=(s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.xlsx';
-  dnXlsx(filename, title, cols, rows, totalRow);
+  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  let html = `<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt;border-color:#ccc">`;
+  // Title row
+  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-weight:bold;font-size:14pt;text-align:center;padding:10px">${esc(s.name)}</td></tr>`;
+  // Subtitle row
+  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-size:11pt;text-align:center;padding:8px">Date: ${esc(fmtDate(s.date)||'—')}${s.notes?'   |   Venue: '+esc(s.notes):''}</td></tr>`;
+  // Summary row
+  html += `<tr><td colspan="${colCount}" style="background:#00B050;color:#FFFFFF;font-weight:bold;font-size:11pt;text-align:center;padding:8px">Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Wait: ${waitCount}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}</td></tr>`;
+  // Blank spacer row
+  html += `<tr>${headers.map(()=>`<td style="border:none"></td>`).join('')}</tr>`;
+  // Header row
+  html += `<tr>${headers.map(h=>`<td style="background:#FFFF00;color:#FF0000;font-weight:bold;font-size:11pt;text-align:center;padding:8px">${esc(h)}</td>`).join('')}</tr>`;
+  // Data rows
+  rows.forEach((row,ri)=>{
+    const bg = ri%2===1 ? '#F2F6FB' : '#FFFFFF';
+    html += '<tr>' + row.map((val,ci)=>{
+      const align = ci===1 ? 'left' : 'center';
+      return `<td style="background:${bg};font-size:11pt;text-align:${align};padding:7px">${esc(val)}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</table>';
+
+  const fullHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Attendees</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+  <body>${html}</body></html>`;
+
+  const blob = new Blob(['\ufeff'+fullHtml], {type:'application/vnd.ms-excel'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.xls';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
   toast('Export done!','success');
 }
 
