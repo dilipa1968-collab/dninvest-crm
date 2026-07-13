@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx-js-style.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
@@ -229,23 +230,10 @@ select:focus{ border-color:var(--accent,var(--purple)); box-shadow:0 0 0 3px var
     <label class="radio-row"><input type="checkbox" name="f-products" value="Loan against Equity/MF"><span>Loan against Equity / Mutual Fund</span></label>
     <label class="radio-row"><input type="checkbox" name="f-products" value="Life Insurance"><span>Life Insurance</span></label>
     <label class="radio-row"><input type="checkbox" name="f-products" value="Health Insurance"><span>Health Insurance</span></label>
-  </div>
-
-  <div class="card" id="q-topics">
-    <div class="q-label">What topic should our next seminar cover? <span style="font-weight:400;font-size:12px;color:var(--text2)">(you can select multiple)</span></div>
-    <label class="radio-row"><input type="checkbox" name="f-topics" value="Beginner Guide to Mutual Funds"><span>Beginner Guide to Mutual Funds</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-topics" value="SIP vs Lump Sum Investment"><span>SIP vs Lump Sum Investment</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-topics" value="Stock Market Basics"><span>Stock Market Basics</span></label>
-    <label class="radio-row"><input type="checkbox" name="f-topics" value="Retirement Planning"><span>Retirement Planning</span></label>
-    <label class="radio-row" id="topic-other-row"><input type="checkbox" name="f-topics" value="__other" onchange="document.getElementById('topic-other-box').style.display=this.checked?'block':'none';if(this.checked)document.getElementById('f-topic-other').focus()"><span>Other (please specify)</span></label>
-    <div id="topic-other-box" style="display:none;margin-top:4px;padding-left:4px">
-      <input type="text" id="f-topic-other" placeholder="Your topic suggestion" maxlength="120">
+    <label class="radio-row" id="prod-other-row"><input type="checkbox" name="f-products" value="__other" onchange="document.getElementById('prod-other-box').style.display=this.checked?'block':'none';if(this.checked)document.getElementById('f-product-other').focus()"><span>Other (please specify)</span></label>
+    <div id="prod-other-box" style="display:none;margin-top:4px;padding-left:4px">
+      <input type="text" id="f-product-other" placeholder="Your product interest" maxlength="120">
     </div>
-  </div>
-
-  <div class="card focus-ring" id="q-comments">
-    <div class="q-label">Any other comments or suggestions?</div>
-    <textarea id="f-comments" placeholder="Your answer" rows="1" maxlength="500"></textarea>
   </div>
 
   <div class="card" id="q-refs">
@@ -284,7 +272,7 @@ select:focus{ border-color:var(--accent,var(--purple)); box-shadow:0 0 0 3px var
     <div class="form-sub" id="respCount">Loading...</div>
     <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <select id="respFilter" onchange="renderResponses()" style="max-width:280px"><option value="">All seminars</option></select>
-      <button class="btn-submit" onclick="exportCSV()" style="padding:8px 16px">⬇ Export CSV</button>
+      <button class="btn-submit" onclick="exportExcel()" style="padding:8px 16px">⬇ Export Excel</button>
     </div>
   </div>
   <div class="card" style="padding:0;overflow:auto;max-height:70vh">
@@ -383,11 +371,9 @@ async function submitForm(){
   const rating=(document.querySelector('input[name=f-rating]:checked')||{}).value||'';
   const content=(document.querySelector('input[name=f-content]:checked')||{}).value||'';
   const interest=(document.querySelector('input[name=f-interest]:checked')||{}).value||'';
-  const products=[...document.querySelectorAll('input[name=f-products]:checked')].map(c=>c.value);
-  let topics=[...document.querySelectorAll('input[name=f-topics]:checked')].map(c=>c.value);
-  const otherTopic=document.getElementById('f-topic-other').value.trim();
-  if(topics.includes('__other')){ topics=topics.filter(t=>t!=='__other'); if(otherTopic) topics.push('Other: '+otherTopic); }
-  const comments=document.getElementById('f-comments').value.trim();
+  let products=[...document.querySelectorAll('input[name=f-products]:checked')].map(c=>c.value);
+  const otherProduct=document.getElementById('f-product-other').value.trim();
+  if(products.includes('__other')){ products=products.filter(p=>p!=='__other'); if(otherProduct) products.push('Other: '+otherProduct); }
 
   // References (optional): keep rows that have a name; mobile must be 10 digits if provided
   const references=[]; let refBad=false;
@@ -415,7 +401,7 @@ async function submitForm(){
     seminarId: sem?sem.id:'',
     seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
     rating:Number(rating), contentRating:Number(content),
-    interested:interest, products, topics, comments,
+    interested:interest, products,
     references,
     ts:new Date().toISOString()
   };
@@ -437,9 +423,8 @@ function clearForm(){
   document.getElementById('f-name').value='';
   document.getElementById('f-mobile').value='';
   const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
-  document.getElementById('f-comments').value='';
-  const tob=document.getElementById('f-topic-other'); if(tob) tob.value='';
-  const tobx=document.getElementById('topic-other-box'); if(tobx) tobx.style.display='none';
+  const pob=document.getElementById('f-product-other'); if(pob) pob.value='';
+  const pobx=document.getElementById('prod-other-box'); if(pobx) pobx.style.display='none';
   document.querySelectorAll('#refRows .ref-row').forEach((row,i)=>{ if(i===0){ row.querySelectorAll('input').forEach(inp=>inp.value=''); } else row.remove(); });
   const bar=document.getElementById('btnAddRef'); if(bar) bar.disabled=false;
   document.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(r=>r.checked=false);
@@ -472,7 +457,7 @@ function renderResponses(){
   const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
   document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
   document.getElementById('respTable').innerHTML=
-    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>Next Topic</th><th>Comments</th><th>References</th></tr>'+
+    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>References</th></tr>'+
     (list.map(r=>`<tr>
       <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
       <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
@@ -480,17 +465,63 @@ function renderResponses(){
       <td style="color:#f59e0b;white-space:nowrap">${stars(r.contentRating)}</td>
       <td>${chip(r.interested)}</td>
       <td style="font-size:11.5px">${(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
-      <td style="font-size:11.5px">${(r.topics||[]).map(p=>'<span style="display:inline-block;background:#e8f0fe;color:#1967d2;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
-      <td>${esc(r.comments)}</td>
       <td style="font-size:11.5px">${(r.references||[]).map(rf=>'<span style="display:inline-block;background:#fdf2f8;color:#be185d;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(rf.name)+(rf.mobile?' · '+esc(rf.mobile):'')+'</span>').join('')||''}</td>
-    </tr>`).join('')||'<tr><td colspan="11" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
+    </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
 }
-function exportCSV(){
+function _valStyle(v){
+  return ({5:{bg:'DCFCE7',tx:'166534'},4:{bg:'CCFBF1',tx:'115E59'},3:{bg:'DBEAFE',tx:'1E40AF'},2:{bg:'FEF3C7',tx:'92400E'},1:{bg:'FEE2E2',tx:'991B1B'}})[v]||null;
+}
+function exportExcel(){
+  if(typeof XLSX==='undefined'){ return exportCSVFallback(); }
+  const f=document.getElementById('respFilter').value;
+  const list=f?RESP.filter(r=>r.seminarName===f):RESP;
+  const EXPL={5:'Excellent',4:'Very Good',3:'Good',2:'Average',1:'Poor'};
+  const CONL={5:'Extremely',4:'Very Useful',3:'Useful',2:'Slightly',1:'Not Useful'};
+  const INT={Haan:{l:'Yes ✓',bg:'DCFCE7',tx:'166534'},Shayad:{l:'Maybe',bg:'FEF3C7',tx:'92400E'},Nahi:{l:'No',bg:'FEE2E2',tx:'991B1B'}};
+  const thin={style:'thin',color:{rgb:'E2E8F0'}}, border={top:thin,bottom:thin,left:thin,right:thin};
+
+  const headers=['Date','Name','Mobile','Seminar','Experience','Content','Interested','Products','References'];
+  const aoa=[headers]; const sMap={}; const put=(r,c,s)=>sMap[r+'_'+c]=s;
+  // header style
+  headers.forEach((h,c)=>put(0,c,{font:{bold:true,sz:11,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'1E3A8A'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:border}));
+
+  list.forEach((r,i)=>{
+    const R=i+1;
+    const expL=(EXPL[r.rating]?EXPL[r.rating]+' ('+r.rating+')':(r.rating||''));
+    const conL=(CONL[r.contentRating]?CONL[r.contentRating]+' ('+r.contentRating+')':(r.contentRating||''));
+    const intO=INT[r.interested]||null;
+    aoa.push([
+      r.ts?new Date(r.ts).toLocaleString('en-IN'):'',
+      r.name||'', r.mobile||'', r.seminarName||'',
+      expL, conL, (intO?intO.l:(r.interested||'')),
+      (r.products||[]).join(', '),
+      (r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')
+    ]);
+    // zebra base for whole row
+    const zebra=(i%2===1)?'F8FAFC':'FFFFFF';
+    for(let c=0;c<headers.length;c++){
+      put(R,c,{fill:{patternType:'solid',fgColor:{rgb:zebra}},font:{sz:10,color:{rgb:'1F2937'}},alignment:{vertical:'center',wrapText:(c>=7),horizontal:(c===0||c===2?'center':'left')},border:border});
+    }
+    // colored cells: Experience(4), Content(5), Interested(6)
+    const es=_valStyle(r.rating); if(es) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:es.bg}},font:{sz:10,bold:true,color:{rgb:es.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
+    const cs=_valStyle(r.contentRating); if(cs) put(R,5,{fill:{patternType:'solid',fgColor:{rgb:cs.bg}},font:{sz:10,bold:true,color:{rgb:cs.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
+    if(intO) put(R,6,{fill:{patternType:'solid',fgColor:{rgb:intO.bg}},font:{sz:10,bold:true,color:{rgb:intO.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:18},{wch:20},{wch:13},{wch:26},{wch:14},{wch:14},{wch:10},{wch:36},{wch:34}];
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:aoa.length-1,c:headers.length-1}})};
+  ws['!freeze']={xSplit:0,ySplit:1};
+  Object.keys(sMap).forEach(k=>{ const p=k.split('_'); const a=XLSX.utils.encode_cell({r:+p[0],c:+p[1]}); if(!ws[a])ws[a]={t:'s',v:''}; ws[a].s=sMap[k]; });
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Feedback');
+  XLSX.writeFile(wb,'DN_Seminar_Feedback_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function exportCSVFallback(){
   const f=document.getElementById('respFilter').value;
   const list=f?RESP.filter(r=>r.seminarName===f):RESP;
   const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','Next Topic','Comments','References']]
-    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.topics||[]).join(', '),r.comments,(r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')]));
+  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','References']]
+    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')]));
   const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
