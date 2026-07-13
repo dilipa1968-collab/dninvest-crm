@@ -1667,15 +1667,6 @@ input:focus, select:focus, textarea:focus{
         <div id="user-list"></div>
 
         <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
-          <h3 style="margin:0 0 6px">📞 Call Follow-up Rule</h3>
-          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Jab ON ho, koi bhi RM kisi client ka <b>Next Call Date</b> badlega to <b>Last Call Date</b> me <b>aaj ki date</b> daalni zaroori hogi — warna save block ho jayega aur error dikhega. Last Call sirf aaj ki date accept karegi. (Admin par yeh rule laagu nahi hota.)</p>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.9rem;font-weight:600">
-            <input type="checkbox" id="set-enforce-call-date" onchange="toggleCallDateRule(this.checked)" style="width:18px;height:18px;cursor:pointer">
-            <span id="set-enforce-call-date-lbl">Next Call badalne par Last Call Date compulsory (aaj ki date)</span>
-          </label>
-        </div>
-
-        <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
           <h3 style="margin:0 0 6px">💾 Data Backup &amp; Restore</h3>
           <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Complete data (CRM + HR Portal + access settings) in a single JSON file. Take a backup once every week/month. Restore uploads it back to Firebase.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2794,30 +2785,6 @@ function fmtDate(d){ if(!d) return ''; try{ if(/^\d{4}-\d{2}-\d{2}/.test(d)){ co
 function fmtTime(ts){ if(!ts) return ''; try{const dt=new Date(ts); if(isNaN(dt)) return ''; return dt.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true});}catch(e){return '';} }
 function daysDiff(d){ if(!d) return null; let dt; if(/^\d{4}-\d{2}-\d{2}/.test(d)){ const p=d.split('T')[0].split('-'); dt=new Date(+p[0],+p[1]-1,+p[2]); } else { dt=new Date(d); } if(isNaN(dt)) return null; const now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return Math.floor((today-dt)/(1000*60*60*24)); }
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
-
-// ── Call-date follow-up rule (admin-controlled toggle) ────────────────────
-// When Admin turns this ON, an RM cannot move a client's Next Call Date forward
-// unless the Last Call Date is ALSO set to TODAY (present date only). Admin
-// himself is exempt so bulk data corrections stay unblocked. Stored in the
-// shared 'crm_settings' doc so it syncs to every RM in real time.
-function callDateRuleOn(){
-  try{ const s=DB.get('crm_settings')||{}; return s.enforce_call_date===true; }catch(e){ return false; }
-}
-// Returns '' when the save is allowed, or an error message string when blocked.
-//  oldNext = client's existing next_call   newNext = value being saved
-//  newLast = last_call_date being saved
-function callDateRuleError(oldNext, newNext, newLast){
-  if(!callDateRuleOn()) return '';
-  // Admin is exempt — rule is meant to enforce RM discipline.
-  if(CU && CU.role==='admin') return '';
-  const nn=(newNext||'').trim(), on=(oldNext||'').trim();
-  if(!nn || nn===on) return '';   // Next Call not changed → no restriction
-  const t=today();
-  if((newLast||'').trim()!==t){
-    return '⚠️ Next Call Date badla hai — pehle Last Call Date me AAJ ki date ('+fmtDate(t)+') daaliye. Last Call sirf aaj ki date hi honi chahiye.';
-  }
-  return '';
-}
 let _uidCounter=0;
 function uid(){ _uidCounter=(_uidCounter+1)%1000; return Date.now().toString(36)+'_'+_uidCounter.toString(36)+Math.random().toString(36).substr(2,6); }
 function v(x){ return (x!=null&&x!=='')?x:'—'; }
@@ -3284,21 +3251,6 @@ function initApp(){
             if(getCurrentPageId()==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
             else if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
             checkAnnouncement();
-          }
-        }
-      });
-
-      // Real-time listener for crm_settings (admin toggles like the Call
-      // Follow-up Rule) — pushes instantly to every logged-in RM.
-      fdb.collection('crm_data').doc('crm_settings').onSnapshot(doc=>{
-        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
-          const newData = doc.data().data;
-          const existing = DB.get('crm_settings');
-          if(JSON.stringify(newData) !== JSON.stringify(existing)){
-            DB.setLocal('crm_settings', newData);
-            console.log('Real-time update: crm_settings');
-            const _cb=document.getElementById('set-enforce-call-date');
-            if(_cb && getCurrentPageId()==='admin') _cb.checked = callDateRuleOn();
           }
         }
       });
@@ -5651,54 +5603,47 @@ function exportSeminarAttendees(){
   if(!s) return;
   const attendees=(s.attendees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!attendees.length){ toast('No attendees to export','error'); return; }
+  if(typeof dnXlsx!=='function'){ toast('Excel engine not loaded — check internet','error'); return; }
 
-  const headers=['#','Name','Mobile','RM','Type','Response','Headcount','Status','Remarks'];
-  const rows=attendees.map((a,i)=>[
-    i+1, upc(a.name), upc(a.mobile), upc(a.rm), upc(a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest'),
-    upc(a.rsvp||'—'), a.expected_count!=null?a.expected_count:'', upc(a.status||'Pending'), upc(a.remarks)
-  ]);
-  const willCome = attendees.filter(x=>x.rsvp==='Yes').length;
-  const waitCount = attendees.filter(x=>x.rsvp==='Wait').length;
+  const willCome    = attendees.filter(x=>x.rsvp==='Yes').length;
+  const waitCount   = attendees.filter(x=>x.rsvp==='Wait').length;
   const expectedTotal = attendees.reduce((sum,x)=>sum+(x.expected_count||0),0);
-  const attended = attendees.filter(x=>x.status==='Attended').length;
-  const colCount = headers.length;
+  const attended    = attendees.filter(x=>x.status==='Attended').length;
 
-  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Type cell colour (Equity=blue, MF=green, Guest=grey)
+  const typeColor = v=>{ v=String(v||'').toLowerCase();
+    if(v==='equity') return {bg:'FFDDEBF7', font:'FF1F4E79'};
+    if(v==='mf')     return {bg:'FFE2EFDA', font:'FF375623'};
+    if(v==='guest')  return {bg:'FFF2F2F2', font:'FF7F7F7F'};
+    return null; };
 
-  let html = `<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt;border-color:#ccc">`;
-  // Title row
-  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-weight:bold;font-size:14pt;text-align:center;padding:10px">${esc(s.name)}</td></tr>`;
-  // Subtitle row
-  html += `<tr><td colspan="${colCount}" style="background:#00B0F0;color:#FFFFFF;font-size:11pt;text-align:center;padding:8px">Date: ${esc(fmtDate(s.date)||'—')}${s.notes?'   |   Venue: '+esc(s.notes):''}</td></tr>`;
-  // Summary row
-  html += `<tr><td colspan="${colCount}" style="background:#00B050;color:#FFFFFF;font-weight:bold;font-size:11pt;text-align:center;padding:8px">Total Attendees: ${attendees.length}   |   Will Attend: ${willCome}   |   Wait: ${waitCount}   |   Expected Headcount: ${expectedTotal}   |   Attended: ${attended}</td></tr>`;
-  // Blank spacer row
-  html += `<tr>${headers.map(()=>`<td style="border:none"></td>`).join('')}</tr>`;
-  // Header row
-  html += `<tr>${headers.map(h=>`<td style="background:#FFFF00;color:#FF0000;font-weight:bold;font-size:11pt;text-align:center;padding:8px">${esc(h)}</td>`).join('')}</tr>`;
-  // Data rows
-  rows.forEach((row,ri)=>{
-    const bg = ri%2===1 ? '#F2F6FB' : '#FFFFFF';
-    html += '<tr>' + row.map((val,ci)=>{
-      const align = ci===1 ? 'left' : 'center';
-      return `<td style="background:${bg};font-size:11pt;text-align:${align};padding:7px">${esc(val)}</td>`;
-    }).join('') + '</tr>';
-  });
-  html += '</table>';
+  const cols=[
+    {header:'#',        width:5,  align:'center', num:true},
+    {header:'Name',     width:26, align:'left'},
+    {header:'Mobile',   width:14, align:'center'},
+    {header:'RM',       width:12, align:'center'},
+    {header:'Type',     width:10, align:'center', color:typeColor},
+    {header:'Response', width:12, align:'center', color:dnStatusColor},
+    {header:'Headcount',width:11, align:'center', num:true},
+    {header:'Status',   width:12, align:'center', color:dnStatusColor},
+    {header:'Remarks',  width:32, align:'left'}
+  ];
+  const rows=attendees.map((a,i)=>[
+    i+1,
+    upc(a.name),
+    a.mobile||'',
+    upc(a.rm||'—'),
+    a.type==='equity'?'Equity':a.type==='mf'?'MF':'Guest',
+    a.rsvp||'—',
+    a.expected_count!=null?a.expected_count:'',
+    a.status||'Pending',
+    upc(a.remarks||'')
+  ]);
+  const totalRow=['Σ','Total: '+attendees.length,'','','','Yes '+willCome+' · Wait '+waitCount, expectedTotal, 'Attended '+attended, ''];
 
-  const fullHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-  <head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Attendees</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
-  <body>${html}</body></html>`;
-
-  const blob = new Blob(['\ufeff'+fullHtml], {type:'application/vnd.ms-excel'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = (s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.xls';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const title = (s.name||'Seminar')+'  —  '+(fmtDate(s.date)||'—')+(s.notes?'   ·   '+s.notes:'');
+  const filename=(s.name||'seminar').replace(/[^a-z0-9]+/gi,'_')+'_attendees_'+today()+'.xlsx';
+  dnXlsx(filename, title, cols, rows, totalRow);
   toast('Export done!','success');
 }
 
@@ -6631,19 +6576,6 @@ async function saveClient(){
     };
   }
 
-  // Call-date follow-up rule (admin toggle): block if Next Call changed but
-  // Last Call is not set to today. Only applies while editing an existing client.
-  if(currentEditId){
-    const _oldC = clients.find(x=>x.id===currentEditId);
-    const _err = callDateRuleError(_oldC?_oldC.next_call:'', rec.next_call, rec.last_call_date);
-    if(_err){
-      toast(_err,'error');
-      const el=document.getElementById('f_last_call');
-      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
-      return;
-    }
-  }
-
   if(currentEditId){
     const idx=clients.findIndex(x=>x.id===currentEditId);
     if(idx>=0){
@@ -6955,8 +6887,6 @@ async function saveCallLog(){
   if(seg==='lead'){
     const leads=DB.get('leads')||[];
     const lead=leads.find(x=>x.id===id);
-    const _errL=callDateRuleError(lead?lead.next_call:'', nextCall, date);
-    if(_errL){ toast(_errL,'error'); return; }
     DB.addCallLog({
       id:uid(), client_id:id, seg:'lead', date, status, note,
       next_call:nextCall, created:today(), ts:new Date().toISOString(),
@@ -6982,8 +6912,6 @@ async function saveCallLog(){
 
   const clients2=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
   const clientObj=clients2.find(x=>x.id===id);
-  const _errC=callDateRuleError(clientObj?clientObj.next_call:'', nextCall, date);
-  if(_errC){ toast(_errC,'error'); return; }
   DB.addCallLog({
     id:uid(), client_id:id, seg, date, status, note,
     next_call:nextCall, created:today(), ts:new Date().toISOString(),
@@ -9321,19 +9249,6 @@ function renderAdmin(){
       </div>
     </div>`).join('');
   document.getElementById('user-list').innerHTML=h;
-  // Reflect the shared Call Follow-up Rule toggle
-  const _cb=document.getElementById('set-enforce-call-date');
-  if(_cb) _cb.checked = callDateRuleOn();
-}
-
-function toggleCallDateRule(on){
-  const s = DB.get('crm_settings') || {};
-  s.enforce_call_date = !!on;
-  s.enforce_call_date_by = CU?CU.name:'';
-  s.enforce_call_date_at = new Date().toISOString();
-  DB.set('crm_settings', s);
-  toast(on ? '✅ Rule ON — RM ko Next Call badalne par Last Call (aaj ki date) daalni hogi'
-           : '⛔ Rule OFF — koi restriction nahi', 'success');
 }
 
 function openAddUser(){
