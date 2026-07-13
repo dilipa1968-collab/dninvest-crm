@@ -6102,17 +6102,15 @@ function showClientSeminarMenu(ev, sourceId, type){
   closeClientSeminarMenu();
   const src = type==='equity'?(DB.get('eq_clients')||[]).find(c=>c.id===sourceId):(DB.get('mf_clients')||[]).find(c=>c.id===sourceId);
   const t=today();
-  const list=(DB.get('seminars')||[]).slice().sort((a,b)=>{
-    const ad=a.date||'', bd=b.date||'', af=ad>=t, bf=bd>=t;
-    if(af&&bf) return ad.localeCompare(bd);   // upcoming: nearest first
-    if(af) return -1; if(bf) return 1;         // upcoming before past
-    return bd.localeCompare(ad);               // past: most recent first
-  });
+  // Sirf aaj ya aane wale seminars — jinki date nikal chuki hai unme add nahi
+  const list=(DB.get('seminars')||[])
+    .filter(s=>(s.date||'')>=t)
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));  // nearest first
   const m=document.createElement('div');
   m.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:60vh;overflow:auto;font-size:.82rem;padding:6px';
   let inner=`<div style="padding:7px 10px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border,#eee);margin-bottom:4px">➕ Add ${src?('“'+src.name+'”'):'client'} to Seminar</div>`;
   if(!list.length){
-    inner+='<div style="padding:12px 10px;color:#999">No seminars yet — create one first.</div>';
+    inner+='<div style="padding:12px 10px;color:#999">No upcoming seminars — create one first.</div>';
   } else {
     list.forEach(s=>{
       const already=(s.attendees||[]).some(a=>a.source_id===sourceId && a.type===type);
