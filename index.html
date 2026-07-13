@@ -4359,7 +4359,7 @@ function renderEqTable(){
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
-      <td style="font-weight:600">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
@@ -4500,7 +4500,7 @@ function renderMfTable(){
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
-      <td style="font-weight:600">${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar">${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
@@ -6088,6 +6088,71 @@ function searchAttendees(){
   });
   h+='</tbody></table>';
   cont.innerHTML=h;
+}
+
+// ==== RIGHT-CLICK: Add client to a seminar directly from Equity/MF list ====
+let _semCtxEl=null;
+function closeClientSeminarMenu(){
+  if(_semCtxEl){ _semCtxEl.remove(); _semCtxEl=null; }
+  document.removeEventListener('click', closeClientSeminarMenu);
+  document.removeEventListener('scroll', closeClientSeminarMenu, true);
+}
+function showClientSeminarMenu(ev, sourceId, type){
+  ev.preventDefault(); ev.stopPropagation();
+  closeClientSeminarMenu();
+  const src = type==='equity'?(DB.get('eq_clients')||[]).find(c=>c.id===sourceId):(DB.get('mf_clients')||[]).find(c=>c.id===sourceId);
+  const t=today();
+  const list=(DB.get('seminars')||[]).slice().sort((a,b)=>{
+    const ad=a.date||'', bd=b.date||'', af=ad>=t, bf=bd>=t;
+    if(af&&bf) return ad.localeCompare(bd);   // upcoming: nearest first
+    if(af) return -1; if(bf) return 1;         // upcoming before past
+    return bd.localeCompare(ad);               // past: most recent first
+  });
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:60vh;overflow:auto;font-size:.82rem;padding:6px';
+  let inner=`<div style="padding:7px 10px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border,#eee);margin-bottom:4px">➕ Add ${src?('“'+src.name+'”'):'client'} to Seminar</div>`;
+  if(!list.length){
+    inner+='<div style="padding:12px 10px;color:#999">No seminars yet — create one first.</div>';
+  } else {
+    list.forEach(s=>{
+      const already=(s.attendees||[]).some(a=>a.source_id===sourceId && a.type===type);
+      const upcoming=(s.date||'')>=t;
+      inner+=`<div ${already?'':`onclick="addClientToSeminarDirect('${sourceId}','${type}','${s.id}');closeClientSeminarMenu()"`}
+        style="padding:8px 10px;border-radius:7px;cursor:${already?'default':'pointer'};display:flex;justify-content:space-between;gap:10px;align-items:center;${already?'opacity:.55':''}"
+        ${already?'':`onmouseover="this.style.background='#F0F5FB'" onmouseout="this.style.background='transparent'"`}>
+        <span style="font-weight:600">${upcoming?'🟢 ':''}${s.name}</span>
+        <span style="color:#888;white-space:nowrap;font-size:.72rem">${fmtDate(s.date)||''}${already?' ✓':''}</span>
+      </div>`;
+    });
+  }
+  m.innerHTML=inner;
+  document.body.appendChild(m);
+  const pad=8, mw=m.offsetWidth, mh=m.offsetHeight;
+  let x=ev.clientX, y=ev.clientY;
+  if(x+mw+pad>window.innerWidth) x=window.innerWidth-mw-pad;
+  if(y+mh+pad>window.innerHeight) y=window.innerHeight-mh-pad;
+  m.style.left=Math.max(pad,x)+'px'; m.style.top=Math.max(pad,y)+'px';
+  _semCtxEl=m;
+  setTimeout(()=>{ document.addEventListener('click', closeClientSeminarMenu); document.addEventListener('scroll', closeClientSeminarMenu, true); },0);
+}
+async function addClientToSeminarDirect(sourceId, type, seminarId){
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===seminarId);
+  if(!s){ toast('Seminar not found','error'); return; }
+  const src = type==='equity'?(DB.get('eq_clients')||[]).find(c=>c.id===sourceId):(DB.get('mf_clients')||[]).find(c=>c.id===sourceId);
+  if(!src){ toast('Client not found','error'); return; }
+  if(CU.role!=='admin' && (src.rm||'').trim().toLowerCase()!==(CU.name||'').trim().toLowerCase()){
+    toast('This client is mapped to '+(src.rm||'another RM')+' — you can only add your own clients','error'); return;
+  }
+  s.attendees=s.attendees||[];
+  if(s.attendees.some(a=>a.source_id===sourceId && a.type===type)){ toast(src.name+' already in “'+s.name+'”','error'); return; }
+  let newId=uid(); while(s.attendees.some(x=>x.id===newId)) newId=uid();
+  s.attendees.push({ id:newId, source_id:sourceId, type, name:src.name, mobile:src.mobile||'', rm:src.rm||'', status:'Pending' });
+  s.updated=today();
+  await DB.setClient('seminars',s);
+  toast('✓ '+src.name+' → “'+s.name+'”','success');
+  if(currentSeminarId===seminarId){ try{ renderSeminarAttendees(); }catch(e){} }
+  try{ renderSeminarsTable(); }catch(e){}
 }
 
 async function addAttendee(sourceId,type){
