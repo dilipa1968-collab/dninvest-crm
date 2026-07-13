@@ -5713,9 +5713,7 @@ async function openSeminarFeedback(){
     +'<td style="padding:7px 8px;white-space:nowrap">'+stars(r.contentRating)+'</td>'
     +'<td style="padding:7px 8px">'+chip(r.interested)+'</td>'
     +'<td style="padding:7px 8px;max-width:140px">'+prodChips(r)+'</td>'
-    +'<td style="padding:7px 8px;max-width:140px">'+topicChips(r)+'</td>'
     +'<td style="padding:7px 8px;max-width:170px">'+refChips(r,i)+'</td>'
-    +'<td style="padding:7px 8px;font-size:11.5px;color:#555;max-width:180px">'+esc(r.comments)+'</td>'
     +'<td style="padding:7px 8px;white-space:nowrap"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="fbToLead('+i+')">➕ Lead</button> <button class="btn-icon" style="color:var(--red)" title="Delete response" onclick="fbDelete('+i+')">🗑️</button></td>'
     +'</tr>').join('');
 
@@ -5732,7 +5730,7 @@ async function openSeminarFeedback(){
     +(haan.length?'<div style="margin-bottom:10px"><button class="btn btn-teal" style="font-size:.78rem" onclick="fbAllHaanToLeads()">➕ Add all \''+'Yes'+'\' responses to Leads ('+haan.length+')</button></div>':'')
     +(resp.length
       ?'<div style="border:1px solid #eee;border-radius:8px;overflow:auto;max-height:48vh"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#f7f5fb">'
-        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NEXT TOPIC</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">COMMENTS</th><th style="padding:8px;font-size:11px;color:#673ab7">ACTION</th>'
+        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;font-size:11px;color:#673ab7">ACTION</th>'
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       :'<div style="text-align:center;padding:30px;color:#999">No feedback received for this seminar yet.<br><small>💬 Use the Feedback Link button to send the link to attendees.</small></div>')
     +'</div></div>';
@@ -5785,7 +5783,6 @@ function fbExportExcel(){
   const totalRefs=list.reduce((t,r)=>t+((r.references||[]).length),0);
   if(totalRefs) summaryRows.push(['References Received', totalRefs]);
   prodCounts.forEach(([p,c])=>summaryRows.push(['Product Interest: '+p, c]));
-  topicCounts.forEach(([p,c])=>summaryRows.push(['Next Topic Vote: '+p, c]));
 
   const respRows=list.map(r=>[
     r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
@@ -5793,9 +5790,7 @@ function fbExportExcel(){
     starTxt(r.rating), starTxt(r.contentRating),
     fbIntLabel(r.interested),
     (r.products||[]).join(', '),
-    (r.topics||[]).join(', '),
-    (r.references||[]).map(rf=>rf.name+(rf.mobile?' \u2014 '+rf.mobile:'')).join('; '),
-    r.comments||''
+    (r.references||[]).map(rf=>rf.name+(rf.mobile?' \u2014 '+rf.mobile:'')).join('; ')
   ]);
 
   const fname='Feedback_'+String(sem.name||'Seminar').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40)+'_'+today()+'.xlsx';
@@ -5820,9 +5815,7 @@ function fbExportExcel(){
         {header:'CONTENT QUALITY\nHow useful was the content? (1\u20135 \u2605)', width:26, align:'center', color:ratingColor},
         {header:'INTERESTED', width:13, align:'center', color:intColor},
         {header:'PRODUCTS', width:34},
-        {header:'NEXT TOPIC', width:30},
-        {header:'REFERENCES', width:34, color:v=>v?{bg:'FFFCE7F3',font:'FF9D174D'}:null},
-        {header:'COMMENTS', width:38}
+        {header:'REFERENCES', width:34, color:v=>v?{bg:'FFFCE7F3',font:'FF9D174D'}:null}
       ],
       rows:respRows
     }
