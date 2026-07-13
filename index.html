@@ -1667,6 +1667,15 @@ input:focus, select:focus, textarea:focus{
         <div id="user-list"></div>
 
         <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
+          <h3 style="margin:0 0 6px">📞 Call Follow-up Rule</h3>
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Jab ON ho, koi bhi RM kisi client ka <b>Next Call Date</b> badlega to <b>Last Call Date</b> me <b>aaj ki date</b> daalni zaroori hogi — warna save block ho jayega aur error dikhega. Last Call sirf aaj ki date accept karegi. (Admin par yeh rule laagu nahi hota.)</p>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.9rem;font-weight:600">
+            <input type="checkbox" id="set-enforce-call-date" onchange="toggleCallDateRule(this.checked)" style="width:18px;height:18px;cursor:pointer">
+            <span id="set-enforce-call-date-lbl">Next Call badalne par Last Call Date compulsory (aaj ki date)</span>
+          </label>
+        </div>
+
+        <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
           <h3 style="margin:0 0 6px">💾 Data Backup &amp; Restore</h3>
           <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Complete data (CRM + HR Portal + access settings) in a single JSON file. Take a backup once every week/month. Restore uploads it back to Firebase.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2785,6 +2794,30 @@ function fmtDate(d){ if(!d) return ''; try{ if(/^\d{4}-\d{2}-\d{2}/.test(d)){ co
 function fmtTime(ts){ if(!ts) return ''; try{const dt=new Date(ts); if(isNaN(dt)) return ''; return dt.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true});}catch(e){return '';} }
 function daysDiff(d){ if(!d) return null; let dt; if(/^\d{4}-\d{2}-\d{2}/.test(d)){ const p=d.split('T')[0].split('-'); dt=new Date(+p[0],+p[1]-1,+p[2]); } else { dt=new Date(d); } if(isNaN(dt)) return null; const now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return Math.floor((today-dt)/(1000*60*60*24)); }
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
+
+// ── Call-date follow-up rule (admin-controlled toggle) ────────────────────
+// When Admin turns this ON, an RM cannot move a client's Next Call Date forward
+// unless the Last Call Date is ALSO set to TODAY (present date only). Admin
+// himself is exempt so bulk data corrections stay unblocked. Stored in the
+// shared 'crm_settings' doc so it syncs to every RM in real time.
+function callDateRuleOn(){
+  try{ const s=DB.get('crm_settings')||{}; return s.enforce_call_date===true; }catch(e){ return false; }
+}
+// Returns '' when the save is allowed, or an error message string when blocked.
+//  oldNext = client's existing next_call   newNext = value being saved
+//  newLast = last_call_date being saved
+function callDateRuleError(oldNext, newNext, newLast){
+  if(!callDateRuleOn()) return '';
+  // Admin is exempt — rule is meant to enforce RM discipline.
+  if(CU && CU.role==='admin') return '';
+  const nn=(newNext||'').trim(), on=(oldNext||'').trim();
+  if(!nn || nn===on) return '';   // Next Call not changed → no restriction
+  const t=today();
+  if((newLast||'').trim()!==t){
+    return '⚠️ Next Call Date badla hai — pehle Last Call Date me AAJ ki date ('+fmtDate(t)+') daaliye. Last Call sirf aaj ki date hi honi chahiye.';
+  }
+  return '';
+}
 let _uidCounter=0;
 function uid(){ _uidCounter=(_uidCounter+1)%1000; return Date.now().toString(36)+'_'+_uidCounter.toString(36)+Math.random().toString(36).substr(2,6); }
 function v(x){ return (x!=null&&x!=='')?x:'—'; }
@@ -3251,6 +3284,21 @@ function initApp(){
             if(getCurrentPageId()==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
             else if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
             checkAnnouncement();
+          }
+        }
+      });
+
+      // Real-time listener for crm_settings (admin toggles like the Call
+      // Follow-up Rule) — pushes instantly to every logged-in RM.
+      fdb.collection('crm_data').doc('crm_settings').onSnapshot(doc=>{
+        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+          const newData = doc.data().data;
+          const existing = DB.get('crm_settings');
+          if(JSON.stringify(newData) !== JSON.stringify(existing)){
+            DB.setLocal('crm_settings', newData);
+            console.log('Real-time update: crm_settings');
+            const _cb=document.getElementById('set-enforce-call-date');
+            if(_cb && getCurrentPageId()==='admin') _cb.checked = callDateRuleOn();
           }
         }
       });
@@ -6583,6 +6631,19 @@ async function saveClient(){
     };
   }
 
+  // Call-date follow-up rule (admin toggle): block if Next Call changed but
+  // Last Call is not set to today. Only applies while editing an existing client.
+  if(currentEditId){
+    const _oldC = clients.find(x=>x.id===currentEditId);
+    const _err = callDateRuleError(_oldC?_oldC.next_call:'', rec.next_call, rec.last_call_date);
+    if(_err){
+      toast(_err,'error');
+      const el=document.getElementById('f_last_call');
+      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
+      return;
+    }
+  }
+
   if(currentEditId){
     const idx=clients.findIndex(x=>x.id===currentEditId);
     if(idx>=0){
@@ -6894,6 +6955,8 @@ async function saveCallLog(){
   if(seg==='lead'){
     const leads=DB.get('leads')||[];
     const lead=leads.find(x=>x.id===id);
+    const _errL=callDateRuleError(lead?lead.next_call:'', nextCall, date);
+    if(_errL){ toast(_errL,'error'); return; }
     DB.addCallLog({
       id:uid(), client_id:id, seg:'lead', date, status, note,
       next_call:nextCall, created:today(), ts:new Date().toISOString(),
@@ -6919,6 +6982,8 @@ async function saveCallLog(){
 
   const clients2=DB.get(seg==='equity'?'eq_clients':'mf_clients')||[];
   const clientObj=clients2.find(x=>x.id===id);
+  const _errC=callDateRuleError(clientObj?clientObj.next_call:'', nextCall, date);
+  if(_errC){ toast(_errC,'error'); return; }
   DB.addCallLog({
     id:uid(), client_id:id, seg, date, status, note,
     next_call:nextCall, created:today(), ts:new Date().toISOString(),
@@ -9256,6 +9321,19 @@ function renderAdmin(){
       </div>
     </div>`).join('');
   document.getElementById('user-list').innerHTML=h;
+  // Reflect the shared Call Follow-up Rule toggle
+  const _cb=document.getElementById('set-enforce-call-date');
+  if(_cb) _cb.checked = callDateRuleOn();
+}
+
+function toggleCallDateRule(on){
+  const s = DB.get('crm_settings') || {};
+  s.enforce_call_date = !!on;
+  s.enforce_call_date_by = CU?CU.name:'';
+  s.enforce_call_date_at = new Date().toISOString();
+  DB.set('crm_settings', s);
+  toast(on ? '✅ Rule ON — RM ko Next Call badalne par Last Call (aaj ki date) daalni hogi'
+           : '⛔ Rule OFF — koi restriction nahi', 'success');
 }
 
 function openAddUser(){
