@@ -5330,6 +5330,7 @@ function renderSeminarAttendees(){
     <th>Mobile</th>
     <th onclick="sortSeminarAttendees('rm')" style="cursor:pointer" title="Click to sort">RM${arrow('rm')}</th>
     <th>Type</th><th>Response</th><th>Headcount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody>`;
+  const _allRMs=[...new Set([...getSegRMs('equity'),...getSegRMs('mf')])].filter(Boolean).sort((x,y)=>x.localeCompare(y));
   attendees.forEach(a=>{
     const isMyAttendee = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
     const dis = isMyAttendee ? '' : 'disabled style="opacity:0.45;pointer-events:none"';
@@ -5337,7 +5338,12 @@ function renderSeminarAttendees(){
       <td><input type="checkbox" class="sem-chk" data-id="${a.id}" onchange="onSemChkChange()"></td>
       <td style="font-weight:600">${a.name}</td>
       <td>${a.mobile||'—'}</td>
-      <td>${a.rm||'—'}</td>
+      <td>${CU.role==='admin'
+        ? `<select class="att-rm" data-id="${a.id}" data-prev="${(a.rm||'').replace(/"/g,'&quot;')}" onchange="onAttRmChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border);max-width:110px">
+          <option value="" ${!a.rm?'selected':''}>— None —</option>
+          ${_allRMs.map(r=>`<option ${r.trim().toLowerCase()===(a.rm||'').trim().toLowerCase()?'selected':''}>${r}</option>`).join('')}
+        </select>`
+        : (a.rm||'—')}</td>
       <td>${(a.source_id && CU.role!=='admin')
         ? `<span class="att-type-locked" data-id="${a.id}" data-type="${a.type}" title="Client record se linked — type locked" style="display:inline-block;padding:4px 10px;font-size:.72rem;font-weight:600;border-radius:6px;background:${a.type==='equity'?'#E6F1FB':'#EAF3DE'};color:${a.type==='equity'?'#185FA5':'#3B6D11'}">${a.type==='equity'?'Equity':'MF'} 🔒</span>`
         : `<select class="att-type" data-id="${a.id}" data-prev="${a.type||'guest'}" ${dis} onchange="onAttTypeChange(this)" style="padding:4px 6px;font-size:.72rem;border-radius:6px;border:1px solid var(--border)">
@@ -5533,6 +5539,31 @@ async function setAttendeeRemarks(attendeeId,val){
   a.remarks = val;
   s.updated=today();
   await DB.setClient('seminars',s);
+}
+
+// Admin-only: RM ko table se hi change karo (equity + mf dono RMs). Client-linked
+// attendee ho to master record ka RM bhi sync ho jata hai.
+async function onAttRmChange(sel){
+  if(CU.role!=='admin'){ sel.value=sel.dataset.prev||''; toast('Only Admin can change RM','error'); return; }
+  const seminars=DB.get('seminars')||[];
+  const s=seminars.find(x=>x.id===currentSeminarId);
+  if(!s){ return; }
+  const a=(s.attendees||[]).find(x=>x.id===sel.dataset.id);
+  if(!a){ return; }
+  const newRm=normRm(sel.value);
+  a.rm=newRm;
+  s.updated=today();
+  await DB.setClient('seminars',s);
+  // Client master RM sync (equity/mf linked attendee)
+  if(a.source_id && (a.type==='equity'||a.type==='mf')){
+    const coll = a.type==='equity' ? 'eq_clients' : 'mf_clients';
+    const list=DB.get(coll)||[];
+    const c=list.find(x=>x.id===a.source_id);
+    if(c && (c.rm||'')!==newRm){ c.rm=newRm; await DB.setClient(coll,c); }
+  }
+  sel.dataset.prev=newRm;
+  toast('RM updated'+(newRm?' → '+newRm:''),'success');
+  try{ rebuildSemRmOptions(s.attendees||[]); }catch(e){}
 }
 
 async function saveSeminarAttendeeChanges(){
