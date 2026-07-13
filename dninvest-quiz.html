@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx-js-style.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
@@ -437,16 +437,96 @@ window.QUIZ = (function(){
     var entries=[]; snap.forEach(function(d){ entries.push(d.data()); });
     if(!entries.length){ alert('No Saved Results To Export Yet.'); return; }
     entries.sort(function(a,b){ var sa=a.savedAt&&a.savedAt.toMillis?a.savedAt.toMillis():0; var sb=b.savedAt&&b.savedAt.toMillis?b.savedAt.toMillis():0; return sa-sb; });
-    var aoa=[['Q#','Question','Correct Ans','Rank','Name','Mobile','Answer','Result','Time (s)']];
-    entries.forEach(function(e){
-      (e.rows||[]).forEach(function(r,i){
-        aoa.push([ e.qIndex, e.question||'', e.correctLetter||'', i+1, r.name||'', r.mobile||'', r.answer||'',
-          (r.correct===true?'Correct':(r.correct===false?'Wrong':'-')),
-          (r.ms!=null?Number((r.ms/1000).toFixed(2)):'') ]);
+
+    // Rotating colour palette per question — {hd:header bg, ht:header text, band:row band bg}
+    var PAL=[
+      {hd:'1E3A8A',ht:'FFFFFF',band:'EAF1FB'}, // blue
+      {hd:'B45309',ht:'FFFFFF',band:'FEF3E2'}, // amber
+      {hd:'0F766E',ht:'FFFFFF',band:'E6F4F1'}, // teal
+      {hd:'6D28D9',ht:'FFFFFF',band:'F1EAFB'}, // purple
+      {hd:'BE123C',ht:'FFFFFF',band:'FCE8EC'}  // rose
+    ];
+    var GREEN_BG='DCFCE7', GREEN_TX='166534', RED_BG='FEE2E2', RED_TX='991B1B';
+    var thin={style:'thin',color:{rgb:'D9D9D9'}};
+    var border={top:thin,bottom:thin,left:thin,right:thin};
+
+    var aoa=[], merges=[], sMap={};
+    function put(r,c,s){ sMap[r+'_'+c]=s; }
+    var R=0;
+
+    // Title
+    aoa.push(['DN Investment — Quiz Results','','','','','']);
+    merges.push({s:{r:R,c:0},e:{r:R,c:5}});
+    put(R,0,{font:{bold:true,sz:15,color:{rgb:'0B1F3A'}},alignment:{horizontal:'left',vertical:'center'}});
+    R++;
+    aoa.push(['Generated: '+new Date().toLocaleString('en-IN'),'','','','','']);
+    merges.push({s:{r:R,c:0},e:{r:R,c:5}});
+    put(R,0,{font:{italic:true,sz:9,color:{rgb:'777777'}}});
+    R++;
+    aoa.push(['','','','','','']); R++; // spacer
+
+    entries.forEach(function(e,qi){
+      var pal=PAL[qi%PAL.length];
+      var qno=(e.qIndex!=null? e.qIndex : (qi+1));
+
+      // ---- Question header (merged band) ----
+      var hdr='Q'+qno+'  ·  '+(e.question||'')+'      Correct Answer:  '+(e.correctLetter||'-');
+      aoa.push([hdr,'','','','','']);
+      merges.push({s:{r:R,c:0},e:{r:R,c:5}});
+      put(R,0,{font:{bold:true,sz:12,color:{rgb:pal.ht}},fill:{patternType:'solid',fgColor:{rgb:pal.hd}},alignment:{horizontal:'left',vertical:'center',wrapText:false},border:border});
+      for(var c=1;c<6;c++) put(R,c,{fill:{patternType:'solid',fgColor:{rgb:pal.hd}},border:border});
+      R++;
+
+      // ---- Column sub-header ----
+      var sub=['Rank','Name','Mobile','Answer','Result','Time (s)'];
+      aoa.push(sub);
+      for(var c2=0;c2<6;c2++) put(R,c2,{font:{bold:true,sz:10,color:{rgb:'333333'}},fill:{patternType:'solid',fgColor:{rgb:'F1F1F1'}},alignment:{horizontal:(c2===1?'left':'center'),vertical:'center'},border:border});
+      R++;
+
+      // ---- Player rows: correct first, fastest (lowest ms) on top ----
+      var rows=(e.rows||[]).slice();
+      rows.sort(function(a,b){
+        var ac=a.correct===true, bc=b.correct===true;
+        if(ac!==bc) return ac?-1:1;                 // correct block first
+        var am=(a.ms!=null?a.ms:Infinity), bm=(b.ms!=null?b.ms:Infinity);
+        return am-bm;                               // faster first
       });
+      var firstCorrect=-1;
+      for(var fi=0;fi<rows.length;fi++){ if(rows[fi].correct===true){ firstCorrect=fi; break; } }
+
+      rows.forEach(function(r,idx){
+        var isC=r.correct===true, isW=r.correct===false;
+        var fastest=(idx===firstCorrect);
+        var tStr=(r.ms!=null? Number((r.ms/1000).toFixed(2)) : '');
+        var nameCell=(fastest?'⚡ ':'')+(r.name||'');
+        aoa.push([ idx+1, nameCell, r.mobile||'', (r.answer||''), (isC?'Correct':(isW?'Wrong':'-')), tStr ]);
+
+        // base band style for the row
+        for(var cc=0;cc<6;cc++){
+          put(R,cc,{fill:{patternType:'solid',fgColor:{rgb:pal.band}},
+            font:{sz:10,bold:(fastest?true:false),color:{rgb:'1A1A1A'}},
+            alignment:{horizontal:(cc===1?'left':'center'),vertical:'center'},border:border});
+        }
+        // Answer cell (D) → green if this player was correct
+        if(isC) put(R,3,{fill:{patternType:'solid',fgColor:{rgb:GREEN_BG}},font:{sz:10,bold:true,color:{rgb:GREEN_TX}},alignment:{horizontal:'center',vertical:'center'},border:border});
+        // Result cell (E) → green / red
+        if(isC) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:GREEN_BG}},font:{sz:10,bold:true,color:{rgb:GREEN_TX}},alignment:{horizontal:'center',vertical:'center'},border:border});
+        else if(isW) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:RED_BG}},font:{sz:10,bold:true,color:{rgb:RED_TX}},alignment:{horizontal:'center',vertical:'center'},border:border});
+        R++;
+      });
+
+      aoa.push(['','','','','','']); R++; // spacer between questions
     });
+
     var ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:5},{wch:40},{wch:11},{wch:6},{wch:22},{wch:14},{wch:8},{wch:9},{wch:9}];
+    ws['!cols']=[{wch:6},{wch:26},{wch:14},{wch:9},{wch:10},{wch:10}];
+    ws['!merges']=merges;
+    // apply collected styles
+    Object.keys(sMap).forEach(function(k){
+      var p=k.split('_'), addr=XLSX.utils.encode_cell({r:+p[0],c:+p[1]});
+      if(!ws[addr]) ws[addr]={t:'s',v:''};
+      ws[addr].s=sMap[k];
+    });
     var wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Quiz Results');
     XLSX.writeFile(wb, 'DN_Quiz_Results_'+new Date().toISOString().slice(0,10)+'.xlsx');
