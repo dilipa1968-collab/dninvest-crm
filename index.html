@@ -261,8 +261,8 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .sidebar-section{padding:5px 14px 1px;font-size:.58rem;font-weight:800;color:#8899bb;
   text-transform:uppercase;letter-spacing:1.4px;margin-top:4px;}
 .nav-item{display:flex;align-items:center;gap:8px;padding:3px 14px;cursor:pointer;
-  font-size:.78rem;font-weight:500;color:var(--gray);border-left:3px solid transparent;
-  transition:all .2s;}
+  font-size:.66rem;font-weight:500;color:var(--gray);border-left:3px solid transparent;
+  letter-spacing:.1px;transition:all .2s;}
 .nav-item:hover{background:var(--bg);color:var(--navy);}
 .nav-item.active{background:linear-gradient(90deg,#e8edf8 0%,#f5f7fc 100%);color:var(--navy);font-weight:700;border-left-color:var(--navy);border-left-width:4px;}
 .nav-item .icon{font-size:.88rem;width:18px;text-align:center;}
@@ -3933,31 +3933,47 @@ function refreshDash(){
     _bdayQueue=[]; _bdayStep=0;   // reset stepper on each dashboard refresh
     bdayEl.innerHTML = bdays.length
       ? (()=>{
-        const rows = bdays.map(c=>{
+        const BPAL=[
+          'linear-gradient(135deg,#EC4899,#F97316)',
+          'linear-gradient(135deg,#8B5CF6,#6366F1)',
+          'linear-gradient(135deg,#14B8A6,#22C55E)',
+          'linear-gradient(135deg,#3B82F6,#06B6D4)',
+          'linear-gradient(135deg,#F43F5E,#EF4444)'
+        ];
+        const rows = bdays.map((c,idx)=>{
           const nm=c.name||'—';
           let d=String(c.mobile||'').replace(/\D/g,'');
           if(d.length===10) d='91'+d;                       // add country code for wa.me
           const yr=parseInt(String(c.dob).slice(0,4),10);
-          const turns=(yr&&curYear>yr)?` <small style="color:var(--gray)">(turns ${curYear-yr})</small>`:'';
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
           const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
           if(d.length>=12) _bdayQueue.push({name:nm, url});   // add to Wish-All queue
+          const pal=BPAL[idx%BPAL.length];
+          const turnsPill=(yr&&curYear>yr)
+            ? `<span style="background:rgba(255,255,255,.28);color:#fff;font-size:.6rem;font-weight:800;padding:1px 8px;border-radius:8px">🎈 TURNS ${curYear-yr}</span>` : '';
           const waBtn = d.length>=12
-            ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
-            : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
-          return `<div class="bar-row" style="border-left:3px solid #e11d8f;padding-left:9px;">
-            <span class="bar-name">${escapeHtml(nm)}${turns}</span>
-            <span class="badge ${c.seg==='EQ'?'b-eq':'b-mf'}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
-            <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
+            ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:4px;background:#fff;color:#128C7E;font-size:.7rem;font-weight:800;padding:6px 13px;border-radius:9px;text-decoration:none;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.2)">💬 WISH</a>`
+            : `<span style="margin-left:4px;font-size:.62rem;color:rgba(255,255,255,.85);flex-shrink:0">NO NUMBER</span>`;
+          return `<div style="display:flex;align-items:center;gap:10px;background:${pal};border-radius:14px;padding:10px 12px;margin-bottom:9px;box-shadow:0 4px 14px -4px rgba(0,0,0,.35);position:relative;overflow:hidden">
+            <div style="font-size:1.7rem;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))">🎂</div>
+            <div style="min-width:0;flex:1">
+              <div style="color:#fff;font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(nm)}</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+                ${turnsPill}
+                <span style="background:rgba(255,255,255,.22);color:#fff;font-size:.6rem;font-weight:700;padding:1px 7px;border-radius:8px">${c.seg}</span>
+                <span style="color:rgba(255,255,255,.92);font-size:.66rem">${escapeHtml(c.rm||'')}</span>
+              </div>
+            </div>
             ${waBtn}
+            <span style="position:absolute;right:-4px;top:-6px;font-size:1.1rem;opacity:.5">🎉</span>
           </div>`;
         }).join('');
         const wishAll = _bdayQueue.length>=2
-          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All (${_bdayQueue.length}) — opens one by one</button>`
+          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:12px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;font-size:.82rem;font-weight:800;padding:10px;border-radius:11px;cursor:pointer;box-shadow:0 4px 12px -2px rgba(18,140,126,.5)">💬 WISH ALL (${_bdayQueue.length}) — OPENS ONE BY ONE</button>`
           : '';
         return wishAll + rows;
       })()
-      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 No birthdays today</p>';
+      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 NO BIRTHDAYS TODAY</p>';
   }
 
   // Redemption / SIP Stop audit (Admin side) — last entry date per MF RM,
