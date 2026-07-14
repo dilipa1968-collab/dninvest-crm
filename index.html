@@ -2349,7 +2349,7 @@ input:focus, select:focus, textarea:focus{
 
       <div id="imp-contact" style="display:none">
         <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-          Upload an Excel file with <b>Name</b>, <b>Mobile</b>, <b>PAN</b> columns. Matching will be done on <b>Name</b> (or PAN) — existing investor's Mobile/PAN will be updated. New investors won't be added.
+          Upload an Excel file with <b>Name</b>, <b>Mobile</b>, <b>PAN</b>, <b>DOB</b> columns. Matching is done on <b>Name</b> (or PAN) — existing investor's Mobile / PAN / Date of Birth will be updated. New investors won't be added.
         </p>
         <div class="import-zone" id="contact-zone" onclick="document.getElementById('contact-file').click()">
           📇 Drag the Contact Info Excel file here or click to browse
@@ -6486,6 +6486,9 @@ function clientForm(seg, c){
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       ${rmFieldHtml('mf', c, 'MF RM *')}
       <div class="form-field"><label>Investor Status</label><select id="f_status"><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
+    </div>
+    <div class="form-row three">
+      <div class="form-field"><label>🎂 Date of Birth</label><input id="f_dob" type="date" value="${c?.dob||''}" max="${today()}"></div>
     </div>
     <div class="form-section">Investment Details</div>
     <div class="form-row three">
@@ -11196,13 +11199,31 @@ function handleBothFile(type, input){
   });
 }
 
-// Parse a simple Name/Mobile/PAN sheet (auto-detect header columns)
+// Normalise a DOB cell (Excel serial, Date, or various string formats) → yyyy-mm-dd
+function _dP2(x){ return String(x).padStart(2,'0'); }
+function normDob(v){
+  if(v===undefined||v===null||v==='') return '';
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+_dP2(v.getMonth()+1)+'-'+_dP2(v.getDate());
+  if(typeof v==='number' && v>0 && v<60000){
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    if(!isNaN(d)) return d.getUTCFullYear()+'-'+_dP2(d.getUTCMonth()+1)+'-'+_dP2(d.getUTCDate());
+  }
+  let s=String(v).trim(); if(!s) return '';
+  let m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);        if(m) return m[1]+'-'+_dP2(m[2])+'-'+_dP2(m[3]);
+  m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);            if(m) return m[3]+'-'+_dP2(m[2])+'-'+_dP2(m[1]);
+  m=s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{4})$/);
+  if(m){ const mo=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].slice(0,3).toLowerCase()); if(mo>=0) return m[3]+'-'+_dP2(mo+1)+'-'+_dP2(m[1]); }
+  const d=new Date(s); if(!isNaN(d)) return d.getFullYear()+'-'+_dP2(d.getMonth()+1)+'-'+_dP2(d.getDate());
+  return '';
+}
+// Parse a simple Name/Mobile/PAN/DOB sheet (auto-detect header columns)
 function parseContactExcel(rows){
   let hdrIdx=-1, colMap={};
   const wanted = {
     name: ['name','clientname','investorname'],
     mobile: ['mobile','mobileno','phone','contactno','mobilenumber'],
-    pan: ['pan','pannumber','pancard']
+    pan: ['pan','pannumber','pancard'],
+    dob: ['dob','dateofbirth','birthdate','birthday','dateofbirthdob','invdob']
   };
   for(let i=0;i<Math.min(rows.length,10);i++){
     const row = rows[i];
@@ -11213,7 +11234,7 @@ function parseContactExcel(rows){
         if(variants.includes(h) && map[field]===undefined) map[field]=ci;
       }
     });
-    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined)){
+    if(map.name!==undefined && (map.mobile!==undefined || map.pan!==undefined || map.dob!==undefined)){
       hdrIdx=i; colMap=map; break;
     }
   }
@@ -11223,7 +11244,8 @@ function parseContactExcel(rows){
     .map(r=>({
       name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
       mobile: colMap.mobile!==undefined ? String(r[colMap.mobile]||'').replace(/\D/g,'').slice(-10) : '',
-      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : ''
+      pan: colMap.pan!==undefined ? String(r[colMap.pan]||'').trim().toUpperCase() : '',
+      dob: colMap.dob!==undefined ? normDob(r[colMap.dob]) : ''
     }))
     .filter(r=>r.name);
 }
@@ -11264,6 +11286,7 @@ async function doContactImport(){
       let changed=false;
       if(row.mobile && ex.mobile!==row.mobile){ ex.mobile=row.mobile; changed=true; }
       if(row.pan && ex.pan!==row.pan){ ex.pan=row.pan; changed=true; }
+      if(row.dob && ex.dob!==row.dob){ ex.dob=row.dob; changed=true; }
       if(changed && !seen.has(ex.id)){
         ex.updated = today();
         touched.push(ex);
