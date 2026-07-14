@@ -3823,55 +3823,78 @@ function birthdayCardImage(idx){
   const first=name.split(' ')[0]||name;
   const W=1080,H=1080;
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d');
-  // festive gradient background
+  function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+  function gold(y0,y1){ const gg=g.createLinearGradient(0,y0,0,y1); gg.addColorStop(0,'#FCEFA1'); gg.addColorStop(.5,'#E6B94E'); gg.addColorStop(1,'#C9962E'); return gg; }
+  // rich jewel-tone gradient background
   const grd=g.createLinearGradient(0,0,W,H);
-  grd.addColorStop(0,'#7C3AED'); grd.addColorStop(.5,'#DB2777'); grd.addColorStop(1,'#F97316');
+  grd.addColorStop(0,'#3B1466'); grd.addColorStop(.5,'#B4236B'); grd.addColorStop(1,'#F0872E');
   g.fillStyle=grd; g.fillRect(0,0,W,H);
+  // soft vignette for depth
+  const vg=g.createRadialGradient(W/2,H*0.46,H*0.28,W/2,H/2,H*0.78);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.30)');
+  g.fillStyle=vg; g.fillRect(0,0,W,H);
   // confetti dots
   const dots=['#FDE68A','#FCA5A5','#A7F3D0','#93C5FD','#FBCFE8','#FFFFFF'];
-  for(let i=0;i<70;i++){ g.fillStyle=dots[i%dots.length]; g.globalAlpha=.85;
-    const x=Math.random()*W, y=Math.random()*H, r=6+Math.random()*10;
+  for(let i=0;i<52;i++){ g.fillStyle=dots[i%dots.length]; g.globalAlpha=.8;
+    const x=Math.random()*W, y=Math.random()*H, r=5+Math.random()*9;
     g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
   g.globalAlpha=1;
-  // balloons top
-  g.font='120px Arial'; g.textAlign='center'; g.fillText('🎈🎂🎉', W/2, 210);
-  // white rounded card panel
-  function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
-  g.fillStyle='rgba(255,255,255,.94)'; rr(90,280,W-180,540,36); g.fill();
-  // HAPPY BIRTHDAY
-  g.fillStyle='#DB2777'; g.font='900 66px Arial'; g.fillText('HAPPY BIRTHDAY', W/2, 400);
-  // NAME — auto-fit inside the panel (shrink, then wrap to 2 lines if needed)
-  g.fillStyle='#0B1F3A';
+  // sparkle plus-stars
+  g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=2;
+  for(let i=0;i<14;i++){ const x=Math.random()*W,y=Math.random()*H,s=6+Math.random()*10;
+    g.beginPath(); g.moveTo(x-s,y); g.lineTo(x+s,y); g.moveTo(x,y-s); g.lineTo(x,y+s); g.stroke(); }
+  // gold double frame
+  g.strokeStyle=gold(0,H); g.lineWidth=6; rr(34,34,W-68,H-68,40); g.stroke();
+  g.lineWidth=2; rr(48,48,W-96,H-96,32); g.stroke();
+  // top festive row
+  g.textAlign='center'; g.font='96px Arial'; g.fillText('🎈   🎂   🎉', W/2, 205);
+  // white panel with shadow + gold inner border
+  g.save(); g.shadowColor='rgba(0,0,0,.35)'; g.shadowBlur=40; g.shadowOffsetY=14;
+  g.fillStyle='#FFFDF9'; rr(95,270,W-190,560,40); g.fill(); g.restore();
+  g.strokeStyle=gold(270,830); g.lineWidth=3; rr(108,283,W-216,534,32); g.stroke();
+  // HAPPY BIRTHDAY (gold) + flourishes
+  g.fillStyle=gold(358,404); g.font='900 60px Arial'; g.fillText('HAPPY BIRTHDAY', W/2, 392);
+  g.strokeStyle='#E6B94E'; g.lineWidth=3;
+  g.beginPath(); g.moveTo(W/2-252,404); g.lineTo(W/2-182,404); g.moveTo(W/2+182,404); g.lineTo(W/2+252,404); g.stroke();
+  g.fillStyle='#E6B94E'; [W/2-168,W/2+168].forEach(x=>{ g.beginPath(); g.arc(x,404,5,0,7); g.fill(); });
+  // NAME — navy, auto-fit inside the panel (shrink, then wrap to 2 lines)
+  g.fillStyle='#12203B';
   const nm=name.toUpperCase();
-  const maxNameW=W-250;                 // keep clear of panel edges
-  let fs=80; g.font='900 '+fs+'px Arial';
+  const maxNameW=W-260;
+  let fs=78; g.font='900 '+fs+'px Arial';
   if(g.measureText(nm).width<=maxNameW){
-    g.fillText(nm, W/2, 500);
+    g.fillText(nm, W/2, 492);
   } else {
     while(g.measureText(nm).width>maxNameW && fs>52){ fs-=2; g.font='900 '+fs+'px Arial'; }
     if(g.measureText(nm).width<=maxNameW){
-      g.fillText(nm, W/2, 500);
+      g.fillText(nm, W/2, 492);
     } else {
-      // wrap to two balanced lines
       const words=nm.split(' '); let l1='',l2='';
       for(const w of words){ const t=(l1?l1+' ':'')+w;
         if(g.measureText(t).width<=maxNameW && !l2) l1=t; else l2=(l2?l2+' ':'')+w; }
       if(!l2){ l2=l1; l1=''; }
-      fs=60; g.font='900 '+fs+'px Arial';
+      fs=58; g.font='900 '+fs+'px Arial';
       while((g.measureText(l1).width>maxNameW||g.measureText(l2).width>maxNameW)&&fs>40){ fs-=2; g.font='900 '+fs+'px Arial'; }
-      if(l1){ g.fillText(l1, W/2, 476); g.fillText(l2, W/2, 476+fs+8); }
-      else  { g.fillText(l2, W/2, 500); }
+      if(l1){ g.fillText(l1, W/2, 466); g.fillText(l2, W/2, 466+fs+6); }
+      else  { g.fillText(l2, W/2, 492); }
     }
   }
+  // gold divider under name
+  g.strokeStyle='#E6B94E'; g.lineWidth=3;
+  g.beginPath(); g.moveTo(W/2-95,540); g.lineTo(W/2-16,540); g.moveTo(W/2+16,540); g.lineTo(W/2+95,540); g.stroke();
+  g.fillStyle='#E6B94E'; g.beginPath(); g.arc(W/2,540,6,0,7); g.fill();
   // message
-  g.fillStyle='#374151'; g.font='36px Arial';
-  g.fillText('Dear '+first+', wishing you a day full of', W/2, 585);
-  g.fillText('joy and a year full of health,', W/2, 635);
-  g.fillText('happiness & prosperity. 🎊', W/2, 685);
+  g.fillStyle='#4B5563'; g.font='34px Arial';
+  g.fillText('Dear '+first+', wishing you a day full of', W/2, 600);
+  g.fillText('joy and a year full of health,', W/2, 645);
+  g.fillText('happiness & prosperity. 🎊', W/2, 690);
   // brand
-  g.fillStyle='#7C3AED'; g.font='900 46px Arial'; g.fillText('D N INVESTMENT', W/2, 770);
-  g.fillStyle='#6B7280'; g.font='28px Arial'; g.fillText('Jamshedpur  ·  Your Trusted Financial Partner', W/2, 806);
-  g.fillStyle='rgba(255,255,255,.9)'; g.font='30px Arial'; g.fillText('🎁  Many Many Happy Returns of the Day  🎁', W/2, 900);
+  g.fillStyle=gold(742,792); g.font='900 48px Arial'; g.fillText('D N INVESTMENT', W/2, 764);
+  g.fillStyle='#6B7280'; g.font='26px Arial'; g.fillText('Jamshedpur  ·  Your Trusted Financial Partner', W/2, 798);
+  // bottom gold ribbon
+  g.fillStyle='rgba(255,255,255,.15)'; rr(W/2-335,862,670,58,29); g.fill();
+  g.strokeStyle=gold(862,920); g.lineWidth=2; rr(W/2-335,862,670,58,29); g.stroke();
+  g.fillStyle='#FFF7E6'; g.font='700 28px Arial'; g.fillText('🎁  Many Many Happy Returns of the Day  🎁', W/2, 900);
 
   cv.toBlob(function(blob){
     const file=new File([blob], 'Birthday_'+first+'.png', {type:'image/png'});
