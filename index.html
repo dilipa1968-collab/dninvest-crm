@@ -1066,7 +1066,9 @@ input:focus, select:focus, textarea:focus{
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
-            <input type="date" onchange="filterEq()" id="eq-last-call-date" style="padding:6px;font-size:.78rem"></label>
+            <input type="date" onchange="filterEq()" id="eq-last-call-from" title="From date" style="padding:6px;font-size:.78rem">
+            <span style="font-size:.72rem">to</span>
+            <input type="date" onchange="filterEq()" id="eq-last-call-to" title="To date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
             <input type="date" onchange="filterEq()" id="eq-next-call-date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Trade:
@@ -1177,7 +1179,9 @@ input:focus, select:focus, textarea:focus{
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Call:
-            <input type="date" onchange="filterMf()" id="mf-last-call-date" style="padding:6px;font-size:.78rem"></label>
+            <input type="date" onchange="filterMf()" id="mf-last-call-from" title="From date" style="padding:6px;font-size:.78rem">
+            <span style="font-size:.72rem">to</span>
+            <input type="date" onchange="filterMf()" id="mf-last-call-to" title="To date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Next Call:
             <input type="date" onchange="filterMf()" id="mf-next-call-date" style="padding:6px;font-size:.78rem"></label>
           <label style="font-size:.78rem;color:var(--gray);display:flex;align-items:center;gap:4px">Last Business:
@@ -4154,7 +4158,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','followup-filter','last-call-date','next-call-date','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
+  ['search','status','rm','followup-filter','last-call-from','last-call-to','next-call-date','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -4270,7 +4274,8 @@ function renderEqTable(){
   const st=(document.getElementById('eq-status')||{value:''}).value;
   const rm=(document.getElementById('eq-rm')||{value:''}).value;
   const fu=(document.getElementById('eq-followup-filter')||{value:''}).value;
-  const lastCallDate=(document.getElementById('eq-last-call-date')||{value:''}).value;
+  const lcFrom=(document.getElementById('eq-last-call-from')||{value:''}).value;
+  const lcTo=(document.getElementById('eq-last-call-to')||{value:''}).value;
   const nextCallDate=(document.getElementById('eq-next-call-date')||{value:''}).value;
   const ltFrom=(document.getElementById('eq-last-trade-from')||{value:''}).value;
   const ltTo=(document.getElementById('eq-last-trade-to')||{value:''}).value;
@@ -4286,7 +4291,12 @@ function renderEqTable(){
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
-  if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
+  if(lcFrom||lcTo) data=data.filter(c=>{
+    const d=c.last_call_date; if(!d) return false;
+    if(lcFrom && d<lcFrom) return false;
+    if(lcTo && d>lcTo) return false;
+    return true;
+  });
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
   if(ltFrom||ltTo) data=data.filter(c=>{
     const d=c.last_trade_date; if(!d) return false;
@@ -4434,7 +4444,8 @@ function renderMfTable(){
   const rm=(document.getElementById('mf-rm')||{value:''}).value;
   const fu=(document.getElementById('mf-followup-filter')||{value:''}).value;
   const nextCallDate=(document.getElementById('mf-next-call-date')||{value:''}).value;
-  const lastCallDate=(document.getElementById('mf-last-call-date')||{value:''}).value;
+  const lcFrom=(document.getElementById('mf-last-call-from')||{value:''}).value;
+  const lcTo=(document.getElementById('mf-last-call-to')||{value:''}).value;
   const lbFrom=(document.getElementById('mf-last-biz-from')||{value:''}).value;
   const lbTo=(document.getElementById('mf-last-biz-to')||{value:''}).value;
 
@@ -4450,7 +4461,12 @@ function renderMfTable(){
   if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(nextCallDate) data=data.filter(c=>c.next_call===nextCallDate);
-  if(lastCallDate) data=data.filter(c=>c.last_call_date===lastCallDate);
+  if(lcFrom||lcTo) data=data.filter(c=>{
+    const d=c.last_call_date; if(!d) return false;
+    if(lcFrom && d<lcFrom) return false;
+    if(lcTo && d>lcTo) return false;
+    return true;
+  });
   if(lbFrom||lbTo) data=data.filter(c=>{
     const d=c.last_invest_date; if(!d) return false;
     if(lbFrom && d<lbFrom) return false;
