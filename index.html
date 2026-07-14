@@ -3817,7 +3817,9 @@ function wishAllBirthdays(){
 
 // ── 🎨 Colourful birthday CARD IMAGE for the CLIENT (send on WhatsApp) ──
 function birthdayCardImage(idx){
-  const name=(_bdayCards[idx]||'Friend').trim();
+  const rec=_bdayCards[idx]||{};
+  const name=(rec.name||'Friend').trim();
+  const num=rec.num||'';
   const first=name.split(' ')[0]||name;
   const W=1080,H=1080;
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d');
@@ -3836,19 +3838,36 @@ function birthdayCardImage(idx){
   // white rounded card panel
   function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
   g.fillStyle='rgba(255,255,255,.94)'; rr(90,280,W-180,540,36); g.fill();
-  // texts
+  // HAPPY BIRTHDAY
   g.fillStyle='#DB2777'; g.font='900 66px Arial'; g.fillText('HAPPY BIRTHDAY', W/2, 400);
-  g.fillStyle='#0B1F3A'; g.font='900 80px Arial';
-  let nm=name.toUpperCase(); if(nm.length>18) nm=nm.slice(0,17)+'…';
-  g.fillText(nm, W/2, 500);
-  // message (wrapped)
+  // NAME — auto-fit inside the panel (shrink, then wrap to 2 lines if needed)
+  g.fillStyle='#0B1F3A';
+  const nm=name.toUpperCase();
+  const maxNameW=W-250;                 // keep clear of panel edges
+  let fs=80; g.font='900 '+fs+'px Arial';
+  if(g.measureText(nm).width<=maxNameW){
+    g.fillText(nm, W/2, 500);
+  } else {
+    while(g.measureText(nm).width>maxNameW && fs>52){ fs-=2; g.font='900 '+fs+'px Arial'; }
+    if(g.measureText(nm).width<=maxNameW){
+      g.fillText(nm, W/2, 500);
+    } else {
+      // wrap to two balanced lines
+      const words=nm.split(' '); let l1='',l2='';
+      for(const w of words){ const t=(l1?l1+' ':'')+w;
+        if(g.measureText(t).width<=maxNameW && !l2) l1=t; else l2=(l2?l2+' ':'')+w; }
+      if(!l2){ l2=l1; l1=''; }
+      fs=60; g.font='900 '+fs+'px Arial';
+      while((g.measureText(l1).width>maxNameW||g.measureText(l2).width>maxNameW)&&fs>40){ fs-=2; g.font='900 '+fs+'px Arial'; }
+      if(l1){ g.fillText(l1, W/2, 476); g.fillText(l2, W/2, 476+fs+8); }
+      else  { g.fillText(l2, W/2, 500); }
+    }
+  }
+  // message
   g.fillStyle='#374151'; g.font='36px Arial';
-  const line1='Dear '+first+', wishing you a day full of';
-  const line2='joy and a year full of health,';
-  const line3='happiness & prosperity. 🎊';
-  g.fillText(line1, W/2, 585);
-  g.fillText(line2, W/2, 635);
-  g.fillText(line3, W/2, 685);
+  g.fillText('Dear '+first+', wishing you a day full of', W/2, 585);
+  g.fillText('joy and a year full of health,', W/2, 635);
+  g.fillText('happiness & prosperity. 🎊', W/2, 685);
   // brand
   g.fillStyle='#7C3AED'; g.font='900 46px Arial'; g.fillText('D N INVESTMENT', W/2, 770);
   g.fillStyle='#6B7280'; g.font='28px Arial'; g.fillText('Jamshedpur  ·  Your Trusted Financial Partner', W/2, 806);
@@ -3857,23 +3876,38 @@ function birthdayCardImage(idx){
   cv.toBlob(function(blob){
     const file=new File([blob], 'Birthday_'+first+'.png', {type:'image/png'});
     const url=URL.createObjectURL(blob);
+    const canShare=(navigator.canShare && (function(){ try{ return navigator.canShare({files:[file]}); }catch(e){ return false; } })());
     const ov=document.createElement('div');
     ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;overflow:auto';
-    const canShare=(navigator.canShare && (function(){ try{ return navigator.canShare({files:[file]}); }catch(e){ return false; } })());
     ov.innerHTML=
-      '<img src="'+url+'" style="max-width:min(90vw,420px);max-height:70vh;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.5)">'+
+      '<img src="'+url+'" style="max-width:min(90vw,420px);max-height:64vh;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.5)">'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">'+
-        (canShare?'<button id="_bcShare" style="padding:12px 20px;border:0;border-radius:10px;background:#25D366;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📤 Share to WhatsApp</button>':'')+
+        (num?'<button id="_bcSend" style="padding:12px 20px;border:0;border-radius:10px;background:#25D366;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📲 Send to '+first+'</button>':'')+
+        (canShare?'<button id="_bcShare" style="padding:12px 20px;border:0;border-radius:10px;background:#128C7E;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📤 Share</button>':'')+
         '<button id="_bcDl" style="padding:12px 20px;border:0;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;font-size:15px;cursor:pointer">⬇️ Download</button>'+
         '<button id="_bcCl" style="padding:12px 20px;border:0;border-radius:10px;background:#374151;color:#fff;font-weight:800;font-size:15px;cursor:pointer">✖ Close</button>'+
       '</div>'+
-      (canShare?'':'<div style="color:#e5e7eb;font-size:12px;text-align:center;max-width:420px">Desktop pe image download karke WhatsApp par client ko bhej do. Mobile par 📤 Share button aata hai.</div>');
+      '<div id="_bcHint" style="color:#e5e7eb;font-size:12.5px;text-align:center;max-width:440px;line-height:1.5">'+
+        (num?('“Send to '+first+'” dabao → image copy hogi aur '+first+' ka WhatsApp chat khul jayega. Wahan <b>Ctrl+V</b> se paste karke bhej do. 🎉')
+            :'Is client ka number nahi hai — image Download karke WhatsApp par bhej do.')+
+      '</div>';
     document.body.appendChild(ov);
+    const hint=ov.querySelector('#_bcHint');
     function close(){ URL.revokeObjectURL(url); ov.remove(); }
     ov.querySelector('#_bcCl').onclick=close;
     ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); };
-    const sh=ov.querySelector('#_bcShare');
-    if(sh) sh.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); }catch(e){} };
+    const shr=ov.querySelector('#_bcShare');
+    if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); }catch(e){} };
+    const send=ov.querySelector('#_bcSend');
+    if(send) send.onclick=async function(){
+      let copied=false;
+      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; }catch(e){ copied=false; }
+      if(!copied){ try{ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); }catch(e){} }
+      window.open('https://wa.me/'+num,'_blank','noopener');
+      hint.innerHTML = copied
+        ? ('✅ Image copy ho gayi aur '+first+' ka chat khul gaya — WhatsApp me <b>Ctrl+V</b> dabao aur bhej do. 🎉')
+        : ('📥 Image download ho gayi aur '+first+' ka chat khul gaya — us chat me image <b>attach</b> karke bhej do.');
+    };
     ov.addEventListener('click', function(ev){ if(ev.target===ov) close(); });
   }, 'image/png');
 }
@@ -4020,7 +4054,7 @@ function refreshDash(){
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
           const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
           if(d.length>=12) _bdayQueue.push({name:nm, url});   // add to Wish-All queue
-          _bdayCards[idx]=nm;                                 // for card-image generator
+          _bdayCards[idx]={name:nm, num:(d.length>=12?d:'')};   // name + wa number for card
           const waBtn = d.length>=12
             ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
             : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
