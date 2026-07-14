@@ -3825,13 +3825,13 @@ function birthdayCardImage(idx){
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d');
   function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
   function gold(y0,y1){ const gg=g.createLinearGradient(0,y0,0,y1); gg.addColorStop(0,'#FCEFA1'); gg.addColorStop(.5,'#E6B94E'); gg.addColorStop(1,'#C9962E'); return gg; }
-  // rich jewel-tone gradient background
+  // bright festive gradient background
   const grd=g.createLinearGradient(0,0,W,H);
-  grd.addColorStop(0,'#3B1466'); grd.addColorStop(.5,'#B4236B'); grd.addColorStop(1,'#F0872E');
+  grd.addColorStop(0,'#A25BF0'); grd.addColorStop(.5,'#FF5FA2'); grd.addColorStop(1,'#FFB347');
   g.fillStyle=grd; g.fillRect(0,0,W,H);
-  // soft vignette for depth
-  const vg=g.createRadialGradient(W/2,H*0.46,H*0.28,W/2,H/2,H*0.78);
-  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.30)');
+  // soft white center glow (brightens, premium shine)
+  const vg=g.createRadialGradient(W/2,H*0.40,H*0.12,W/2,H/2,H*0.88);
+  vg.addColorStop(0,'rgba(255,255,255,0.20)'); vg.addColorStop(1,'rgba(0,0,0,0.10)');
   g.fillStyle=vg; g.fillRect(0,0,W,H);
   // confetti dots
   const dots=['#FDE68A','#FCA5A5','#A7F3D0','#93C5FD','#FBCFE8','#FFFFFF'];
