@@ -2544,6 +2544,19 @@ const DB = {
   // other RMs' concurrent entries. Uses a Firestore transaction (re-fetch latest,
   // merge this entry in by id, write back) — the same proven pattern as setClientsBulk.
   _clWriting:0,
+  // Keep the shared call_logs document safely under Firestore's 1 MiB limit.
+  // Newest entries are kept; oldest are dropped once the JSON size crosses the cap.
+  _pruneCallLogs(arr, maxBytes){
+    const sorted = (arr||[]).slice().sort((a,b)=>
+      String((b&&(b.ts||b.date))||'').localeCompare(String((a&&(a.ts||a.date))||'')));
+    const kept=[]; let size=2;                       // "[]" baseline
+    for(const x of sorted){
+      const s=JSON.stringify(x).length+1;            // +1 for comma
+      if(size+s>maxBytes) break;
+      kept.push(x); size+=s;
+    }
+    return kept;
+  },
   async addCallLog(entry){
     // 1) optimistic local append
     let local=[];
@@ -2563,6 +2576,8 @@ const DB = {
         latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
         if(entry&&entry.id) byId[entry.id]=entry;   // add/replace this entry
         finalData = Object.values(byId);
+        // Trim oldest logs so the document stays under Firestore's 1 MiB cap
+        finalData = DB._pruneCallLogs(finalData, 850000);
         tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){
