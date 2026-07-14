@@ -226,6 +226,11 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 
 /* ── LAYOUT ── */
 #app{display:none;}
+/* Show the whole CRM in CAPITAL letters (data, tables, inputs, buttons).
+   Login screen is a separate element (#loginScreen) so credentials are NOT
+   forced to uppercase — login stays case-correct. */
+#app{ text-transform:uppercase; }
+#app .no-upper{ text-transform:none; }
 .topbar{background:linear-gradient(90deg,var(--navy) 0%,var(--navy2) 60%,var(--navy3) 100%);color:#fff;padding:0 24px;display:flex;align-items:center;
   justify-content:space-between;height:50px;position:sticky;top:0;z-index:200;box-shadow:0 2px 0 rgba(255,255,255,.06),var(--shadow2);min-width:0;overflow:hidden;border-bottom:1px solid rgba(255,255,255,.08);}
 .topbar>div:first-child{min-width:0;flex:0 1 auto;overflow:hidden;}
