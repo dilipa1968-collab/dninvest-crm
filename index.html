@@ -3782,7 +3782,7 @@ function hardRefresh(){
 }
 
 // ── Birthday "Wish All" stepper: opens each client's WhatsApp chat one-by-one ──
-let _bdayQueue=[], _bdayStep=0;
+let _bdayQueue=[], _bdayStep=0, _bdayCards=[];
 function wishAllBirthdays(){
   const btn=document.getElementById('wishAllBtn');
   if(!_bdayQueue.length) return;
@@ -3798,6 +3798,69 @@ function wishAllBirthdays(){
       btn.innerHTML=`Next ▶ ${escapeHtml((nx.name||'').split(' ')[0]||nx.name)} (${_bdayStep+1}/${_bdayQueue.length})`;
     }
   }
+}
+
+// ── 🎨 Colourful birthday CARD IMAGE for the CLIENT (send on WhatsApp) ──
+function birthdayCardImage(idx){
+  const name=(_bdayCards[idx]||'Friend').trim();
+  const first=name.split(' ')[0]||name;
+  const W=1080,H=1080;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d');
+  // festive gradient background
+  const grd=g.createLinearGradient(0,0,W,H);
+  grd.addColorStop(0,'#7C3AED'); grd.addColorStop(.5,'#DB2777'); grd.addColorStop(1,'#F97316');
+  g.fillStyle=grd; g.fillRect(0,0,W,H);
+  // confetti dots
+  const dots=['#FDE68A','#FCA5A5','#A7F3D0','#93C5FD','#FBCFE8','#FFFFFF'];
+  for(let i=0;i<70;i++){ g.fillStyle=dots[i%dots.length]; g.globalAlpha=.85;
+    const x=Math.random()*W, y=Math.random()*H, r=6+Math.random()*10;
+    g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
+  g.globalAlpha=1;
+  // balloons top
+  g.font='120px Arial'; g.textAlign='center'; g.fillText('🎈🎂🎉', W/2, 210);
+  // white rounded card panel
+  function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+  g.fillStyle='rgba(255,255,255,.94)'; rr(90,280,W-180,540,36); g.fill();
+  // texts
+  g.fillStyle='#DB2777'; g.font='900 66px Arial'; g.fillText('HAPPY BIRTHDAY', W/2, 400);
+  g.fillStyle='#0B1F3A'; g.font='900 80px Arial';
+  let nm=name.toUpperCase(); if(nm.length>18) nm=nm.slice(0,17)+'…';
+  g.fillText(nm, W/2, 500);
+  // message (wrapped)
+  g.fillStyle='#374151'; g.font='36px Arial';
+  const line1='Dear '+first+', wishing you a day full of';
+  const line2='joy and a year full of health,';
+  const line3='happiness & prosperity. 🎊';
+  g.fillText(line1, W/2, 585);
+  g.fillText(line2, W/2, 635);
+  g.fillText(line3, W/2, 685);
+  // brand
+  g.fillStyle='#7C3AED'; g.font='900 46px Arial'; g.fillText('D N INVESTMENT', W/2, 770);
+  g.fillStyle='#6B7280'; g.font='28px Arial'; g.fillText('Jamshedpur  ·  Your Trusted Financial Partner', W/2, 806);
+  g.fillStyle='rgba(255,255,255,.9)'; g.font='30px Arial'; g.fillText('🎁  Many Many Happy Returns of the Day  🎁', W/2, 900);
+
+  cv.toBlob(function(blob){
+    const file=new File([blob], 'Birthday_'+first+'.png', {type:'image/png'});
+    const url=URL.createObjectURL(blob);
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;overflow:auto';
+    const canShare=(navigator.canShare && (function(){ try{ return navigator.canShare({files:[file]}); }catch(e){ return false; } })());
+    ov.innerHTML=
+      '<img src="'+url+'" style="max-width:min(90vw,420px);max-height:70vh;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.5)">'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">'+
+        (canShare?'<button id="_bcShare" style="padding:12px 20px;border:0;border-radius:10px;background:#25D366;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📤 Share to WhatsApp</button>':'')+
+        '<button id="_bcDl" style="padding:12px 20px;border:0;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;font-size:15px;cursor:pointer">⬇️ Download</button>'+
+        '<button id="_bcCl" style="padding:12px 20px;border:0;border-radius:10px;background:#374151;color:#fff;font-weight:800;font-size:15px;cursor:pointer">✖ Close</button>'+
+      '</div>'+
+      (canShare?'':'<div style="color:#e5e7eb;font-size:12px;text-align:center;max-width:420px">Desktop pe image download karke WhatsApp par client ko bhej do. Mobile par 📤 Share button aata hai.</div>');
+    document.body.appendChild(ov);
+    function close(){ URL.revokeObjectURL(url); ov.remove(); }
+    ov.querySelector('#_bcCl').onclick=close;
+    ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); };
+    const sh=ov.querySelector('#_bcShare');
+    if(sh) sh.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); }catch(e){} };
+    ov.addEventListener('click', function(ev){ if(ev.target===ov) close(); });
+  }, 'image/png');
 }
 
 function refreshDash(){
@@ -3930,50 +3993,36 @@ function refreshDash(){
     ];
     const bHead=document.getElementById('bdayHeadCount');
     if(bHead){bHead.textContent=bdays.length>0?bdays.length:'';bHead.style.display=bdays.length>0?'':'none';}
-    _bdayQueue=[]; _bdayStep=0;   // reset stepper on each dashboard refresh
+    _bdayQueue=[]; _bdayStep=0; _bdayCards=[];   // reset stepper on each dashboard refresh
     bdayEl.innerHTML = bdays.length
       ? (()=>{
-        const BPAL=[
-          'linear-gradient(135deg,#EC4899,#F97316)',
-          'linear-gradient(135deg,#8B5CF6,#6366F1)',
-          'linear-gradient(135deg,#14B8A6,#22C55E)',
-          'linear-gradient(135deg,#3B82F6,#06B6D4)',
-          'linear-gradient(135deg,#F43F5E,#EF4444)'
-        ];
         const rows = bdays.map((c,idx)=>{
           const nm=c.name||'—';
           let d=String(c.mobile||'').replace(/\D/g,'');
           if(d.length===10) d='91'+d;                       // add country code for wa.me
           const yr=parseInt(String(c.dob).slice(0,4),10);
+          const turns=(yr&&curYear>yr)?` <small style="color:var(--gray)">(turns ${curYear-yr})</small>`:'';
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
           const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
           if(d.length>=12) _bdayQueue.push({name:nm, url});   // add to Wish-All queue
-          const pal=BPAL[idx%BPAL.length];
-          const turnsPill=(yr&&curYear>yr)
-            ? `<span style="background:rgba(255,255,255,.28);color:#fff;font-size:.6rem;font-weight:800;padding:1px 8px;border-radius:8px">🎈 TURNS ${curYear-yr}</span>` : '';
+          _bdayCards[idx]=nm;                                 // for card-image generator
           const waBtn = d.length>=12
-            ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:4px;background:#fff;color:#128C7E;font-size:.7rem;font-weight:800;padding:6px 13px;border-radius:9px;text-decoration:none;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.2)">💬 WISH</a>`
-            : `<span style="margin-left:4px;font-size:.62rem;color:rgba(255,255,255,.85);flex-shrink:0">NO NUMBER</span>`;
-          return `<div style="display:flex;align-items:center;gap:10px;background:${pal};border-radius:14px;padding:10px 12px;margin-bottom:9px;box-shadow:0 4px 14px -4px rgba(0,0,0,.35);position:relative;overflow:hidden">
-            <div style="font-size:1.7rem;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))">🎂</div>
-            <div style="min-width:0;flex:1">
-              <div style="color:#fff;font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(nm)}</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
-                ${turnsPill}
-                <span style="background:rgba(255,255,255,.22);color:#fff;font-size:.6rem;font-weight:700;padding:1px 7px;border-radius:8px">${c.seg}</span>
-                <span style="color:rgba(255,255,255,.92);font-size:.66rem">${escapeHtml(c.rm||'')}</span>
-              </div>
-            </div>
-            ${waBtn}
-            <span style="position:absolute;right:-4px;top:-6px;font-size:1.1rem;opacity:.5">🎉</span>
+            ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
+            : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
+          const cardBtn=`<button onclick="birthdayCardImage(${idx})" title="Make colourful card image for client" style="margin-left:6px;background:#e11d8f;color:#fff;border:none;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:8px;cursor:pointer;flex-shrink:0">🎨 Card</button>`;
+          return `<div class="bar-row" style="border-left:3px solid #e11d8f;padding-left:9px;">
+            <span class="bar-name">${escapeHtml(nm)}${turns}</span>
+            <span class="badge ${c.seg==='EQ'?'b-eq':'b-mf'}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
+            <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
+            ${waBtn}${cardBtn}
           </div>`;
         }).join('');
         const wishAll = _bdayQueue.length>=2
-          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:12px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;font-size:.82rem;font-weight:800;padding:10px;border-radius:11px;cursor:pointer;box-shadow:0 4px 12px -2px rgba(18,140,126,.5)">💬 WISH ALL (${_bdayQueue.length}) — OPENS ONE BY ONE</button>`
+          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All (${_bdayQueue.length}) — opens one by one</button>`
           : '';
         return wishAll + rows;
       })()
-      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 NO BIRTHDAYS TODAY</p>';
+      : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 No birthdays today</p>';
   }
 
   // Redemption / SIP Stop audit (Admin side) — last entry date per MF RM,
