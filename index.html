@@ -1715,6 +1715,7 @@ input:focus, select:focus, textarea:focus{
             </div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveCallLimits()">💾 Save Limits</button>
+              <button class="btn btn-outline" onclick="resetCallLimits()" title="Rolling default wapas: Last Call aaj tak, Next Call aaj se +3 mahine">↩️ Reset to Default</button>
               <button class="btn btn-outline" onclick="document.getElementById('cl-lc-min').value='';document.getElementById('cl-lc-max').value='';document.getElementById('cl-nc-min').value='';document.getElementById('cl-nc-max').value=''">✖ Clear All (no limit)</button>
             </div>
           </div>
@@ -3317,6 +3318,17 @@ function populateCallLimitInputs(){
   const eff = CALL_LIMITS.configured ? CALL_LIMITS : {lcMin:'',lcMax:today(),ncMin:today(),ncMax:_plus3m()};
   const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v||'';};
   set('cl-lc-min',eff.lcMin); set('cl-lc-max',eff.lcMax); set('cl-nc-min',eff.ncMin); set('cl-nc-max',eff.ncMax);
+}
+// Reset to the built-in DEFAULT (rolling): Last Call up to today; Next Call
+// today .. +3 months. Removes any admin-set fixed limits.
+async function resetCallLimits(){
+  if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
+  CALL_LIMITS = { configured:false, lcMin:'', lcMax:'', ncMin:'', ncMax:'' };
+  try{
+    if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').delete();
+    populateCallLimitInputs();
+    toast('Default limits wapas lag gaye ✓ (Last Call: aaj tak · Next Call: aaj se +3 mahine)','success');
+  }catch(e){ toast('Reset failed: '+(e&&e.message||e),'error'); }
 }
 async function saveCallLimits(){
   if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
