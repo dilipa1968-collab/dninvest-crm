@@ -2858,7 +2858,7 @@ async function doLogin(){
       }
     }
     CU = user;
-    localStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p}));
+    localStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p, at:Date.now()}));
     document.getElementById('lerr').style.display='none';
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
@@ -3173,7 +3173,7 @@ async function tryAutoLogin(){
   }
   if(saved){
     try{
-      const {username, password} = JSON.parse(saved);
+      const {username, password, at} = JSON.parse(saved);
       const users = DB.get('users') || DEFAULT_USERS;
       const td = today();
       // Same credential + active rules as doLogin():
@@ -3198,6 +3198,19 @@ async function tryAutoLogin(){
         // Session is kept (not cleared) so auto-login resumes once reopened.
         if(user.role!=='admin'){
           try{ if(await isCrmBlockedForRm()) return; }catch(e){}
+        }
+        // Daily fresh-login for RMs on shared computers: the FIRST auto-login
+        // after 8 AM each day must instead ask for a password. If the saved
+        // session was established before today's 8 AM boundary, clear it and
+        // stay on the login screen. (Admin is exempt — stays auto-logged in.)
+        if(user.role!=='admin'){
+          const now8 = new Date(); now8.setHours(8,0,0,0);
+          const nowMs = Date.now();
+          const loginAt = Number(at)||0;
+          if(nowMs >= now8.getTime() && loginAt < now8.getTime()){
+            localStorage.removeItem('dninvest_session');
+            return; // require manual password login
+          }
         }
         CU = user;
         document.getElementById('loginScreen').style.display='none';
@@ -10853,8 +10866,8 @@ function saveChangeCred(){
   if(newPin && CU.role==='rm') users[idx].pin = newPin;
 
   // Update persistent session so auto-login keeps working with the new credential
-  if(newPass){ CU.password = newPass; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass})); }
-  if(newPin && CU.role==='rm'){ CU.pin = newPin; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPin})); }
+  if(newPass){ CU.password = newPass; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass, at:Date.now()})); }
+  if(newPin && CU.role==='rm'){ CU.pin = newPin; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPin, at:Date.now()})); }
 
   DB.set('users', users);
   closeModal('changeCredModal');
