@@ -1690,6 +1690,35 @@ input:focus, select:focus, textarea:focus{
           </div>
           <p style="color:#b91c1c;font-size:.75rem;margin:12px 0 0">⚠️ Restore replaces the current data with the backup file data — use with caution.</p>
         </div>
+
+        <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
+          <h3 style="margin:0 0 6px">🔒 Call Date Lock (for RMs)</h3>
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">RM ke Follow-up form me <b>Last Call</b> aur <b>Next Call</b> date ki limit set karo. Isse pehle ya iske baad ki date RM daal nahi payega. Blank chhodo = us taraf koi limit nahi. (Admin par koi limit nahi lagti.)</p>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse pehle nahi (earliest)
+                  <input type="date" id="cl-lc-min" style="padding:6px"></label>
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse baad nahi (latest)
+                  <input type="date" id="cl-lc-max" style="padding:6px"></label>
+              </div>
+            </div>
+            <div>
+              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse pehle nahi (earliest)
+                  <input type="date" id="cl-nc-min" style="padding:6px"></label>
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse baad nahi (latest)
+                  <input type="date" id="cl-nc-max" style="padding:6px"></label>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="saveCallLimits()">💾 Save Limits</button>
+              <button class="btn btn-outline" onclick="document.getElementById('cl-lc-min').value='';document.getElementById('cl-lc-max').value='';document.getElementById('cl-nc-min').value='';document.getElementById('cl-nc-max').value=''">✖ Clear All (no limit)</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── ANNOUNCEMENTS PAGE ── -->
@@ -3260,6 +3289,48 @@ window.addEventListener('DOMContentLoaded', tryAutoLogin);
 // ══════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════
+// ── Admin-configurable Call Date Limits (locks RM date entry) ─────────────
+// Admin sets earliest/latest allowed dates for Last Call & Next Call. RMs are
+// restricted (input min/max + save validation). Admin itself is unrestricted.
+let CALL_LIMITS = { configured:false, lcMin:'', lcMax:'', ncMin:'', ncMax:'' };
+function _plus3m(){ const d=new Date(); d.setMonth(d.getMonth()+3); return d.toISOString().split('T')[0]; }
+async function loadCallLimits(){
+  try{
+    if(typeof fdb==='undefined') return;
+    const doc = await fdb.collection('shared_control').doc('call_limits').get();
+    if(doc.exists && doc.data() && doc.data().data){
+      const d=doc.data().data;
+      CALL_LIMITS = { configured:true, lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'' };
+    }
+  }catch(e){ console.log('call limits load failed', e); }
+  try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
+}
+// Effective min/max for the CURRENT user. Admin = no limits.
+function effectiveCallLimits(){
+  if(CU && CU.role==='admin') return {lcMin:'',lcMax:'',ncMin:'',ncMax:''};
+  if(CALL_LIMITS.configured) return {lcMin:CALL_LIMITS.lcMin,lcMax:CALL_LIMITS.lcMax,ncMin:CALL_LIMITS.ncMin,ncMax:CALL_LIMITS.ncMax};
+  return {lcMin:'',lcMax:today(),ncMin:today(),ncMax:_plus3m()}; // legacy defaults
+}
+function _lcAttr(){ const c=effectiveCallLimits(); return (c.lcMin?` min="${c.lcMin}"`:'')+(c.lcMax?` max="${c.lcMax}"`:''); }
+function _ncAttr(){ const c=effectiveCallLimits(); return (c.ncMin?` min="${c.ncMin}"`:'')+(c.ncMax?` max="${c.ncMax}"`:''); }
+function populateCallLimitInputs(){
+  const eff = CALL_LIMITS.configured ? CALL_LIMITS : {lcMin:'',lcMax:today(),ncMin:today(),ncMax:_plus3m()};
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v||'';};
+  set('cl-lc-min',eff.lcMin); set('cl-lc-max',eff.lcMax); set('cl-nc-min',eff.ncMin); set('cl-nc-max',eff.ncMax);
+}
+async function saveCallLimits(){
+  if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
+  const gv=id=>(document.getElementById(id)||{value:''}).value||'';
+  const d={ lcMin:gv('cl-lc-min'), lcMax:gv('cl-lc-max'), ncMin:gv('cl-nc-min'), ncMax:gv('cl-nc-max') };
+  if(d.lcMin && d.lcMax && d.lcMin>d.lcMax){ toast('Last Call: "earliest" date "latest" se baad me hai','error'); return; }
+  if(d.ncMin && d.ncMax && d.ncMin>d.ncMax){ toast('Next Call: "earliest" date "latest" se baad me hai','error'); return; }
+  CALL_LIMITS = { configured:true, ...d };
+  try{
+    if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').set({data:d, updated:new Date().toISOString()});
+    toast('Call date limits saved ✓ — RMs par lag gaya','success');
+  }catch(e){ toast('Save failed: '+(e&&e.message||e),'error'); }
+}
+
 function initApp(){
   // Sync from Firebase first, then setup real-time listeners.
   // If fdb isn't ready yet (slow load), wait for it so we don't skip the
@@ -3280,6 +3351,16 @@ function initApp(){
       checkRmReply();
       refreshHolidaySet().then(runAutoSchedule); // Load holidays, then run auto-schedule on load
       cleanExpiredTempAccess(); // Clean expired temp access
+      loadCallLimits(); // admin-configured call date locks
+
+      // Real-time: call date limits (RM gets Admin's change without reload)
+      fdb.collection('shared_control').doc('call_limits').onSnapshot(doc=>{
+        if(doc.exists && doc.data() && doc.data().data){
+          const d=doc.data().data;
+          CALL_LIMITS = { configured:true, lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'' };
+          try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
+        }
+      });
 
       // Real-time listener for announcements (single object, not array)
       fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
@@ -3705,7 +3786,7 @@ function showPage(id){
   else if(id==='reports') renderReports();
   else if(id==='activity-log') renderActivityLog();
   else if(id==='brokerage') renderBrokeragePage();
-  else if(id==='admin') renderAdmin();
+  else if(id==='admin'){ renderAdmin(); populateCallLimitInputs(); }
   else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); populateOfferTarget(); renderOffersAdmin(); renderCommHistory(); const of=document.getElementById('offer-from'); if(of && !of.value) of.value=today(); }
   else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
@@ -4844,8 +4925,8 @@ function leadForm(c){
   </div>
   <div class="form-section">Follow-up</div>
   <div class="form-row three">
-    <div class="form-field"><label>Last Calling Date</label><input id="l_last_call" type="date" value="${c?.last_call||''}" max="${today()}"></div>
-    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}"></div>
+    <div class="form-field"><label>Last Calling Date</label><input id="l_last_call" type="date" value="${c?.last_call||''}"${_lcAttr()}></div>
+    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()}></div>
     <div class="form-field"><label>Follow-up Status</label><select id="l_followup">
       <option value="">—</option>
       <option ${c?.followup_status==='Pending'?'selected':''}>Pending</option>
@@ -4905,6 +4986,18 @@ async function saveLead(){
   const name=(document.getElementById('l_name')||{value:''}).value.trim();
   const rm=normRm((document.getElementById('l_rm')||{value:''}).value.trim());
   if(!name){ toast('Lead name is required','error'); return; }
+
+  // RM call-date lock (Admin-configured). Admin is unrestricted.
+  if(CU && CU.role!=='admin'){
+    const _cl=effectiveCallLimits();
+    const _lc=(document.getElementById('l_last_call')||{value:''}).value;
+    const _nc=(document.getElementById('l_next_call')||{value:''}).value;
+    const _fd=s=>{ const p=String(s).split('-'); return p.length===3? p[2]+'-'+p[1]+'-'+p[0] : s; };
+    if(_lc){ if(_cl.lcMin && _lc<_cl.lcMin){ toast('Last Call date '+_fd(_cl.lcMin)+' se pehle nahi ho sakti','error'); return; }
+             if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date '+_fd(_cl.lcMax)+' ke baad nahi ho sakti','error'); return; } }
+    if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date '+_fd(_cl.ncMin)+' se pehle nahi ho sakti','error'); return; }
+             if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date '+_fd(_cl.ncMax)+' ke baad nahi ho sakti','error'); return; } }
+  }
 
   const gv2=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
   const leads=DB.get('leads')||[];
@@ -6512,13 +6605,13 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Last Trade Date</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}"></div>
       <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
-      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" max="${today()}"></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"${_lcAttr()}></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
       <div class="form-field">
         <label>Next Calling Date</label>
-        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}" ${c?.do_not_call?'disabled':''}>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${c?.do_not_call?'disabled':''}>
         <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
           <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
           🚫 Do Not Call
@@ -6570,14 +6663,14 @@ function clientForm(seg, c){
     </div>
     <div class="form-row three">
       <div class="form-field"><label>Last Investment Date</label><input id="f_last_invest" type="date" value="${c?.last_invest_date||''}"></div>
-      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" max="${today()}"></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"${_lcAttr()}></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
       <div class="form-field">
         <label>Next Calling Date</label>
-        <input id="f_next_call" type="date" value="${c?.next_call||''}" min="${today()}" max="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return d.toISOString().split('T')[0]})()}" ${c?.do_not_call?'disabled':''}>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${c?.do_not_call?'disabled':''}>
         <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
           <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
           🚫 Do Not Call
@@ -6646,6 +6739,18 @@ async function saveClient(){
   const rm = normRm((document.getElementById('f_rm')||{value:''}).value.trim());
   if(!name){ toast('Client name is required','error'); return; }
   if(!rm){ toast('Please select RM','error'); return; }
+
+  // RM call-date lock (Admin-configured). Admin is unrestricted.
+  if(CU && CU.role!=='admin'){
+    const _cl=effectiveCallLimits();
+    const _lc=(document.getElementById('f_last_call')||{value:''}).value;
+    const _nc=(document.getElementById('f_next_call')||{value:''}).value;
+    const _fd=s=>{ const p=String(s).split('-'); return p.length===3? p[2]+'-'+p[1]+'-'+p[0] : s; };
+    if(_lc){ if(_cl.lcMin && _lc<_cl.lcMin){ toast('Last Call date '+_fd(_cl.lcMin)+' se pehle nahi ho sakti','error'); return; }
+             if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date '+_fd(_cl.lcMax)+' ke baad nahi ho sakti','error'); return; } }
+    if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date '+_fd(_cl.ncMin)+' se pehle nahi ho sakti','error'); return; }
+             if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date '+_fd(_cl.ncMax)+' ke baad nahi ho sakti','error'); return; } }
+  }
 
   // Mandatory field validation
   if(seg==='equity'){
