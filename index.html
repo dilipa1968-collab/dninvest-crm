@@ -1657,7 +1657,41 @@ input:focus, select:focus, textarea:focus{
         <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
           <h3 style="margin:0 0 6px">🔒 Call Date Lock (for RMs)</h3>
           <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">RM ke Follow-up form me <b>Last Call</b> aur <b>Next Call</b> date ki limit set karo. Isse pehle ya iske baad ki date RM daal nahi payega. Blank chhodo = us taraf koi limit nahi. (Admin par koi limit nahi lagti.)</p>
-          <div style="display:flex;flex-direction:column;gap:14px">
+
+          <div style="display:flex;gap:8px;margin:0 0 14px;background:#f1f5f9;padding:4px;border-radius:10px;width:fit-content">
+            <button type="button" id="cl-tab-rolling" class="btn" style="border:0;padding:7px 14px;border-radius:8px;font-size:.82rem" onclick="setCallLimitMode('rolling')">🔄 Rolling (auto)</button>
+            <button type="button" id="cl-tab-fixed" class="btn" style="border:0;padding:7px 14px;border-radius:8px;font-size:.82rem" onclick="setCallLimitMode('fixed')">📅 Fixed Dates</button>
+          </div>
+
+          <!-- ROLLING MODE -->
+          <div id="cl-pane-rolling" style="display:none;flex-direction:column;gap:14px">
+            <p style="margin:0;font-size:.8rem;color:var(--gray);background:#ecfdf5;border-left:3px solid #10b981;padding:8px 10px;border-radius:6px">
+              ✅ <b>Rolling mode:</b> limit har roz <b>khud aage khisak jati hai</b> — daily click karne ki zarurat nahi. Neeche <b>aaj se kitne din</b> ka gap allow karna hai wo daalo. Blank = us taraf koi limit nahi.
+              <br>Example: <b>-7</b> = 7 din pehle tak · <b>0</b> = aaj · <b>90</b> = aaj se 90 din baad tak.
+            </p>
+            <div>
+              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se kam se kam (din)
+                  <input type="number" id="cl-r-lc-min" placeholder="blank = no limit" style="padding:6px;width:150px"></label>
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se zyada se zyada (din)
+                  <input type="number" id="cl-r-lc-max" placeholder="0 = aaj tak" style="padding:6px;width:150px"></label>
+              </div>
+            </div>
+            <div>
+              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se kam se kam (din)
+                  <input type="number" id="cl-r-nc-min" placeholder="0 = aaj se" style="padding:6px;width:150px"></label>
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se zyada se zyada (din)
+                  <input type="number" id="cl-r-nc-max" placeholder="90 = +3 mahine" style="padding:6px;width:150px"></label>
+              </div>
+            </div>
+            <div id="cl-preview" style="font-size:.8rem;color:var(--navy);background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px"></div>
+          </div>
+
+          <!-- FIXED MODE -->
+          <div id="cl-pane-fixed" style="display:none;flex-direction:column;gap:14px">
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1676,11 +1710,15 @@ input:focus, select:focus, textarea:focus{
                   <input type="date" id="cl-nc-max" style="padding:6px"></label>
               </div>
             </div>
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <button class="btn btn-primary" onclick="saveCallLimits()">💾 Save Limits</button>
-              <button class="btn btn-outline" onclick="resetCallLimits()" title="Rolling default wapas: Last Call aaj tak, Next Call aaj se +3 mahine">↩️ Reset to Default</button>
-              <button class="btn btn-outline" onclick="document.getElementById('cl-lc-min').value='';document.getElementById('cl-lc-max').value='';document.getElementById('cl-nc-min').value='';document.getElementById('cl-nc-max').value=''">✖ Clear All (no limit)</button>
-            </div>
+            <p style="margin:0;font-size:.8rem;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:6px">
+              ⚠️ <b>Fixed mode:</b> ye dates <b>freeze</b> rehti hain — apne aap aage nahi badhti. Rolling limit chahiye to upar "Rolling (auto)" chuno.
+            </p>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
+            <button class="btn btn-primary" onclick="saveCallLimits()">💾 Save Limits</button>
+            <button class="btn btn-outline" onclick="resetCallLimits()" title="Rolling default wapas: Last Call aaj tak, Next Call aaj se +3 mahine">↩️ Reset to Default</button>
+            <button class="btn btn-outline" onclick="clearCallLimits()">✖ Clear All (no limit)</button>
           </div>
         </div>
       </div>
@@ -3488,15 +3526,30 @@ window.addEventListener('DOMContentLoaded', tryAutoLogin);
 // ── Admin-configurable Call Date Limits (locks RM date entry) ─────────────
 // Admin sets earliest/latest allowed dates for Last Call & Next Call. RMs are
 // restricted (input min/max + save validation). Admin itself is unrestricted.
-let CALL_LIMITS = { configured:false, lcMin:'', lcMax:'', ncMin:'', ncMax:'' };
-function _plus3m(){ const d=new Date(); d.setMonth(d.getMonth()+3); return d.toISOString().split('T')[0]; }
+// mode:'rolling' → offsets are DAYS from today (recomputed on every read, so the
+// window auto-rolls daily and never needs re-clicking). mode:'fixed' → frozen dates.
+let CALL_LIMITS = { configured:false, mode:'rolling', lcMin:'', lcMax:'', ncMin:'', ncMax:'', rLcMin:'', rLcMax:'', rNcMin:'', rNcMax:'' };
+const CL_DEFAULT_ROLL = { rLcMin:'', rLcMax:0, rNcMin:0, rNcMax:90 };
+// Local-date arithmetic (no UTC/ISO — avoids IST midnight date shift)
+function _dayOffset(n){
+  const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+Number(n));
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function _off(v){ return (v===''||v===null||v===undefined||isNaN(v)) ? '' : _dayOffset(v); }
+function _plus3m(){ return _dayOffset(90); }
 async function loadCallLimits(){
   try{
     if(typeof fdb==='undefined') return;
     const doc = await fdb.collection('shared_control').doc('call_limits').get();
     if(doc.exists && doc.data() && doc.data().data){
       const d=doc.data().data;
-      CALL_LIMITS = { configured:true, lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'' };
+      const num=v=>(v===''||v===null||v===undefined)?'':Number(v);
+      CALL_LIMITS = { configured:true, mode:(d.mode==='fixed'?'fixed':'rolling'),
+        lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'',
+        rLcMin:num(d.rLcMin), rLcMax:num(d.rLcMax), rNcMin:num(d.rNcMin), rNcMax:num(d.rNcMax) };
+      // legacy doc (saved before rolling mode existed) had only fixed dates
+      if(d.mode===undefined) CALL_LIMITS.mode='fixed';
     }
   }catch(e){ console.log('call limits load failed', e); }
   try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
@@ -3504,37 +3557,89 @@ async function loadCallLimits(){
 // Effective min/max for the CURRENT user. Admin = no limits.
 function effectiveCallLimits(){
   if(CU && CU.role==='admin') return {lcMin:'',lcMax:'',ncMin:'',ncMax:''};
-  if(CALL_LIMITS.configured) return {lcMin:CALL_LIMITS.lcMin,lcMax:CALL_LIMITS.lcMax,ncMin:CALL_LIMITS.ncMin,ncMax:CALL_LIMITS.ncMax};
-  return {lcMin:'',lcMax:today(),ncMin:today(),ncMax:_plus3m()}; // legacy defaults
+  if(CALL_LIMITS.configured && CALL_LIMITS.mode==='fixed')
+    return {lcMin:CALL_LIMITS.lcMin,lcMax:CALL_LIMITS.lcMax,ncMin:CALL_LIMITS.ncMin,ncMax:CALL_LIMITS.ncMax};
+  const r = CALL_LIMITS.configured ? CALL_LIMITS : CL_DEFAULT_ROLL;
+  return {lcMin:_off(r.rLcMin), lcMax:_off(r.rLcMax), ncMin:_off(r.rNcMin), ncMax:_off(r.rNcMax)};
+}
+function setCallLimitMode(m){
+  CALL_LIMITS.mode = (m==='fixed'?'fixed':'rolling');
+  const on = {background:'#fff',color:'var(--navy)',fontWeight:'700',boxShadow:'0 1px 3px rgba(0,0,0,.12)'};
+  const off = {background:'transparent',color:'var(--gray)',fontWeight:'500',boxShadow:'none'};
+  const tabR=document.getElementById('cl-tab-rolling'), tabF=document.getElementById('cl-tab-fixed');
+  Object.assign(tabR.style, CALL_LIMITS.mode==='rolling'?on:off);
+  Object.assign(tabF.style, CALL_LIMITS.mode==='fixed'?on:off);
+  document.getElementById('cl-pane-rolling').style.display = CALL_LIMITS.mode==='rolling'?'flex':'none';
+  document.getElementById('cl-pane-fixed').style.display   = CALL_LIMITS.mode==='fixed'?'flex':'none';
+  renderCallLimitPreview();
+}
+function renderCallLimitPreview(){
+  const el=document.getElementById('cl-preview'); if(!el) return;
+  const gn=id=>{const v=(document.getElementById(id)||{value:''}).value; return v===''?'':Number(v);};
+  const fd=s=>{ if(!s) return '<i>koi limit nahi</i>'; const p=s.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+  el.innerHTML = '<b>Aaj (' + fd(today()) + ') ka asar:</b><br>'
+    + '📞 Last Call: ' + fd(_off(gn('cl-r-lc-min'))) + ' &nbsp;se&nbsp; ' + fd(_off(gn('cl-r-lc-max'))) + '<br>'
+    + '🔜 Next Call: ' + fd(_off(gn('cl-r-nc-min'))) + ' &nbsp;se&nbsp; ' + fd(_off(gn('cl-r-nc-max')))
+    + '<br><span style="color:var(--gray)">Kal ye window apne aap 1 din aage khisak jayegi.</span>';
+}
+function clearCallLimits(){
+  ['cl-lc-min','cl-lc-max','cl-nc-min','cl-nc-max','cl-r-lc-min','cl-r-lc-max','cl-r-nc-min','cl-r-nc-max']
+    .forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  renderCallLimitPreview();
 }
 function _lcAttr(){ const c=effectiveCallLimits(); return (c.lcMin?` min="${c.lcMin}"`:'')+(c.lcMax?` max="${c.lcMax}"`:''); }
 function _ncAttr(){ const c=effectiveCallLimits(); return (c.ncMin?` min="${c.ncMin}"`:'')+(c.ncMax?` max="${c.ncMax}"`:''); }
 function populateCallLimitInputs(){
-  const eff = CALL_LIMITS.configured ? CALL_LIMITS : {lcMin:'',lcMax:today(),ncMin:today(),ncMax:_plus3m()};
-  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v||'';};
-  set('cl-lc-min',eff.lcMin); set('cl-lc-max',eff.lcMax); set('cl-nc-min',eff.ncMin); set('cl-nc-max',eff.ncMax);
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=(v===''||v===null||v===undefined)?'':v;};
+  const c = CALL_LIMITS.configured ? CALL_LIMITS : null;
+  // fixed pane — show current fixed dates, or today's rolling window as a starting point
+  const f = (c && c.mode==='fixed') ? c : effectiveCallLimits0();
+  set('cl-lc-min',f.lcMin); set('cl-lc-max',f.lcMax); set('cl-nc-min',f.ncMin); set('cl-nc-max',f.ncMax);
+  // rolling pane
+  const r = (c && c.mode==='rolling') ? c : CL_DEFAULT_ROLL;
+  set('cl-r-lc-min',r.rLcMin); set('cl-r-lc-max',r.rLcMax); set('cl-r-nc-min',r.rNcMin); set('cl-r-nc-max',r.rNcMax);
+  ['cl-r-lc-min','cl-r-lc-max','cl-r-nc-min','cl-r-nc-max'].forEach(id=>{
+    const el=document.getElementById(id); if(el && !el._clBound){ el._clBound=1; el.addEventListener('input',renderCallLimitPreview); }
+  });
+  setCallLimitMode(c ? c.mode : 'rolling');
+}
+// Same as effectiveCallLimits but ignoring the admin bypass — used to prefill the fixed pane.
+function effectiveCallLimits0(){
+  if(CALL_LIMITS.configured && CALL_LIMITS.mode==='fixed') return CALL_LIMITS;
+  const r = CALL_LIMITS.configured ? CALL_LIMITS : CL_DEFAULT_ROLL;
+  return {lcMin:_off(r.rLcMin), lcMax:_off(r.rLcMax), ncMin:_off(r.rNcMin), ncMax:_off(r.rNcMax)};
 }
 // Reset to the built-in DEFAULT (rolling): Last Call up to today; Next Call
 // today .. +3 months. Removes any admin-set fixed limits.
 async function resetCallLimits(){
   if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
-  CALL_LIMITS = { configured:false, lcMin:'', lcMax:'', ncMin:'', ncMax:'' };
+  CALL_LIMITS = { configured:false, mode:'rolling', lcMin:'', lcMax:'', ncMin:'', ncMax:'', ...CL_DEFAULT_ROLL };
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').delete();
     populateCallLimitInputs();
-    toast('Default limits wapas lag gaye ✓ (Last Call: aaj tak · Next Call: aaj se +3 mahine)','success');
+    toast('Default rolling limits wapas ✓ (Last Call: aaj tak · Next Call: aaj se +90 din) — daily click ki zarurat nahi','success');
   }catch(e){ toast('Reset failed: '+(e&&e.message||e),'error'); }
 }
 async function saveCallLimits(){
   if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
   const gv=id=>(document.getElementById(id)||{value:''}).value||'';
-  const d={ lcMin:gv('cl-lc-min'), lcMax:gv('cl-lc-max'), ncMin:gv('cl-nc-min'), ncMax:gv('cl-nc-max') };
-  if(d.lcMin && d.lcMax && d.lcMin>d.lcMax){ toast('Last Call: "earliest" date "latest" se baad me hai','error'); return; }
-  if(d.ncMin && d.ncMax && d.ncMin>d.ncMax){ toast('Next Call: "earliest" date "latest" se baad me hai','error'); return; }
+  const gn=id=>{const v=gv(id); return v===''?'':Number(v);};
+  const mode = CALL_LIMITS.mode==='fixed' ? 'fixed' : 'rolling';
+  let d;
+  if(mode==='fixed'){
+    d={ mode, lcMin:gv('cl-lc-min'), lcMax:gv('cl-lc-max'), ncMin:gv('cl-nc-min'), ncMax:gv('cl-nc-max'), rLcMin:'', rLcMax:'', rNcMin:'', rNcMax:'' };
+    if(d.lcMin && d.lcMax && d.lcMin>d.lcMax){ toast('Last Call: "earliest" date "latest" se baad me hai','error'); return; }
+    if(d.ncMin && d.ncMax && d.ncMin>d.ncMax){ toast('Next Call: "earliest" date "latest" se baad me hai','error'); return; }
+  } else {
+    d={ mode, lcMin:'', lcMax:'', ncMin:'', ncMax:'', rLcMin:gn('cl-r-lc-min'), rLcMax:gn('cl-r-lc-max'), rNcMin:gn('cl-r-nc-min'), rNcMax:gn('cl-r-nc-max') };
+    if(d.rLcMin!=='' && d.rLcMax!=='' && d.rLcMin>d.rLcMax){ toast('Last Call: "kam se kam" din "zyada se zyada" se bada hai','error'); return; }
+    if(d.rNcMin!=='' && d.rNcMax!=='' && d.rNcMin>d.rNcMax){ toast('Next Call: "kam se kam" din "zyada se zyada" se bada hai','error'); return; }
+  }
   CALL_LIMITS = { configured:true, ...d };
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').set({data:d, updated:new Date().toISOString()});
-    toast('Call date limits saved ✓ — RMs par lag gaya','success');
+    toast(mode==='rolling' ? 'Rolling limits saved ✓ — har roz apne aap aage khisakegi' : 'Fixed call date limits saved ✓ — RMs par lag gaya','success');
+    renderCallLimitPreview();
   }catch(e){ toast('Save failed: '+(e&&e.message||e),'error'); }
 }
 
