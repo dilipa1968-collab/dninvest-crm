@@ -12177,7 +12177,7 @@ async function doEqImport(){
   const usedIds = new Set(existing.map(c=>c.id));
 
   let updated=0, added=0, skipped=0, closedSkipped=0, closedMarked=0;
-  const touched = [];
+  const touched = [], statusFixes = [];
   eqImportData.forEach(row=>{
     // Match by Client Code first, then by Name (mobile match removed - family accounts can share the same mobile)
     let ex = (row.code && byCode[String(row.code).trim().toUpperCase()]) || (row.name && byName[String(row.name).trim().toUpperCase()]);
@@ -12187,7 +12187,11 @@ async function doEqImport(){
 
     if(ex){
       if(row.status){
-        if(row.status==='Closed' && ex.status!=='Closed') closedMarked++;
+        const old = ex.status || '(blank)';
+        if(old !== row.status){
+          statusFixes.push([ex.rm||'—', ex.code||'', ex.name||'', old, row.status]);
+          if(row.status==='Closed') closedMarked++;
+        }
         ex.status = row.status;                // Active / Inactive / Closed file se
       }
       if(row.asset_value!==null) ex.asset_value = row.asset_value;
@@ -12225,11 +12229,19 @@ async function doEqImport(){
   await DB.setClientsBulk('eq_clients', touched);
   closeModal('eqImportModal');
   let msg = `✅ Import done! ${updated} updated, ${added} new added`;
-  if(closedMarked) msg += `, ${closedMarked} Closed mark kiye`;
+  if(statusFixes.length) msg += `, ${statusFixes.length} status corrected`;
   if(closedSkipped) msg += `, ${closedSkipped} Closed skip (add nahi kiye)`;
   if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
+
+  // Jo status file se theek hue (RM ne galat mark kiya tha) — unki report dikhao
+  if(statusFixes.length){
+    setTimeout(()=>{
+      showReport(`Status Corrections — ${statusFixes.length} clients (${closedMarked} Closed mark)`,
+        ['RM','Code','Name','CRM me tha','File se sahi'], statusFixes);
+    }, 600);
+  }
 }
 
 // ══ EQUITY BULK RM UPDATE (Admin only) ══
