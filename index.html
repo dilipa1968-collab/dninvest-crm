@@ -12171,7 +12171,12 @@ async function doEqImport(){
   const byCode = {}, byName = {};
   existing.forEach(c=>{
     if(c.code) byCode[String(c.code).trim().toUpperCase()] = c;
-    if(c.name) byName[String(c.name).trim().toUpperCase()] = c;
+    // Duplicate naam wale clients ko AMBIGUOUS mark karo — inko naam se
+    // match karna khatarnak hai (ek hi naam ke 2-7 alag codes hote hain).
+    if(c.name){
+      const nk = String(c.name).trim().toUpperCase();
+      byName[nk] = (byName[nk] === undefined) ? c : 'AMBIGUOUS';
+    }
   });
   // ids already used (to avoid collision with new uids)
   const usedIds = new Set(existing.map(c=>c.id));
@@ -12179,8 +12184,24 @@ async function doEqImport(){
   let updated=0, added=0, skipped=0, closedSkipped=0, closedMarked=0;
   const touched = [], statusFixes = [];
   eqImportData.forEach(row=>{
-    // Match by Client Code first, then by Name (mobile match removed - family accounts can share the same mobile)
-    let ex = (row.code && byCode[String(row.code).trim().toUpperCase()]) || (row.name && byName[String(row.name).trim().toUpperCase()]);
+    // ── MATCHING (fixed) ────────────────────────────────────────────────
+    // Pehle jo logic tha: code na mile to naam se match kar leta tha. Bug ye
+    // tha ki ek hi naam ke kai alag accounts hote hain (e.g. NITESH KUMAR ke
+    // 4 codes: 225870/1539468 Active, 1788150/3335199 Closed). Closed wale
+    // code ki row CRM me na milne par naam se fallback hota tha aur Active
+    // wale Nitesh pe Closed chipak jaata tha. File me 141 duplicate naam
+    // hain jinme 75 ka status mixed hai → 75 clients tak galat ho sakte the.
+    // Fix: agar row me CODE hai to SIRF code se match karo. Code diya hai
+    // par CRM me nahi mila = ye alag account hai → naya add hoga (ya Closed
+    // hone par skip). Naam-fallback sirf tab jab row me code hi na ho, aur
+    // tab bhi sirf unique naam ke liye.
+    let ex = null;
+    if(row.code){
+      ex = byCode[String(row.code).trim().toUpperCase()] || null;
+    } else if(row.name){
+      const nm = byName[String(row.name).trim().toUpperCase()];
+      if(nm && nm !== 'AMBIGUOUS') ex = nm;
+    }
 
     // Closed account jo CRM me hai hi nahi -> post hi mat karo
     if(!ex && row.status==='Closed'){ closedSkipped++; return; }
