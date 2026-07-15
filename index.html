@@ -944,6 +944,9 @@ input:focus, select:focus, textarea:focus{
       <div class="nav-item" onclick="showPage('announcements')" id="nav-announcements">
         <span class="icon">📢</span> Announcements
       </div>
+      <div class="nav-item" onclick="showPage('duplicates')" id="nav-duplicates">
+        <span class="icon">🧹</span> Duplicates
+      </div>
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Users & Settings
         <span class="badge" id="admin-inbox-badge-nav" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
@@ -1515,6 +1518,41 @@ input:focus, select:focus, textarea:focus{
       </div>
 
       <!-- ── BROKERAGE ── -->
+      <div class="page" id="page-duplicates">
+        <div class="page-hdr">
+          <div class="page-title">🧹 Duplicate Finder</div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="DUP.export()">⬇️ Excel Export</button>
+            <button class="btn btn-outline" onclick="DUP.scan()">🔄 Re-scan</button>
+          </div>
+        </div>
+
+        <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.82rem">
+          ⚠️ <b>Delete permanent hai.</b> Pehle <b>Users &amp; Settings → Download Full Backup</b> le lijiye.
+          Har group me kam se kam <b>1 record</b> rehna zaruri hai — sabko ek saath delete nahi kar sakte.
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item active" onclick="switchTab('dup','eq')">📈 Equity — same Client Code</div>
+          <div class="tab-item" onclick="switchTab('dup','mf')">🏦 Mutual Fund — same PAN</div>
+        </div>
+
+        <div class="tab-panel active" id="dup-eq">
+          <div id="dup-eq-summary" style="margin-bottom:10px;font-size:.85rem"></div>
+          <div id="dup-eq-body"></div>
+        </div>
+        <div class="tab-panel" id="dup-mf">
+          <div id="dup-mf-summary" style="margin-bottom:10px;font-size:.85rem"></div>
+          <div id="dup-mf-body"></div>
+        </div>
+
+        <div id="dup-actionbar" style="display:none;position:sticky;bottom:8px;background:#12263f;color:#fff;padding:10px 16px;border-radius:10px;margin-top:14px;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 -2px 12px rgba(0,0,0,.18)">
+          <span id="dup-selcount" style="font-weight:600"></span>
+          <button class="btn" style="background:#fff;color:#12263f;padding:5px 12px;font-size:.78rem" onclick="DUP.clearSel()">Clear</button>
+          <button class="btn" style="background:#e53935;color:#fff;padding:5px 14px;font-size:.78rem;font-weight:600" onclick="DUP.deleteSelected()">🗑️ Delete Selected</button>
+        </div>
+      </div>
+
       <div class="page" id="page-other-products">
         <div class="page-hdr">
           <div class="page-title">🎯 Other Products</div>
@@ -3759,6 +3797,8 @@ function initApp(){
   if(annNav) annNav.style.display=CU.role==='admin'?'flex':'none';
   const quizNav=document.getElementById('nav-seminar-quiz');
   if(quizNav) quizNav.style.display=CU.role==='admin'?'flex':'none';
+  const dupNav=document.getElementById('nav-duplicates');
+  if(dupNav) dupNav.style.display=CU.role==='admin'?'flex':'none';
 
   // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
@@ -3784,7 +3824,7 @@ function initApp(){
      'nav-eq-followup','nav-eq-notrade','nav-eq-nocall','nav-eq-demat',
      'nav-mf-followup','nav-mf-sip','nav-mf-nocall','nav-mf-txns',
      'nav-other-products','nav-reports','nav-activity-log',
-     'nav-announcements','nav-admin'].forEach(id=>{
+     'nav-announcements','nav-admin','nav-duplicates'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='none';
     });
@@ -3981,6 +4021,7 @@ function showPage(id){
   else if(id==='eq-demat'){ renderEqDematPage(); }
   else if(id==='reports') renderReports();
   else if(id==='activity-log') renderActivityLog();
+  else if(id==='duplicates') DUP.scan();
   else if(id==='admin'){ renderAdmin(); populateCallLimitInputs(); }
   else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); populateOfferTarget(); renderOffersAdmin(); renderCommHistory(); const of=document.getElementById('offer-from'); if(of && !of.value) of.value=today(); }
   else if(id==='rm-messages') renderRmMessages();
@@ -4031,6 +4072,16 @@ function switchTab(group, tab){
   else if(group==='nt'){ activeNtTab=tab; renderNoTrade(); }
   else if(group==='eqnc'){ activeEqncTab=tab; renderNoCall('equity'); }
   else if(group==='mfnc'){ activeMfncTab=tab; renderNoCall('mf'); }
+  else if(group==='dup'){
+    document.querySelectorAll('#page-duplicates .tab-item').forEach((el,i)=>{
+      el.classList.toggle('active',['eq','mf'][i]===tab);
+    });
+    document.querySelectorAll('#page-duplicates .tab-panel').forEach(p=>p.classList.remove('active'));
+    const tp=document.getElementById('dup-'+tab);
+    if(tp) tp.classList.add('active');
+    DUP.activeTab=tab; DUP.renderBar();
+    return;
+  }
   else if(group==='rpt'){
     activeRptTab=tab;
     document.querySelectorAll('#page-reports .tab-item').forEach((el,i)=>{
@@ -13115,6 +13166,201 @@ function exportActivityLog(){
 // Indian-format money helper (₹ 1,23,456.78) — kept from the removed
 // Brokerage Calculator because MF Transactions & View Client still use it.
 function brkFmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DUPLICATE FINDER  (Admin only)
+   Equity → grouped by Client Code · MF → grouped by PAN.
+   Keys are normalised (trim + uppercase + inner spaces removed) so that
+   "1375210", " 1375210 " and "abcde1234f"/"ABCDE1234F" group together.
+   Blank keys are skipped (a Minor's PAN is legitimately empty).
+   Deletes go through DB.deleteClient / DB.deleteClientsBulk, so they are
+   shard-aware and merge-safe. Every group must keep at least one record.
+   ══════════════════════════════════════════════════════════════════════════ */
+const DUP = {
+  activeTab: 'eq',
+  groups: { eq: [], mf: [] },     // [ [key, [recs...]], ... ]
+  sel:    { eq: new Set(), mf: new Set() },
+  stats:  { eq: {total:0,blank:0}, mf: {total:0,blank:0} },
+
+  KEY(seg){ return seg==='eq' ? 'eq_clients' : 'mf_clients'; },
+  norm(s){ return String(s==null?'':s).trim().toUpperCase().replace(/\s+/g,''); },
+
+  scan(){
+    ['eq','mf'].forEach(seg=>{
+      const list = DB.get(this.KEY(seg)) || [];
+      const keyOf = seg==='eq' ? (c=>this.norm(c.code)) : (c=>this.norm(c.pan));
+      const groups = {}; let blank = 0;
+      list.forEach(c=>{
+        const k = keyOf(c);
+        if(!k){ blank++; return; }
+        (groups[k] = groups[k] || []).push(c);
+      });
+      this.groups[seg] = Object.entries(groups)
+        .filter(([,v])=>v.length>1)
+        .sort((a,b)=> b[1].length-a[1].length || a[0].localeCompare(b[0]));
+      this.sel[seg].clear();
+      this.stats[seg] = { total:list.length, blank };
+      this.render(seg, list.length, blank);
+    });
+    this.renderBar();
+  },
+
+  _fmtD(d){ return d ? String(d).split('T')[0] : ''; },
+
+  render(seg, total, blank){
+    const gs = this.groups[seg];
+    const extra = gs.reduce((s,[,v])=>s+v.length-1, 0);
+    const label = seg==='eq' ? 'Client Code' : 'PAN';
+    document.getElementById('dup-'+seg+'-summary').innerHTML =
+      `Total ${seg==='eq'?'clients':'investors'}: <b>${total}</b> &nbsp;|&nbsp; ` +
+      `Duplicate ${label}s: <b style="color:${gs.length?'#e53935':'#2e7d32'}">${gs.length}</b> &nbsp;|&nbsp; ` +
+      `Extra records: <b style="color:${extra?'#e53935':'#2e7d32'}">${extra}</b> &nbsp;|&nbsp; ` +
+      `<span style="color:#888">Blank ${label} (skipped): ${blank}</span>`;
+
+    const body = document.getElementById('dup-'+seg+'-body');
+    if(!gs.length){
+      body.innerHTML = `<div style="padding:30px;text-align:center;color:#2e7d32;font-size:1rem">
+        ✅ Koi duplicate ${label} nahi mila.</div>`;
+      return;
+    }
+
+    body.innerHTML = gs.map(([key, recs])=>{
+      // newest first, so "Keep newest" = keep row #1
+      const sorted = recs.slice().sort((a,b)=>
+        String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
+      const rows = sorted.map((c,i)=>{
+        const extraCol = seg==='eq'
+          ? `<td>${c.status||''}</td><td>${this._fmtD(c.last_trade)}</td>`
+          : `<td>${c.status||''}</td><td style="text-align:right">${c.aum?'₹'+brkFmt(c.aum):''}</td>`;
+        return `<tr>
+          <td style="width:34px"><input type="checkbox" data-seg="${seg}" data-id="${c.id}"
+                onchange="DUP.toggle('${seg}','${c.id}',this.checked)"
+                ${this.sel[seg].has(c.id)?'checked':''}></td>
+          <td style="color:#888">${i+1}</td>
+          <td><b>${c.name||'—'}</b></td>
+          <td>${c.mobile||''}</td>
+          <td>${c.rm||''}</td>
+          ${extraCol}
+          <td style="color:#888;font-size:.72rem">${this._fmtD(c.updated||c.created)}</td>
+          <td><button class="btn btn-outline" style="padding:2px 8px;font-size:.7rem;color:#e53935;border-color:#e53935"
+                onclick="DUP.deleteOne('${seg}','${c.id}')">🗑️</button></td>
+        </tr>`;
+      }).join('');
+      const hdr = seg==='eq'
+        ? '<th></th><th>#</th><th>Name</th><th>Mobile</th><th>RM</th><th>Status</th><th>Last Trade</th><th>Updated</th><th></th>'
+        : '<th></th><th>#</th><th>Name</th><th>Mobile</th><th>RM</th><th>Status</th><th>AUM</th><th>Updated</th><th></th>';
+      return `<div style="border:1px solid #e0e0e0;border-radius:8px;margin-bottom:12px;overflow:hidden">
+        <div style="background:#f5f7fa;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <b style="font-size:.9rem">${label}: ${key}</b>
+          <span style="background:#e53935;color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem">${recs.length} records</span>
+          <span style="flex:1"></span>
+          <button class="btn btn-outline" style="padding:3px 10px;font-size:.72rem" onclick="DUP.keepFirst('${seg}','${key}')">Keep newest, select rest</button>
+          <button class="btn btn-outline" style="padding:3px 10px;font-size:.72rem" onclick="DUP.keepLast('${seg}','${key}')">Keep oldest, select rest</button>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll"><table style="width:100%">
+          <thead><tr>${hdr}</tr></thead><tbody>${rows}</tbody></table></div></div>
+      </div>`;
+    }).join('');
+  },
+
+  _group(seg,key){ const g=this.groups[seg].find(([k])=>k===key); return g?g[1]:[]; },
+  _sortedGroup(seg,key){
+    return this._group(seg,key).slice().sort((a,b)=>
+      String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
+  },
+
+  toggle(seg,id,on){ on ? this.sel[seg].add(id) : this.sel[seg].delete(id); this.renderBar(); },
+  clearSel(){ this.sel[this.activeTab].clear(); this.scan(); },
+
+  // select every record in the group EXCEPT the one to keep
+  _keep(seg,key,idx){
+    const s = this._sortedGroup(seg,key);
+    s.forEach((c,i)=>{ i===idx ? this.sel[seg].delete(c.id) : this.sel[seg].add(c.id); });
+    // NOTE: must NOT call scan() here — scan() clears sel[] and would wipe the
+    // selection we just made. Re-render from the stats captured during scan().
+    const st = this.stats[seg];
+    this.render(seg, st.total, st.blank);
+    this.renderBar();
+  },
+  keepFirst(seg,key){ this._keep(seg,key,0); },
+  keepLast(seg,key){ const s=this._sortedGroup(seg,key); this._keep(seg,key,s.length-1); },
+
+  renderBar(){
+    const seg = this.activeTab;
+    const n = this.sel[seg].size;
+    const bar = document.getElementById('dup-actionbar');
+    if(!bar) return;
+    bar.style.display = n ? 'flex' : 'none';
+    const el = document.getElementById('dup-selcount');
+    if(el) el.textContent = `${n} record${n>1?'s':''} selected for delete`;
+  },
+
+  // Guard: never let a whole group be wiped out
+  _wouldEmpty(seg, ids){
+    const bad = [];
+    this.groups[seg].forEach(([key,recs])=>{
+      if(recs.every(c=>ids.has(c.id))) bad.push(key);
+    });
+    return bad;
+  },
+
+  async deleteOne(seg,id){
+    const key = this.KEY(seg);
+    const rec = (DB.get(key)||[]).find(c=>c.id===id);
+    if(!rec) return;
+    const bad = this._wouldEmpty(seg, new Set([id]));
+    if(bad.length){ toast('Ye group ka aakhri record hai — delete nahi kar sakte','error'); return; }
+    if(!confirm(`Delete "${rec.name}"?\n\n${seg==='eq'?'Code':'PAN'}: ${seg==='eq'?rec.code:rec.pan}\nRM: ${rec.rm||'—'}\n\nYe permanent hai.`)) return;
+    await DB.deleteClient(key, id);
+    DB.addActivityLog({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf', client_id:id,
+      client_name:rec.name, rm:rec.rm, by:CU.name, date:new Date().toISOString(),
+      changes:[{field:'duplicate_cleanup', old:seg==='eq'?rec.code:rec.pan, new:'deleted'}] });
+    toast('Deleted: '+rec.name,'success');
+    this.scan(); refreshDash(); updateBadges();
+  },
+
+  async deleteSelected(){
+    const seg = this.activeTab, key = this.KEY(seg);
+    const ids = new Set(this.sel[seg]);
+    if(!ids.size) return;
+    const bad = this._wouldEmpty(seg, ids);
+    if(bad.length){
+      toast(`${bad.length} group me saare records selected hain — har group me 1 rakhna zaruri hai`,'error');
+      return;
+    }
+    const list = DB.get(key)||[];
+    const recs = list.filter(c=>ids.has(c.id));
+    if(!confirm(`${recs.length} records DELETE karein?\n\nYe permanent hai aur wapas nahi aayega.\nBackup liya hai na?`)) return;
+    await DB.deleteClientsBulk(key, [...ids]);
+    DB.addActivityLog(recs.map(r=>({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf',
+      client_id:r.id, client_name:r.name, rm:r.rm, by:CU.name, date:new Date().toISOString(),
+      changes:[{field:'duplicate_cleanup', old:seg==='eq'?r.code:r.pan, new:'deleted'}] })));
+    toast(`✅ ${recs.length} duplicate records delete ho gaye`,'success');
+    this.sel[seg].clear();
+    this.scan(); refreshDash(); updateBadges();
+    if(seg==='eq' && typeof renderEqTable==='function') renderEqTable();
+    if(seg==='mf' && typeof renderMfTable==='function') renderMfTable();
+  },
+
+  export(){
+    if(typeof XLSX==='undefined'){ toast('Excel library load nahi hui','error'); return; }
+    const wb = XLSX.utils.book_new();
+    let any = false;
+    [['eq','Client Code','EQ dup CODE'],['mf','PAN','MF dup PAN']].forEach(([seg,label,sheet])=>{
+      const rows = [];
+      this.groups[seg].forEach(([k,recs])=>{
+        recs.slice().sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')))
+          .forEach((c,i)=>rows.push(seg==='eq'
+            ? {[label]:k, '#':i+1, Name:c.name||'', Mobile:c.mobile||'', RM:c.rm||'', Status:c.status||'', PAN:c.pan||'', 'Last Trade':this._fmtD(c.last_trade), Updated:this._fmtD(c.updated||c.created), ID:c.id}
+            : {[label]:k, '#':i+1, Name:c.name||'', Mobile:c.mobile||'', RM:c.rm||'', Status:c.status||'', Minor:c.is_minor?'YES':'', AUM:c.aum||'', Updated:this._fmtD(c.updated||c.created), ID:c.id}));
+      });
+      if(rows.length){ XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet); any = true; }
+    });
+    if(!any){ toast('Koi duplicate nahi — export ke liye kuch nahi','error'); return; }
+    XLSX.writeFile(wb, 'duplicates_'+today()+'.xlsx');
+    toast('Excel download ho gayi','success');
+  }
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    INCENTIVE ENGINE — MF Business (% of amount) + Demat (fixed ₹ per a/c).
