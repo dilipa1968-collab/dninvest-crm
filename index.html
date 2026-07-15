@@ -3595,6 +3595,18 @@ function clearCallLimits(){
     .forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   renderCallLimitPreview();
 }
+// Keep a prefilled default inside the allowed window, else the form opens
+// with a value the RM can't actually save.
+// Static (non-template) date inputs get their limits applied imperatively.
+function applyCallLimitsTo(id, kind){
+  const el=document.getElementById(id); if(!el) return;
+  const c=effectiveCallLimits(); const mn=kind==='lc'?c.lcMin:c.ncMin, mx=kind==='lc'?c.lcMax:c.ncMax;
+  if(mn) el.min=mn; else el.removeAttribute('min');
+  if(mx) el.max=mx; else el.removeAttribute('max');
+}
+function _clamp(d, min, max){ if(!d) return d; if(min && d<min) return min; if(max && d>max) return max; return d; }
+function _clampLC(d){ const c=effectiveCallLimits(); return _clamp(d, c.lcMin, c.lcMax); }
+function _clampNC(d){ const c=effectiveCallLimits(); return _clamp(d, c.ncMin, c.ncMax); }
 function _lcAttr(){ const c=effectiveCallLimits(); return (c.lcMin?` min="${c.lcMin}"`:'')+(c.lcMax?` max="${c.lcMax}"`:''); }
 function _ncAttr(){ const c=effectiveCallLimits(); return (c.ncMin?` min="${c.ncMin}"`:'')+(c.ncMax?` max="${c.ncMax}"`:''); }
 function populateCallLimitInputs(){
@@ -7468,7 +7480,7 @@ function logCall(id,seg){
     document.getElementById('callModalTitle').textContent='Log Call — '+c.name+' (Lead)';
     document.getElementById('callModalBody').innerHTML=`
       <div class="form-row">
-        <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${today()}" max="${today()}"></div>
+        <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${_clampLC(today())}"${_lcAttr()}></div>
         <div class="form-field"><label>Call Status</label><select id="cl_status">
           <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option></select></div>
       </div>
@@ -7477,7 +7489,7 @@ function logCall(id,seg){
           <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}" min="${today()}"></div>
+        <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${_clampNC(addDays(today(),7))}"${_ncAttr()}></div>
         <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">
           <option ${c.followup_status==='Pending'?'selected':''}>Pending</option>
           <option ${c.followup_status==='Done'?'selected':''}>Done</option>
@@ -7502,7 +7514,7 @@ function logCall(id,seg){
   document.getElementById('callModalTitle').textContent='Log Call — '+c.name;
   document.getElementById('callModalBody').innerHTML=`
     <div class="form-row">
-      <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${today()}" max="${today()}"></div>
+      <div class="form-field"><label>Call Date</label><input id="cl_date" type="date" value="${_clampLC(today())}"${_lcAttr()}></div>
       <div class="form-field"><label>Call Status</label><select id="cl_status">
         <option>Done</option><option>No Answer</option><option>Callback Requested</option><option>Pending</option></select></div>
     </div>
@@ -7511,7 +7523,7 @@ function logCall(id,seg){
         <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${addDays(today(),7)}" min="${today()}"></div>
+      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${_clampNC(addDays(today(),7))}"${_ncAttr()}></div>
       <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">${seg==='equity'?`
         <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
         <option>TRADE</option><option>INTERESTED IN OTHER PRODUCT</option><option>POSITIVE</option><option>WRONG NUMBER</option><option>OPEN DEMAT ACCOUNT</option>`:`
@@ -15238,6 +15250,7 @@ function selectOpClient(clientId, seg){
   const clients = seg==='equity' ? (DB.get('eq_clients')||[]) : (DB.get('mf_clients')||[]);
   const c = clients.find(x=>x.id===clientId);
   if(!c) return;
+  applyCallLimitsTo('op-next-call','nc');
   document.getElementById('op-client-name').value = c.name||'';
   document.getElementById('op-client-id').value = c.id;
   document.getElementById('op-client-seg').value = seg;
