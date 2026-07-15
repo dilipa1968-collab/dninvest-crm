@@ -3548,8 +3548,16 @@ async function loadCallLimits(){
       CALL_LIMITS = { configured:true, mode:(d.mode==='fixed'?'fixed':'rolling'),
         lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'',
         rLcMin:num(d.rLcMin), rLcMax:num(d.rLcMax), rNcMin:num(d.rNcMin), rNcMax:num(d.rNcMax) };
-      // legacy doc (saved before rolling mode existed) had only fixed dates
-      if(d.mode===undefined) CALL_LIMITS.mode='fixed';
+      // Legacy doc (saved before rolling mode existed) has no `mode` field.
+      // Treat it as fixed — but ONLY if it actually carries dates. An all-blank
+      // legacy doc used to mean "no limit"; that silently disabled the lock, so
+      // we now fall back to the rolling defaults instead.
+      if(d.mode===undefined){
+        const hasDates = !!(d.lcMin||d.lcMax||d.ncMin||d.ncMax);
+        if(hasDates){ CALL_LIMITS.mode='fixed'; }
+        else { CALL_LIMITS = { configured:false, mode:'rolling', lcMin:'', lcMax:'', ncMin:'', ncMax:'', ...CL_DEFAULT_ROLL };
+               console.log('call_limits: blank legacy doc ignored — rolling defaults applied'); }
+      }
     }
   }catch(e){ console.log('call limits load failed', e); }
   try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
@@ -3636,6 +3644,9 @@ async function saveCallLimits(){
     if(d.rNcMin!=='' && d.rNcMax!=='' && d.rNcMin>d.rNcMax){ toast('Next Call: "kam se kam" din "zyada se zyada" se bada hai','error'); return; }
   }
   CALL_LIMITS = { configured:true, ...d };
+  const allBlank = mode==='fixed' ? !(d.lcMin||d.lcMax||d.ncMin||d.ncMax)
+                                  : (d.rLcMin===''&&d.rLcMax===''&&d.rNcMin===''&&d.rNcMax==='');
+  if(allBlank && !confirm('Saari fields blank hain — iska matlab RMs par KOI LIMIT NAHI lagegi.\n\nPakka save karna hai?')) return;
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').set({data:d, updated:new Date().toISOString()});
     toast(mode==='rolling' ? 'Rolling limits saved ✓ — har roz apne aap aage khisakegi' : 'Fixed call date limits saved ✓ — RMs par lag gaya','success');
