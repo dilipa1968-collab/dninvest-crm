@@ -4275,13 +4275,44 @@ function hardRefresh(){
 }
 
 // ── Birthday "Wish All" stepper: opens each client's WhatsApp chat one-by-one ──
-let _bdayQueue=[], _bdayStep=0, _bdayCards=[];
+let _bdayQueue=[], _bdayStep=0, _bdayCards=[], _bdayMeta=[];
+
+// ── 🎂 Birthday wish SENT stamp ──
+// Jab RM Wish/Card bhejta hai, client record pe {y, by, at, via} stamp lag jaata
+// hai. Ye Firestore me sync hota hai → Admin ke dashboard pe turant "✅ Sent by
+// RIYA" dikh jaata hai. Har saal ka alag (y = year), to agle saal reset.
+async function markBdayWished(idx, via){
+  const m = _bdayMeta[idx];
+  if(!m || !m.id) return;
+  const list = DB.get(m.key)||[];
+  const ex = list.find(c=>c.id===m.id);
+  if(!ex) return;
+  const yr = parseInt(today().slice(0,4),10);
+  const already = ex.bday_wish && ex.bday_wish.y===yr;
+  const stamp = {y:yr, by:CU.name, at:new Date().toISOString(), via:via||'wish'};
+  ex.bday_wish = stamp;
+  ex.updated = today();
+  try{ await DB.setClient(m.key, ex); }catch(e){ console.log('bday stamp sync error',e); }
+  if(!already){
+    try{
+      await DB.addActivityLog([{
+        id: uid(), type:'birthday_wish', seg: m.key==='eq_clients'?'equity':'mf',
+        client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
+        by: CU.name, date: stamp.at,
+        changes: [{field:'Birthday Wish', old:'—', new:(via==='card'?'Card bheja':'WhatsApp wish bheja')}]
+      }]);
+    }catch(e){}
+  }
+  refreshDash();
+}
+
 function wishAllBirthdays(){
   const btn=document.getElementById('wishAllBtn');
   if(!_bdayQueue.length) return;
   if(_bdayStep>=_bdayQueue.length) _bdayStep=0;   // allow restart
   const c=_bdayQueue[_bdayStep];
   window.open(c.url,'_blank','noopener');
+  if(c.idx!==undefined) markBdayWished(c.idx,'wish');
   _bdayStep++;
   if(btn){
     if(_bdayStep>=_bdayQueue.length){
@@ -4398,13 +4429,14 @@ function birthdayCardImage(idx){
     ov.querySelector('#_bcCl').onclick=close;
     ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); };
     const shr=ov.querySelector('#_bcShare');
-    if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); }catch(e){} };
+    if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); markBdayWished(idx,'card'); }catch(e){} };
     const send=ov.querySelector('#_bcSend');
     if(send) send.onclick=async function(){
       let copied=false;
       try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; }catch(e){ copied=false; }
       if(!copied){ try{ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); }catch(e){} }
       window.open('https://wa.me/'+num,'_blank','noopener');
+      markBdayWished(idx,'card');
       hint.innerHTML = copied
         ? ('✅ Image copy ho gayi aur '+first+' ka chat khul gaya — WhatsApp me <b>Ctrl+V</b> dabao aur bhej do. 🎉')
         : ('📥 Image download ho gayi aur '+first+' ka chat khul gaya — us chat me image <b>attach</b> karke bhej do.');
@@ -4538,12 +4570,17 @@ function refreshDash(){
     const todayMD = tdStr.slice(5,10);            // mm-dd
     const curYear = parseInt(tdStr.slice(0,4),10);
     const bdays = [
-      ...eq.filter(c=>c.dob && c.dob.slice(5,10)===todayMD).map(c=>({name:c.name,rm:c.rm,mobile:c.mobile,dob:c.dob,seg:'EQ'})),
-      ...mf.filter(c=>c.dob && c.dob.slice(5,10)===todayMD).map(c=>({name:c.name,rm:c.rm,mobile:c.mobile,dob:c.dob,seg:'MF'}))
+      ...eq.filter(c=>c.dob && c.dob.slice(5,10)===todayMD).map(c=>({id:c.id,key:'eq_clients',name:c.name,rm:c.rm,mobile:c.mobile,dob:c.dob,bw:c.bday_wish,seg:'EQ'})),
+      ...mf.filter(c=>c.dob && c.dob.slice(5,10)===todayMD).map(c=>({id:c.id,key:'mf_clients',name:c.name,rm:c.rm,mobile:c.mobile,dob:c.dob,bw:c.bday_wish,seg:'MF'}))
     ];
     const bHead=document.getElementById('bdayHeadCount');
-    if(bHead){bHead.textContent=bdays.length>0?bdays.length:'';bHead.style.display=bdays.length>0?'':'none';}
-    _bdayQueue=[]; _bdayStep=0; _bdayCards=[];   // reset stepper on each dashboard refresh
+    const _nSent=bdays.filter(c=>c.bw && c.bw.y===curYear).length;
+    if(bHead){
+      bHead.innerHTML=bdays.length>0?`${_nSent}/${bdays.length} sent`:'';
+      bHead.style.display=bdays.length>0?'':'none';
+      bHead.style.background=(bdays.length && _nSent===bdays.length)?'#16a34a':'#e11d8f';
+    }
+    _bdayQueue=[]; _bdayStep=0; _bdayCards=[]; _bdayMeta=[];   // reset stepper on each dashboard refresh
     bdayEl.innerHTML = bdays.length
       ? (()=>{
         const rows = bdays.map((c,idx)=>{
@@ -4554,23 +4591,37 @@ function refreshDash(){
           const turns=(yr&&curYear>yr)?` <small style="color:var(--gray)">(turns ${curYear-yr})</small>`:'';
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
           const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
-          if(d.length>=12) _bdayQueue.push({name:nm, url});   // add to Wish-All queue
+          const sent = c.bw && c.bw.y===curYear ? c.bw : null;
+          if(d.length>=12 && !sent) _bdayQueue.push({name:nm, url, idx});   // Wish-All: sirf pending wale
           _bdayCards[idx]={name:nm, num:(d.length>=12?d:'')};   // name + wa number for card
+          _bdayMeta[idx]={id:c.id, key:c.key, name:nm};         // sent-stamp ke liye
+          // ✅ Sent stamp — Admin ko dikhta hai ki kisne aur kab bheja
+          let sentTag='';
+          if(sent){
+            let tm='';
+            try{ tm=new Date(sent.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}); }catch(e){}
+            sentTag=`<span title="${escapeHtml(sent.by||'')} ne ${escapeHtml(sent.via==='card'?'card':'wish')} bheja${tm?' — '+tm:''}"
+              style="margin-left:6px;background:#dcfce7;color:#166534;font-size:.66rem;font-weight:800;padding:2px 7px;border-radius:7px;flex-shrink:0;white-space:nowrap">
+              ✅ Sent${sent.by?' · '+escapeHtml(sent.by):''}${tm?' · '+tm:''}</span>`;
+          }
           const waBtn = d.length>=12
-            ? `<a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;background:#25D366;color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 Wish</a>`
+            ? `<a href="${url}" target="_blank" rel="noopener" onclick="markBdayWished(${idx},'wish')" style="margin-left:auto;background:${sent?'#9ca3af':'#25D366'};color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 ${sent?'Re-send':'Wish'}</a>`
             : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
-          const cardBtn=`<button onclick="birthdayCardImage(${idx})" title="Make colourful card image for client" style="margin-left:6px;background:#e11d8f;color:#fff;border:none;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:8px;cursor:pointer;flex-shrink:0">🎨 Card</button>`;
-          return `<div class="bar-row" style="border-left:3px solid #e11d8f;padding-left:9px;">
+          const cardBtn=`<button onclick="birthdayCardImage(${idx})" title="Make colourful card image for client" style="margin-left:6px;background:${sent?'#9ca3af':'#e11d8f'};color:#fff;border:none;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:8px;cursor:pointer;flex-shrink:0">🎨 Card</button>`;
+          return `<div class="bar-row" style="border-left:3px solid ${sent?'#16a34a':'#e11d8f'};padding-left:9px;${sent?'background:#f6fef9;':''}">
             <span class="bar-name">${escapeHtml(nm)}${turns}</span>
             <span class="badge ${c.seg==='EQ'?'b-eq':'b-mf'}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
             <span style="font-size:.72rem;color:var(--gray)">${escapeHtml(c.rm||'')}</span>
-            ${waBtn}${cardBtn}
+            ${sentTag}${waBtn}${cardBtn}
           </div>`;
         }).join('');
         const wishAll = _bdayQueue.length>=2
-          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All (${_bdayQueue.length}) — opens one by one</button>`
+          ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All Pending (${_bdayQueue.length}) — opens one by one</button>`
           : '';
-        return wishAll + rows;
+        const doneBar = (bdays.length && _nSent===bdays.length)
+          ? `<div style="background:#dcfce7;color:#166534;font-size:.78rem;font-weight:800;padding:7px;border-radius:9px;margin-bottom:10px;text-align:center">✅ Aaj ke sabhi ${bdays.length} birthday wish ho gaye</div>`
+          : '';
+        return doneBar + wishAll + rows;
       })()
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 No birthdays today</p>';
   }
