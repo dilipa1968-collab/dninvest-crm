@@ -2513,7 +2513,99 @@ input:focus, select:focus, textarea:focus{
 // merge the change in, minimizing data loss from concurrent edits.
 const PER_DOC_COLLECTIONS = {}; // no longer used, kept for compatibility
 
+// ══════════════════════════════════════════
+// SHARDING (Firestore 1 MiB per-document limit)
+// ══════════════════════════════════════════
+// A single Firestore document can never exceed 1,048,576 bytes. 'eq_clients'
+// crossed that limit (~3400 clients in one array), so ALL writes started
+// failing with "exceeds the maximum allowed size".
+//
+// Fix: split the array across N sibling documents in the SAME 'crm_data'
+// collection (so existing security rules keep working):
+//     crm_data/eq_clients__s0 ... crm_data/eq_clients__s7
+//
+// Each record is assigned to a shard by a stable hash of its `id`, so a
+// record ALWAYS lives in the same shard. Benefits over index-slicing:
+//   • editing one client rewrites only ~1/8th of the data (faster + cheaper)
+//   • no overflow risk as the client count grows
+//   • no re-shuffling when records are added/removed
+//
+// Everything below is contained inside the DB layer — the rest of the app
+// keeps calling DB.get()/DB.setClient()/DB.setClientsBulk() unchanged.
+//
+// To shard another key later (e.g. mf_clients when it grows), just add it
+// here. NOTE: changing a shard COUNT requires a full re-migration — bump
+// the number and delete the old crm_data/<key>__sN docs first.
+const SHARD_CFG = {
+  eq_clients: 8,   // ~3400 clients → ~425/shard → ~130 KB/shard (lots of headroom)
+};
+
 const DB = {
+  // ── shard helpers ──────────────────────────────────────────
+  _shardCache: {},   // { key: [shard0Array, shard1Array, ...] }
+  _shardSeen: {},    // { key: Set(shardIndex) } — realtime readiness guard
+  _isSharded(key){ return !!SHARD_CFG[key]; },
+  _shardName(key,i){ return key+'__s'+i; },
+  _shardRef(key,i){ return fdb.collection('crm_data').doc(this._shardName(key,i)); },
+  // Stable string hash → shard index. Same id always maps to the same shard.
+  _shardOf(key,id){
+    const n = SHARD_CFG[key];
+    const s = String(id==null?'':id);
+    let h = 0;
+    for(let i=0;i<s.length;i++){ h = (Math.imul(h,31) + s.charCodeAt(i)) | 0; }
+    return Math.abs(h) % n;
+  },
+  // Split a full array into per-shard arrays
+  _splitShards(key,arr){
+    const n = SHARD_CFG[key];
+    const parts = Array.from({length:n},()=>[]);
+    (arr||[]).forEach(r=>{ if(r) parts[this._shardOf(key,r.id)].push(r); });
+    return parts;
+  },
+  // Flatten the in-memory shard cache back into one array
+  _mergeShards(key){
+    const parts = this._shardCache[key]||[];
+    return [].concat(...parts.map(p=>p||[]));
+  },
+  // Read every shard doc in parallel. Returns array of arrays, or null per
+  // shard where the doc doesn't exist yet.
+  async _readShards(key){
+    const n = SHARD_CFG[key];
+    const snaps = await Promise.all(
+      Array.from({length:n},(_,i)=>this._shardRef(key,i).get())
+    );
+    return snaps.map(s=>(s.exists && s.data() && Array.isArray(s.data().data)) ? s.data().data : null);
+  },
+  // Overwrite ALL shards from a full array (atomic batch — all or nothing)
+  async _writeAllShards(key,arr){
+    const parts = this._splitShards(key,arr);
+    const batch = fdb.batch();
+    parts.forEach((p,i)=>{
+      batch.set(this._shardRef(key,i), {data:p, updated:new Date().toISOString(), shard:i, count:p.length});
+    });
+    await batch.commit();
+    this._shardCache[key] = parts;
+    return parts;
+  },
+  // One-time migration: if no shard doc exists yet but the legacy oversized
+  // document does, copy it into shards. Deterministic + idempotent, so it's
+  // safe even if two browsers do it at the same instant. The legacy doc is
+  // intentionally LEFT IN PLACE as a backup (it is simply never read again).
+  async _ensureMigrated(key){
+    let parts = await this._readShards(key);
+    if(parts.some(p=>p!==null)) return parts.map(p=>p||[]);   // already sharded
+    let legacy = [];
+    try{
+      const d = await fdb.collection('crm_data').doc(key).get();
+      if(d.exists && d.data() && Array.isArray(d.data().data)) legacy = d.data().data;
+    }catch(e){ console.log('legacy read failed for',key,e); }
+    if(!legacy.length) return parts.map(()=>[]);
+    parts = await this._writeAllShards(key, legacy);
+    console.log('✅ MIGRATED',key,'→',legacy.length,'records across',SHARD_CFG[key],'shards',
+                parts.map(p=>p.length));
+    try{ toast('Storage upgraded: '+legacy.length+' records split into '+SHARD_CFG[key]+' shards','success'); }catch(e){}
+    return parts;
+  },
   get(key){
     try{ const v=localStorage.getItem('dninvest_'+key); return v?JSON.parse(v):null; }catch(e){return null;}
   },
@@ -2522,6 +2614,14 @@ const DB = {
     try{
       localStorage.setItem('dninvest_'+key,JSON.stringify(val));
     }catch(e){}
+    // Sharded keys: a whole-array replace must rewrite every shard
+    if(this._isSharded(key) && typeof fdb!=='undefined'){
+      this._writing[key] = (this._writing[key]||0) + 1;
+      return this._writeAllShards(key, val||[])
+        .then(()=>console.log('Firebase synced (sharded):',key,(val||[]).length))
+        .catch(e=>{ console.log('Firebase error:',e); toast('Sync error: '+e.message,'error'); })
+        .finally(()=>{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); });
+    }
     try{
       if(typeof fdb!=='undefined'){
         fdb.collection('crm_data').doc(key).set({data:val,updated:new Date().toISOString()})
@@ -2628,12 +2728,36 @@ const DB = {
   // Tracks keys with an in-flight Firestore write, so the real-time listener
   // can avoid overwriting localStorage with a stale snapshot mid-write.
   _writing: {},
+  // Sharded variant: touches ONLY the one shard this record hashes to.
+  async _setClientSharded(key, rec){
+    const si  = this._shardOf(key, rec.id);
+    const ref = this._shardRef(key, si);
+    this._writing[key] = (this._writing[key]||0) + 1;
+    try{
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(ref);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data))
+                   ? doc.data().data
+                   : ((this._shardCache[key]||[])[si] || []);
+        const lidx = latest.findIndex(c=>c.id===rec.id);
+        if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
+        tx.set(ref, {data:latest, updated:new Date().toISOString(), shard:si, count:latest.length});
+        if(this._shardCache[key]) this._shardCache[key][si] = latest;
+      });
+      console.log('Firebase shard-synced:',key,'s'+si,rec.id);
+    }catch(e){ console.log('setClient(shard) error:',e); toast('Sync error: '+e.message,'error'); }
+    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+  },
   async setClient(key, rec){
     // update local copy immediately for responsiveness
     let arr = this.get(key)||[];
     let idx = arr.findIndex(c=>c.id===rec.id);
     if(idx>=0) arr[idx]=rec; else arr.push(rec);
     this.setLocal(key, arr);
+
+    if(this._isSharded(key) && typeof fdb!=='undefined'){
+      return this._setClientSharded(key, rec);
+    }
 
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
@@ -2659,6 +2783,26 @@ const DB = {
   async deleteClient(key, id){
     let arr = (this.get(key)||[]).filter(c=>c.id!==id);
     this.setLocal(key, arr);
+
+    if(this._isSharded(key) && typeof fdb!=='undefined'){
+      const si  = this._shardOf(key, id);
+      const ref = this._shardRef(key, si);
+      this._writing[key] = (this._writing[key]||0) + 1;
+      try{
+        await fdb.runTransaction(async (tx)=>{
+          const doc = await tx.get(ref);
+          let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data))
+                     ? doc.data().data
+                     : ((this._shardCache[key]||[])[si] || []);
+          latest = latest.filter(c=>c.id!==id);
+          tx.set(ref, {data:latest, updated:new Date().toISOString(), shard:si, count:latest.length});
+          if(this._shardCache[key]) this._shardCache[key][si] = latest;
+        });
+      }catch(e){ console.log('deleteClient(shard) error:',e); toast('Sync error: '+e.message,'error'); }
+      finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+      return;
+    }
+
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
@@ -2676,6 +2820,76 @@ const DB = {
     }catch(e){ console.log('deleteClient error:',e); toast('Sync error: '+e.message,'error'); }
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
+  // Sharded bulk merge: groups records by shard, reads only the affected
+  // shards, then writes them back in ONE transaction (all reads before all
+  // writes, as Firestore requires).
+  async _setBulkSharded(key, records){
+    const groups = {};
+    records.forEach(r=>{ const i=this._shardOf(key,r.id); (groups[i]=groups[i]||[]).push(r); });
+    const idxs = Object.keys(groups).map(Number);
+    this._writing[key] = (this._writing[key]||0) + 1;
+    try{
+      await fdb.runTransaction(async (tx)=>{
+        const refs = idxs.map(i=>this._shardRef(key,i));
+        const docs = [];
+        for(const ref of refs) docs.push(await tx.get(ref));   // ALL reads first
+        idxs.forEach((i,k)=>{
+          const d = docs[k];
+          let latest = (d.exists && d.data() && Array.isArray(d.data().data)) ? d.data().data : [];
+          const m = {}; latest.forEach(c=>{ if(c) m[c.id]=c; });
+          groups[i].forEach(r=>m[r.id]=r);
+          const out = Object.values(m);
+          tx.set(refs[k], {data:out, updated:new Date().toISOString(), shard:i, count:out.length});
+          if(this._shardCache[key]) this._shardCache[key][i] = out;
+        });
+      });
+      console.log('Bulk shard-synced:',key,records.length,'records across shards',idxs);
+    }catch(e){ console.log('Bulk sync(shard) error:',e); toast('Sync error: '+(e.message||e),'error'); }
+    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+  },
+  // Bulk delete by ids — shard-aware, mirrors _setBulkSharded
+  async deleteClientsBulk(key, ids){
+    const idSet = new Set(ids);
+    const arr = (this.get(key)||[]).filter(c=>!idSet.has(c.id));
+    this.setLocal(key, arr);
+    if(typeof fdb==='undefined') return;
+
+    if(this._isSharded(key)){
+      const groups = {};
+      ids.forEach(id=>{ const i=this._shardOf(key,id); (groups[i]=groups[i]||new Set()).add(id); });
+      const idxs = Object.keys(groups).map(Number);
+      this._writing[key] = (this._writing[key]||0) + 1;
+      try{
+        await fdb.runTransaction(async (tx)=>{
+          const refs = idxs.map(i=>this._shardRef(key,i));
+          const docs = [];
+          for(const ref of refs) docs.push(await tx.get(ref));   // ALL reads first
+          idxs.forEach((i,k)=>{
+            const d = docs[k];
+            let latest = (d.exists && d.data() && Array.isArray(d.data().data)) ? d.data().data : [];
+            const out = latest.filter(c=>!groups[i].has(c.id));
+            tx.set(refs[k], {data:out, updated:new Date().toISOString(), shard:i, count:out.length});
+            if(this._shardCache[key]) this._shardCache[key][i] = out;
+          });
+        });
+      }catch(e){ toast('Delete sync error: '+(e.message||e),'error'); }
+      finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+      return;
+    }
+
+    this._writing[key] = (this._writing[key]||0) + 1;
+    try{
+      const ref = fdb.collection('crm_data').doc(key);
+      await fdb.runTransaction(async tx=>{
+        const doc = await tx.get(ref);
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
+        latest = latest.filter(c=>!idSet.has(c.id));
+        tx.set(ref, {data:latest, updated:new Date().toISOString()});
+        this.setLocal(key, latest);
+      });
+    }catch(e){ toast('Delete sync error: '+(e.message||e),'error'); }
+    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+  },
   // Bulk save (import) - merge multiple records into the latest array
   async setClientsBulk(key, records){
     let arr = this.get(key)||[];
@@ -2683,6 +2897,11 @@ const DB = {
     records.forEach(r=>map[r.id]=r);
     let merged = Object.values(map);
     this.setLocal(key, merged);
+
+    if(this._isSharded(key) && typeof fdb!=='undefined'){
+      return this._setBulkSharded(key, records);
+    }
+
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
       if(typeof fdb!=='undefined'){
@@ -2713,6 +2932,19 @@ const DB = {
     if(typeof fdb==='undefined') return;
     for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
       try{
+        // ── sharded keys: read every shard, auto-migrate on first run ──
+        if(this._isSharded(key)){
+          const parts = await this._ensureMigrated(key);
+          this._shardCache[key] = parts.map(p=>p||[]);
+          this._shardSeen[key]  = new Set(parts.map((_,i)=>i));   // all shards known
+          const merged = this._mergeShards(key);
+          if(merged.length){
+            localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+            console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
+                        this._shardCache[key].map(p=>p.length));
+          }
+          continue;
+        }
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
@@ -3511,7 +3743,48 @@ function initApp(){
       // write, AND skip while a setClient/deleteClient/setClientsBulk write is
       // in flight (DB._writing[key] > 0) to avoid a stale Firestore snapshot
       // overwriting localStorage between our read and our write.
+      // Re-render whatever page is open after a real-time change lands.
+      const _afterRealtime = (key)=>{
+        console.log('Real-time update:', key);
+        if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
+        if(key==='eq_clients' && getCurrentPageId()==='eq-followup') renderFollowup('eqf');
+        if(key==='eq_clients' && getCurrentPageId()==='eq-notrade') renderNoTrade();
+        if(key==='eq_clients' && getCurrentPageId()==='eq-nocall') renderNoCall('equity');
+        if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
+        if(key==='mf_clients' && getCurrentPageId()==='mf-followup') renderFollowup('mff');
+        if(key==='mf_clients' && getCurrentPageId()==='mf-nocall') renderNoCall('mf');
+        if(key==='mf_clients' && getCurrentPageId()==='mf-sip') renderSip();
+        if(key==='leads' && getCurrentPageId()==='leads') renderLeadsTable();
+        if(key==='seminars' && getCurrentPageId()==='seminars') renderSeminarsTable();
+        if(getCurrentPageId()==='dashboard') refreshDash();
+        updateBadges();
+      };
+
       ['eq_clients','mf_clients','leads','seminars'].forEach(key=>{
+        // ── sharded key: one listener per shard, merged back together ──
+        if(DB._isSharded(key)){
+          const n = SHARD_CFG[key];
+          if(!DB._shardCache[key]) DB._shardCache[key] = Array.from({length:n},()=>[]);
+          if(!DB._shardSeen[key])  DB._shardSeen[key]  = new Set();
+          for(let i=0;i<n;i++){
+            DB._shardRef(key,i).onSnapshot(doc=>{
+              if(doc.metadata.hasPendingWrites) return;
+              if(DB._writing[key]>0) return;
+              if(!(doc.exists && doc.data() && Array.isArray(doc.data().data))) return;
+              DB._shardCache[key][i] = doc.data().data;
+              DB._shardSeen[key].add(i);
+              // Don't publish a half-loaded picture: wait until every shard
+              // has reported in at least once.
+              if(DB._shardSeen[key].size < n) return;
+              const merged   = DB._mergeShards(key);
+              const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
+              if(JSON.stringify(merged) === JSON.stringify(existing)) return;
+              localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+              _afterRealtime(key);
+            });
+          }
+          return;
+        }
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
           if(DB._writing[key]>0) return;
@@ -3520,19 +3793,7 @@ function initApp(){
             const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
             if(JSON.stringify(newData) !== JSON.stringify(existing)){
               localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
-              console.log('Real-time update:', key);
-              if(key==='eq_clients' && getCurrentPageId()==='eq-clients') renderEqTable();
-              if(key==='eq_clients' && getCurrentPageId()==='eq-followup') renderFollowup('eqf');
-              if(key==='eq_clients' && getCurrentPageId()==='eq-notrade') renderNoTrade();
-              if(key==='eq_clients' && getCurrentPageId()==='eq-nocall') renderNoCall('equity');
-              if(key==='mf_clients' && getCurrentPageId()==='mf-clients') renderMfTable();
-              if(key==='mf_clients' && getCurrentPageId()==='mf-followup') renderFollowup('mff');
-              if(key==='mf_clients' && getCurrentPageId()==='mf-nocall') renderNoCall('mf');
-              if(key==='mf_clients' && getCurrentPageId()==='mf-sip') renderSip();
-              if(key==='leads' && getCurrentPageId()==='leads') renderLeadsTable();
-              if(key==='seminars' && getCurrentPageId()==='seminars') renderSeminarsTable();
-              if(getCurrentPageId()==='dashboard') refreshDash();
-              updateBadges();
+              _afterRealtime(key);
             }
           }
         });
@@ -14149,20 +14410,9 @@ const BULK = {
 
   // ── shared: bulk delete via transaction (no clobber) ──
   async _bulkDelete(key,ids){
-    const idSet=new Set(ids);
-    let arr=(DB.get(key)||[]).filter(c=>!idSet.has(c.id));
-    DB.setLocal(key,arr);
-    if(typeof fdb!=='undefined'){
-      try{
-        const ref=fdb.collection('crm_data').doc(key);
-        await fdb.runTransaction(async tx=>{
-          const doc=await tx.get(ref);
-          let latest=(doc.exists&&doc.data()&&doc.data().data)?doc.data().data:arr;
-          latest=latest.filter(c=>!idSet.has(c.id));
-          tx.set(ref,{data:latest,updated:new Date().toISOString()});
-        });
-      }catch(e){ toast('Delete sync error: '+(e.message||e),'error'); }
-    }
+    // Delegated to the DB layer so sharded keys (eq_clients) are handled
+    // correctly — deleting only from the shards that actually hold the ids.
+    await DB.deleteClientsBulk(key, ids);
   },
 
   _done(seg,msg){
