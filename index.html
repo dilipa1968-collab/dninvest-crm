@@ -1056,6 +1056,7 @@ input:focus, select:focus, textarea:focus{
             <button class="btn btn-outline" onclick="openEqImportModal()" id="eqImportBtn">📥 Import Excel</button>
             <button class="btn btn-outline" onclick="openEqRmUpdateModal()" id="eqRmUpdateBtn" style="display:none">⇅ Bulk RM Update</button>
             <button class="btn btn-outline" onclick="openEqPanUpdateModal()" id="eqPanUpdateBtn" style="display:none">🪪 Bulk PAN Update</button>
+            <button class="btn btn-outline" onclick="openEqDobUpdateModal()" id="eqDobUpdateBtn" style="display:none">🎂 Bulk DOB Update</button>
             <button class="btn btn-outline" onclick="fixAllMobiles()" id="eqFixMobileBtn" style="display:none">🧹 Fix Mobile (91)</button>
             <button class="btn btn-primary" id="eqAddClientBtn" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
@@ -2492,6 +2493,37 @@ input:focus, select:focus, textarea:focus{
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('eqPanUpdateModal')">Cancel</button>
       <button class="btn btn-teal" id="eqPanUpdateBtnGo" onclick="doEqPanUpdate()" disabled>Update PAN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Equity Bulk DOB Update (Admin only) -->
+<div class="modal-overlay" id="eqDobUpdateModal" onclick="if(event.target===this)closeModal('eqDobUpdateModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>🎂 Equity — Bulk DOB Update</h3>
+      <button class="modal-close" onclick="closeModal('eqDobUpdateModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+        Upload an Excel file with only <b>Client Code</b> and <b>DOB</b>. Matching will be done on <b>Client Code</b> (exact) — only the <b>Date of Birth field will be updated</b>, nothing else (RM, Asset Value, Status, Mobile, Remarks etc.) will be touched. <b>Naye client add nahi honge.</b>
+      </p>
+      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
+        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>DOB</b> (Name column optional — ignore ho jayega).<br>
+        DOB format: <b>DD/MM/YYYY</b> ya Excel ka real date cell — dono chalega.
+      </p>
+      <div style="margin-bottom:12px">
+        <a href="#" onclick="downloadEqDobTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
+      </div>
+      <div class="import-zone" id="eq-dob-zone" onclick="document.getElementById('eq-dob-file').click()">
+        📊 Drag the Excel file here or click to browse
+        <input type="file" id="eq-dob-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqDobUpdateFile(this)">
+      </div>
+      <div id="eq-dob-preview" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('eqDobUpdateModal')">Cancel</button>
+      <button class="btn btn-teal" id="eqDobUpdateBtnGo" onclick="doEqDobUpdate()" disabled>Update DOB</button>
     </div>
   </div>
 </div>
@@ -4001,6 +4033,8 @@ function initApp(){
   if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqPanUpdateBtn=document.getElementById('eqPanUpdateBtn');
   if(eqPanUpdateBtn) eqPanUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqDobUpdateBtn=document.getElementById('eqDobUpdateBtn');
+  if(eqDobUpdateBtn) eqDobUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixMobileBtn=document.getElementById('eqFixMobileBtn');
   if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
@@ -12653,6 +12687,151 @@ async function doEqPanUpdate(){
   if(notFound) msg += `, ${notFound} Client Code not found`;
   toast(msg, updated>0?'success':'error');
   renderEqTable(); refreshDash(); updateBadges();
+}
+
+
+// ══ EQUITY BULK DOB UPDATE (Admin only) ══
+// Sirf Client Code + DOB. Code exact match. Kuch aur field touch nahi hoga,
+// naye client add nahi honge.
+let eqDobUpdateData = null;
+
+function openEqDobUpdateModal(){
+  if(CU.role!=='admin') return;
+  eqDobUpdateData = null;
+  document.getElementById('eq-dob-preview').innerHTML='';
+  document.getElementById('eqDobUpdateBtnGo').disabled=true;
+  document.getElementById('eq-dob-file').value='';
+  document.getElementById('eqDobUpdateModal').classList.add('open');
+}
+
+function downloadEqDobTemplate(){
+  const wsData = [
+    ['Client Code','Client Name (reference only)','DOB'],
+    ['EQ12345','Example: Ramesh Kumar','15/08/1985'],
+    ['EQ67890','Example: Sunita Devi','02/01/1979']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:18},{wch:32},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DOB Update');
+  XLSX.writeFile(wb, 'Equity_DOB_Update_Template.xlsx');
+}
+
+function handleEqDobUpdateFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    let hdrIdx=-1, colMap={};
+    const wanted = {
+      code: ['code','clientcode','clientid','ucccode','ucc'],
+      dob: ['dob','dateofbirth','birthdate','birthday','dateofbirthdob','invdob','dobdate']
+    };
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const map = {};
+      rows[i].forEach((cell,ci)=>{
+        const h = normHdr(cell);
+        for(const [field, variants] of Object.entries(wanted)){
+          if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+        }
+      });
+      if(map.code!==undefined && map.dob!==undefined){ hdrIdx=i; colMap=map; break; }
+    }
+    if(hdrIdx===-1){
+      toast('Header row not found. Excel must have Client Code and DOB columns.','error');
+      return;
+    }
+
+    const raw = rows.slice(hdrIdx+1)
+      .filter(r=>r.some(c=>c!==''))
+      .map(r=>({
+        code: String(r[colMap.code]||'').trim(),
+        rawDob: r[colMap.dob],
+        dob: normDob(r[colMap.dob])
+      }))
+      .filter(r=>r.code && String(r.rawDob||'').trim()!=='');
+
+    if(!raw.length){
+      toast('No valid rows found (Client Code aur DOB dono chahiye).','error');
+      return;
+    }
+
+    // Invalid / future / absurd dates alag karo
+    const todayStr = today();
+    const badDates = [];
+    const data = [];
+    raw.forEach(r=>{
+      if(!r.dob){ badDates.push([r.code, String(r.rawDob), 'Date parse nahi hui']); return; }
+      if(r.dob > todayStr){ badDates.push([r.code, String(r.rawDob), 'Future date']); return; }
+      if(r.dob < '1900-01-01'){ badDates.push([r.code, String(r.rawDob), '1900 se pehle']); return; }
+      data.push({code:r.code, dob:r.dob});
+    });
+
+    eqDobUpdateData = data;
+    let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${data.length} valid rows found</div>`;
+    if(badDates.length){
+      html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
+       ⚠️ ${badDates.length} row(s) ki DOB galat/invalid hai — wo skip ho jayengi.
+       <a href="#" onclick="showEqDobBadReport();return false;" style="color:var(--teal);text-decoration:underline;margin-left:6px">Dekho</a></div>`;
+      window._eqDobBad = badDates;
+    } else {
+      window._eqDobBad = null;
+    }
+    document.getElementById('eq-dob-preview').innerHTML = html;
+    document.getElementById('eqDobUpdateBtnGo').disabled = data.length===0;
+  });
+}
+
+function showEqDobBadReport(){
+  if(!window._eqDobBad) return;
+  showReport(`Invalid DOB rows (${window._eqDobBad.length})`,
+    ['Client Code','File ki value','Wajah'], window._eqDobBad);
+}
+
+async function doEqDobUpdate(){
+  if(CU.role!=='admin') return;
+  if(!eqDobUpdateData || !eqDobUpdateData.length) return;
+  const existing = DB.get('eq_clients')||[];
+  const byCode = {};
+  existing.forEach(c=>{ if(c.code) byCode[String(c.code).trim().toUpperCase()] = c; });
+
+  let updated=0, unchanged=0;
+  const touched = [], newLogs = [], notFoundRows = [];
+
+  eqDobUpdateData.forEach(row=>{
+    const ex = byCode[row.code.trim().toUpperCase()];
+    if(!ex){ notFoundRows.push([row.code, fmtDate(row.dob)]); return; }
+    const oldDob = (ex.dob||'').trim();
+    if(oldDob===row.dob){ unchanged++; return; }
+    ex.dob = row.dob;
+    ex.updated = today();
+    touched.push(ex);
+    updated++;
+    newLogs.push({
+      id: uid(), type: 'bulk_dob_update', seg:'equity',
+      client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
+      by: CU.name, date: new Date().toISOString(),
+      changes: [{field:'dob', old:oldDob||'—', new:row.dob}]
+    });
+  });
+
+  if(touched.length) await DB.setClientsBulk('eq_clients', touched);
+  if(newLogs.length) await DB.addActivityLog(newLogs);
+
+  closeModal('eqDobUpdateModal');
+  let msg = `✅ DOB Update done! ${updated} client(s) updated`;
+  if(unchanged) msg += `, ${unchanged} already same`;
+  if(notFoundRows.length) msg += `, ${notFoundRows.length} Client Code not found`;
+  toast(msg, updated>0?'success':'error');
+  renderEqTable(); refreshDash(); updateBadges();
+
+  if(notFoundRows.length){
+    setTimeout(()=>{
+      showReport(`Client Code Not Found — ${notFoundRows.length} rows (skip kiye)`,
+        ['Client Code','DOB (file se)'], notFoundRows);
+    }, 600);
+  }
 }
 
 
