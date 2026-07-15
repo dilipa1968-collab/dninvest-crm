@@ -6914,9 +6914,9 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Investor Name *</label><input id="f_name" value="${c?.name||''}" placeholder="Full name"></div>
       <div class="form-field"><label>📱 Registered Number</label><input id="f_mobile" value="${c?.mobile||''}" placeholder="10 digit mobile"></div>
-      <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase" ${CU.role!=='admin'?'readonly':''}>
+      <div class="form-field"><label>PAN</label><input id="f_pan" value="${c?.pan||''}" placeholder="ABCDE1234F" style="text-transform:uppercase">
         <label style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:.76rem;cursor:pointer">
-          <input type="checkbox" id="f_minor" ${c?.is_minor?'checked':''} ${CU.role!=='admin'?'disabled':''}> 👶 Minor (PAN optional / guardian's PAN)
+          <input type="checkbox" id="f_minor" ${c?.is_minor?'checked':''}> 👶 Minor (PAN optional / guardian's PAN)
         </label>
       </div>
     </div>
