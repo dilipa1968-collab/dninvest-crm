@@ -11685,15 +11685,25 @@ async function doContactImport(){
   if(!data || !data.length) return;
   const existing = DB.get('mf_clients')||[];
   const byName = {};
-  existing.forEach(c=>{ if(c.name) byName[c.name.trim().toUpperCase()] = c; });
+  // Duplicate naam wale investors ko AMBIGUOUS mark karo. Ek hi naam ke kai
+  // alag folios/investors ho sakte hain — unme se kisi ek pe dusre ka mobile/
+  // PAN/DOB chipak jaana galat hai. Aise naamo ko chhod dete hain.
+  existing.forEach(c=>{
+    if(c.name){
+      const nk = c.name.trim().toUpperCase();
+      byName[nk] = (byName[nk] === undefined) ? c : 'AMBIGUOUS';
+    }
+  });
 
-  let updated=0, notFound=0;
+  let updated=0, notFound=0, ambiguous=0;
   const touched=[];
   // If multiple rows share the same name, keep the first mobile/pan found
   const seen = new Set();
+  const ambigNames = new Set();
   data.forEach(row=>{
     const key = row.name.trim().toUpperCase();
     const ex = byName[key];
+    if(ex === 'AMBIGUOUS'){ ambiguous++; ambigNames.add(row.name.trim()); return; }
     if(ex){
       let changed=false;
       if(row.mobile && ex.mobile!==row.mobile){ ex.mobile=row.mobile; changed=true; }
@@ -11712,8 +11722,20 @@ async function doContactImport(){
 
   await DB.setClientsBulk('mf_clients', touched);
   closeModal('importModal');
-  toast(`✅ Contact info updated! ${updated} updated${notFound?`, ${notFound} not matched`:''}`, 'success');
+  let cmsg = `✅ Contact info updated! ${updated} updated`;
+  if(notFound) cmsg += `, ${notFound} not matched`;
+  if(ambiguous) cmsg += `, ${ambiguous} skip (duplicate naam)`;
+  toast(cmsg, 'success');
   renderMfTable(); refreshDash(); updateBadges();
+
+  // Duplicate naam wale rows skip hue — inhe manually update karna padega
+  if(ambigNames.size){
+    setTimeout(()=>{
+      showReport(`Duplicate Naam — Skip Kiye (${ambigNames.size} naam / ${ambiguous} rows)`,
+        ['#','Naam','Wajah'],
+        [...ambigNames].map((n,i)=>[i+1, n, 'CRM me isi naam ke 1+ investor hain — manually update karein']));
+    }, 600);
+  }
 }
 
 async function doImport(){
