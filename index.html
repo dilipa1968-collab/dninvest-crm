@@ -2510,7 +2510,7 @@ input:focus, select:focus, textarea:focus{
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
         Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>DOB</b> (Name column optional — ignore ho jayega).<br>
-        DOB format: <b>DD/MM/YYYY</b> ya Excel ka real date cell — dono chalega.
+        DOB format: <b>19561009</b> (YYYYMMDD), <b>DD/MM/YYYY</b>, ya Excel ka real date cell — sab chalega. <b>0</b> / <b>NULL</b> wali rows apne aap skip ho jayengi.
       </p>
       <div style="margin-bottom:12px">
         <a href="#" onclick="downloadEqDobTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
@@ -11778,6 +11778,13 @@ function _dP2(x){ return String(x).padStart(2,'0'); }
 function normDob(v){
   if(v===undefined||v===null||v==='') return '';
   if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+_dP2(v.getMonth()+1)+'-'+_dP2(v.getDate());
+  // ── Compact YYYYMMDD (broker files: 19561009 → 1956-10-09) ──
+  const _c = String(v).trim();
+  if(['','0','null','na','n/a','-','00000000'].includes(_c.toLowerCase())) return '';
+  if(/^(19|20)\d{6}$/.test(_c)){
+    const _mo=+_c.slice(4,6), _da=+_c.slice(6,8);
+    if(_mo>=1 && _mo<=12 && _da>=1 && _da<=31) return _c.slice(0,4)+'-'+_c.slice(4,6)+'-'+_c.slice(6,8);
+  }
   if(typeof v==='number' && v>0 && v<60000){
     const d=new Date(Math.round((v-25569)*86400*1000));
     if(!isNaN(d)) return d.getUTCFullYear()+'-'+_dP2(d.getUTCMonth()+1)+'-'+_dP2(d.getUTCDate());
@@ -12742,6 +12749,7 @@ function handleEqDobUpdateFile(input){
       return;
     }
 
+    const _blankVals = ['','0','null','na','n/a','-','00000000'];
     const raw = rows.slice(hdrIdx+1)
       .filter(r=>r.some(c=>c!==''))
       .map(r=>({
@@ -12749,7 +12757,7 @@ function handleEqDobUpdateFile(input){
         rawDob: r[colMap.dob],
         dob: normDob(r[colMap.dob])
       }))
-      .filter(r=>r.code && String(r.rawDob||'').trim()!=='');
+      .filter(r=>r.code && !_blankVals.includes(String(r.rawDob==null?'':r.rawDob).trim().toLowerCase()));
 
     if(!raw.length){
       toast('No valid rows found (Client Code aur DOB dono chahiye).','error');
@@ -12760,16 +12768,25 @@ function handleEqDobUpdateFile(input){
     const todayStr = today();
     const badDates = [];
     const data = [];
+    const seenCodes = new Set();
+    let dupSkipped = 0;
     raw.forEach(r=>{
       if(!r.dob){ badDates.push([r.code, String(r.rawDob), 'Date parse nahi hui']); return; }
       if(r.dob > todayStr){ badDates.push([r.code, String(r.rawDob), 'Future date']); return; }
       if(r.dob < '1900-01-01'){ badDates.push([r.code, String(r.rawDob), '1900 se pehle']); return; }
+      const ck = r.code.toUpperCase();
+      if(seenCodes.has(ck)){ dupSkipped++; return; }   // same code repeat — pehli row hi lo
+      seenCodes.add(ck);
       data.push({code:r.code, dob:r.dob});
     });
 
     eqDobUpdateData = data;
     let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
        ✅ ${data.length} valid rows found</div>`;
+    if(dupSkipped){
+      html += `<div style="background:#eef6ff;color:#1d4ed8;padding:8px 10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
+       ℹ️ ${dupSkipped} duplicate Client Code row(s) — pehli row li gayi hai.</div>`;
+    }
     if(badDates.length){
       html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
        ⚠️ ${badDates.length} row(s) ki DOB galat/invalid hai — wo skip ho jayengi.
