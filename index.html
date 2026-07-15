@@ -11821,6 +11821,15 @@ function openEqImportModal(){
 // Normalize a header string for flexible matching
 function normHdr(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 
+// Broker file ka Account Status ("Active" / "InActive" / "Closed") -> CRM status
+function normAcStatus(v){
+  const s = String(v||'').toLowerCase().replace(/[^a-z]/g,'');
+  if(s==='closed'||s==='close'||s==='closedaccount') return 'Closed';
+  if(s==='inactive'||s==='dormant') return 'Inactive';
+  if(s==='active') return 'Active';
+  return '';
+}
+
 // Try to parse an Excel date value (could be Date object, serial number, or string)
 // All paths return local date (YYYY-MM-DD) without UTC timezone shift
 function parseExcelDate(val){
@@ -12106,7 +12115,8 @@ function handleEqFile(input){
       dob: ['dob','dateofbirth','birthdate','birthday','dateofbirthdob'],
       name: ['name','clientname','investorname'],
       asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
-      last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate']
+      last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate'],
+      status: ['accountstatus','acstatus','clientstatus','status','tradingstatus']
     };
     if(CU.role==='admin') wanted.rm = ['rm','relationshipmanager','dealer','dealername','employeename'];
     for(let i=0;i<Math.min(rows.length,15);i++){
@@ -12136,14 +12146,21 @@ function handleEqFile(input){
         name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
         rm: colMap.rm!==undefined ? normRm(String(r[colMap.rm]||'').trim()) : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
-        last_trade_date: colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : ''
+        last_trade_date: colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : '',
+        status: colMap.status!==undefined ? normAcStatus(r[colMap.status]) : ''
       }))
       .filter(r=>r.code||r.mobile||r.name);
 
     eqImportData = data;
+    const nClosed = data.filter(r=>r.status==='Closed').length;
     document.getElementById('eq-preview').innerHTML =
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${data.length} rows found (matched by Code/Mobile)</div>`;
+       ✅ ${data.length} rows found (matched by Code/Mobile)</div>` +
+      (colMap.status!==undefined
+        ? `<div style="background:#FEF6E7;color:#92400E;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
+           📋 Account Status column mila — ${nClosed} Closed. Naye Closed accounts add nahi honge; purane clients Closed mark ho jayenge.</div>`
+        : `<div style="background:#FEE2E2;color:#991B1B;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
+           ⚠️ Account Status column nahi mila — status update nahi hoga.</div>`);
     document.getElementById('eqImportBtnGo').disabled = data.length===0;
   });
 }
@@ -12159,12 +12176,20 @@ async function doEqImport(){
   // ids already used (to avoid collision with new uids)
   const usedIds = new Set(existing.map(c=>c.id));
 
-  let updated=0, added=0, skipped=0;
+  let updated=0, added=0, skipped=0, closedSkipped=0, closedMarked=0;
   const touched = [];
   eqImportData.forEach(row=>{
     // Match by Client Code first, then by Name (mobile match removed - family accounts can share the same mobile)
     let ex = (row.code && byCode[String(row.code).trim().toUpperCase()]) || (row.name && byName[String(row.name).trim().toUpperCase()]);
+
+    // Closed account jo CRM me hai hi nahi -> post hi mat karo
+    if(!ex && row.status==='Closed'){ closedSkipped++; return; }
+
     if(ex){
+      if(row.status){
+        if(row.status==='Closed' && ex.status!=='Closed') closedMarked++;
+        ex.status = row.status;                // Active / Inactive / Closed file se
+      }
       if(row.asset_value!==null) ex.asset_value = row.asset_value;
       if(row.last_trade_date) ex.last_trade_date = row.last_trade_date;
       if(row.email) ex.email = row.email;      // always overwrite email from file
@@ -12184,7 +12209,7 @@ async function doEqImport(){
       usedIds.add(id);
       const rec = {
         id, code:row.code, name:row.name, mobile:row.mobile, email:row.email||'', dob:row.dob||'',
-        rm, status:'Active',
+        rm, status: row.status || 'Active',
         asset_value: row.asset_value, revenue:null,
         last_trade_date: row.last_trade_date, last_trade_month:'',
         last_call_date:'', next_call:'', followup_status:'', remarks:'',
@@ -12200,6 +12225,8 @@ async function doEqImport(){
   await DB.setClientsBulk('eq_clients', touched);
   closeModal('eqImportModal');
   let msg = `✅ Import done! ${updated} updated, ${added} new added`;
+  if(closedMarked) msg += `, ${closedMarked} Closed mark kiye`;
+  if(closedSkipped) msg += `, ${closedSkipped} Closed skip (add nahi kiye)`;
   if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
