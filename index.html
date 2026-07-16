@@ -4458,7 +4458,9 @@ function birthdayCardImage(idx){
         '<button id="_bcCl" style="padding:12px 20px;border:0;border-radius:10px;background:#374151;color:#fff;font-weight:800;font-size:15px;cursor:pointer">✖ Close</button>'+
       '</div>'+
       '<div id="_bcHint" style="color:#e5e7eb;font-size:12.5px;text-align:center;max-width:440px;line-height:1.5">'+
-        (num?('“Send to '+first+'” dabao → image copy hogi aur '+first+' ka WhatsApp chat khul jayega. Wahan <b>Ctrl+V</b> se paste karke bhej do. 🎉')
+        (num?(isMobileDevice()&&canShare
+              ?('“Send to '+first+'” dabao → share sheet khulega, usme <b>WhatsApp</b> chunkar '+first+' ko bhej do. 🎉')
+              :('“Send to '+first+'” dabao → image copy hogi aur '+first+' ka WhatsApp chat khul jayega. Wahan <b>Ctrl+V</b> se paste karke bhej do. 🎉'))
             :'Is client ka number nahi hai — image Download karke WhatsApp par bhej do.')+
       '</div>';
     document.body.appendChild(ov);
@@ -4469,15 +4471,33 @@ function birthdayCardImage(idx){
     const shr=ov.querySelector('#_bcShare');
     if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); markBdayWished(idx,'card'); }catch(e){} };
     const send=ov.querySelector('#_bcSend');
-    if(send) send.onclick=async function(){
-      let copied=false;
-      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; }catch(e){ copied=false; }
-      if(!copied){ try{ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); }catch(e){} }
-      window.open('https://wa.me/'+num,'_blank','noopener');
+    if(send) send.onclick=function(){
+      // ── MOBILE: clipboard-paste WhatsApp par kaam nahi karta. Native share
+      // sheet se image + text seedha client ko chala jata hai — best route.
+      if(isMobileDevice() && canShare){
+        navigator.share({files:[file], title:'Happy Birthday',
+          text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'})
+          .then(function(){ markBdayWished(idx,'card');
+            hint.innerHTML='✅ Share sheet me WhatsApp chunkar '+first+' ko bhej do. 🎉'; })
+          .catch(function(){});
+        return;
+      }
+      // ── DESKTOP: clipboard.write ko gesture ke andar hi START karo (await
+      // nahi) — warna gesture khatam ho jata hai aur wa.me popup block ho
+      // jati hai. Isliye copy chalu karke turant window.open, phir hint update.
+      let writeP=null;
+      try{ writeP=navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); }catch(e){ writeP=Promise.reject(e); }
+      const win=window.open('https://wa.me/'+num,'_blank','noopener');
       markBdayWished(idx,'card');
-      hint.innerHTML = copied
-        ? ('✅ Image copy ho gayi aur '+first+' ka chat khul gaya — WhatsApp me <b>Ctrl+V</b> dabao aur bhej do. 🎉')
-        : ('📥 Image download ho gayi aur '+first+' ka chat khul gaya — us chat me image <b>attach</b> karke bhej do.');
+      hint.innerHTML='⏳ Image copy ho rahi hai...';
+      writeP.then(function(){
+        hint.innerHTML = win
+          ? ('✅ Image copy ho gayi aur '+first+' ka chat khul gaya — WhatsApp me <b>Ctrl+V</b> dabao aur bhej do. 🎉')
+          : ('✅ Image copy ho gayi. Popup block hua — <a href="https://wa.me/'+num+'" target="_blank" style="color:#25D366;font-weight:800">yahan click karke</a> chat kholo, phir <b>Ctrl+V</b>. 🎉');
+      }).catch(function(){
+        try{ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); }catch(e){}
+        hint.innerHTML='📥 Copy nahi ho payi, image download kar di — '+first+' ke chat me <b>attach</b> karke bhej do.';
+      });
     };
     ov.addEventListener('click', function(ev){ if(ev.target===ov) close(); });
   }, 'image/png');
