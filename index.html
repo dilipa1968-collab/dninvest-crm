@@ -12230,6 +12230,24 @@ function normAcStatus(v){
   return '';
 }
 
+// ── CRM ka asli status: LAST TRADE DATE se ─────────────────────────────────
+// Broker ka "Account Status" sirf ye batata hai ki account khula hai ya band —
+// trading activity nahi. Isliye file me 2017/2023 ke last trade wale bhi
+// "Active" aate hain, aur import unhe CRM me Inactive se Active kar deta tha.
+// Ab rule: Closed => Closed (broker se). Baaki sab me last trade 1 saal se
+// purana => Inactive, warna Active. Last trade blank ho to status chhedte nahi.
+const EQ_INACTIVE_DAYS = 365;
+function deriveEqStatus(brokerStatus, lastTradeYMD){
+  if(brokerStatus==='Closed') return 'Closed';
+  if(!lastTradeYMD) return '';                 // pata nahi -> mat badlo
+  const p = String(lastTradeYMD).split('-');
+  const d = new Date(+p[0], +p[1]-1, +p[2]);
+  if(isNaN(d)) return '';
+  const now = new Date();
+  const days = Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - d)/86400000);
+  return days > EQ_INACTIVE_DAYS ? 'Inactive' : 'Active';
+}
+
 // Try to parse an Excel date value (could be Date object, serial number, or string)
 // All paths return local date (YYYY-MM-DD) without UTC timezone shift
 function parseExcelDate(val){
@@ -12538,7 +12556,10 @@ function handleEqFile(input){
     }
     const data = rows.slice(hdrIdx+1)
       .filter(r=>r.some(c=>c!==''))
-      .map(r=>({
+      .map(r=>{
+        const lt = colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : '';
+        const bs = colMap.status!==undefined ? normAcStatus(r[colMap.status]) : '';
+        return {
         code: colMap.code!==undefined ? String(r[colMap.code]||'').trim() : '',
         mobile: colMap.mobile!==undefined ? cleanMobileNo(r[colMap.mobile]) : '',
         email: colMap.email!==undefined ? String(r[colMap.email]||'').trim().toLowerCase() : '',
@@ -12546,21 +12567,32 @@ function handleEqFile(input){
         name: colMap.name!==undefined ? String(r[colMap.name]||'').trim() : '',
         rm: colMap.rm!==undefined ? normRm(String(r[colMap.rm]||'').trim()) : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
-        last_trade_date: colMap.last_trade_date!==undefined ? parseExcelDate(r[colMap.last_trade_date]) : '',
-        status: colMap.status!==undefined ? normAcStatus(r[colMap.status]) : ''
-      }))
+        last_trade_date: lt,
+        broker_status: bs,
+        // Status file ke "Account Status" se nahi, LAST TRADE se banta hai
+        status: deriveEqStatus(bs, lt)
+        };
+      })
       .filter(r=>r.code||r.mobile||r.name);
 
     eqImportData = data;
     const nClosed = data.filter(r=>r.status==='Closed').length;
+    const nInact  = data.filter(r=>r.status==='Inactive').length;
+    const nAct    = data.filter(r=>r.status==='Active').length;
+    const nUnk    = data.filter(r=>!r.status).length;
+    // Broker "Active" bol raha hai par 1 saal se trade nahi — inhe Inactive kiya
+    const nFlip   = data.filter(r=>r.broker_status==='Active' && r.status==='Inactive').length;
     document.getElementById('eq-preview').innerHTML =
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
        ✅ ${data.length} rows found (matched by Code/Mobile)</div>` +
-      (colMap.status!==undefined
+      (colMap.last_trade_date!==undefined
         ? `<div style="background:#FEF6E7;color:#92400E;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
-           📋 Account Status column mila — ${nClosed} Closed. Naye Closed accounts add nahi honge; purane clients Closed mark ho jayenge.</div>`
+           📅 Status <b>Last Trade Date</b> se banega (1 saal se purana = Inactive):<br>
+           🟢 ${nAct} Active &nbsp;·&nbsp; 🟡 ${nInact} Inactive &nbsp;·&nbsp; 🔴 ${nClosed} Closed${nUnk?` &nbsp;·&nbsp; ⚪ ${nUnk} last trade blank (status waisa hi rahega)`:''}
+           ${nFlip?`<br>⚠️ Inme se <b>${nFlip}</b> ko file "Active" bol rahi hai par 1 saal se trade nahi — Inactive rakhe gaye.`:''}
+           <br>Naye Closed accounts add nahi honge; purane clients Closed mark ho jayenge.</div>`
         : `<div style="background:#FEE2E2;color:#991B1B;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
-           ⚠️ Account Status column nahi mila — status update nahi hoga.</div>`);
+           ⚠️ Last Trade Date column nahi mila — status update nahi hoga.</div>`);
     document.getElementById('eqImportBtnGo').disabled = data.length===0;
   });
 }
@@ -12660,7 +12692,7 @@ async function doEqImport(){
   if(statusFixes.length){
     setTimeout(()=>{
       showReport(`Status Corrections — ${statusFixes.length} clients (${closedMarked} Closed mark)`,
-        ['RM','Code','Name','CRM me tha','File se sahi'], statusFixes);
+        ['RM','Code','Name','CRM me tha','Last Trade se'], statusFixes);
     }, 600);
   }
 }
