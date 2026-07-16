@@ -12240,14 +12240,13 @@ function normAcStatus(v){
 // Ab rule: Closed => Closed (broker se). Baaki sab me last trade 1 saal se
 // purana => Inactive, warna Active. Last trade blank ho to status chhedte nahi.
 const EQ_INACTIVE_DAYS = 365;
-function deriveEqStatus(brokerStatus, lastTradeYMD){
+function deriveEqStatus(brokerStatus, lastTrade){
   if(brokerStatus==='Closed') return 'Closed';
-  if(!lastTradeYMD) return '';                 // pata nahi -> mat badlo
-  const p = String(lastTradeYMD).split('-');
-  const d = new Date(+p[0], +p[1]-1, +p[2]);
-  if(isNaN(d)) return '';
-  const now = new Date();
-  const days = Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - d)/86400000);
+  // daysDiff() hi use karo — wahi parser table ke "6299D AGO" me chalta hai.
+  // Pehle yahan sirf YYYY-MM-DD parse hota tha, isliye purane records
+  // (2009-04-17T00:00:00Z / 17-Apr-2009 jaise) chupchaap skip ho jate the.
+  const days = daysDiff(lastTrade);
+  if(days===null) return '';                   // pata nahi -> mat badlo
   return days > EQ_INACTIVE_DAYS ? 'Inactive' : 'Active';
 }
 
@@ -12488,19 +12487,29 @@ async function fixStatusByLastTrade(){
   if(CU.role!=='admin') return;
   const list = DB.get('eq_clients')||[];
   const toFix = [];
+  let nBlank=0, nBadDate=0;
   list.forEach(c=>{
     if(c.status==='Closed') return;              // Closed chhedna nahi
-    if(!c.last_trade_date) return;               // last trade pata nahi -> chhodo
-    const want = deriveEqStatus('', c.last_trade_date);
-    if(want && want!==c.status) toFix.push({c, from:c.status||'—', to:want});
+    if(!c.last_trade_date){ nBlank++; return; }  // last trade pata nahi -> chhodo
+    // daysDiff() wahi function hai jo table me "6299D AGO" dikhata hai — isse
+    // har format (YYYY-MM-DD / 17-Apr-2009 / Date object) sahi parse hota hai.
+    const days = daysDiff(c.last_trade_date);
+    if(days===null){ nBadDate++; return; }       // date samajh nahi aayi
+    const want = days > EQ_INACTIVE_DAYS ? 'Inactive' : 'Active';
+    if(want!==c.status) toFix.push({c, from:c.status||'—', to:want});
   });
-  if(!toFix.length){ toast('✅ Sab clients ka status already last trade ke hisab se sahi hai','success'); return; }
+  if(nBadDate) console.log('Fix Status: date parse fail ->', nBadDate, 'clients');
+  if(!toFix.length){
+    toast(`✅ Sab clients ka status already last trade ke hisab se sahi hai${nBadDate?` (${nBadDate} ki date samajh nahi aayi)`:''}`,'success');
+    return;
+  }
   const nInact = toFix.filter(x=>x.to==='Inactive').length;
   const nAct   = toFix.filter(x=>x.to==='Active').length;
   if(!confirm(`${toFix.length} clients ka status last trade se match nahi kar raha:\n\n`+
               `🟡 ${nInact} ko Inactive karna hai (1 saal se trade nahi)\n`+
               `🟢 ${nAct} ko Active karna hai (1 saal ke andar trade hua)\n\n`+
-              `Closed clients aur jinka last trade blank hai — unhe chhua nahi jayega.\n\nUpdate karu?`)) return;
+              `Chhue nahi jayenge: Closed clients, ${nBlank} jinka last trade blank hai`+
+              `${nBadDate?`, ${nBadDate} jinki date parse nahi hui`:''}.\n\nUpdate karu?`)) return;
   const touched=[];
   toFix.forEach(x=>{ x.c.status = x.to; touched.push(x.c); });
   await DB.setClientsBulk('eq_clients', touched);
