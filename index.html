@@ -4166,6 +4166,33 @@ function getSegRMs(seg){
 }
 
 // RM ke apne dealer names (ek RM ke ek se zyada dealer codes ho sakte hain)
+// Temp access ko RM-wise group karta hai: har absent RM ka EK option, jo uske
+// saare dealer names (PUJA / PUJA MADAM / PUJA/MEGHA ...) ko cover karta hai.
+function getTempAccessGroups(seg){
+  const users = DB.get('users')||[];
+  const me = users.find(u=>u.id===CU.id);
+  if(!me || !me.tempAccess || !me.tempAccess.length) return [];
+  const today = new Date().toISOString().split('T')[0];
+  const groups=[];
+  me.tempAccess.filter(t=>t.expiry===today).forEach(t=>{
+    const au = users.find(u=>u.id===t.absentUserId);
+    if(!au) return;
+    const raw = seg==='eq' ? au.eq_dealers : au.mf_dealers;
+    const list = (Array.isArray(raw) && raw.length) ? raw : [au.name];
+    const dealers=[...new Set(list.map(d=>String(d||'').trim().toUpperCase()).filter(Boolean))];
+    if(dealers.length) groups.push({name:au.name||dealers[0], dealers});
+  });
+  return groups;
+}
+
+// Client ka RM selected filter se match karta hai? __G__: wale option ek se
+// zyada dealer names ko cover karte hain.
+function rmMatches(cRm, sel){
+  const v=String(cRm||'').trim().toUpperCase();
+  if(String(sel).startsWith('__G__:')) return String(sel).slice(6).split('|').includes(v);
+  return v===String(sel).trim().toUpperCase();
+}
+
 function getMyDealerNames(seg){
   const raw = seg==='eq' ? CU.eq_dealers : CU.mf_dealers;
   // Khaali array bhi truthy hota hai — isliye length check zaroori, warna
@@ -4178,57 +4205,70 @@ function getMyDealerNames(seg){
 }
 
 function populateRmDropdowns(){
-  let eqRMs = getSegRMs('equity');
-  let mfRMs = getSegRMs('mf');
-  // Temp access wale RM ka naam bhi list me aayega, taki RM apna aur temp
-  // wale ka data alag-alag dekh sake. Bina temp ke behaviour purana hi.
-  let tempEq = [], tempMf = [];
-  if(CU.role!=='admin'){
-    const myEq = getMyDealerNames('eq'), myMf = getMyDealerNames('mf');
-    const upper = a => a.map(x=>String(x).trim().toUpperCase());
-    tempEq = getTempAccessDealers('eq').filter(t=>!upper(myEq).includes(t));
-    tempMf = getTempAccessDealers('mf').filter(t=>!upper(myMf).includes(t));
-    eqRMs = [...myEq, ...tempEq];
-    mfRMs = [...myMf, ...tempMf];
-  }
+  const isAdmin = CU.role==='admin';
   // Admin gets a "No RM" filter to find unassigned clients and shift them
-  const noRmOpt = CU.role==='admin' ? '<option value="__NONE__">— No RM (Unassigned) —</option>' : '';
-  const opts = (list, temp) => {
-    const seen=new Set();
-    return list.filter(r=>{ const k=String(r||'').trim().toUpperCase();
-      if(!k||seen.has(k)) return false; seen.add(k); return true; })
-      .map(r => `<option value="${String(r).replace(/"/g,'&quot;')}">${escapeHtml(String(r))}${temp.includes(String(r).trim().toUpperCase())?' 🔄 (temp)':''}</option>`).join('');
-  };
-  ['eq-rm'].forEach(id=>{
-    const el=document.getElementById(id);
+  const noRmOpt = isAdmin ? '<option value="__NONE__">— No RM (Unassigned) —</option>' : '';
+  const esc = s => String(s).replace(/"/g,'&quot;');
+
+  // Admin ke liye purana behaviour: har RM ka naam.
+  // RM/desk ke liye: apna EK option + har temp RM ka EK option (uske saare
+  // dealer names andar group ho jate hain, isliye PUJA MADAM / PUJA/MEGHA
+  // jaisi variants alag se list me nahi aati).
+  function build(seg, elId){
+    const el=document.getElementById(elId);
     if(!el) return;
-    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+opts(eqRMs, tempEq);
-    if(CU.role!=='admin'){
-      // Temp access ho to dropdown khula rahega (default: All = apna + temp).
-      if(tempEq.length){ el.disabled=false; el.value=''; }
-      else { el.value=CU.name; el.disabled=true; }
+    let html='<option value="">All RMs</option>'+noRmOpt;
+    if(isAdmin){
+      const seen=new Set();
+      getSegRMs(seg==='eq'?'equity':'mf').forEach(r=>{
+        const k=String(r||'').trim().toUpperCase();
+        if(!k||seen.has(k)) return; seen.add(k);
+        html+=`<option value="${esc(r)}">${escapeHtml(String(r))}</option>`;
+      });
+      el.innerHTML=html; el.disabled=false;
+      return;
     }
-  });
-  ['mf-rm'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el) return;
-    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+opts(mfRMs, tempMf);
-    if(CU.role!=='admin'){
-      if(tempMf.length){ el.disabled=false; el.value=''; }
-      else { el.value=CU.name; el.disabled=true; }
+    const mine=getMyDealerNames(seg);
+    const myVal='__G__:'+mine.map(d=>d.toUpperCase()).join('|');
+    html+=`<option value="${esc(myVal)}">${escapeHtml(CU.name||mine[0]||'Me')}</option>`;
+    const groups=getTempAccessGroups(seg);
+    groups.forEach(g=>{
+      html+=`<option value="${esc('__G__:'+g.dealers.join('|'))}">${escapeHtml(g.name)} 🔄 (temp)</option>`;
+    });
+    el.innerHTML=html;
+    // Temp access ho to dropdown khula (default All = apna + temp), warna lock.
+    if(groups.length){ el.disabled=false; el.value=''; }
+    else { el.value=myVal; el.disabled=true; }
+  }
+  build('eq','eq-rm');
+  build('mf','mf-rm');
+
+  const le=document.getElementById('leads-rm');
+  if(le){
+    let html='<option value="">All RMs</option>'+noRmOpt;
+    if(isAdmin){
+      const seen=new Set();
+      [...getSegRMs('equity'),...getSegRMs('mf')].forEach(r=>{
+        const k=String(r||'').trim().toUpperCase();
+        if(!k||seen.has(k)) return; seen.add(k);
+        html+=`<option value="${esc(r)}">${escapeHtml(String(r))}</option>`;
+      });
+      le.innerHTML=html; le.disabled=false;
+    } else {
+      const mine=[...new Set([...getMyDealerNames('eq'),...getMyDealerNames('mf')].map(d=>d.toUpperCase()))];
+      const myVal='__G__:'+mine.join('|');
+      html+=`<option value="${esc(myVal)}">${escapeHtml(CU.name||mine[0]||'Me')}</option>`;
+      const seen=new Set();
+      [...getTempAccessGroups('eq'),...getTempAccessGroups('mf')].forEach(g=>{
+        const k=String(g.name).toUpperCase();
+        if(seen.has(k)) return; seen.add(k);
+        html+=`<option value="${esc('__G__:'+g.dealers.join('|'))}">${escapeHtml(g.name)} 🔄 (temp)</option>`;
+      });
+      le.innerHTML=html;
+      if(seen.size){ le.disabled=false; le.value=''; }
+      else { le.value=myVal; le.disabled=true; }
     }
-  });
-  ['leads-rm'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el) return;
-    const allRMs=[...new Set([...eqRMs,...mfRMs])];
-    const allTemp=[...new Set([...tempEq,...tempMf])];
-    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+opts(allRMs, allTemp);
-    if(CU.role!=='admin'){
-      if(allTemp.length){ el.disabled=false; el.value=''; }
-      else { el.value=CU.name; el.disabled=true; }
-    }
-  });
+  }
 }
 
 // ══════════════════════════════════════════
@@ -5064,7 +5104,7 @@ function renderEqTable(){
   else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
   if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
-  else if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  else if(rm) data=data.filter(c=>rmMatches(c.rm, rm));
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
@@ -5239,7 +5279,7 @@ function renderMfTable(){
   else if(st) data=data.filter(c=>c.status===st && !c.do_not_call);
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
   if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
-  else if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  else if(rm) data=data.filter(c=>rmMatches(c.rm, rm));
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
@@ -5378,7 +5418,7 @@ function renderLeadsTable(){
 
   if(q) data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q));
   if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
-  else if(rm) data=data.filter(c=>(c.rm||'').trim().toLowerCase()===rm.trim().toLowerCase());
+  else if(rm) data=data.filter(c=>rmMatches(c.rm, rm));
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(fu&&!['today','overdue'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
