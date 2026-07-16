@@ -3152,6 +3152,14 @@ async function doLogin(){
   if(typeof fdb!=='undefined'){
     try{ await DB.syncFromFirebase(); }catch(e){}
   }
+  // The active/inactive flag is flipped by runAutoSchedule(), which until now
+  // only ran inside an already logged-in session. If nobody was logged in when
+  // the window opened (8:00 AM Mon-Fri), every RM's flag stayed at last night's
+  // `false` and login was wrongly blocked. Run the schedule here so the flag is
+  // always current before the office-hours check below.
+  if(typeof fdb!=='undefined'){
+    try{ await refreshHolidaySet(); runAutoSchedule(); }catch(e){}
+  }
   const users = DB.get('users') || DEFAULT_USERS;
   const td = today();
   // RM can login with PIN (4-digit) OR password; Admin uses password only.
@@ -3167,15 +3175,28 @@ async function doLogin(){
     if(x.role==='rm' && x.pin && x.pin===p) return true;
     return false;
   });
-  // If user found but inactive (outside office hours) → show time message
+  // If user found but inactive → block ONLY if the clock really is outside
+  // today's working window. If we're inside the window, the stored flag is
+  // simply stale (auto-schedule not yet run on this device) → repair it and
+  // let them in. Manual Admin deactivation still blocks (manualOverride).
+  const insideWindow = isWithinActiveWindowNow();
   if(userExists && userExists.active===false && userExists.lateAbsentMarked!==td){
-    document.getElementById('lerr').textContent='🕐 Login not allowed outside office hours. Please try again during working hours.';
-    document.getElementById('lerr').style.display='block';
-    return;
+    if(insideWindow && !userExists.manualOverride){
+      const fixList = DB.get('users') || [];
+      const fi = fixList.findIndex(x=>x.id===userExists.id);
+      if(fi>=0){ fixList[fi].active = true; DB.set('users', fixList); }
+      userExists.active = true;
+    } else {
+      document.getElementById('lerr').textContent = userExists.manualOverride
+        ? '🔒 Your access has been disabled by Admin. Please contact Admin.'
+        : '🕐 Login not allowed outside office hours. Please try again during working hours.';
+      document.getElementById('lerr').style.display='block';
+      return;
+    }
   }
   const user = users.find(x=>{
     if(x.username!==u) return false;
-    if(x.active===false && x.lateAbsentMarked!==td) return false;
+    if(x.active===false && x.lateAbsentMarked!==td && !(insideWindow && !x.manualOverride)) return false;
     if(x.password===p) return true;
     if(x.role==='rm' && x.pin && x.pin===p) return true;
     return false;
@@ -10260,6 +10281,16 @@ function getActiveWindowForDay(dow){
   return {start:8, end:19};          // Mon-Fri — 8:00 AM to 7:00 PM
 }
 
+// TRUE if the current IST moment lies inside today's working window.
+// Login uses this directly instead of trusting the stored `active` flag,
+// which can be stale if the auto-schedule hasn't run yet on this device.
+function isWithinActiveWindowNow(){
+  const win = isHolidayToday() ? null : getActiveWindowForDay(getISTDayOfWeek());
+  if(!win) return false;
+  const h = getISTHour();
+  return h >= win.start && h < win.end;
+}
+
 function runAutoSchedule(){
   const users = DB.get('users') || [];
   const istHour = getISTHour();
@@ -10280,7 +10311,8 @@ function runAutoSchedule(){
       const overrideWin = isHolidayToday() ? null : getActiveWindowForDay(overrideDow);
       // Has the day changed since the override, or has the active window
       // (start/end) for today been crossed since the override was set?
-      const dayChanged = new Date().getDate() !== overrideTime.getDate();
+      const dayChanged = getISTDateStr() !== (isNaN(istO) ? '' :
+        istO.getFullYear()+'-'+String(istO.getMonth()+1).padStart(2,'0')+'-'+String(istO.getDate()).padStart(2,'0'));
       let crossedBoundary = dayChanged;
       if(!dayChanged && overrideWin){
         crossedBoundary = (overrideHour < overrideWin.start && istHour >= overrideWin.start) ||
