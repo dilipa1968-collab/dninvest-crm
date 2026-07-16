@@ -4159,33 +4159,59 @@ function getSegRMs(seg){
   return (DB.get('users')||[]).filter(u=>u.active!==false && u.role!=='mf_desk' && u.role!=='backoffice' && (u.segments||[]).includes(seg)).map(u=>u.name);
 }
 
+// RM ke apne dealer names (ek RM ke ek se zyada dealer codes ho sakte hain)
+function getMyDealerNames(seg){
+  const list = seg==='eq' ? (CU.eq_dealers||[CU.name]) : (CU.mf_dealers||[CU.name]);
+  return [...new Set(list.map(d=>String(d||'').trim()).filter(Boolean))];
+}
+
 function populateRmDropdowns(){
   let eqRMs = getSegRMs('equity');
   let mfRMs = getSegRMs('mf');
+  // Temp access wale RM ka naam bhi list me aayega, taki RM apna aur temp
+  // wale ka data alag-alag dekh sake. Bina temp ke behaviour purana hi.
+  let tempEq = [], tempMf = [];
   if(CU.role!=='admin'){
-    eqRMs = [CU.name];
-    mfRMs = [CU.name];
+    const myEq = getMyDealerNames('eq'), myMf = getMyDealerNames('mf');
+    const upper = a => a.map(x=>String(x).trim().toUpperCase());
+    tempEq = getTempAccessDealers('eq').filter(t=>!upper(myEq).includes(t));
+    tempMf = getTempAccessDealers('mf').filter(t=>!upper(myMf).includes(t));
+    eqRMs = [...myEq, ...tempEq];
+    mfRMs = [...myMf, ...tempMf];
   }
   // Admin gets a "No RM" filter to find unassigned clients and shift them
   const noRmOpt = CU.role==='admin' ? '<option value="__NONE__">— No RM (Unassigned) —</option>' : '';
+  const opts = (list, temp) => list.map(r =>
+    `<option value="${String(r).replace(/"/g,'&quot;')}">${escapeHtml(String(r))}${temp.includes(String(r).trim().toUpperCase())?' 🔄 (temp)':''}</option>`).join('');
   ['eq-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
-    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+eqRMs.map(r=>`<option>${r}</option>`).join('');
-    if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
+    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+opts(eqRMs, tempEq);
+    if(CU.role!=='admin'){
+      // Temp access ho to dropdown khula rahega (default: All = apna + temp).
+      if(tempEq.length){ el.disabled=false; el.value=''; }
+      else { el.value=CU.name; el.disabled=true; }
+    }
   });
   ['mf-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
-    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+mfRMs.map(r=>`<option>${r}</option>`).join('');
-    if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
+    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+opts(mfRMs, tempMf);
+    if(CU.role!=='admin'){
+      if(tempMf.length){ el.disabled=false; el.value=''; }
+      else { el.value=CU.name; el.disabled=true; }
+    }
   });
   ['leads-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
     const allRMs=[...new Set([...eqRMs,...mfRMs])];
-    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+allRMs.map(r=>`<option>${r}</option>`).join('');
-    if(CU.role!=='admin'){ el.value=CU.name; el.disabled=true; }
+    const allTemp=[...new Set([...tempEq,...tempMf])];
+    el.innerHTML='<option value="">All RMs</option>'+noRmOpt+opts(allRMs, allTemp);
+    if(CU.role!=='admin'){
+      if(allTemp.length){ el.disabled=false; el.value=''; }
+      else { el.value=CU.name; el.disabled=true; }
+    }
   });
 }
 
@@ -11598,7 +11624,11 @@ function saveTempAccess(){
 
   DB.set('users', users);
   // Update CU if granting to logged-in user
-  if(CU.id === users[idx].id) CU.tempAccess = users[idx].tempAccess;
+  if(CU.id === users[idx].id){
+    CU.tempAccess = users[idx].tempAccess;
+    // Dropdown turant refresh ho, warna temp RM ka option reload tak nahi aata
+    try{ populateRmDropdowns(); }catch(e){}
+  }
 
   closeModal('tempAccessModal');
   renderAdmin();
