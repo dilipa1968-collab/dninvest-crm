@@ -1075,6 +1075,7 @@ input:focus, select:focus, textarea:focus{
             <button class="btn btn-outline" onclick="openEqPanUpdateModal()" id="eqPanUpdateBtn" style="display:none">🪪 Bulk PAN Update</button>
             <button class="btn btn-outline" onclick="openEqDobUpdateModal()" id="eqDobUpdateBtn" style="display:none">🎂 Bulk DOB Update</button>
             <button class="btn btn-outline" onclick="fixAllMobiles()" id="eqFixMobileBtn" style="display:none">🧹 Fix Mobile (91)</button>
+            <button class="btn btn-outline" onclick="fixStatusByLastTrade()" id="eqFixStatusBtn" style="display:none">🔄 Fix Status (Last Trade)</button>
             <button class="btn btn-primary" id="eqAddClientBtn" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
@@ -4075,6 +4076,8 @@ function initApp(){
   if(eqDobUpdateBtn) eqDobUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixMobileBtn=document.getElementById('eqFixMobileBtn');
   if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqFixStatusBtn=document.getElementById('eqFixStatusBtn');
+  if(eqFixStatusBtn) eqFixStatusBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
   if(mfImportBtn) mfImportBtn.style.display=isBackOfficeOrAdmin()?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
@@ -12473,6 +12476,40 @@ async function fixAllMobiles(){
   }
   toast(`✅ ${fixed} clients ke mobile fix ho gaye (91 hataya)`,'success');
   renderEqTable(); if(typeof renderMfTable==='function') renderMfTable(); refreshDash(); updateBadges();
+}
+
+// ── Fix Status (Last Trade) — Admin only ───────────────────────────────────
+// Import sirf un clients ko chhoo sakta hai jo broker file me hote hain. Jo
+// client file me hi nahi aaya (purane/dormant account), wo CRM me Active hi
+// pada reh jata tha chahe uska last trade 5 saal purana ho. Ye button CRM ke
+// apne last_trade_date se poore Equity base ka status dobara banata hai.
+// Closed clients ko haath nahi lagate — wo broker se hi decide hote hain.
+async function fixStatusByLastTrade(){
+  if(CU.role!=='admin') return;
+  const list = DB.get('eq_clients')||[];
+  const toFix = [];
+  list.forEach(c=>{
+    if(c.status==='Closed') return;              // Closed chhedna nahi
+    if(!c.last_trade_date) return;               // last trade pata nahi -> chhodo
+    const want = deriveEqStatus('', c.last_trade_date);
+    if(want && want!==c.status) toFix.push({c, from:c.status||'—', to:want});
+  });
+  if(!toFix.length){ toast('✅ Sab clients ka status already last trade ke hisab se sahi hai','success'); return; }
+  const nInact = toFix.filter(x=>x.to==='Inactive').length;
+  const nAct   = toFix.filter(x=>x.to==='Active').length;
+  if(!confirm(`${toFix.length} clients ka status last trade se match nahi kar raha:\n\n`+
+              `🟡 ${nInact} ko Inactive karna hai (1 saal se trade nahi)\n`+
+              `🟢 ${nAct} ko Active karna hai (1 saal ke andar trade hua)\n\n`+
+              `Closed clients aur jinka last trade blank hai — unhe chhua nahi jayega.\n\nUpdate karu?`)) return;
+  const touched=[];
+  toFix.forEach(x=>{ x.c.status = x.to; touched.push(x.c); });
+  await DB.setClientsBulk('eq_clients', touched);
+  DB.addActivityLog(toFix.map(x=>({ id:uid(), type:'edit', seg:'equity',
+    client_id:x.c.id, client_name:x.c.name, rm:x.c.rm, by:CU.name,
+    date:new Date().toISOString(),
+    changes:[{field:'status', old:x.from, new:x.to}] })));
+  toast(`✅ ${toFix.length} clients ka status update ho gaya (${nInact} Inactive, ${nAct} Active)`,'success');
+  renderEqTable(); refreshDash(); updateBadges();
 }
 
 // Entry point for the Equity "Import Excel" file input. Peeks at every sheet's
