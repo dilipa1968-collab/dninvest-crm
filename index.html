@@ -4114,11 +4114,17 @@ function getTempAccessDealers(seg){
   const valid = me.tempAccess.filter(t=>t.expiry===today);
   if(!valid.length) return [];
   const extraDealers = [];
+  const seen = new Set();
   valid.forEach(t=>{
     const absentUser = users.find(u=>u.id===t.absentUserId);
     if(!absentUser) return;
     const dealers = seg==='eq' ? (absentUser.eq_dealers||[absentUser.name]) : (absentUser.mf_dealers||[absentUser.name]);
-    dealers.forEach(d=>extraDealers.push(d.trim().toUpperCase()));
+    dealers.forEach(d=>{
+      const key=String(d||'').trim().toUpperCase();
+      // Do absent RM ka same dealer ho to ek hi baar (pehle duplicate aata tha)
+      if(!key || seen.has(key)) return;
+      seen.add(key); extraDealers.push(key);
+    });
   });
   return extraDealers;
 }
@@ -4161,8 +4167,14 @@ function getSegRMs(seg){
 
 // RM ke apne dealer names (ek RM ke ek se zyada dealer codes ho sakte hain)
 function getMyDealerNames(seg){
-  const list = seg==='eq' ? (CU.eq_dealers||[CU.name]) : (CU.mf_dealers||[CU.name]);
-  return [...new Set(list.map(d=>String(d||'').trim()).filter(Boolean))];
+  const raw = seg==='eq' ? CU.eq_dealers : CU.mf_dealers;
+  // Khaali array bhi truthy hota hai — isliye length check zaroori, warna
+  // apna naam list se gayab ho jata tha.
+  const list = (Array.isArray(raw) && raw.length) ? raw : [CU.name];
+  const out=[], seen=new Set();
+  list.forEach(d=>{ const v=String(d||'').trim(); const k=v.toUpperCase();
+    if(v && !seen.has(k)){ seen.add(k); out.push(v); } });
+  return out;
 }
 
 function populateRmDropdowns(){
@@ -4181,8 +4193,12 @@ function populateRmDropdowns(){
   }
   // Admin gets a "No RM" filter to find unassigned clients and shift them
   const noRmOpt = CU.role==='admin' ? '<option value="__NONE__">— No RM (Unassigned) —</option>' : '';
-  const opts = (list, temp) => list.map(r =>
-    `<option value="${String(r).replace(/"/g,'&quot;')}">${escapeHtml(String(r))}${temp.includes(String(r).trim().toUpperCase())?' 🔄 (temp)':''}</option>`).join('');
+  const opts = (list, temp) => {
+    const seen=new Set();
+    return list.filter(r=>{ const k=String(r||'').trim().toUpperCase();
+      if(!k||seen.has(k)) return false; seen.add(k); return true; })
+      .map(r => `<option value="${String(r).replace(/"/g,'&quot;')}">${escapeHtml(String(r))}${temp.includes(String(r).trim().toUpperCase())?' 🔄 (temp)':''}</option>`).join('');
+  };
   ['eq-rm'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
