@@ -1151,7 +1151,7 @@ input:focus, select:focus, textarea:focus{
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="sqExport()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-sq" id="sq-clrbtn" style="display:none" onclick="sqClear()">🗑️ Clear</button>
-            <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" onclick="document.getElementById('sq-file').click()">⬆️ Upload Today's File</button>
+            <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" title="Har office ki file alag-alag upload kar sakte hain — data merge hoga, mitega nahi" onclick="document.getElementById('sq-file').click()">⬆️ Upload File (Merge)</button>
             <input type="file" id="sq-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sqUpload(this)">
           </div>
         </div>
@@ -9702,12 +9702,23 @@ function sqUpload(input){
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
-      // Full replace: every new upload wipes out whatever was there before and
-      // becomes the sole active square-off dataset (today's file, both its
-      // sheets/dates). Keeps the table from accumulating old, stale dates.
-      DB.set('squareoff', out);
+      // MERGE mode: purana data mitta nahi. Key = Client Code + Square-off Date.
+      // Same key wali row nayi file se overwrite ho jati hai, baaki add hoti hain.
+      // Isse alag-alag office ki files alag-alag upload ki ja sakti hain.
+      // Sirf beeti hui sq-date wali rows (aaj se pehle) hata di jati hain, taaki
+      // purani dates jama na hon.
+      const keyOf = r => String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
+      const merged = new Map();
+      (DB.get('squareoff')||[]).forEach(r=>merged.set(keyOf(r), r));   // pehle purana
+      out.forEach(r=>merged.set(keyOf(r), r));                          // naya upar
+      const todayISO = today();
+      const finalRows = [...merged.values()].filter(r=>!r.sqDate || r.sqDate >= todayISO);
+      const dropped = merged.size - finalRows.length;
+      DB.set('squareoff', finalRows);
       const uploadedDates = [...new Set(out.map(r=>r.sqDate).filter(Boolean))];
-      toast('Square-off updated — '+out.length+' clients ('+uploadedDates.map(sqFmtD).join(', ')+')','success');
+      let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), total '+finalRows.length+' clients';
+      if(dropped) msg += ', '+dropped+' purani date wali hataayi';
+      toast(msg,'success');
       renderSquareoff(); updateBadges(); sqUpdateBell();
     }catch(err){ console.error(err); toast('Upload failed: '+err.message,'error'); }
     input.value='';
