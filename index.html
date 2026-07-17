@@ -2453,6 +2453,16 @@ input:focus, select:focus, textarea:focus{
 </div>
 
 <!-- Equity Risk Detail Modal (RMS file data) -->
+<div class="modal-overlay" id="mfAumModal" onclick="if(event.target===this)closeModal('mfAumModal')">
+  <div class="modal" style="width:440px;max-width:94vw">
+    <div class="modal-hdr">
+      <h3>📈 Portfolio Details</h3>
+      <button class="modal-close" onclick="closeModal('mfAumModal')">×</button>
+    </div>
+    <div class="modal-body" id="mfAumModalBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="eqRiskModal" onclick="if(event.target===this)closeModal('eqRiskModal')">
   <div class="modal" style="width:440px;max-width:94vw">
     <div class="modal-hdr">
@@ -5388,7 +5398,7 @@ function renderMfTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
-      <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
+      <td>${c.aum?`<a href="#" onclick="openMfAum('${c.id}');return false" style="text-decoration:none;color:var(--navy)" title="Click for Invested / Gain-Loss / XIRR">₹${fmtNum(c.aum)}</a>`:'—'}</td>
       <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
       <td>${sipCntCell(c)}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
@@ -9446,7 +9456,7 @@ function renderSip(){
       <td>${c.mobile||'—'}</td>
       <td>${c.rm||'—'}</td>
       <td><span class="badge b-investor">${c.status}</span></td>
-      <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
+      <td>${c.aum?`<a href="#" onclick="openMfAum('${c.id}');return false" style="text-decoration:none;color:var(--navy)" title="Click for Invested / Gain-Loss / XIRR">₹${fmtNum(c.aum)}</a>`:'—'}</td>
       <td style="font-weight:700;color:var(--teal)">₹${fmtNum(c.sip_amount)}</td>
       <td>${sipCntCell(c)}</td>
       <td><button class="btn-icon" onclick="viewClient('${c.id}','mf')">👁</button>
@@ -12038,6 +12048,16 @@ function parseAumExcel(rows){
     client_id: ['clientid','clientcode','clientno','clientidno'],
     aum:     ['aum','currentvalue','marketvalue','closingbalance','currentamt'],
     inv_amt: ['invamt','invamount','investmentamount','investedamount','purchaseamount','investment'],
+    // Performance columns, shown when the AUM cell is clicked.
+    // NOTE: "Today's P/L" and "Today's P/L %" BOTH normalise to "todayspl",
+    // so they can't be told apart by header alone — and they go stale daily
+    // anyway. Deliberately not imported.
+    div_paid:  ['divpaid','dividendpaid'],
+    div_reinv: ['divreinv','dividendreinv','divreinvest'],
+    avg_days:  ['avgdays','averagedays'],
+    gain_loss: ['gainloss','gain','profitloss'],
+    abs_rtn:   ['absrtn','absreturn','absolutereturn'],
+    xirr:      ['xirr','xirrpct'],
     rm:      ['rm','relationshipmanager','dealer','dealername','employeename'],
     sno:     ['sno','srno','serialno','slno']
   };
@@ -12082,6 +12102,12 @@ function parseAumExcel(rows){
       client_id: String(at(r,'client_id')||'').trim(),
       inv_amt: num(at(r,'inv_amt')),
       aum: num(at(r,'aum')),
+      div_paid:  num(at(r,'div_paid')),
+      div_reinv: num(at(r,'div_reinv')),
+      avg_days:  num(at(r,'avg_days')),
+      gain_loss: num(at(r,'gain_loss')),
+      abs_rtn:   num(at(r,'abs_rtn')),
+      xirr:      num(at(r,'xirr')),
       rm: String(at(r,'rm')||'').trim()
     };
   }).filter(r=>r.name);
@@ -12415,6 +12441,15 @@ async function doImport(){
   const ambigRows = [];      // couldn't be identified safely
   const claimed = new Set(); // guard: never let two file rows write the same client
   
+  // Compact performance snapshot kept on the MF client so the AUM cell can be
+  // clicked open. Short keys on purpose — this rides along in the mf_clients
+  // blob doc, which every open tab re-downloads on change.
+  const _aumDetail = row => ({
+    inv: row.inv_amt||0, dp: row.div_paid||0, dr: row.div_reinv||0,
+    ad: row.avg_days||0, gl: row.gain_loss||0, ar: row.abs_rtn||0,
+    xirr: row.xirr||0, on: today()
+  });
+
   let updated = 0, added = 0;
   const newClients = [];
   
@@ -12442,6 +12477,7 @@ async function doImport(){
         if(row.aum || row.aum===0) ex.aum = row.aum;   // 0 is a real value, not "skip"
         ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
+        ex.aum_detail = _aumDetail(row);
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
         if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
         if(sipInfo.sip_details) ex.sip_details = sipInfo.sip_details;
@@ -12457,6 +12493,7 @@ async function doImport(){
           name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:'', email:'', rm,
           status: 'Investor',
           aum: row.aum,
+          aum_detail: _aumDetail(row),
           sip_amount: sipInfo.sip_amount||null,
           sip_count: sipInfo.sip_count||null,
           sip_details: sipInfo.sip_details||null,
@@ -12723,6 +12760,42 @@ function fmtRiskMoney(n){
   const pos=n>0;
   return `<span style="color:${pos?'var(--green,#16a34a)':'var(--red,#dc2626)'};font-weight:700">${pos?'+':'−'}₹${s}</span>`;
 }
+// MF AUM cell -> portfolio breakdown. Same idea as openEqRisk() on the equity
+// side. Data comes from the AUM By Client import (aum_detail).
+function openMfAum(id){
+  const c = (DB.get('mf_clients')||[]).find(x=>x.id===id);
+  const body = document.getElementById('mfAumModalBody');
+  if(!c){ return; }
+  const d = c.aum_detail;
+  const row = (label,val) => `<div style="display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid #eef1f6">
+    <span style="color:var(--gray);font-size:.86rem">${label}</span><span style="font-size:.95rem">${val}</span></div>`;
+  const signed = (n,pct) => {
+    if(n===null || n===undefined || n==='') return '—';
+    const pos = Number(n) >= 0;
+    const col = pos ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
+    const txt = pct ? Math.abs(Number(n)).toFixed(2)+'%' : '₹'+fmtNum(Math.abs(Number(n)));
+    return `<b style="color:${col}">${pos?'+':'−'}${txt}</b>`;
+  };
+  const hdr = `<div style="font-weight:700;font-size:1.05rem;margin-bottom:4px">${escapeHtml(c.name||'')}</div>
+    <div style="color:var(--gray);font-size:.78rem;margin-bottom:10px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div>`;
+  if(!d){
+    body.innerHTML = hdr + `${row('AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—')}
+      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">Baaki detail (Invested, Gain/Loss, XIRR) ke liye MF → Import Excel se AUM By Client report upload karein.</div>`;
+  } else {
+    body.innerHTML = hdr +
+      row('Invested', d.inv?'₹'+fmtNum(d.inv):'—') +
+      row('Current AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—') +
+      row('Gain / Loss', signed(d.gl)) +
+      row('Abs. Return', signed(d.ar, true)) +
+      row('XIRR', signed(d.xirr, true)) +
+      (d.dp ? row('Dividend Paid', '₹'+fmtNum(d.dp)) : '') +
+      (d.dr ? row('Dividend Re-Inv', '₹'+fmtNum(d.dr)) : '') +
+      (d.ad ? row('Avg. Days', fmtNum(d.ad)) : '') +
+      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}</div>`;
+  }
+  document.getElementById('mfAumModal').classList.add('open');
+}
+
 function openEqRisk(code, name){
   const r = eqRiskFor(code);
   const body = document.getElementById('eqRiskModalBody');
