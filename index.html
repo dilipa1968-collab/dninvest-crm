@@ -4497,7 +4497,8 @@ function wishAllBirthdays(){
   }
 }
 
-// ── 🎨 Colourful birthday CARD IMAGE for the CLIENT (send on WhatsApp) ──
+// ── 🎨 Birthday CARD IMAGE for the CLIENT (send on WhatsApp) ──
+// Ivory + brand-teal design, no gold. Vector balloons, ribbon confetti.
 function birthdayCardImage(idx){
   const rec=_bdayCards[idx]||{};
   const name=(rec.name||'Friend').trim();
@@ -4505,78 +4506,105 @@ function birthdayCardImage(idx){
   const first=name.split(' ')[0]||name;
   const W=1080,H=1080;
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d');
+  const TEAL='#0d9488', TEAL_D='#0a5f58', CORAL='#F0714E', NAVY='#12203B', INK='#5A6273';
   function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
-  function gold(y0,y1){ const gg=g.createLinearGradient(0,y0,0,y1); gg.addColorStop(0,'#FCEFA1'); gg.addColorStop(.5,'#E6B94E'); gg.addColorStop(1,'#C9962E'); return gg; }
-  // bright festive gradient background
-  const grd=g.createLinearGradient(0,0,W,H);
-  grd.addColorStop(0,'#A25BF0'); grd.addColorStop(.5,'#FF5FA2'); grd.addColorStop(1,'#FFB347');
-  g.fillStyle=grd; g.fillRect(0,0,W,H);
-  // soft white center glow (brightens, premium shine)
-  const vg=g.createRadialGradient(W/2,H*0.40,H*0.12,W/2,H/2,H*0.88);
-  vg.addColorStop(0,'rgba(255,255,255,0.20)'); vg.addColorStop(1,'rgba(0,0,0,0.10)');
-  g.fillStyle=vg; g.fillRect(0,0,W,H);
-  // confetti dots
-  const dots=['#FDE68A','#FCA5A5','#A7F3D0','#93C5FD','#FBCFE8','#FFFFFF'];
-  for(let i=0;i<52;i++){ g.fillStyle=dots[i%dots.length]; g.globalAlpha=.8;
-    const x=Math.random()*W, y=Math.random()*H, r=5+Math.random()*9;
-    g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
+  // warm ivory background
+  const bg=g.createLinearGradient(0,0,W*0.5,H);
+  bg.addColorStop(0,'#FFFDF7'); bg.addColorStop(1,'#F3EFE4');
+  g.fillStyle=bg; g.fillRect(0,0,W,H);
+  const glow=g.createRadialGradient(W/2,H*0.44,60,W/2,H*0.44,H*0.7);
+  glow.addColorStop(0,'rgba(13,148,136,0.07)'); glow.addColorStop(1,'rgba(13,148,136,0)');
+  g.fillStyle=glow; g.fillRect(0,0,W,H);
+  // faint diagonal texture, washed back
+  g.strokeStyle='rgba(13,148,136,.10)'; g.lineWidth=1;
+  for(let d=-H; d<W; d+=26){ g.beginPath(); g.moveTo(d,0); g.lineTo(d+H,H); g.stroke(); }
+  g.fillStyle='rgba(255,253,247,.82)'; g.fillRect(0,0,W,H);
+  // vector balloons
+  function balloon(x,y,rw,rh,c1,c2,tilt){
+    g.save(); g.translate(x,y); g.rotate(tilt);
+    const q=g.createLinearGradient(-rw,-rh,rw,rh); q.addColorStop(0,c1); q.addColorStop(1,c2);
+    g.fillStyle=q; g.beginPath(); g.ellipse(0,0,rw,rh,0,0,7); g.fill();
+    g.fillStyle='rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(-rw*.32,-rh*.36,rw*.20,rh*.28,-0.5,0,7); g.fill();
+    g.fillStyle=c2; g.beginPath(); g.moveTo(-9,rh); g.lineTo(9,rh); g.lineTo(0,rh+16); g.closePath(); g.fill();
+    g.strokeStyle='rgba(18,32,59,.30)'; g.lineWidth=2; g.beginPath(); g.moveTo(0,rh+16);
+    g.bezierCurveTo(26,rh+90,-26,rh+150,6,rh+215); g.stroke();
+    g.restore();
+  }
+  balloon(166,238,52,64,'#F58A6A',CORAL,-0.16);
+  balloon(272,184,44,55,'#3FBFB0',TEAL,0.12);
+  balloon(914,238,52,64,'#3FBFB0',TEAL,0.16);
+  balloon(808,184,44,55,'#F58A6A',CORAL,-0.12);
+  // ribbon confetti (kept clear of the centre panel)
+  function conf(x,y,w,h,c,rot){ g.save(); g.translate(x,y); g.rotate(rot); g.fillStyle=c; g.fillRect(-w/2,-h/2,w,h); g.restore(); }
+  const cc=[TEAL,CORAL,'#F4C542','#7C6BE0','#3FBFB0'];
+  let _seed=11; const rnd=()=>{ _seed=(_seed*16807)%2147483647; return _seed/2147483647; };
+  for(let i=0;i<44;i++){ const x=rnd()*W, y=rnd()*H;
+    if(x>130&&x<950&&y>296&&y<836) continue;
+    g.globalAlpha=.55+rnd()*.35; conf(x,y,7+rnd()*7,3+rnd()*4,cc[i%5],rnd()*3.14); }
   g.globalAlpha=1;
-  // sparkle plus-stars
-  g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=2;
-  for(let i=0;i<14;i++){ const x=Math.random()*W,y=Math.random()*H,s=6+Math.random()*10;
-    g.beginPath(); g.moveTo(x-s,y); g.lineTo(x+s,y); g.moveTo(x,y-s); g.lineTo(x,y+s); g.stroke(); }
-  // gold double frame
-  g.strokeStyle=gold(0,H); g.lineWidth=6; rr(34,34,W-68,H-68,40); g.stroke();
-  g.lineWidth=2; rr(48,48,W-96,H-96,32); g.stroke();
-  // top festive row
-  g.textAlign='center'; g.font='96px Arial'; g.fillText('🎈   🎂   🎉', W/2, 205);
-  // white panel with shadow + gold inner border
-  g.save(); g.shadowColor='rgba(0,0,0,.35)'; g.shadowBlur=40; g.shadowOffsetY=14;
-  g.fillStyle='#FFFDF9'; rr(95,270,W-190,560,40); g.fill(); g.restore();
-  g.strokeStyle=gold(270,830); g.lineWidth=3; rr(108,283,W-216,534,32); g.stroke();
-  // HAPPY BIRTHDAY (gold) + flourishes
-  g.fillStyle=gold(358,404); g.font='900 60px Arial'; g.fillText('HAPPY BIRTHDAY', W/2, 392);
-  g.strokeStyle='#E6B94E'; g.lineWidth=3;
-  g.beginPath(); g.moveTo(W/2-252,404); g.lineTo(W/2-182,404); g.moveTo(W/2+182,404); g.lineTo(W/2+252,404); g.stroke();
-  g.fillStyle='#E6B94E'; [W/2-168,W/2+168].forEach(x=>{ g.beginPath(); g.arc(x,404,5,0,7); g.fill(); });
-  // NAME — navy, auto-fit inside the panel (shrink, then wrap to 2 lines)
-  g.fillStyle='#12203B';
+  // teal frame + coral inner line + corner dots
+  g.strokeStyle=TEAL; g.lineWidth=8; rr(40,40,W-80,H-80,44); g.stroke();
+  g.strokeStyle=CORAL; g.lineWidth=2; rr(58,58,W-116,H-116,34); g.stroke();
+  g.fillStyle=TEAL;
+  [[58,58,1,1],[W-58,58,-1,1],[58,H-58,1,-1],[W-58,H-58,-1,-1]].forEach(c=>{
+    g.save(); g.translate(c[0],c[1]); g.scale(c[2],c[3]);
+    g.beginPath(); g.arc(30,30,5,0,7); g.fill(); g.restore(); });
+  // white panel
+  g.save(); g.shadowColor='rgba(18,32,59,.16)'; g.shadowBlur=44; g.shadowOffsetY=14;
+  g.fillStyle='#FFFFFF'; rr(104,300,W-208,540,32); g.fill(); g.restore();
+  g.strokeStyle='rgba(13,148,136,.28)'; g.lineWidth=1.5; rr(104,300,W-208,540,32); g.stroke();
+  g.fillStyle=TEAL; rr(104,300,W-208,10,5); g.fill();
+  // HAPPY BIRTHDAY, letter-spaced
+  g.textAlign='center';
+  g.fillStyle=TEAL_D; g.font='500 27px Georgia, serif';
+  (function(t,y){ const sp=8; let tot=0,i;
+    for(i=0;i<t.length;i++) tot+=g.measureText(t[i]).width+sp; tot-=sp;
+    let x=W/2-tot/2; g.textAlign='left';
+    for(i=0;i<t.length;i++){ g.fillText(t[i],x,y); x+=g.measureText(t[i]).width+sp; }
+    g.textAlign='center'; })('HAPPY BIRTHDAY',396);
+  g.strokeStyle='rgba(240,113,78,.75)'; g.lineWidth=2;
+  g.beginPath(); g.moveTo(W/2-272,386); g.lineTo(W/2-212,386); g.moveTo(W/2+212,386); g.lineTo(W/2+272,386); g.stroke();
+  g.fillStyle=CORAL; [W/2-200,W/2+200].forEach(x=>{ g.beginPath(); g.arc(x,386,4,0,7); g.fill(); });
+  // NAME — navy, auto-fit (shrink, then wrap to 2 lines)
+  g.fillStyle=NAVY;
   const nm=name.toUpperCase();
-  const maxNameW=W-260;
-  let fs=78; g.font='900 '+fs+'px Arial';
+  const maxNameW=W-300;
+  let fs=76; g.font='500 '+fs+'px Georgia, serif';
   if(g.measureText(nm).width<=maxNameW){
-    g.fillText(nm, W/2, 492);
+    g.fillText(nm, W/2, 500);
   } else {
-    while(g.measureText(nm).width>maxNameW && fs>52){ fs-=2; g.font='900 '+fs+'px Arial'; }
+    while(g.measureText(nm).width>maxNameW && fs>52){ fs-=2; g.font='500 '+fs+'px Georgia, serif'; }
     if(g.measureText(nm).width<=maxNameW){
-      g.fillText(nm, W/2, 492);
+      g.fillText(nm, W/2, 500);
     } else {
       const words=nm.split(' '); let l1='',l2='';
       for(const w of words){ const t=(l1?l1+' ':'')+w;
         if(g.measureText(t).width<=maxNameW && !l2) l1=t; else l2=(l2?l2+' ':'')+w; }
       if(!l2){ l2=l1; l1=''; }
-      fs=58; g.font='900 '+fs+'px Arial';
-      while((g.measureText(l1).width>maxNameW||g.measureText(l2).width>maxNameW)&&fs>40){ fs-=2; g.font='900 '+fs+'px Arial'; }
-      if(l1){ g.fillText(l1, W/2, 466); g.fillText(l2, W/2, 466+fs+6); }
-      else  { g.fillText(l2, W/2, 492); }
+      fs=56; g.font='500 '+fs+'px Georgia, serif';
+      while((g.measureText(l1).width>maxNameW||g.measureText(l2).width>maxNameW)&&fs>38){ fs-=2; g.font='500 '+fs+'px Georgia, serif'; }
+      if(l1){ g.fillText(l1, W/2, 474); g.fillText(l2, W/2, 474+fs+6); }
+      else  { g.fillText(l2, W/2, 500); }
     }
   }
-  // gold divider under name
-  g.strokeStyle='#E6B94E'; g.lineWidth=3;
-  g.beginPath(); g.moveTo(W/2-95,540); g.lineTo(W/2-16,540); g.moveTo(W/2+16,540); g.lineTo(W/2+95,540); g.stroke();
-  g.fillStyle='#E6B94E'; g.beginPath(); g.arc(W/2,540,6,0,7); g.fill();
+  // divider with coral diamond
+  g.strokeStyle=TEAL; g.lineWidth=2.5;
+  g.beginPath(); g.moveTo(W/2-110,550); g.lineTo(W/2-24,550); g.moveTo(W/2+24,550); g.lineTo(W/2+110,550); g.stroke();
+  g.save(); g.translate(W/2,550); g.rotate(Math.PI/4); g.fillStyle=CORAL; g.fillRect(-7,-7,14,14); g.restore();
   // message
-  g.fillStyle='#4B5563'; g.font='34px Arial';
-  g.fillText('Dear '+first+', wishing you a day full of', W/2, 600);
-  g.fillText('joy and a year full of health,', W/2, 645);
-  g.fillText('happiness & prosperity. 🎊', W/2, 690);
+  g.fillStyle=INK; g.font='32px Georgia, serif';
+  g.fillText('Dear '+first+', wishing you a day filled with joy', W/2, 614);
+  g.fillText('and a year of health, happiness', W/2, 658);
+  g.fillText('and prosperity.', W/2, 702);
   // brand
-  g.fillStyle=gold(742,792); g.font='900 48px Arial'; g.fillText('D N INVESTMENT', W/2, 764);
-  g.fillStyle='#6B7280'; g.font='26px Arial'; g.fillText('Jamshedpur  ·  Your Trusted Financial Partner', W/2, 798);
-  // bottom gold ribbon
-  g.fillStyle='rgba(255,255,255,.15)'; rr(W/2-335,862,670,58,29); g.fill();
-  g.strokeStyle=gold(862,920); g.lineWidth=2; rr(W/2-335,862,670,58,29); g.stroke();
-  g.fillStyle='#FFF7E6'; g.font='700 28px Arial'; g.fillText('🎁  Many Many Happy Returns of the Day  🎁', W/2, 900);
+  g.strokeStyle='rgba(18,32,59,.12)'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(W/2-150,740); g.lineTo(W/2+150,740); g.stroke();
+  g.fillStyle=TEAL_D; g.font='500 48px Georgia, serif'; g.fillText('D N INVESTMENT', W/2, 794);
+  g.fillStyle='#9AA1AF'; g.font='23px Georgia, serif'; g.fillText('Jamshedpur  ·  Your Trusted Financial Partner', W/2, 826);
+  // bottom teal ribbon
+  g.fillStyle=TEAL; rr(W/2-320,880,640,58,29); g.fill();
+  g.fillStyle='#FFFFFF'; g.font='500 26px Georgia, serif';
+  g.fillText('Many Many Happy Returns of the Day', W/2, 918);
 
   cv.toBlob(function(blob){
     const file=new File([blob], 'Birthday_'+first+'.png', {type:'image/png'});
