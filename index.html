@@ -12017,24 +12017,67 @@ function readExcel(file, cb){
   reader.readAsBinaryString(file);
 }
 
+// Parse the "AUM By Client" report.
+// HEADER-BASED, deliberately. This used to read fixed column positions
+// (pan=r[2], inv=r[3], aum=r[6]) which matched the OLD report layout:
+//   S.No | Client Name | PAN | Inv. Amt | Div. Paid | Div. ReInv | AUM
+// The RTA later inserted a "Client ID" column at position 2, shifting every
+// column after it one to the right. The old code kept reading blindly, so
+// Client IDs were written into the PAN field (that's where junk PANs like
+// "2537656" came from) and AUM silently read Div. ReInv instead. Never trust
+// positions in this file again — read the header row.
 function parseAumExcel(rows){
-  // Find header row
-  let hdrIdx = rows.findIndex(r => String(r[0]).includes('S.No') || String(r[1]).includes('Client Name'));
-  if(hdrIdx < 0) hdrIdx = 7; // default
-  // try to find an RM column in the header row
-  let rmCol=-1;
-  if(hdrIdx>=0 && rows[hdrIdx]){
-    rows[hdrIdx].forEach((cell,ci)=>{
+  const wanted = {
+    name:    ['clientname','name','investorname','clientnames'],
+    pan:     ['pan','pannumber','pancard','panno','pancardno'],
+    aum:     ['aum','currentvalue','marketvalue','closingbalance','currentamt'],
+    inv_amt: ['invamt','invamount','investmentamount','investedamount','purchaseamount','investment'],
+    rm:      ['rm','relationshipmanager','dealer','dealername','employeename'],
+    sno:     ['sno','srno','serialno','slno']
+  };
+  let hdrIdx=-1, colMap={};
+  for(let i=0; i<Math.min(rows.length,15); i++){
+    const map={};
+    (rows[i]||[]).forEach((cell,ci)=>{
       const h=normHdr(cell);
-      if(['rm','relationshipmanager','dealer','dealername','employeename'].includes(h)) rmCol=ci;
+      for(const [f,vars] of Object.entries(wanted)){
+        if(vars.includes(h) && map[f]===undefined) map[f]=ci;
+      }
     });
+    // Name + AUM are the minimum we need to call this a real header row.
+    if(map.name!==undefined && map.aum!==undefined){ hdrIdx=i; colMap=map; break; }
   }
-  const data = rows.slice(hdrIdx+1).filter(r => String(r[0]).match(/^\d+$/));
-  return data.map(r => ({
-    sno: r[0], name: String(r[1]||'').trim(), pan: String(r[2]||'').trim(),
-    inv_amt: parseFloat(r[3])||0, aum: parseFloat(r[6])||0,
-    rm: rmCol>=0 ? String(r[rmCol]||'').trim() : ''
-  })).filter(r => r.name);
+  // No header found -> return null so the caller aborts with a clear message.
+  // (The old code assumed row 7 here and imported garbage instead.)
+  if(hdrIdx===-1) return null;
+
+  const isPan = v => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(v||'').trim().toUpperCase());
+  const num = v => parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0;
+  const at = (r,f) => colMap[f]!==undefined ? r[colMap[f]] : '';
+
+  const data = rows.slice(hdrIdx+1).filter(r=>{
+    if(!r || !r.some(c=>c!=='' && c!=null)) return false;
+    // Data rows carry a serial number; totals/footer rows don't.
+    if(colMap.sno!==undefined) return String(r[colMap.sno]||'').trim().match(/^\d+$/);
+    return String(at(r,'name')||'').trim() !== '';
+  });
+
+  const out = data.map(r=>{
+    const rawPan = String(at(r,'pan')||'').trim().toUpperCase();
+    return {
+      sno: colMap.sno!==undefined ? r[colMap.sno] : '',
+      name: String(at(r,'name')||'').trim(),
+      // Only accept a real PAN. Anything else (Client ID, folio, blank) is
+      // dropped rather than written over a client's good PAN.
+      pan: isPan(rawPan) ? rawPan : '',
+      inv_amt: num(at(r,'inv_amt')),
+      aum: num(at(r,'aum')),
+      rm: String(at(r,'rm')||'').trim()
+    };
+  }).filter(r=>r.name);
+
+  out._badPan = data.length - out.filter(r=>r.pan).length;
+  return out;
 }
 
 function parseSipExcel(rows){
@@ -12074,10 +12117,19 @@ function handleAumFile(input){
   if(!file) return;
   readExcel(file, function(err, rows){
     if(err){ toast('AUM file read error: '+err.message,'error'); return; }
-    importData.aum = parseAumExcel(rows);
+    const parsed = parseAumExcel(rows);
+    if(!parsed || !parsed.length){
+      importData.aum = null;
+      document.getElementById('aum-preview').innerHTML =
+        `<div style="background:var(--red2,#fee);color:var(--red,#c00);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+         ❌ Header row nahi mila (Client Name + AUM columns chahiye). File ka format check karein — import roka gaya.</div>`;
+      checkImportReady(); return;
+    }
+    importData.aum = parsed;
+    const warn = parsed._badPan ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ ${parsed._badPan} rows me valid PAN nahi — un clients ka PAN chheda nahi jayega</div>` : '';
     document.getElementById('aum-preview').innerHTML = 
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${importData.aum.length} clients found in AUM file</div>`;
+       ✅ ${parsed.length} clients found in AUM file</div>${warn}`;
     checkImportReady();
   });
 }
@@ -12103,9 +12155,16 @@ function handleBothFile(type, input){
   readExcel(file, function(err, rows){
     if(err){ toast('Error: '+err.message,'error'); return; }
     if(type==='aum'){
-      importData.aum = parseAumExcel(rows);
+      const parsedB = parseAumExcel(rows);
+      if(!parsedB || !parsedB.length){
+        importData.aum = null;
+        document.getElementById('both-preview').innerHTML +=
+          `<div style="color:var(--red,#c00);font-size:.82rem;font-weight:600">❌ AUM: header row nahi mila — format check karein</div>`;
+        checkImportReady(); return;
+      }
+      importData.aum = parsedB;
       document.getElementById('both-preview').innerHTML += 
-        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${importData.aum.length} clients</div>`;
+        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${parsedB.length} clients${parsedB._badPan?' (⚠️ '+parsedB._badPan+' bina valid PAN)':''}</div>`;
     } else {
       importData.sip = parseSipExcel(rows);
       const cnt = Object.keys(importData.sip).length;
@@ -12273,8 +12332,8 @@ async function doImport(){
       
       if(ex){
         // Update existing
-        ex.aum = row.aum || ex.aum;
-        ex.pan = row.pan || ex.pan;
+        if(row.aum || row.aum===0) ex.aum = row.aum;   // 0 is a real value, not "skip"
+        ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
         if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
         if(sipInfo.sip_details) ex.sip_details = sipInfo.sip_details;
