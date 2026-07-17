@@ -7398,8 +7398,12 @@ async function saveClient(){
     if(seg==='mf'){
       const pan = gv2('f_pan').toUpperCase();
       const _minor = document.getElementById('f_minor')?.checked;
+      // A minor has no PAN of their own — their record carries the GUARDIAN's
+      // PAN. So a shared PAN between a minor and an adult is correct data, not
+      // a duplicate. Skip the check when the record being saved is a minor
+      // (below), and never treat an existing minor as the duplicate (!c.is_minor).
       if(pan && !_minor){
-        const dup = clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
+        const dup = clients.find(c=>!c.is_minor && c.pan && c.pan.trim().toUpperCase()===pan);
         if(dup){
           toast(`⚠️ MF Investor already exists: "${dup.name}" (PAN: ${dup.pan}) - RM: ${dup.rm||'—'}`,'error');
           return;
@@ -7422,7 +7426,8 @@ async function saveClient(){
       const pan = gv2('f_pan').toUpperCase();
       const _minor = document.getElementById('f_minor')?.checked;
       if(pan && !_minor){
-        const dup = clients.find(c=>c.id!==currentEditId && c.pan && c.pan.trim().toUpperCase()===pan);
+        // !c.is_minor — a minor sharing this PAN is the guardian's child, not a clash
+        const dup = clients.find(c=>c.id!==currentEditId && !c.is_minor && c.pan && c.pan.trim().toUpperCase()===pan);
         if(dup){
           toast(`⚠️ Yeh PAN already exists: "${dup.name}" (PAN: ${dup.pan}) - RM: ${dup.rm||'—'}`,'error');
           return;
@@ -14013,6 +14018,10 @@ const DUP = {
       const keyOf = seg==='eq' ? (c=>this.norm(c.code)) : (c=>this.norm(c.pan));
       const groups = {}; let blank = 0;
       list.forEach(c=>{
+        // Minors carry their guardian's PAN by design — grouping them here
+        // would flag a real father/daughter pair as duplicates and offer to
+        // delete one of them. Leave them out of the MF PAN scan entirely.
+        if(seg==='mf' && c.is_minor) return;
         const k = keyOf(c);
         if(!k){ blank++; return; }
         (groups[k] = groups[k] || []).push(c);
