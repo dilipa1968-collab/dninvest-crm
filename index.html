@@ -9638,7 +9638,40 @@ function noTrade90(){ ntReport(90); }
 // SQUARE-OFF (T+5) — daily admin upload, RM-filtered view
 // Stored as a single array in crm_data/squareoff (overwritten daily → stays light)
 // ══════════════════════════════════════════
-function getSquareoff(){ return DB.get('squareoff')||[]; }
+// Square-off rows carry a DEALER name straight from the uploaded file. That
+// name is unreliable — it can be blank, misspelt, or an old/short form that
+// doesn't match any RM in the CRM, and then the row falls through to nobody.
+// So we resolve each row's RM by CLIENT CODE against eq_clients (the code is
+// the one field the broker file always gets right), and only fall back to the
+// file's dealer name when the code can't be matched.
+// Done here, in the single accessor, so the table, RM pill, RM dropdown,
+// filter and Excel export all agree without touching each of them.
+function sqCodeRmMap(){
+  const m = new Map();
+  (DB.get('eq_clients')||[]).forEach(c=>{
+    const code = String(c.code||'').trim().toUpperCase();
+    const rm   = String(c.rm||'').trim().toUpperCase();
+    if(code && rm) m.set(code, rm);
+  });
+  return m;
+}
+function getSquareoff(){
+  const rows = DB.get('squareoff')||[];
+  if(!rows.length) return rows;
+  const codeMap = sqCodeRmMap();
+  if(!codeMap.size) return rows;                 // clients not synced yet — leave as-is
+  // Names that actually exist as an RM in the CRM
+  const knownRMs = new Set([...codeMap.values()]);
+  return rows.map(r=>{
+    const code = String(r.code||'').trim().toUpperCase();
+    const byCode = code ? codeMap.get(code) : '';
+    if(!byCode) return r;                         // code unknown — keep file's dealer
+    const fileDealer = String(r.dealer||'').trim().toUpperCase();
+    // Code wins whenever the file's dealer is blank or isn't a real RM.
+    if(!fileDealer || !knownRMs.has(fileDealer)) return {...r, dealer:byCode, _rmBy:'code'};
+    return r;
+  });
+}
 function sqMyRows(){
   const rows=getSquareoff();
   if(!(CU) ) return [];
