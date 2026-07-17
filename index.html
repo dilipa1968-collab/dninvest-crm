@@ -12030,6 +12030,7 @@ function parseAumExcel(rows){
   const wanted = {
     name:    ['clientname','name','investorname','clientnames'],
     pan:     ['pan','pannumber','pancard','panno','pancardno'],
+    client_id: ['clientid','clientcode','clientno','clientidno'],
     aum:     ['aum','currentvalue','marketvalue','closingbalance','currentamt'],
     inv_amt: ['invamt','invamount','investmentamount','investedamount','purchaseamount','investment'],
     rm:      ['rm','relationshipmanager','dealer','dealername','employeename'],
@@ -12070,6 +12071,10 @@ function parseAumExcel(rows){
       // Only accept a real PAN. Anything else (Client ID, folio, blank) is
       // dropped rather than written over a client's good PAN.
       pan: isPan(rawPan) ? rawPan : '',
+      // Client ID is the RTA's own stable key. We keep it because it's the only
+      // field that survives name changes — and because the wrong-column bug
+      // wrote these very IDs into the PAN field, it's how we find those records.
+      client_id: String(at(r,'client_id')||'').trim(),
       inv_amt: num(at(r,'inv_amt')),
       aum: num(at(r,'aum')),
       rm: String(at(r,'rm')||'').trim()
@@ -12136,11 +12141,14 @@ function parseSipExcel(rows){
     const name = nameRaw.replace(/\[.*?\]/g,'').replace(/\s+/g,' ').trim();
     const panMatch = nameRaw.match(/\[([A-Z]{5}\d{4}[A-Z])\]/);
     const pan = panMatch ? panMatch[1] : '';        // minors: empty bracket -> ''
+    const cidMatch = nameRaw.match(/\[(\d{4,})\]/);   // 2nd bracket = Client ID
+    const clientId = cidMatch ? cidMatch[1] : '';
     const amt = num(r[amtCol]);
     const cnt = parseInt(at(r,'count'))||0;
     const key = pan || name.toUpperCase();
     if(!key) return;
-    if(!sipMap[key]){ sipMap[key] = {name, pan, sip_amount:0, sip_count:0, sip_details:[]}; }
+    if(!sipMap[key]){ sipMap[key] = {name, pan, client_id:clientId, sip_amount:0, sip_count:0, sip_details:[]}; }
+    if(clientId && !sipMap['CID:'+clientId]) sipMap['CID:'+clientId] = sipMap[key];   // alias, same object
     sipMap[key].sip_amount += amt;
     sipMap[key].sip_count  += cnt;
     sipMap[key].sip_details.push({
@@ -12375,25 +12383,60 @@ async function doImport(){
   const existing = DB.get('mf_clients')||[];
   
   // Build lookup from existing clients
-  const existingMap = {};
+  // Match on identity, in order of how much we trust it:
+  //   1. PAN        — exact, once the data is clean
+  //   2. Client ID  — RTA's stable key. Also catches records poisoned by the
+  //                   old wrong-column bug, whose `pan` field literally holds
+  //                   a Client ID.
+  //   3. Name       — ONLY when it is unique on both sides. 20 names in the
+  //                   AUM file belong to several different people (3 different
+  //                   RAJ KUMARs). Matching those by name would write one
+  //                   person's AUM/PAN onto another. Skip and report instead.
+  const existingMap = {}, byClientId = {}, nameMap = {}, nameCount = {};
   existing.forEach(c => {
-    if(c.pan) existingMap[c.pan] = c;
-    if(c.name) existingMap[c.name.toUpperCase()] = c;
+    const p = String(c.pan||'').trim().toUpperCase();
+    if(p && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) existingMap[p] = c;
+    if(c.client_id) byClientId[String(c.client_id).trim()] = c;
+    if(/^\d{4,}$/.test(p)) byClientId[p] = c;      // legacy: Client ID stuck in the PAN field
+    const n = String(c.name||'').toUpperCase().trim();
+    if(n){ nameCount[n] = (nameCount[n]||0)+1; nameMap[n] = c; }
   });
+  // How often each name appears in the uploaded file itself
+  const fileNameCount = {};
+  (importData.aum||[]).forEach(r => {
+    const n = String(r.name||'').toUpperCase().trim();
+    if(n) fileNameCount[n] = (fileNameCount[n]||0)+1;
+  });
+  const ambigRows = [];      // couldn't be identified safely
+  const claimed = new Set(); // guard: never let two file rows write the same client
   
   let updated = 0, added = 0;
   const newClients = [];
   
   if(importData.aum){
     importData.aum.forEach(row => {
-      const key = row.pan || row.name.toUpperCase();
-      const sipInfo = importData.sip ? (importData.sip[row.pan] || importData.sip[row.name.toUpperCase()] || {}) : {};
-      const ex = existingMap[row.pan] || existingMap[row.name.toUpperCase()];
+      const upName = String(row.name||'').toUpperCase().trim();
+      const sipInfo = importData.sip
+        ? (importData.sip[row.pan] || importData.sip['CID:'+row.client_id] || importData.sip[upName] || {})
+        : {};
+
+      let ex = (row.pan && existingMap[row.pan]) || (row.client_id && byClientId[row.client_id]) || null;
+      if(!ex){
+        if(nameCount[upName] === 1 && fileNameCount[upName] === 1){
+          ex = nameMap[upName];                       // unique on both sides — safe
+        } else if(nameCount[upName] > 1 || fileNameCount[upName] > 1){
+          ambigRows.push(row); return;                // several people share this name
+        }
+        // else: nobody by this name -> genuinely new client, fall through to add
+      }
+      if(ex && claimed.has(ex.id)){ ambigRows.push(row); return; }
+      if(ex) claimed.add(ex.id);
       
       if(ex){
         // Update existing
         if(row.aum || row.aum===0) ex.aum = row.aum;   // 0 is a real value, not "skip"
         ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
+        if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
         if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
         if(sipInfo.sip_details) ex.sip_details = sipInfo.sip_details;
@@ -12406,7 +12449,7 @@ async function doImport(){
         if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) rm = CU.name;
         newClients.push({
           id: uid(),
-          name: row.name, pan: row.pan, mobile:'', email:'', rm,
+          name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:'', email:'', rm,
           status: 'Investor',
           aum: row.aum,
           sip_amount: sipInfo.sip_amount||null,
@@ -12445,8 +12488,20 @@ async function doImport(){
   // them into the existing local array and writes only these docs to Firestore.
   await DB.setClientsBulk('mf_clients', newClients);
   closeModal('importModal');
-  toast(`✅ Import done! ${updated} updated + ${added} new clients`, 'success');
+  toast(`✅ Import done! ${updated} updated + ${added} new clients`
+        + (ambigRows.length ? ` — ${ambigRows.length} rows skip (same naam, 1+ log)` : ''), 'success');
   renderMfTable(); refreshDash(); updateBadges();
+  // Anything we refused to guess at, hand back to the user with the Client ID
+  // and PAN so it can be fixed by hand.
+  if(ambigRows.length){
+    setTimeout(()=>{
+      showReport(`Same Naam — Skip Kiye (${ambigRows.length} rows)`,
+        ['#','Naam','Client ID','PAN','AUM','Wajah'],
+        ambigRows.map((r,i)=>[i+1, r.name, r.client_id||'—', r.pan||'—',
+          (r.aum||0).toLocaleString('en-IN'),
+          'Is naam ke 1+ investor hain — manually update karein']));
+    }, 600);
+  }
 }
 
 // ══════════════════════════════════════════
