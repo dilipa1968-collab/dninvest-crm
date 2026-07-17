@@ -9668,21 +9668,33 @@ function sqUpload(input){
         const ws=wb.Sheets[sn];
         const arr=XLSX.utils.sheet_to_json(ws,{defval:''});
         arr.forEach(r=>{
+          // Needle-priority matching: har needle ke liye pehle exact header,
+          // phir partial. Jo pehla needle non-empty value de, wahi lete hain.
+          // (Column order nahi, needle order decide karta hai — isse
+          //  "Debit for Actual Shortage" jaise galat column nahi pakdte.)
+          const _keys = Object.keys(r);
+          const _norm = k => String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+          const _val = k => { const v = r[k]; return (v===null||v===undefined||String(v).trim()==='') ? null : v; };
           const pick=(...needles)=>{
-            const keys=Object.keys(r);
-            const norm=k=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
-            // exact match first (so 'code' hits "Code", not "GroupCode")
-            for(const k of keys){ if(needles.includes(norm(k))) return r[k]; }
-            // then partial
-            for(const k of keys){ const hk=norm(k); if(needles.some(n=>hk.includes(n))) return r[k]; }
-            return '';
+            let firstHit = null;
+            for(const n of needles){
+              for(const k of _keys){ if(_norm(k)===n){ const v=_val(k); if(v!==null) return v; if(firstHit===null) firstHit=''; } }
+              for(const k of _keys){ const hk=_norm(k); if(hk!==n && hk.includes(n)){ const v=_val(k); if(v!==null) return v; if(firstHit===null) firstHit=''; } }
+            }
+            return firstHit===null ? '' : firstHit;
           };
-          const name=String(pick('name')||'').replace(/\s+/g,' ').trim();
-          const code=String(pick('code')||'').trim();
-          const dealer=String(pick('dealer')||'').trim();
-          const debit=parseFloat(String(pick('sqoffdebit','debit','sqoff')||'0').replace(/[,\s]/g,''))||0;
-          const t5=sqToISO(pick('t590daydate','t5','90day','tminus'));
-          const sqDate=sqToISO(pick('squareoffdate','sqdate','squareoff'));
+          const name=String(pick('name','clientname','custname')||'').replace(/\s+/g,' ').trim();
+          const code=String(pick('clientcode','ucccode','ucc','clientid','code')||'').trim();
+          // Dealer khali ho to RM / Sales Person naam fallback (dusre office ki
+          // file me 'Dealer Name' blank hota hai aur naam 'R M' column me hota hai)
+          const dealer=String(pick('dealername','dealer','rm','relationshipmanager','salespersname','salesperson')||'').trim();
+          // Debit: 'Bal More than 5/90 Days' hi asli square-off amount hai —
+          // 'Debit for Actual Shortage' (aksar 0) se pehle isko dekho
+          const debit=parseFloat(String(pick('sqoffdebit','balmorethan5','balmorethan','sqoffamount','sqoff','debitamount','debit')||'0').replace(/[,\s]/g,''))||0;
+          // t5 date — 'T-5/90 AcBal' (amount) se bachne ke liye bare 't5' nahi
+          const t5=sqToISO(pick('t590daydate','f590date','t590date','t5date','90daydate','tminus5','t5day'));
+          // sq date — 'Square Off Days' (count) se bachne ke liye bare 'squareoff' nahi
+          const sqDate=sqToISO(pick('squareoffdate','sqroffdate','sqoffdate','sqrdate','sqdate'));
           if(!code && !name) return;
           // ₹100 se neeche (99.99 tak) ka debit ignore — chhoti amount pe square-off nahi
           if(debit < 100) return;
