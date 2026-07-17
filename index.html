@@ -3680,6 +3680,56 @@ function _clampLC(d){ const c=effectiveCallLimits(); return _clamp(d, c.lcMin, c
 function _clampNC(d){ const c=effectiveCallLimits(); return _clamp(d, c.ncMin, c.ncMax); }
 function _lcAttr(){ const c=effectiveCallLimits(); return (c.lcMin?` min="${c.lcMin}"`:'')+(c.lcMax?` max="${c.lcMax}"`:''); }
 function _ncAttr(){ const c=effectiveCallLimits(); return (c.ncMin?` min="${c.ncMin}"`:'')+(c.ncMax?` max="${c.ncMax}"`:''); }
+
+// ---- Next Calling Date: Sunday / holiday guard -------------------------
+// A next-call date must never land on a Sunday or a Stock Exchange holiday
+// (holiday calendar comes from the HR Portal via _holidaySet).
+function _isOffDay(d){
+  if(!d) return false;
+  const dt = new Date(d+'T00:00:00');
+  if(isNaN(dt)) return false;
+  if(dt.getDay()===0) return true;                    // Sunday
+  try{ if(_holidaySet && _holidaySet.has(d)) return true; }catch(e){}
+  return false;
+}
+function _offDayLabel(d){
+  const dt = new Date(d+'T00:00:00');
+  return dt.getDay()===0 ? 'Sunday' : 'Holiday';
+}
+// Roll forward to the next working day; if that crosses the allowed max,
+// roll backward instead so the date stays inside the call-limit window.
+function _nextWorkingDay(d){
+  if(!d) return d;
+  const c = effectiveCallLimits();
+  let x = d;
+  for(let i=0; i<21 && _isOffDay(x); i++) x = addDays(x,1);
+  if(c.ncMax && x > c.ncMax){
+    x = d;
+    for(let i=0; i<21 && _isOffDay(x); i++) x = addDays(x,-1);
+    if(c.ncMin && x < c.ncMin) return d; // no working day in window — leave as is
+  }
+  return _isOffDay(x) ? d : x;
+}
+function _clampNCWork(d){ return _nextWorkingDay(_clampNC(d)); }
+
+// Delegated guard — works for inputs rendered inside modals after load.
+document.addEventListener('change', function(e){
+  const el = e.target;
+  if(!el || el.type!=='date') return;
+  if(!['f_next_call','l_next_call','cl_next'].includes(el.id)) return;
+  const v = el.value;
+  if(!v || !_isOffDay(v)) return;
+  const fixed = _nextWorkingDay(v);
+  if(fixed && fixed!==v){
+    const was = _offDayLabel(v);
+    el.value = fixed;
+    try{ toast(was+' pe call date nahi lag sakti — '+fmtDate(fixed)+' kar diya','warn'); }
+    catch(err){ alert(was+' pe call date nahi lag sakti. '+fixed+' set kar diya.'); }
+  } else {
+    try{ toast('Is window me koi working day nahi mil raha — date check karein','warn'); }catch(err){}
+  }
+});
+// -----------------------------------------------------------------------
 function populateCallLimitInputs(){
   const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=(v===''||v===null||v===undefined)?'':v;};
   const c = CALL_LIMITS.configured ? CALL_LIMITS : null;
@@ -7720,7 +7770,7 @@ function logCall(id,seg){
           <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${_clampNC(addDays(today(),7))}"${_ncAttr()}></div>
+        <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${_clampNCWork(addDays(today(),7))}"${_ncAttr()}></div>
         <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">
           <option ${c.followup_status==='Pending'?'selected':''}>Pending</option>
           <option ${c.followup_status==='Done'?'selected':''}>Done</option>
@@ -7754,7 +7804,7 @@ function logCall(id,seg){
         <textarea id="cl_note" placeholder="What was discussed? Any commitment made?" rows="4"></textarea></div>
     </div>
     <div class="form-row">
-      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${_clampNC(addDays(today(),7))}"${_ncAttr()}></div>
+      <div class="form-field"><label>Next Call Date</label><input id="cl_next" type="date" value="${_clampNCWork(addDays(today(),7))}"${_ncAttr()}></div>
       <div class="form-field"><label>Follow-up Status</label><select id="cl_followup">${seg==='equity'?`
         <option>NOT INTERESTED</option><option>CALL NOT RECEIVED</option><option>CALL LATER</option>
         <option>TRADE</option><option>INTERESTED IN OTHER PRODUCT</option><option>POSITIVE</option><option>WRONG NUMBER</option><option>OPEN DEMAT ACCOUNT</option>`:`
