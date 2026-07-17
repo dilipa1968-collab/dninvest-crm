@@ -7546,7 +7546,7 @@ async function saveClient(){
       aum:parseFloat(gv2('f_aum'))||null,
       sip_amount:parseFloat(gv2('f_sip'))||null,
       sip_count:parseInt(gv2('f_sip_count'))||null,
-      sip_details: (currentEditId ? (clients.find(x=>x.id===currentEditId)?.sip_details ?? null) : null),
+      sip_details: (currentEditId ? ((DB.get('mf_clients')||[]).find(x=>x.id===currentEditId)?.sip_details ?? null) : null),
       last_invest_date:gv2('f_last_invest'), last_call_date:gv2('f_last_call'),
       next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
       do_not_call: document.getElementById('f_do_not_call')?.checked || false,
@@ -11982,7 +11982,8 @@ function sipCntCell(c){
 }
 
 function showSipDetails(id){
-  const c = clients.find(x=>x.id===id);
+  const list = DB.get('mf_clients')||[];
+  const c = list.find(x=>x.id===id);
   if(!c) return;
   const d = Array.isArray(c.sip_details)?c.sip_details:[];
   if(!d.length){ toast('SIP details available nahi — Running SIP Report import kijiye','error'); return; }
