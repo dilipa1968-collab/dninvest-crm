@@ -1071,9 +1071,7 @@ input:focus, select:focus, textarea:focus{
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="exportCSV('equity')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openEqImportModal()" id="eqImportBtn">📥 Import Excel</button>
-            <button class="btn btn-outline" onclick="openEqRmUpdateModal()" id="eqRmUpdateBtn" style="display:none">⇅ Bulk RM Update</button>
-            <button class="btn btn-outline" onclick="openEqPanUpdateModal()" id="eqPanUpdateBtn" style="display:none">🪪 Bulk PAN Update</button>
-            <button class="btn btn-outline" onclick="openEqDobUpdateModal()" id="eqDobUpdateBtn" style="display:none">🎂 Bulk DOB Update</button>
+            <button class="btn btn-outline" onclick="openEqBulkModal()" id="eqBulkBtn" style="display:none">⇅ Bulk Update (RM / PAN / DOB)</button>
             <button class="btn btn-outline" onclick="fixAllMobiles()" id="eqFixMobileBtn" style="display:none">🧹 Fix Mobile (91)</button>
             <button class="btn btn-outline" onclick="fixStatusByLastTrade()" id="eqFixStatusBtn" style="display:none">🔄 Fix Status (Last Trade)</button>
             <button class="btn btn-primary" id="eqAddClientBtn" onclick="openAddClient('equity')">+ Add Client</button>
@@ -2465,93 +2463,33 @@ input:focus, select:focus, textarea:focus{
   </div>
 </div>
 
-<!-- Bulk RM Update Modal (Equity) -->
-<div class="modal-overlay" id="eqRmUpdateModal" onclick="if(event.target===this)closeModal('eqRmUpdateModal')">
+<!-- Bulk Update Modal (Equity) — RM / PAN / DOB ek hi file se -->
+<div class="modal-overlay" id="eqBulkModal" onclick="if(event.target===this)closeModal('eqBulkModal')">
   <div class="modal">
     <div class="modal-hdr">
-      <h3>⇅ Equity — Bulk RM Update</h3>
-      <button class="modal-close" onclick="closeModal('eqRmUpdateModal')">×</button>
+      <h3>⇅ Equity — Bulk Update (RM / PAN / DOB)</h3>
+      <button class="modal-close" onclick="closeModal('eqBulkModal')">×</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Upload an Excel file with only <b>Client Code</b> and <b>New RM</b>. Matching will be done on <b>Client Code</b> (exact) — only the <b>RM field will be updated</b>, nothing else (Asset Value, Status, Remarks etc.) will be touched.
+        Ek hi Excel upload kijiye. <b>Client Code</b> zaroori hai; uske saath <b>RM</b>, <b>PAN</b>, <b>DOB</b> me se jo bhi column milega <b>sirf wahi update</b> hoga — baaki kuch (Asset Value, Status, Mobile, Remarks) touch nahi hoga. <b>Naye client add nahi honge.</b>
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>New RM</b> (Name column is optional and will be ignored)
+        Header names flexible hain (auto-detect): <b>Client Code</b> + koi bhi ek ya zyada me se — <b>New RM / RM / Dealer</b>, <b>PAN</b>, <b>DOB / Date of Birth</b>. Baaki saare columns ignore.<br>
+        DOB format: <b>19561009</b> (YYYYMMDD), <b>DD/MM/YYYY</b>, ya Excel date cell — sab chalega. <b>0</b> / <b>NULL</b> rows apne aap skip.
       </p>
       <div style="margin-bottom:12px">
-        <a href="#" onclick="downloadEqRmUpdateTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
+        <a href="#" onclick="downloadEqBulkTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
       </div>
-      <div class="import-zone" id="eq-rm-zone" onclick="document.getElementById('eq-rm-file').click()">
+      <div class="import-zone" id="eq-bulk-zone" onclick="document.getElementById('eq-bulk-file').click()">
         📊 Drag the Excel file here or click to browse
-        <input type="file" id="eq-rm-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqRmUpdateFile(this)">
+        <input type="file" id="eq-bulk-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqBulkFile(this)">
       </div>
-      <div id="eq-rm-preview" style="margin-top:12px"></div>
+      <div id="eq-bulk-preview" style="margin-top:12px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('eqRmUpdateModal')">Cancel</button>
-      <button class="btn btn-teal" id="eqRmUpdateBtnGo" onclick="doEqRmUpdate()" disabled>Update RM</button>
-    </div>
-  </div>
-</div>
-
-<!-- Bulk PAN Update Modal (Equity) -->
-<div class="modal-overlay" id="eqPanUpdateModal" onclick="if(event.target===this)closeModal('eqPanUpdateModal')">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h3>🪪 Equity — Bulk PAN Update</h3>
-      <button class="modal-close" onclick="closeModal('eqPanUpdateModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Upload an Excel file with only <b>Client Code</b> and <b>PAN</b>. Matching will be done on <b>Client Code</b> (exact) — only the <b>PAN field will be updated</b>, nothing else (RM, Asset Value, Status, Remarks etc.) will be touched.
-      </p>
-      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>PAN</b> (Name column is optional and will be ignored)
-      </p>
-      <div style="margin-bottom:12px">
-        <a href="#" onclick="downloadEqPanTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
-      </div>
-      <div class="import-zone" id="eq-pan-zone" onclick="document.getElementById('eq-pan-file').click()">
-        📊 Drag the Excel file here or click to browse
-        <input type="file" id="eq-pan-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqPanUpdateFile(this)">
-      </div>
-      <div id="eq-pan-preview" style="margin-top:12px"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('eqPanUpdateModal')">Cancel</button>
-      <button class="btn btn-teal" id="eqPanUpdateBtnGo" onclick="doEqPanUpdate()" disabled>Update PAN</button>
-    </div>
-  </div>
-</div>
-
-<!-- Equity Bulk DOB Update (Admin only) -->
-<div class="modal-overlay" id="eqDobUpdateModal" onclick="if(event.target===this)closeModal('eqDobUpdateModal')">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h3>🎂 Equity — Bulk DOB Update</h3>
-      <button class="modal-close" onclick="closeModal('eqDobUpdateModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Upload an Excel file with only <b>Client Code</b> and <b>DOB</b>. Matching will be done on <b>Client Code</b> (exact) — only the <b>Date of Birth field will be updated</b>, nothing else (RM, Asset Value, Status, Mobile, Remarks etc.) will be touched. <b>Naye client add nahi honge.</b>
-      </p>
-      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        Expected columns (header names flexible/auto-detect): <b>Client Code</b>, <b>DOB</b> (Name column optional — ignore ho jayega).<br>
-        DOB format: <b>19561009</b> (YYYYMMDD), <b>DD/MM/YYYY</b>, ya Excel ka real date cell — sab chalega. <b>0</b> / <b>NULL</b> wali rows apne aap skip ho jayengi.
-      </p>
-      <div style="margin-bottom:12px">
-        <a href="#" onclick="downloadEqDobTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
-      </div>
-      <div class="import-zone" id="eq-dob-zone" onclick="document.getElementById('eq-dob-file').click()">
-        📊 Drag the Excel file here or click to browse
-        <input type="file" id="eq-dob-file" accept=".xlsx,.xls" style="display:none" onchange="handleEqDobUpdateFile(this)">
-      </div>
-      <div id="eq-dob-preview" style="margin-top:12px"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('eqDobUpdateModal')">Cancel</button>
-      <button class="btn btn-teal" id="eqDobUpdateBtnGo" onclick="doEqDobUpdate()" disabled>Update DOB</button>
+      <button class="btn btn-outline" onclick="closeModal('eqBulkModal')">Cancel</button>
+      <button class="btn btn-teal" id="eqBulkBtnGo" onclick="doEqBulkUpdate()" disabled>Update</button>
     </div>
   </div>
 </div>
@@ -4128,12 +4066,8 @@ function initApp(){
     // Relabel for risk-only RMs (no broader Back Office access) so it's clear what they can upload
     if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access && CU.risk_upload===true){ eqImportBtn.innerHTML='📥 Upload Risk File'; }
   }
-  const eqRmUpdateBtn=document.getElementById('eqRmUpdateBtn');
-  if(eqRmUpdateBtn) eqRmUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
-  const eqPanUpdateBtn=document.getElementById('eqPanUpdateBtn');
-  if(eqPanUpdateBtn) eqPanUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
-  const eqDobUpdateBtn=document.getElementById('eqDobUpdateBtn');
-  if(eqDobUpdateBtn) eqDobUpdateBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqBulkBtn=document.getElementById('eqBulkBtn');
+  if(eqBulkBtn) eqBulkBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixMobileBtn=document.getElementById('eqFixMobileBtn');
   if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixStatusBtn=document.getElementById('eqFixStatusBtn');
@@ -12920,397 +12854,218 @@ async function doEqImport(){
   }
 }
 
-// ══ EQUITY BULK RM UPDATE (Admin only) ══
-let eqRmUpdateData = null;
+// ══ EQUITY BULK UPDATE — RM / PAN / DOB ek hi file se (Admin only) ══
+// Client Code zaroori. RM / PAN / DOB me se jo column file me mile, sirf wahi
+// field update hota hai. Naye client add nahi hote, baaki fields touch nahi hote.
+let eqBulkData = null;      // {code, rm?, pan?, dob?}[]
+let eqBulkFields = [];      // file me kaunse field mile
 
-function openEqRmUpdateModal(){
+function openEqBulkModal(){
   if(CU.role!=='admin') return;
-  eqRmUpdateData = null;
-  document.getElementById('eq-rm-preview').innerHTML='';
-  document.getElementById('eqRmUpdateBtnGo').disabled=true;
-  document.getElementById('eq-rm-file').value='';
-  document.getElementById('eqRmUpdateModal').classList.add('open');
+  eqBulkData = null; eqBulkFields = [];
+  document.getElementById('eq-bulk-preview').innerHTML='';
+  document.getElementById('eqBulkBtnGo').disabled=true;
+  document.getElementById('eq-bulk-file').value='';
+  document.getElementById('eqBulkModal').classList.add('open');
 }
 
-function downloadEqRmUpdateTemplate(){
+function downloadEqBulkTemplate(){
   const wsData = [
-    ['Client Code','Client Name (reference only)','New RM'],
-    ['EQ12345','Example: Ramesh Kumar','Komal'],
-    ['EQ67890','Example: Sunita Devi','Bharat']
+    ['Client Code','Client Name (reference only)','New RM','PAN','DOB'],
+    ['EQ12345','Example: Ramesh Kumar','Komal','ABCDE1234F','19561009'],
+    ['EQ67890','Example: Sunita Devi','Bharat','',''],
+    ['EQ11111','Example: sirf DOB update','','','09/10/1956']
   ];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:18},{wch:32},{wch:18}];
+  ws['!cols'] = [{wch:18},{wch:32},{wch:16},{wch:16},{wch:14}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'RM Update');
-  XLSX.writeFile(wb, 'Equity_RM_Update_Template.xlsx');
+  XLSX.utils.book_append_sheet(wb, ws, 'Bulk Update');
+  XLSX.writeFile(wb, 'Equity_Bulk_Update_Template.xlsx');
 }
 
-function handleEqRmUpdateFile(input){
+function handleEqBulkFile(input){
   const file = input.files[0];
   if(!file) return;
   readExcel(file, function(err, rows){
     if(err){ toast('File read error: '+err.message,'error'); return; }
-    let hdrIdx=-1, colMap={};
     const wanted = {
       code: ['code','clientcode','clientid','ucccode','ucc'],
-      rm: ['newrm','rm','relationshipmanager','dealer','dealername','employeename']
+      rm:   ['newrm','rm','relationshipmanager','dealer','dealername','employeename'],
+      pan:  ['pan','pancard','panno','pannumber','pancardno','pancardnumber'],
+      dob:  ['dob','dateofbirth','birthdate','birthday','dateofbirthdob','invdob','dobdate']
     };
+    let hdrIdx=-1, colMap={};
     for(let i=0;i<Math.min(rows.length,15);i++){
-      const row = rows[i];
       const map = {};
-      row.forEach((cell,ci)=>{
+      rows[i].forEach((cell,ci)=>{
         const h = normHdr(cell);
         for(const [field, variants] of Object.entries(wanted)){
           if(variants.includes(h) && map[field]===undefined) map[field]=ci;
         }
       });
-      if(map.code!==undefined && map.rm!==undefined){
+      // Code + kam se kam ek updatable field mile tabhi header row maano
+      if(map.code!==undefined && (map.rm!==undefined || map.pan!==undefined || map.dob!==undefined)){
         hdrIdx=i; colMap=map; break;
       }
     }
     if(hdrIdx===-1){
-      toast('Header row not found. Excel must have Client Code and New RM columns.','error');
-      return;
-    }
-    const data = rows.slice(hdrIdx+1)
-      .filter(r=>r.some(c=>c!==''))
-      .map(r=>({
-        code: String(r[colMap.code]||'').trim(),
-        rm: normRm(String(r[colMap.rm]||'').trim())
-      }))
-      .filter(r=>r.code && r.rm);
-
-    if(!data.length){
-      toast('No valid rows found (both Client Code and New RM are required).','error');
+      toast('Header row nahi mila. Excel me Client Code ke saath RM / PAN / DOB me se koi ek column hona chahiye.','error');
       return;
     }
 
-    // Validate RM names against active RM list
+    eqBulkFields = ['rm','pan','dob'].filter(f=>colMap[f]!==undefined);
     const validRms = new Set((DB.get('users')||DEFAULT_USERS).filter(u=>u.role!=='admin').map(u=>u.name));
-    const invalidRows = data.filter(r=>!validRms.has(r.rm));
+    const panRe = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    const _blank = ['','0','null','na','n/a','-','00000000'];
+    const todayStr = today();
 
-    eqRmUpdateData = data;
-    let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${data.length} rows found</div>`;
-    if(invalidRows.length){
-      const names = [...new Set(invalidRows.map(r=>r.rm))].join(', ');
-      html += `<div style="background:#fdecea;color:var(--red);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
-       ⚠️ ${invalidRows.length} row(s) have an RM name that doesn't match the CRM's list: <b>${names}</b>. These rows will be skipped — RM name must match exactly (e.g. Komal, Bharat).</div>`;
-    }
-    document.getElementById('eq-rm-preview').innerHTML = html;
-    document.getElementById('eqRmUpdateBtnGo').disabled = data.length===0;
-  });
-}
+    const data = [];
+    const seen = new Set();
+    let dupSkipped=0, badRm=0, badPanFmt=0;
+    const badDates = [];
+    const counts = {rm:0, pan:0, dob:0};
 
-async function doEqRmUpdate(){
-  if(CU.role!=='admin') return;
-  if(!eqRmUpdateData || !eqRmUpdateData.length) return;
-  const existing = DB.get('eq_clients')||[];
-  const byCode = {};
-  existing.forEach(c=>{ if(c.code) byCode[String(c.code).trim().toUpperCase()] = c; });
-  const validRms = new Set((DB.get('users')||DEFAULT_USERS).filter(u=>u.role!=='admin').map(u=>u.name));
+    rows.slice(hdrIdx+1).filter(r=>r.some(c=>c!=='')).forEach(r=>{
+      const code = String(r[colMap.code]||'').trim();
+      if(!code) return;
+      const ck = code.toUpperCase();
+      if(seen.has(ck)){ dupSkipped++; return; }   // same code repeat — pehli row hi
+      const row = {code};
 
-  let updated=0, notFound=0, invalidRm=0;
-  const touched = [];
-  const newLogs = [];
-
-  eqRmUpdateData.forEach(row=>{
-    if(!validRms.has(row.rm)){ invalidRm++; return; }
-    const ex = byCode[row.code.trim().toUpperCase()];
-    if(!ex){ notFound++; return; }
-    if(ex.rm===row.rm) return; // no change needed
-    const oldRm = ex.rm||'—';
-    ex.rm = row.rm;
-    ex.updated = today();
-    touched.push(ex);
-    updated++;
-    newLogs.push({
-      id: uid(), type: 'bulk_rm_update', seg:'equity',
-      client_id: ex.id, client_name: ex.name, rm: row.rm,
-      by: CU.name, date: new Date().toISOString(),
-      changes: [{field:'rm', old:oldRm, new:row.rm}]
-    });
-  });
-
-  if(touched.length) await DB.setClientsBulk('eq_clients', touched);
-  if(newLogs.length) await DB.addActivityLog(newLogs);
-
-  closeModal('eqRmUpdateModal');
-  let msg = `✅ RM Update done! ${updated} client(s) updated`;
-  if(notFound) msg += `, ${notFound} Client Code not found`;
-  if(invalidRm) msg += `, ${invalidRm} invalid RM name`;
-  toast(msg, updated>0?'success':'error');
-  renderEqTable(); refreshDash(); updateBadges();
-}
-
-
-// ══ EQUITY BULK PAN UPDATE (Admin only) ══
-let eqPanUpdateData = null;
-
-function openEqPanUpdateModal(){
-  if(CU.role!=='admin') return;
-  eqPanUpdateData = null;
-  document.getElementById('eq-pan-preview').innerHTML='';
-  document.getElementById('eqPanUpdateBtnGo').disabled=true;
-  document.getElementById('eq-pan-file').value='';
-  document.getElementById('eqPanUpdateModal').classList.add('open');
-}
-
-function downloadEqPanTemplate(){
-  const wsData = [
-    ['Client Code','Client Name (reference only)','PAN'],
-    ['EQ12345','Example: Ramesh Kumar','ABCDE1234F'],
-    ['EQ67890','Example: Sunita Devi','PQRSX6789K']
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:18},{wch:32},{wch:16}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'PAN Update');
-  XLSX.writeFile(wb, 'Equity_PAN_Update_Template.xlsx');
-}
-
-function handleEqPanUpdateFile(input){
-  const file = input.files[0];
-  if(!file) return;
-  readExcel(file, function(err, rows){
-    if(err){ toast('File read error: '+err.message,'error'); return; }
-    let hdrIdx=-1, colMap={};
-    const wanted = {
-      code: ['code','clientcode','clientid','ucccode','ucc'],
-      pan: ['pan','pancard','panno','pannumber','pancardno','pancardnumber']
-    };
-    for(let i=0;i<Math.min(rows.length,15);i++){
-      const map = {};
-      rows[i].forEach((cell,ci)=>{
-        const h = normHdr(cell);
-        for(const [field, variants] of Object.entries(wanted)){
-          if(variants.includes(h) && map[field]===undefined) map[field]=ci;
+      if(colMap.rm!==undefined){
+        const rm = normRm(String(r[colMap.rm]||'').trim());
+        if(rm){
+          if(validRms.has(rm)){ row.rm = rm; counts.rm++; }
+          else badRm++;
         }
-      });
-      if(map.code!==undefined && map.pan!==undefined){ hdrIdx=i; colMap=map; break; }
-    }
-    if(hdrIdx===-1){
-      toast('Header row not found. Excel must have Client Code and PAN columns.','error');
-      return;
-    }
-    const data = rows.slice(hdrIdx+1)
-      .filter(r=>r.some(c=>c!==''))
-      .map(r=>({
-        code: String(r[colMap.code]||'').trim(),
-        pan: String(r[colMap.pan]||'').trim().toUpperCase()
-      }))
-      .filter(r=>r.code && r.pan);
+      }
+      if(colMap.pan!==undefined){
+        const pan = String(r[colMap.pan]||'').trim().toUpperCase();
+        if(pan && !_blank.includes(pan.toLowerCase())){
+          row.pan = pan; counts.pan++;
+          if(!panRe.test(pan)) badPanFmt++;
+        }
+      }
+      if(colMap.dob!==undefined){
+        const rawDob = r[colMap.dob];
+        const rawStr = String(rawDob==null?'':rawDob).trim().toLowerCase();
+        if(!_blank.includes(rawStr)){
+          const dob = normDob(rawDob);
+          if(!dob) badDates.push([code, String(rawDob), 'Date parse nahi hui']);
+          else if(dob > todayStr) badDates.push([code, String(rawDob), 'Future date']);
+          else if(dob < '1900-01-01') badDates.push([code, String(rawDob), '1900 se pehle']);
+          else { row.dob = dob; counts.dob++; }
+        }
+      }
+
+      if(row.rm || row.pan || row.dob){ seen.add(ck); data.push(row); }
+    });
 
     if(!data.length){
-      toast('No valid rows found (both Client Code and PAN are required).','error');
+      toast('Koi valid row nahi mili (Client Code ke saath RM / PAN / DOB me se kuch chahiye).','error');
       return;
     }
 
-    const panRe = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-    const badFmt = data.filter(r=>!panRe.test(r.pan));
-
-    eqPanUpdateData = data;
+    eqBulkData = data;
+    const labels = {rm:'RM', pan:'PAN', dob:'DOB'};
+    const found = eqBulkFields.map(f=>`<b>${labels[f]}</b> (${counts[f]})`).join(', ');
     let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${data.length} rows found</div>`;
-    if(badFmt.length){
-      html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
-       ⚠️ ${badFmt.length} row(s) have a PAN that doesn't look like a standard PAN (ABCDE1234F). They will still be uploaded as-is — please double-check.</div>`;
-    }
-    document.getElementById('eq-pan-preview').innerHTML = html;
-    document.getElementById('eqPanUpdateBtnGo').disabled = data.length===0;
-  });
-}
-
-async function doEqPanUpdate(){
-  if(CU.role!=='admin') return;
-  if(!eqPanUpdateData || !eqPanUpdateData.length) return;
-  const existing = DB.get('eq_clients')||[];
-  const byCode = {};
-  existing.forEach(c=>{ if(c.code) byCode[String(c.code).trim().toUpperCase()] = c; });
-
-  let updated=0, notFound=0, unchanged=0;
-  const touched = [];
-  const newLogs = [];
-
-  eqPanUpdateData.forEach(row=>{
-    const ex = byCode[row.code.trim().toUpperCase()];
-    if(!ex){ notFound++; return; }
-    const oldPan = (ex.pan||'').trim().toUpperCase();
-    if(oldPan===row.pan){ unchanged++; return; }
-    ex.pan = row.pan;
-    ex.updated = today();
-    touched.push(ex);
-    updated++;
-    newLogs.push({
-      id: uid(), type: 'bulk_pan_update', seg:'equity',
-      client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
-      by: CU.name, date: new Date().toISOString(),
-      changes: [{field:'pan', old:oldPan||'—', new:row.pan}]
-    });
-  });
-
-  if(touched.length) await DB.setClientsBulk('eq_clients', touched);
-  if(newLogs.length) await DB.addActivityLog(newLogs);
-
-  closeModal('eqPanUpdateModal');
-  let msg = `✅ PAN Update done! ${updated} client(s) updated`;
-  if(unchanged) msg += `, ${unchanged} already same`;
-  if(notFound) msg += `, ${notFound} Client Code not found`;
-  toast(msg, updated>0?'success':'error');
-  renderEqTable(); refreshDash(); updateBadges();
-}
-
-
-// ══ EQUITY BULK DOB UPDATE (Admin only) ══
-// Sirf Client Code + DOB. Code exact match. Kuch aur field touch nahi hoga,
-// naye client add nahi honge.
-let eqDobUpdateData = null;
-
-function openEqDobUpdateModal(){
-  if(CU.role!=='admin') return;
-  eqDobUpdateData = null;
-  document.getElementById('eq-dob-preview').innerHTML='';
-  document.getElementById('eqDobUpdateBtnGo').disabled=true;
-  document.getElementById('eq-dob-file').value='';
-  document.getElementById('eqDobUpdateModal').classList.add('open');
-}
-
-function downloadEqDobTemplate(){
-  const wsData = [
-    ['Client Code','Client Name (reference only)','DOB'],
-    ['EQ12345','Example: Ramesh Kumar','15/08/1985'],
-    ['EQ67890','Example: Sunita Devi','02/01/1979']
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:18},{wch:32},{wch:14}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'DOB Update');
-  XLSX.writeFile(wb, 'Equity_DOB_Update_Template.xlsx');
-}
-
-function handleEqDobUpdateFile(input){
-  const file = input.files[0];
-  if(!file) return;
-  readExcel(file, function(err, rows){
-    if(err){ toast('File read error: '+err.message,'error'); return; }
-    let hdrIdx=-1, colMap={};
-    const wanted = {
-      code: ['code','clientcode','clientid','ucccode','ucc'],
-      dob: ['dob','dateofbirth','birthdate','birthday','dateofbirthdob','invdob','dobdate']
-    };
-    for(let i=0;i<Math.min(rows.length,15);i++){
-      const map = {};
-      rows[i].forEach((cell,ci)=>{
-        const h = normHdr(cell);
-        for(const [field, variants] of Object.entries(wanted)){
-          if(variants.includes(h) && map[field]===undefined) map[field]=ci;
-        }
-      });
-      if(map.code!==undefined && map.dob!==undefined){ hdrIdx=i; colMap=map; break; }
-    }
-    if(hdrIdx===-1){
-      toast('Header row not found. Excel must have Client Code and DOB columns.','error');
-      return;
-    }
-
-    const _blankVals = ['','0','null','na','n/a','-','00000000'];
-    const raw = rows.slice(hdrIdx+1)
-      .filter(r=>r.some(c=>c!==''))
-      .map(r=>({
-        code: String(r[colMap.code]||'').trim(),
-        rawDob: r[colMap.dob],
-        dob: normDob(r[colMap.dob])
-      }))
-      .filter(r=>r.code && !_blankVals.includes(String(r.rawDob==null?'':r.rawDob).trim().toLowerCase()));
-
-    if(!raw.length){
-      toast('No valid rows found (Client Code aur DOB dono chahiye).','error');
-      return;
-    }
-
-    // Invalid / future / absurd dates alag karo
-    const todayStr = today();
-    const badDates = [];
-    const data = [];
-    const seenCodes = new Set();
-    let dupSkipped = 0;
-    raw.forEach(r=>{
-      if(!r.dob){ badDates.push([r.code, String(r.rawDob), 'Date parse nahi hui']); return; }
-      if(r.dob > todayStr){ badDates.push([r.code, String(r.rawDob), 'Future date']); return; }
-      if(r.dob < '1900-01-01'){ badDates.push([r.code, String(r.rawDob), '1900 se pehle']); return; }
-      const ck = r.code.toUpperCase();
-      if(seenCodes.has(ck)){ dupSkipped++; return; }   // same code repeat — pehli row hi lo
-      seenCodes.add(ck);
-      data.push({code:r.code, dob:r.dob});
-    });
-
-    eqDobUpdateData = data;
-    let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${data.length} valid rows found</div>`;
+       ✅ ${data.length} rows — update honge: ${found}</div>`;
     if(dupSkipped){
       html += `<div style="background:#eef6ff;color:#1d4ed8;padding:8px 10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
        ℹ️ ${dupSkipped} duplicate Client Code row(s) — pehli row li gayi hai.</div>`;
     }
+    if(badRm){
+      html += `<div style="background:#fdecea;color:var(--red);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
+       ⚠️ ${badRm} row(s) ka RM naam CRM ki list se match nahi karta — wo RM skip ho jayega (baaki fields fir bhi update honge). Naam exact hona chahiye (jaise Komal, Bharat).</div>`;
+    }
+    if(badPanFmt){
+      html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
+       ⚠️ ${badPanFmt} PAN standard format (ABCDE1234F) jaisa nahi lag raha — as-is upload hoga, ek baar check kar lijiye.</div>`;
+    }
     if(badDates.length){
       html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
-       ⚠️ ${badDates.length} row(s) ki DOB galat/invalid hai — wo skip ho jayengi.
-       <a href="#" onclick="showEqDobBadReport();return false;" style="color:var(--teal);text-decoration:underline;margin-left:6px">Dekho</a></div>`;
-      window._eqDobBad = badDates;
+       ⚠️ ${badDates.length} row(s) ki DOB invalid hai — wo DOB skip ho jayegi.
+       <a href="#" onclick="showEqBulkBadDobReport();return false;" style="color:var(--teal);text-decoration:underline;margin-left:6px">Dekho</a></div>`;
+      window._eqBulkBadDob = badDates;
     } else {
-      window._eqDobBad = null;
+      window._eqBulkBadDob = null;
     }
-    document.getElementById('eq-dob-preview').innerHTML = html;
-    document.getElementById('eqDobUpdateBtnGo').disabled = data.length===0;
+    document.getElementById('eq-bulk-preview').innerHTML = html;
+    document.getElementById('eqBulkBtnGo').disabled = false;
   });
 }
 
-function showEqDobBadReport(){
-  if(!window._eqDobBad) return;
-  showReport(`Invalid DOB rows (${window._eqDobBad.length})`,
-    ['Client Code','File ki value','Wajah'], window._eqDobBad);
+function showEqBulkBadDobReport(){
+  if(!window._eqBulkBadDob) return;
+  showReport(`Invalid DOB rows (${window._eqBulkBadDob.length})`,
+    ['Client Code','File ki value','Wajah'], window._eqBulkBadDob);
 }
 
-async function doEqDobUpdate(){
+async function doEqBulkUpdate(){
   if(CU.role!=='admin') return;
-  if(!eqDobUpdateData || !eqDobUpdateData.length) return;
+  if(!eqBulkData || !eqBulkData.length) return;
   const existing = DB.get('eq_clients')||[];
   const byCode = {};
   existing.forEach(c=>{ if(c.code) byCode[String(c.code).trim().toUpperCase()] = c; });
 
-  let updated=0, unchanged=0;
+  const upd = {rm:0, pan:0, dob:0};
+  let unchanged=0;
   const touched = [], newLogs = [], notFoundRows = [];
 
-  eqDobUpdateData.forEach(row=>{
+  eqBulkData.forEach(row=>{
     const ex = byCode[row.code.trim().toUpperCase()];
-    if(!ex){ notFoundRows.push([row.code, fmtDate(row.dob)]); return; }
-    const oldDob = (ex.dob||'').trim();
-    if(oldDob===row.dob){ unchanged++; return; }
-    ex.dob = row.dob;
+    if(!ex){ notFoundRows.push([row.code, row.rm||'—', row.pan||'—', row.dob?fmtDate(row.dob):'—']); return; }
+    const changes = [];
+
+    if(row.rm && ex.rm!==row.rm){
+      changes.push({field:'rm', old:ex.rm||'—', new:row.rm});
+      ex.rm = row.rm; upd.rm++;
+    }
+    if(row.pan){
+      const oldPan = (ex.pan||'').trim().toUpperCase();
+      if(oldPan!==row.pan){
+        changes.push({field:'pan', old:oldPan||'—', new:row.pan});
+        ex.pan = row.pan; upd.pan++;
+      }
+    }
+    if(row.dob){
+      const oldDob = (ex.dob||'').trim();
+      if(oldDob!==row.dob){
+        changes.push({field:'dob', old:oldDob||'—', new:row.dob});
+        ex.dob = row.dob; upd.dob++;
+      }
+    }
+
+    if(!changes.length){ unchanged++; return; }
     ex.updated = today();
     touched.push(ex);
-    updated++;
     newLogs.push({
-      id: uid(), type: 'bulk_dob_update', seg:'equity',
+      id: uid(), type: 'bulk_update', seg:'equity',
       client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
       by: CU.name, date: new Date().toISOString(),
-      changes: [{field:'dob', old:oldDob||'—', new:row.dob}]
+      changes
     });
   });
 
   if(touched.length) await DB.setClientsBulk('eq_clients', touched);
   if(newLogs.length) await DB.addActivityLog(newLogs);
 
-  closeModal('eqDobUpdateModal');
-  let msg = `✅ DOB Update done! ${updated} client(s) updated`;
+  closeModal('eqBulkModal');
+  const parts = [];
+  if(upd.rm) parts.push(`RM: ${upd.rm}`);
+  if(upd.pan) parts.push(`PAN: ${upd.pan}`);
+  if(upd.dob) parts.push(`DOB: ${upd.dob}`);
+  let msg = `✅ Bulk Update done! ${touched.length} client(s) updated` + (parts.length?` (${parts.join(', ')})`:'');
   if(unchanged) msg += `, ${unchanged} already same`;
   if(notFoundRows.length) msg += `, ${notFoundRows.length} Client Code not found`;
-  toast(msg, updated>0?'success':'error');
+  toast(msg, touched.length>0?'success':'error');
   renderEqTable(); refreshDash(); updateBadges();
 
   if(notFoundRows.length){
     setTimeout(()=>{
       showReport(`Client Code Not Found — ${notFoundRows.length} rows (skip kiye)`,
-        ['Client Code','DOB (file se)'], notFoundRows);
+        ['Client Code','RM','PAN','DOB'], notFoundRows);
     }, 600);
   }
 }
@@ -13924,7 +13679,7 @@ function renderActivityLog(){
   const tbl=document.getElementById('al-table');
   if(!tbl) return;
 
-  const typeLabel={add:'✅ New Client',edit:'✏️ Edited',call:'📞 Call Log',call_update:'📞 Follow-up Updated'};
+  const typeLabel={add:'✅ New Client',edit:'✏️ Edited',call:'📞 Call Log',call_update:'📞 Follow-up Updated',bulk_update:'⇅ Bulk Update',bulk_rm_update:'⇅ Bulk RM Update'};
   const typeBg={add:'#d1fae5',edit:'#fef3c7',call:'#e0f2fe',call_update:'#f0e6ff'};
   const typeColor={add:'#065f46',edit:'#92400e',call:'#0369a1',call_update:'#6d28d9'};
 
