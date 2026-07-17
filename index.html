@@ -12080,35 +12080,79 @@ function parseAumExcel(rows){
   return out;
 }
 
+// Parse the "Running SIP Report".
+// HEADER-BASED for the same reason parseAumExcel is: this used to read fixed
+// positions (amt=r[6], cnt=r[7], scheme=r[2], date=r[9]). Those happen to be
+// right for today's layout, but the AUM report proved the RTA will insert a
+// column without warning — and when that happens, parseFloat() on the wrong
+// column quietly yields 0 instead of failing loudly. Read the header.
+//
+// Name column looks like:  "SURESH SAHU [AOFPS2567B] [1854321]"
+//                            name        PAN          Client ID
+// Minors have an empty PAN bracket: "Saanvi Agarwal [] [4993137]".
 function parseSipExcel(rows){
-  // Find header row - row 1 is header
-  const hdrIdx = rows.findIndex(r => String(r[0]).includes('S.No') || String(r[1]).includes('Name'));
-  const data = rows.slice(hdrIdx+1).filter(r => String(r[0]).match(/^\d+$/));
-  
-  // Extract name and PAN from "Name [PAN][Code]" format
+  const wanted = {
+    sno:        ['sno','srno','serialno','slno'],
+    name:       ['name','clientname','investorname'],
+    scheme:     ['scheme','schemename','fundname','fund'],
+    folio:      ['foliono','folio','folionumber'],
+    freq:       ['sipfrequency','frequency'],
+    amount:     ['sipmonthlyamount','monthlyamount'],
+    reg_amount: ['sipregisteredamount','registeredamount'],
+    count:      ['sipcount'],
+    day:        ['sipdate']
+  };
+  let hdrIdx=-1, colMap={};
+  for(let i=0; i<Math.min(rows.length,15); i++){
+    const map={};
+    (rows[i]||[]).forEach((cell,ci)=>{
+      const h=normHdr(cell);
+      for(const [f,vars] of Object.entries(wanted)){
+        if(vars.includes(h) && map[f]===undefined) map[f]=ci;
+      }
+    });
+    if(map.name!==undefined && (map.amount!==undefined || map.reg_amount!==undefined)){
+      hdrIdx=i; colMap=map; break;
+    }
+  }
+  if(hdrIdx===-1) return null;   // caller aborts — never guess positions
+
+  // "SIP Monthly Amount" is the one we want. Fall back to the registered
+  // amount only if the monthly column is missing entirely.
+  const amtCol = colMap.amount!==undefined ? colMap.amount : colMap.reg_amount;
+  const usedRegAmt = colMap.amount===undefined;
+  const at = (r,f) => colMap[f]!==undefined ? r[colMap[f]] : '';
+  const num = v => parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0;
+
+  const data = rows.slice(hdrIdx+1).filter(r=>{
+    if(!r || !r.some(c=>c!=='' && c!=null)) return false;
+    if(colMap.sno!==undefined) return String(r[colMap.sno]||'').trim().match(/^\d+$/);
+    return String(at(r,'name')||'').trim() !== '';
+  });
+
   const sipMap = {};
   data.forEach(r => {
-    const nameRaw = String(r[1]||'');
-    const name = nameRaw.replace(/\[.*?\]/g,'').trim();
+    const nameRaw = String(at(r,'name')||'');
+    const name = nameRaw.replace(/\[.*?\]/g,'').replace(/\s+/g,' ').trim();
     const panMatch = nameRaw.match(/\[([A-Z]{5}\d{4}[A-Z])\]/);
-    const pan = panMatch ? panMatch[1] : '';
-    const amt = parseFloat(r[6])||0;
-    const cnt = parseInt(r[7])||0;
+    const pan = panMatch ? panMatch[1] : '';        // minors: empty bracket -> ''
+    const amt = num(r[amtCol]);
+    const cnt = parseInt(at(r,'count'))||0;
     const key = pan || name.toUpperCase();
+    if(!key) return;
     if(!sipMap[key]){ sipMap[key] = {name, pan, sip_amount:0, sip_count:0, sip_details:[]}; }
     sipMap[key].sip_amount += amt;
-    sipMap[key].sip_count += cnt;
-    // Per-SIP detail: Scheme (col 2) | SIP Monthly Amount (col 6) | SIP Date (col 9)
+    sipMap[key].sip_count  += cnt;
     sipMap[key].sip_details.push({
-      scheme: String(r[2]||'').trim(),
+      scheme: String(at(r,'scheme')||'').trim(),
       amount: amt,
-      day: String(r[9]||'').trim(),
-      folio: String(r[3]||'').trim(),
-      freq: String(r[4]||'').trim()
+      day:    String(at(r,'day')||'').trim(),
+      folio:  String(at(r,'folio')||'').trim(),
+      freq:   String(at(r,'freq')||'').trim()
     });
   });
-  // Sort each client's SIPs by amount (largest first)
   Object.values(sipMap).forEach(v => v.sip_details.sort((a,b)=>(b.amount||0)-(a.amount||0)));
+  Object.defineProperty(sipMap, '_usedRegAmt', {value:usedRegAmt, enumerable:false});
   return sipMap;
 }
 
@@ -12139,11 +12183,20 @@ function handleSipFile(input){
   if(!file) return;
   readExcel(file, function(err, rows){
     if(err){ toast('SIP file read error: '+err.message,'error'); return; }
-    importData.sip = parseSipExcel(rows);
-    const cnt = Object.keys(importData.sip).length;
+    const parsedS = parseSipExcel(rows);
+    if(!parsedS || !Object.keys(parsedS).length){
+      importData.sip = null;
+      document.getElementById('sip-preview').innerHTML =
+        `<div style="background:var(--red2,#fee);color:var(--red,#c00);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+         ❌ Header row nahi mila (Name + SIP Monthly Amount columns chahiye). File ka format check karein — import roka gaya.</div>`;
+      checkImportReady(); return;
+    }
+    importData.sip = parsedS;
+    const cnt = Object.keys(parsedS).length;
+    const rw = parsedS._usedRegAmt ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ "SIP Monthly Amount" column nahi mila — "SIP Registered Amount" use kiya</div>` : '';
     document.getElementById('sip-preview').innerHTML = 
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${cnt} SIP clients found</div>`;
+       ✅ ${cnt} SIP clients found</div>${rw}`;
     checkImportReady();
   });
 }
@@ -12166,10 +12219,17 @@ function handleBothFile(type, input){
       document.getElementById('both-preview').innerHTML += 
         `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${parsedB.length} clients${parsedB._badPan?' (⚠️ '+parsedB._badPan+' bina valid PAN)':''}</div>`;
     } else {
-      importData.sip = parseSipExcel(rows);
-      const cnt = Object.keys(importData.sip).length;
+      const parsedSB = parseSipExcel(rows);
+      if(!parsedSB || !Object.keys(parsedSB).length){
+        importData.sip = null;
+        document.getElementById('both-preview').innerHTML +=
+          `<div style="color:var(--red,#c00);font-size:.82rem;font-weight:600">❌ SIP: header row nahi mila — format check karein</div>`;
+        checkImportReady(); return;
+      }
+      importData.sip = parsedSB;
+      const cnt = Object.keys(parsedSB).length;
       document.getElementById('both-preview').innerHTML += 
-        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ SIP: ${cnt} clients</div>`;
+        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ SIP: ${cnt} clients${parsedSB._usedRegAmt?' (⚠️ Registered Amount used)':''}</div>`;
     }
     checkImportReady();
   });
