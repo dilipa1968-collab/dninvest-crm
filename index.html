@@ -1865,6 +1865,16 @@ input:focus, select:focus, textarea:focus{
 <!-- ══ MODALS ══ -->
 
 <!-- Client Modal (Equity + MF) -->
+<div class="modal-overlay" id="sipDetailModal" onclick="if(event.target===this)closeModal('sipDetailModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="sipDetailTitle">SIP Details</h3>
+      <button class="modal-close" onclick="closeModal('sipDetailModal')">×</button>
+    </div>
+    <div class="modal-body" id="sipDetailBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="clientModal" onclick="if(event.target===this)closeModal('clientModal')">
   <div class="modal wide">
     <div class="modal-hdr">
@@ -5446,7 +5456,7 @@ function renderMfTable(){
       <td>${c.rm||'—'}</td>
       <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
       <td>${c.sip_amount?'₹'+fmtNum(c.sip_amount):'—'}</td>
-      <td>${c.sip_count||'—'}</td>
+      <td>${sipCntCell(c)}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
@@ -7536,6 +7546,7 @@ async function saveClient(){
       aum:parseFloat(gv2('f_aum'))||null,
       sip_amount:parseFloat(gv2('f_sip'))||null,
       sip_count:parseInt(gv2('f_sip_count'))||null,
+      sip_details: (currentEditId ? (clients.find(x=>x.id===currentEditId)?.sip_details ?? null) : null),
       last_invest_date:gv2('f_last_invest'), last_call_date:gv2('f_last_call'),
       next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
       do_not_call: document.getElementById('f_do_not_call')?.checked || false,
@@ -9498,7 +9509,7 @@ function renderSip(){
       <td><span class="badge b-investor">${c.status}</span></td>
       <td>${c.aum?'₹'+fmtNum(c.aum):'—'}</td>
       <td style="font-weight:700;color:var(--teal)">₹${fmtNum(c.sip_amount)}</td>
-      <td>${c.sip_count||'—'}</td>
+      <td>${sipCntCell(c)}</td>
       <td><button class="btn-icon" onclick="viewClient('${c.id}','mf')">👁</button>
           <button class="btn-icon" onclick="editClient('${c.id}','mf')">✏️</button></td></tr>`;
   });
@@ -11960,6 +11971,45 @@ function gp(tab,p){
 // ══════════════════════════════════════════
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
+// ══ SIP DETAILS POPUP (SIP Cnt pe click) ══
+function sipCntCell(c){
+  const n = parseInt(c.sip_count)||0;
+  if(!n) return '—';
+  const has = Array.isArray(c.sip_details) && c.sip_details.length;
+  if(!has) return n;
+  return `<span onclick="showSipDetails('${c.id}')" title="Click for scheme-wise SIP details"
+    style="cursor:pointer;background:var(--teal,#0d9488);color:#fff;border-radius:6px;padding:1px 8px;font-weight:700;font-size:.78rem;display:inline-block">${n}</span>`;
+}
+
+function showSipDetails(id){
+  const c = clients.find(x=>x.id===id);
+  if(!c) return;
+  const d = Array.isArray(c.sip_details)?c.sip_details:[];
+  if(!d.length){ toast('SIP details available nahi — Running SIP Report import kijiye','error'); return; }
+  const total = d.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
+  document.getElementById('sipDetailTitle').innerHTML = `SIP Details — ${c.name} <span style="font-weight:500;opacity:.7">(${d.length} SIP${d.length>1?'s':''})</span>`;
+  let h = `<div style="overflow:auto"><table class="tbl" style="width:100%;font-size:.85rem">
+    <thead><tr>
+      <th style="text-align:left">Scheme</th>
+      <th style="text-align:right;white-space:nowrap">SIP Amount</th>
+      <th style="text-align:center;white-space:nowrap">SIP Date</th>
+    </tr></thead><tbody>`;
+  d.forEach(x=>{
+    h += `<tr>
+      <td style="text-align:left">${x.scheme||'—'}${x.folio?`<div style="font-size:.7rem;opacity:.6">Folio: ${x.folio}${x.freq?' · '+x.freq:''}</div>`:''}</td>
+      <td style="text-align:right;font-weight:700;color:var(--teal,#0d9488);white-space:nowrap">₹${fmtNum(x.amount||0)}</td>
+      <td style="text-align:center;white-space:nowrap">${x.day||'—'}</td>
+    </tr>`;
+  });
+  h += `</tbody><tfoot><tr style="font-weight:800;border-top:2px solid var(--teal,#0d9488)">
+      <td style="text-align:left">TOTAL (${d.length})</td>
+      <td style="text-align:right;white-space:nowrap">₹${fmtNum(total)}</td>
+      <td></td>
+    </tr></tfoot></table></div>`;
+  document.getElementById('sipDetailBody').innerHTML = h;
+  document.getElementById('sipDetailModal').classList.add('open');
+}
+
 let toastTimer;
 function toast(msg,type=''){
   const el=document.getElementById('toast');
@@ -12042,10 +12092,20 @@ function parseSipExcel(rows){
     const amt = parseFloat(r[6])||0;
     const cnt = parseInt(r[7])||0;
     const key = pan || name.toUpperCase();
-    if(!sipMap[key]){ sipMap[key] = {name, pan, sip_amount:0, sip_count:0}; }
+    if(!sipMap[key]){ sipMap[key] = {name, pan, sip_amount:0, sip_count:0, sip_details:[]}; }
     sipMap[key].sip_amount += amt;
     sipMap[key].sip_count += cnt;
+    // Per-SIP detail: Scheme (col 2) | SIP Monthly Amount (col 6) | SIP Date (col 9)
+    sipMap[key].sip_details.push({
+      scheme: String(r[2]||'').trim(),
+      amount: amt,
+      day: String(r[9]||'').trim(),
+      folio: String(r[3]||'').trim(),
+      freq: String(r[4]||'').trim()
+    });
   });
+  // Sort each client's SIPs by amount (largest first)
+  Object.values(sipMap).forEach(v => v.sip_details.sort((a,b)=>(b.amount||0)-(a.amount||0)));
   return sipMap;
 }
 
@@ -12257,6 +12317,7 @@ async function doImport(){
         ex.pan = row.pan || ex.pan;
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
         if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
+        if(sipInfo.sip_details) ex.sip_details = sipInfo.sip_details;
         ex.status = 'Investor';
         newClients.push(ex);
         updated++;
@@ -12271,6 +12332,7 @@ async function doImport(){
           aum: row.aum,
           sip_amount: sipInfo.sip_amount||null,
           sip_count: sipInfo.sip_count||null,
+          sip_details: sipInfo.sip_details||null,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created: today(), updated: today()
         });
@@ -12284,12 +12346,13 @@ async function doImport(){
       if(ex){
         ex.sip_amount = row.sip_amount;
         ex.sip_count = row.sip_count;
+        ex.sip_details = row.sip_details||null;
         newClients.push(ex);
         updated++;
       } else {
         newClients.push({
           id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: (CU.role!=='admin'&&CU.role!=='backoffice'&&!CU.backoffice_access)?CU.name:(row.rm||''),
-          status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count,
+          status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count, sip_details:row.sip_details||null,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created:today(), updated:today()
         });
