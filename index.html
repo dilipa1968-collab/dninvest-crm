@@ -9750,6 +9750,8 @@ function sqUpload(input){
           const t5=sqToISO(pick('t590daydate','t5','90day','tminus'));
           const sqDate=sqToISO(pick('squareoffdate','sqdate','squareoff'));
           if(!code && !name) return;
+          // ₹100 se neeche (99.99 tak) ka debit ignore — chhoti amount pe square-off nahi
+          if(debit < 100) return;
           out.push({code,name,dealer,debit,t5,sqDate});
         });
       });
