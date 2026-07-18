@@ -1976,7 +1976,26 @@ async function sendHeartbeatPing(){
     const ist=_hbIstNow();
     const hhmm=String(ist.getHours()).padStart(2,'0')+':'+String(ist.getMinutes()).padStart(2,'0');
     await DB.setMerged('heartbeats', {[currentUser]: {date:today(), time:hhmm}});
+    // LIVE OUT-TIME: har ping pe aaj ka out-time = abhi ka time save karo, taaki
+    // out-time kabhi lost na ho — chahe RM logout na kare, chahe 6:15 pe koi device
+    // khula na ho. Sirf 'out' field update hoti hai; status ka final faisla cutoff par
+    // autoOutTimeCheck hi karta hai (half-day logic). Out tabhi badalti hai jab naya
+    // time purane se aage ho — minute badalne par max 1 write.
+    await liveUpdateOutTime(currentUser, hhmm);
   }catch(e){ console.log('sendHeartbeatPing error:', e); }
+}
+// Aaj ke attendance record ki out-time ko live update karta hai (sirf out field).
+// Status ko haath nahi lagata — half-day ka faisla cutoff par hota hai.
+async function liveUpdateOutTime(name, hhmm){
+  try{
+    const td=today();
+    const att=getAtt();
+    const rec=(att[name]||[]).find(r=>r.date===td);
+    if(!rec) return; // login abhi mark nahi hua — kuch mat karo
+    if(!(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) return;
+    if(rec.out && !(hhmm>rec.out)) return; // already same/later — dobara likhne ki zaroorat nahi
+    await saveAttRecord(name, {...rec, out:hhmm});
+  }catch(e){ console.log('liveUpdateOutTime error:', e); }
 }
 function startHeartbeat(){
   if(_heartbeatTimer) return; // already running
@@ -2184,45 +2203,11 @@ async function autoOutTimeCheck(){
 
     if(cutoff===null) return; // Sunday — no cutoff, kuch nahi
 
-    // ── PRE-CUTOFF LIVE HEAL: cutoff se pehle agar kisi record me out-time laga
-    // hai LEKIN uska heartbeat abhi-abhi (last 15 min) aaya hai, matlab bandaa
-    // office me active hai → premature out (accidental logout) hatao aur Half day
-    // revert karo. Admin device sabke liye heal karta hai; RM apne liye. Isse
-    // Khokhan-type case (subah logout → wapas active) khud thik ho jata hai.
-    if(istH<cutoff){
-      const tdP=today();
-      const attP=getAtt();
-      const hbP=DB.get('heartbeats', {}) || {};
-      const nowMin=ist.getHours()*60+ist.getMinutes();
-      const hbFresh=(nm)=>{
-        const hb=hbP[nm];
-        if(!hb || hb.date!==tdP || !hb.time) return false;
-        const m=/^(\d{1,2}):(\d{2})$/.exec(hb.time); if(!m) return false;
-        return (nowMin-(Number(m[1])*60+Number(m[2])))<=15; // 15 min ke andar ka ping = active
-      };
-      const revertP=(rec)=>{
-        const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
-        const lateCut=(dow===6)?10.75:10;
-        return (m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
-      };
-      const scope = isAdmin ? Object.keys(attP) : (currentUser?[currentUser]:[]);
-      let healed=false;
-      for(const emp of scope){
-        const rec=(attP[emp]||[]).find(r=>r.date===tdP);
-        if(!rec || !rec.out) continue;
-        if(!(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) continue;
-        if(hbFresh(emp)){
-          const st = rec.status==='Half day' ? revertP(rec) : rec.status;
-          await saveAttRecord(emp, {...rec, out:'', status:st});
-          healed=true;
-        }
-      }
-      if(healed){
-        if(typeof renderDashboard==='function') renderDashboard();
-        if(typeof renderAttendancePage==='function') renderAttendancePage();
-      }
-      return; // pre-cutoff kaam ho gaya
-    }
+    // Pre-cutoff: kuch nahi karna. Ab out-time har heartbeat pe live save hoti hai
+    // (liveUpdateOutTime / CRM ka crmLiveOutTime), isliye pehle wala "premature out
+    // clear + half-day revert" heal ki zaroorat nahi — balki wo live out se takraata
+    // tha (har minute clear → wapas set). Out ka final faisla neeche cutoff par hota hai.
+    if(istH<cutoff) return;
 
     const td=today();
     const att=getAtt();
@@ -2262,42 +2247,43 @@ async function autoOutTimeCheck(){
       return (m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
     }
 
+    // Ek record ke liye cutoff par final out-time + status compute karo. Out ab aksar
+    // pehle se live-filled hoti hai; agar missing hai to heartbeat/cutoff se bharo, aur
+    // agar baad ka heartbeat mila to aage badhao. Status HAMESHA final out se recompute —
+    // taaki half-day (out < 1:30 PM) sahi lage bhale out live save hui ho. Koi badlav
+    // na ho to null (write skip).
+    function cutoffRecordFor(emp, rec){
+      let oT = rec.out;
+      if(!oT) oT = outTimeFor(emp);                         // out missing → heartbeat/cutoff fallback
+      else { const lh = laterHeartbeat(emp, rec); if(lh) oT = lh; } // baad ka ping → aage
+      const st = statusFor(oT, rec);
+      if(oT===rec.out && st===rec.status) return null;      // kuch nahi badla
+      return {...rec, out:oT, status:st};
+    }
+
     if(isAdmin){
-      // Admin: sabka out time fill karo agar missing ho
+      // Admin: sabka out-time + status finalize karo
       const emps=Object.keys(att);
       let changed=false;
       for(const emp of emps){
         const rec=(att[emp]||[]).find(r=>r.date===td);
         if(!rec) continue;
-        if((rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')){
-          if(!rec.out){
-            const oT=outTimeFor(emp);
-            await saveAttRecord(emp, {...rec, out:oT, status:statusFor(oT, rec)});
-            changed=true;
-          } else {
-            const lh=laterHeartbeat(emp, rec);
-            if(lh){
-              await saveAttRecord(emp, {...rec, out:lh, status:statusFor(lh, rec)});
-              changed=true;
-            }
-          }
-        }
+        if(!(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) continue;
+        const upd=cutoffRecordFor(emp, rec);
+        if(upd){ await saveAttRecord(emp, upd); changed=true; }
       }
-      if(changed){
-        if(typeof renderDashboard==='function') renderDashboard();
-      }
+      if(changed && typeof renderDashboard==='function') renderDashboard();
     } else {
-      // RM: apna out time fill karo
+      // RM: apna out-time + status finalize karo
       if(!currentUser) return;
       const rec=(att[currentUser]||[]).find(r=>r.date===td);
       if(!rec || !(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) return;
-      let oT=null;
-      if(!rec.out) oT=outTimeFor(currentUser);
-      else oT=laterHeartbeat(currentUser, rec); // out set hai, sirf later heartbeat se update
-      if(!oT) return;
-      await saveAttRecord(currentUser, {...rec, out:oT, status:statusFor(oT, rec)});
-      if(typeof renderAttendancePage==='function') renderAttendancePage();
-      if(typeof renderDashboard==='function') renderDashboard();
+      const upd=cutoffRecordFor(currentUser, rec);
+      if(upd){
+        await saveAttRecord(currentUser, upd);
+        if(typeof renderAttendancePage==='function') renderAttendancePage();
+        if(typeof renderDashboard==='function') renderDashboard();
+      }
     }
   }catch(e){}
 }
@@ -2334,6 +2320,38 @@ async function migrateHalfDayFromJuly1(){
   }catch(e){ console.log('HD migration error:', e); }
 }
 setTimeout(migrateHalfDayFromJuly1, 8000); // DB load hone ke baad chale
+
+// ── Rolling half-day safety (Admin): pichhle 7 din (aaj chhod ke) ke un records ko
+// Half day mark karo jinka out 1:30 PM se pehle ka hai (Mon–Fri). Ab out-time har
+// heartbeat pe live save hoti hai, isliye agar kisi din 6:15 pe koi device khula na
+// bhi ho to out sahi rehti hai — ye reconcile us out se half-day finalize kar deta hai.
+// Idempotent (Half day ho jane par dobara match nahi hota); Saturday exempt; sirf
+// status badalta hai to likhta hai. Auto-revert NAHI karta (safe side).
+async function reconcileRecentHalfDays(){
+  try{
+    if(!isAdmin) return;
+    const td=today();
+    const att=getAtt();
+    const d=new Date(td+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-7);
+    const since=d.toISOString().slice(0,10); // 7 din pehle ki date
+    let fixed=0;
+    for(const emp of Object.keys(att)){
+      for(const rec of (att[emp]||[])){
+        if(rec.date<since || rec.date>=td) continue;        // sirf pichhle 7 din, aaj nahi
+        if(!(rec.status==='Present'||rec.status==='Late')) continue;
+        if(!rec.out) continue;
+        if(dateIsSaturday(rec.date)) continue;               // Saturday khud half day office
+        const m=/^(\d{1,2}):(\d{2})$/.exec(rec.out);
+        if(m && (Number(m[1])+Number(m[2])/60)<13.5){
+          await saveAttRecord(emp, {...rec, status:'Half day'});
+          fixed++;
+        }
+      }
+    }
+    if(fixed>0 && typeof renderDashboard==='function') renderDashboard();
+  }catch(e){ console.log('reconcileRecentHalfDays error:', e); }
+}
+setTimeout(reconcileRecentHalfDays, 9000);
 
 // Date string (YYYY-MM-DD, IST-based) Saturday hai ya nahi — UTC parse se
 // deterministic, device timezone se koi farak nahi padta.
