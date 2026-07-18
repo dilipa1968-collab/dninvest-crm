@@ -3242,7 +3242,33 @@ async function sendCrmHeartbeat(){
       latest[_crmHbName]={date:today(), time:hhmm};
       tx.set(docRef, {data:latest, updated:new Date().toISOString()});
     });
+    // LIVE OUT-TIME: RMs poora din CRM me rehte hain, isliye out-time yahin se live
+    // save karo — HR portal ya kisi device ke 6:15 PM par khule hone par depend na kare.
+    // Sirf 'out' field update hoti hai; half-day ka faisla HR ka autoOutTimeCheck cutoff
+    // par karta hai. Out tabhi badalti hai jab naya time purane se aage ho (max 1 write/min).
+    await crmLiveOutTime(hhmm);
   }catch(e){ console.log('[HB] ping failed:', e); }
+}
+// Aaj ke attendance record ki out-time live update — CRM se seedhe HR ki attendance
+// doc me (hr_data/attendance). Sirf out field; status ko haath nahi.
+async function crmLiveOutTime(hhmm){
+  try{
+    if(typeof fdb==='undefined' || !_crmHbName) return;
+    const td=today();
+    const docRef=fdb.collection('hr_data').doc('attendance');
+    await fdb.runTransaction(async (tx)=>{
+      const doc=await tx.get(docRef);
+      let latest=(doc.exists && doc.data() && doc.data().data)?doc.data().data:{};
+      const arr=latest[_crmHbName]; if(!arr) return;
+      const idx=arr.findIndex(r=>r.date===td); if(idx<0) return;
+      const rec=arr[idx];
+      if(!(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) return;
+      if(rec.out && !(hhmm>rec.out)) return; // same/earlier — koi write nahi
+      arr[idx]={...rec, out:hhmm};
+      latest[_crmHbName]=arr;
+      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+    });
+  }catch(e){ console.log('[HB] out-time update failed:', e); }
 }
 function startCrmHeartbeat(user){
   if(_crmHbTimer) return; // already running
