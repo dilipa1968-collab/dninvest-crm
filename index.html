@@ -6646,7 +6646,7 @@ async function openSeminarFeedback(){
     +'<td style="padding:7px 8px">'+chip(r.interested)+'</td>'
     +'<td style="padding:7px 8px;max-width:140px">'+prodChips(r)+'</td>'
     +'<td style="padding:7px 8px;max-width:170px">'+refChips(r,i)+'</td>'
-    +'<td style="padding:7px 8px;white-space:nowrap"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="fbToLead('+i+')">➕ Lead</button> <button class="btn-icon" style="color:var(--red)" title="Delete response" onclick="fbDelete('+i+')">🗑️</button></td>'
+    +'<td style="padding:7px 8px;white-space:nowrap;position:sticky;right:0;background:'+(fbIntLabel(r.interested)==='Yes'?'#f4fbf6':'#fff')+';box-shadow:-6px 0 8px -5px rgba(0,0,0,.12)"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="fbToLead('+i+')">➕ Lead</button> <button class="btn-icon" style="color:var(--red)" title="Delete response" onclick="fbDelete('+i+')">🗑️</button></td>'
     +'</tr>').join('');
 
   ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(900px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()">'
@@ -6662,7 +6662,7 @@ async function openSeminarFeedback(){
     +(haan.length?'<div style="margin-bottom:10px"><button class="btn btn-teal" style="font-size:.78rem" onclick="fbAllHaanToLeads()">➕ Add all \''+'Yes'+'\' responses to Leads ('+haan.length+')</button></div>':'')
     +(resp.length
       ?'<div style="border:1px solid #eee;border-radius:8px;overflow:auto;max-height:48vh"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#f7f5fb">'
-        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;font-size:11px;color:#673ab7">ACTION</th>'
+        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;font-size:11px;color:#673ab7;position:sticky;right:0;background:#f7f5fb;box-shadow:-6px 0 8px -5px rgba(0,0,0,.12)">ACTION</th>'
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       :'<div style="text-align:center;padding:30px;color:#999">No feedback received for this seminar yet.<br><small>💬 Use the Feedback Link button to send the link to attendees.</small></div>')
     +'</div></div>';
