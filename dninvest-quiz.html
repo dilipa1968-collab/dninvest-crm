@@ -1143,6 +1143,12 @@ window.QUIZ = (function(){
 
   function C(){ return document.getElementById('qp-content'); }
 
+  // when the host has closed the quiz link, send players to the main website
+  function redirectClosed(){
+    try{ location.replace('https://dninvestment.in'); }
+    catch(e){ location.href='https://dninvestment.in'; }
+  }
+
   async function bootPlayer(){
     document.getElementById('quizPlayer').style.display='block';
     injectPlayerCSS();
@@ -1162,7 +1168,7 @@ window.QUIZ = (function(){
       player.requireMobile = !!v.requireMobile;
       var bt=document.getElementById('qp-brand-title');
       if(bt){ var t=(v.screenTitle||'').trim(); bt.textContent = t ? ('🎯 '+t) : '🎯 D N Investment'; }
-      if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
+      if(!player.linkOpen){ redirectClosed(); return; }
       var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
       if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } }
     }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } } });
@@ -1282,7 +1288,7 @@ window.QUIZ = (function(){
   function renderPlayerState(d){
     var dbg=document.getElementById('qp-debug');
     if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
-    if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
+    if(player.linkOpen===false){ redirectClosed(); return; }
     // session changed by host reset → LOG OUT this player, force fresh name entry
     if(d.sessionId && player.sessionId && d.sessionId!==player.sessionId){
       if(player.unsub){ try{ player.unsub(); }catch(e){} player.unsub=null; }
