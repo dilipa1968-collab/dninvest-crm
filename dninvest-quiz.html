@@ -62,7 +62,7 @@ input,select,textarea,button{font-family:inherit}
 <div id="quizPlayer" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);color:#fff;overflow-y:auto;padding:20px;box-sizing:border-box;font-family:inherit">
   <div style="max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column">
     <div style="text-align:center;margin:20px 0 24px">
-      <div style="font-size:1.6rem;font-weight:800;letter-spacing:.5px">🎯 D N Investment</div>
+      <div id="qp-brand-title" style="font-size:1.6rem;font-weight:800;letter-spacing:.5px">🎯 D N Investment</div>
       <div style="font-size:.85rem;color:#94a3b8;margin-top:2px">Seminar Quiz</div>
     </div>
     <div id="qp-content" style="flex:1"></div>
@@ -1160,6 +1160,8 @@ window.QUIZ = (function(){
       var v=d.data()||{};
       player.linkOpen = v.quizOpen!==false;
       player.requireMobile = !!v.requireMobile;
+      var bt=document.getElementById('qp-brand-title');
+      if(bt){ var t=(v.screenTitle||'').trim(); bt.textContent = t ? ('🎯 '+t) : '🎯 D N Investment'; }
       if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
       var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
       if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } }
