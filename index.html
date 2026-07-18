@@ -6769,6 +6769,25 @@ async function fbDelete(idx){
   }catch(e){ toast('Could not delete — please check your internet','error'); }
 }
 
+// Feedback respondent/referrer ka RM dhoondho — pehle seminar attendee se (mobile
+// match), phir existing Lead / Equity Client / MF Investor se. Yaani "jis RM ke client
+// ne response/reference diya" wahi RM. Admin entry kare tab bhi admin ka naam NAHI aata;
+// sirf actual client-owner RM. Kahin na mile to '' (caller non-admin fallback lagata hai).
+function rmForFeedbackPerson(r, s){
+  const cm=v=>String(v||'').replace(/\D/g,'').slice(-10);
+  const mob=cm(r&&r.mobile);
+  if(!mob) return '';
+  const a=s&&(s.attendees||[]).find(x=>cm(x.mobile)===mob);
+  if(a && (a.rm||'').trim()) return a.rm;
+  const l=(DB.get('leads')||[]).find(x=>cm(x.mobile)===mob);
+  if(l && (l.rm||'').trim()) return l.rm;
+  const ec=(DB.get('eq_clients')||[]).find(x=>cm(x.mobile)===mob);
+  if(ec && (ec.rm||'').trim()) return ec.rm;
+  const mc=(DB.get('mf_clients')||[]).find(x=>cm(x.mobile)===mob);
+  if(mc && (mc.rm||'').trim()) return mc.rm;
+  return '';
+}
+
 async function fbToLead(idx, silent){
   const r=(window._semFbList||[])[idx];
   if(!r) return false;
@@ -6780,11 +6799,11 @@ async function fbToLead(idx, silent){
     if((DB.get('eq_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ if(!silent) toast(r.name+' — already Equity Client','error'); return false; }
     if((DB.get('mf_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ if(!silent) toast(r.name+' — already MF Investor','error'); return false; }
   }
-  // RM: attendee list me mobile match kare to uska RM, warna current user
+  // RM: is respondent ka apna RM (attendee/lead/client se). Admin entry kare tab bhi
+  // admin ka naam NAHI — na mile to non-admin entry-karta, warna blank.
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
-  const attMatch=s?(s.attendees||[]).find(a=>cleanMob(a.mobile)===mob && mob):null;
-  const rm=normRm((attMatch&&attMatch.rm)||CU.name||'');
+  const rm=normRm(rmForFeedbackPerson(r, s) || (CU.role!=='admin' ? (CU.name||'') : ''));
   const rec={
     id:uid(), name:r.name||'', mobile:r.mobile||'', rm,
     last_call:'', next_call:'', followup_status:'Pending',
@@ -6808,12 +6827,12 @@ async function fbRefToLead(idx, refIdx){
     if((DB.get('eq_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ toast(rf.name+' — already an Equity Client','error'); return; }
     if((DB.get('mf_clients')||[]).find(c=>cleanMob(c.mobile)===mob)){ toast(rf.name+' — already an MF Investor','error'); return; }
   }
-  // RM: same logic as respondent — attendee match by respondent mobile, else current user
+  // RM: jis client (referrer r) ne reference diya, uska RM — attendee/lead/client se.
+  // Admin entry kare tab bhi admin ka naam NAHI aata; kahin na mile to non-admin
+  // entry-karta ka naam, warna blank (admin baad me assign kar de).
   const seminars=DB.get('seminars')||[];
   const s=seminars.find(x=>x.id===currentSeminarId);
-  const respMob=cleanMob(r.mobile);
-  const attMatch=s?(s.attendees||[]).find(a=>cleanMob(a.mobile)===respMob && respMob):null;
-  const rm=normRm((attMatch&&attMatch.rm)||CU.name||'');
+  const rm=normRm(rmForFeedbackPerson(r, s) || (CU.role!=='admin' ? (CU.name||'') : ''));
   const rec={
     id:uid(), name:rf.name||'', mobile:rf.mobile||'', rm,
     last_call:'', next_call:'', followup_status:'Pending',
