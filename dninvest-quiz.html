@@ -1162,8 +1162,25 @@ window.QUIZ = (function(){
       player.requireMobile = !!v.requireMobile;
       if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
       var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
-      if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } }
-    }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } } });
+      if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } }
+    }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } } });
+  }
+
+  // Auto-rejoin ONLY if the saved name belongs to the current live session
+  // (e.g. a mobile refresh mid-quiz). If the host has started a new quiz since,
+  // force the player to type their name again.
+  async function maybeAutoJoin(){
+    try{
+      var d=await DOC().get();
+      var liveSess=(d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
+      var savedSess=localStorage.getItem('dnquiz_sess')||'';
+      if(liveSess && savedSess && liveSess===savedSess){ joinAndListen(); return; }
+    }catch(e){}
+    player.name=''; player.mobile='';
+    localStorage.removeItem('dnquiz_name');
+    localStorage.removeItem('dnquiz_mobile');
+    localStorage.removeItem('dnquiz_sess');
+    renderNameForm();
   }
 
   function injectPlayerCSS(){
@@ -1234,6 +1251,7 @@ window.QUIZ = (function(){
     try{
       var d=await DOC().get();
       player.sessionId = (d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
+      try{ localStorage.setItem('dnquiz_sess', player.sessionId); }catch(e){}
       await PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() });
     }catch(e){}
     if(player.unsub) player.unsub();
@@ -1263,10 +1281,18 @@ window.QUIZ = (function(){
     var dbg=document.getElementById('qp-debug');
     if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
     if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
-    // session changed by host reset → rejoin under new session
-    if(d.sessionId && d.sessionId!==player.sessionId){
-      player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
-      try{ PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
+    // session changed by host reset → LOG OUT this player, force fresh name entry
+    if(d.sessionId && player.sessionId && d.sessionId!==player.sessionId){
+      if(player.unsub){ try{ player.unsub(); }catch(e){} player.unsub=null; }
+      try{ PLAYERS().doc(player.id).delete(); }catch(e){}
+      player.sessionId=''; player.name=''; player.mobile='';
+      player.answered=false; player.qIndex=0; player.lastGuess=null;
+      localStorage.removeItem('dnquiz_name');
+      localStorage.removeItem('dnquiz_mobile');
+      localStorage.removeItem('dnquiz_sess');
+      C().innerHTML=msgCard('🔄 <b>New Quiz Started!</b><br><br>Please Enter Your Name Again To Join.');
+      setTimeout(function(){ if(!player.name) renderNameForm(); }, 1400);
+      return;
     }
     if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; player.lastGuess=null; }
 
