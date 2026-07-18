@@ -101,6 +101,14 @@ input,select,textarea,button{font-family:inherit}
               <div style="margin-top:10px;font-size:.82rem">👥 Joined Players: <b id="quiz-player-count" style="color:var(--teal)">0</b></div>
               <div id="quiz-player-names" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
               <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Open Big Screen (LCD)</button></div>
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+                <label style="font-size:.82rem;font-weight:700;display:block;margin-bottom:5px">🖥️ Big Screen Ka Title (Upar Wala Naam)</label>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <input type="text" id="quiz-screen-title" placeholder="D N INVESTMENT" maxlength="60" style="flex:1;min-width:180px;padding:7px 9px;font-size:.85rem;border:1px solid var(--border);border-radius:6px">
+                  <button class="btn btn-teal" style="padding:7px 14px;font-size:.82rem" onclick="QUIZ.saveScreenTitle()">💾 Save</button>
+                </div>
+                <div style="font-size:.72rem;color:var(--gray);margin-top:5px">Ye naam big screen ke upar dikhega. "· QUIZ TIME ✨" apne-aap juda rahega. Sabhi devices par sync ho jayega.</div>
+              </div>
             </div>
           </div>
 
@@ -400,7 +408,17 @@ window.QUIZ = (function(){
       var v=d.data()||{};
       var cb=document.getElementById('quiz-require-mobile');
       if(cb) cb.checked = !!v.requireMobile;
+      var ti=document.getElementById('quiz-screen-title');
+      if(ti && document.activeElement!==ti) ti.value = (v.screenTitle||'');
     }, function(){});
+  }
+
+  async function saveScreenTitle(){
+    await window.waitForFdb(8000); if(!window.fdb){ alert('Connect Nahi Ho Paya. Refresh Karo.'); return; }
+    var ti=document.getElementById('quiz-screen-title');
+    var val = ti ? (ti.value||'').trim().slice(0,60) : '';
+    try{ await LINKS().set({ screenTitle: val }, {merge:true}); alert('✅ Title Save Ho Gaya. Big Screen Par Apne-Aap Update Ho Jayega.'); }
+    catch(e){ alert('Save Failed: '+(e&&e.message||e)); }
   }
 
   async function toggleRequireMobile(){
@@ -1492,7 +1510,7 @@ window.QUIZ = (function(){
       var el=document.getElementById('qs-joined-count'); if(el) el.textContent=n;
     }, function(){});
     LINKS().onSnapshot(function(d){
-      var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false;
+      var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false; screen.title = (v.screenTitle||'').trim();
       if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz Is Currently Closed</div></div>'; }
       else { DOC().get().then(function(dd){ renderScreen(dd.data()||{}); }); }
     }, function(){});
@@ -1518,7 +1536,7 @@ window.QUIZ = (function(){
     var link=joinLink();
     S().innerHTML =
       '<div style="text-align:center" class="qs-pop">'
-      + '<div style="font-size:clamp(28px,5.5vw,106px);font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 D N Investment Quiz</div>'
+      + '<div style="font-size:clamp(28px,5.5vw,106px);font-weight:900;margin-bottom:1vh;background:linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent">🎯 '+esc((screen.title||'D N Investment'))+' Quiz</div>'
       + '<div style="font-size:clamp(16px,2.4vw,46px);color:#94a3b8;margin-bottom:4vh">Scan The QR To Join From Your Phone</div>'
       + '<img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data='+encodeURIComponent(link)+'" style="width:min(30vh,70vw);height:min(30vh,70vw);background:#fff;padding:1.6vh;border-radius:2.4vh;box-shadow:0 0 8vh rgba(167,139,250,.5)">'
       + '<div style="font-size:clamp(12px,2vw,38px);margin-top:3vh;color:#e2e8f0;word-break:break-all;padding:0 4vw">'+esc(link)+'</div>'
@@ -1532,7 +1550,7 @@ window.QUIZ = (function(){
     var tag  = kind==='reveal' ? 'RESULT' : 'QUIZ TIME';
     return '<div class="qs-hero qs-pop" style="text-align:center;margin-bottom:2vh">'
       + '<div class="qs-hero-emoji">'+icon+'</div>'
-      + '<div class="qs-hero-band">✨ D N INVESTMENT &nbsp;·&nbsp; '+tag+' ✨</div>'
+      + '<div class="qs-hero-band">✨ '+esc((screen.title||'D N INVESTMENT'))+' &nbsp;·&nbsp; '+tag+' ✨</div>'
       + '</div>';
   }
 
@@ -1666,7 +1684,7 @@ window.QUIZ = (function(){
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
-    toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile
+    toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile, saveScreenTitle:saveScreenTitle
   };
 })();
 
