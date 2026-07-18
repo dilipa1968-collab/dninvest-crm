@@ -2559,7 +2559,9 @@ function renderDashboard(){
   const myAtt=att[currentUser]&&att[currentUser].find(r=>r.date===td);
   const as=document.getElementById('dash-att-status');
   if(as){
-    if(todayHoliday) as.innerHTML='🎉 Today is a holiday — '+todayHoliday;
+    as.style.display='';
+    if(isAdmin){ as.style.display='none'; as.innerHTML=''; } // Admin ka apna attendance nahi hota — ye line sirf RM ke liye
+    else if(todayHoliday) as.innerHTML='🎉 Today is a holiday — '+todayHoliday;
     else if(myAtt) as.innerHTML='✓ Today\'s attendance recorded — In: '+myAtt.in;
     else as.innerHTML='⚠ Today\'s attendance not recorded yet';
   }
