@@ -1466,7 +1466,7 @@ window.QUIZ = (function(){
   }
 
   // ─────────── BIG SCREEN (LCD / projector, display-only) ───────────
-  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, unsubPlayers:null, timer:null, ansCount:0, joinedCount:0, linkOpen:true };
+  var screen = { sessionId:'', qIndex:0, unsubDoc:null, unsubResp:null, unsubPlayers:null, timer:null, ansCount:0, joinedCount:0, linkOpen:true, lastAnnounceKey:'' };
   function isScreenMode(){ try{ return new URLSearchParams(location.search).has('screen'); }catch(e){ return false; } }
   function openScreen(){ window.open(location.origin+location.pathname+'?screen=1','_blank'); }
   function S(){ return document.getElementById('qs-content'); }
@@ -1511,6 +1511,63 @@ window.QUIZ = (function(){
       qs.appendChild(s); setTimeout(function(){ s.remove(); },5200); })(i); }
   }
 
+  // ===== Winner SOUND + Hinglish VOICE announcement (big screen only) =====
+  var _audioCtx=null, _soundArmed=false;
+  function armScreenSound(){
+    if(_soundArmed) return;
+    try{ _audioCtx = _audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if(_audioCtx.state==='suspended') _audioCtx.resume(); }catch(e){}
+    try{ if(window.speechSynthesis){ var u=new SpeechSynthesisUtterance(' '); u.volume=0; window.speechSynthesis.speak(u); } }catch(e){}
+    try{ if(window.speechSynthesis) window.speechSynthesis.getVoices(); }catch(e){}
+    _soundArmed=true;
+    var b=document.getElementById('qs-sound-btn'); if(b){ b.textContent='🔊 Sound Ready'; b.style.opacity='.55'; setTimeout(function(){ if(b) b.remove(); },1600); }
+  }
+  function playFanfare(){
+    try{
+      if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      if(_audioCtx.state==='suspended') _audioCtx.resume();
+      var ctx=_audioCtx, t0=ctx.currentTime;
+      // triumphant arpeggio: C5 E5 G5 C6
+      var notes=[[523.25,0],[659.25,0.12],[783.99,0.24],[1046.50,0.40]];
+      notes.forEach(function(n){
+        var o=ctx.createOscillator(), g=ctx.createGain();
+        o.type='triangle'; o.frequency.value=n[0];
+        var st=t0+n[1];
+        g.gain.setValueAtTime(0.0001,st);
+        g.gain.exponentialRampToValueAtTime(0.35,st+0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001,st+0.55);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(st); o.stop(st+0.6);
+      });
+    }catch(e){}
+  }
+  function _pickHiVoice(){
+    try{ var vs=window.speechSynthesis.getVoices()||[];
+      var hi=vs.filter(function(v){ return /hi[-_]IN/i.test(v.lang); }); if(hi.length) return hi[0];
+      var en=vs.filter(function(v){ return /en[-_]IN/i.test(v.lang); }); if(en.length) return en[0];
+    }catch(e){}
+    return null;
+  }
+  function speakWinner(name, secs){
+    if(!window.speechSynthesis) return;
+    try{
+      var timePart=(secs!=null)?(', sirf '+secs+' second me'):'';
+      var text='Congratulations '+name+'! Aap hain winner, first place'+timePart+'. Shabaash!';
+      var u=new SpeechSynthesisUtterance(text);
+      u.lang='hi-IN'; u.rate=0.95; u.pitch=1.05; u.volume=1;
+      var v=_pickHiVoice(); if(v) u.voice=v;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  function announceWinner(d){
+    var key=(d.sessionId||'')+'|'+(d.qIndex||'')+'|'+(d.winnerName||'');
+    if(screen.lastAnnounceKey===key) return;   // already announced this reveal → no repeat
+    screen.lastAnnounceKey=key;
+    playFanfare();
+    var secs=(d.winnerMs!=null)?(d.winnerMs/1000).toFixed(2):null;
+    setTimeout(function(){ speakWinner(d.winnerName, secs); }, 950); // let fanfare peak first
+  }
+
   var _screenRefreshAttached=false;
   function attachScreenRefreshGuards(){
     if(_screenRefreshAttached) return; _screenRefreshAttached=true;
@@ -1532,6 +1589,22 @@ window.QUIZ = (function(){
     injectScreenCSS();
     var app=document.getElementById('app'); if(app) app.style.display='none';
     var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
+    // Sound needs a one-time user gesture (browser autoplay policy). Show a small
+    // corner button + unlock on ANY click/tap/key so the winner announcement can play.
+    (function(){
+      var qs=document.getElementById('quizScreen'); if(!qs) return;
+      if(!document.getElementById('qs-sound-btn')){
+        var b=document.createElement('button'); b.id='qs-sound-btn';
+        b.textContent='🔊 Tap To Enable Sound';
+        b.style.cssText='position:fixed;right:2vw;bottom:2vh;z-index:99999;padding:10px 16px;font-size:clamp(12px,1.4vw,20px);font-weight:800;color:#0f172a;background:linear-gradient(135deg,#fbbf24,#f472b6);border:none;border-radius:999px;box-shadow:0 4px 20px rgba(0,0,0,.4);cursor:pointer';
+        b.onclick=armScreenSound;
+        qs.appendChild(b);
+      }
+      var once=function(){ armScreenSound(); };
+      window.addEventListener('pointerdown', once, {once:true});
+      window.addEventListener('keydown', once, {once:true});
+      try{ if(window.speechSynthesis){ window.speechSynthesis.onvoiceschanged=function(){ window.speechSynthesis.getVoices(); }; window.speechSynthesis.getVoices(); } }catch(e){}
+    })();
     await window.waitForFdb(9000);
     if(!window.fdb){ S().innerHTML='<div style="text-align:center;font-size:3vw">⚠️ Could Not Connect. Please Check The Network And Refresh.</div>'; return; }
     if(screen.unsubDoc) screen.unsubDoc();
@@ -1673,7 +1746,7 @@ window.QUIZ = (function(){
       + (d.question?'<div style="font-size:clamp(17px,2.4vw,46px);font-weight:800;text-align:center;line-height:1.2;color:#cbd5e1">'+esc(d.question)+'</div>':'')
       + optHtml + winnerBlock
       + '</div>';
-    if(d.winnerName) confettiBurst();
+    if(d.winnerName){ confettiBurst(); announceWinner(d); }
   }
 
   // ─────────── LINK OPEN/CLOSE (admin) ───────────
