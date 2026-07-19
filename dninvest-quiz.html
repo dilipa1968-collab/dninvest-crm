@@ -1161,7 +1161,7 @@ window.QUIZ = (function(){
       player.linkOpen = v.quizOpen!==false;
       player.requireMobile = !!v.requireMobile;
       var bt=document.getElementById('qp-brand-title'); if(bt) bt.textContent='🎯 '+((v.screenTitle||'').trim()||'D N Investment');
-      if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
+      if(!player.linkOpen){ location.replace('https://dninvestment.in'); return; } // quiz closed → website pe bhej do
       var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
       if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } }
     }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } } });
@@ -1280,7 +1280,7 @@ window.QUIZ = (function(){
   function renderPlayerState(d){
     var dbg=document.getElementById('qp-debug');
     if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
-    if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
+    if(player.linkOpen===false){ location.replace('https://dninvestment.in'); return; } // quiz closed → website pe bhej do
     // session changed by host reset → rejoin under new session
     if(d.sessionId && d.sessionId!==player.sessionId){
       player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
