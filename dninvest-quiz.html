@@ -1563,16 +1563,16 @@ window.QUIZ = (function(){
     try{
       var t=(secs!=null)?secs:null;
       var timePart=t?('सिर्फ़ '+t+' सेकंड में! '):'';
-      // Classic Hindi radio-announcer andaaz (Ameen Sayani / Annu Kapoor style flair)
+      // Annu Kapoor / Antakshari style — peppy, musical, theatrical
       var lines=[
-        'बहनों और भाइयों! जी हाँ... आज के हमारे विजेता हैं — '+name+'! '+timePart+'वाह, क्या बात है! ज़बरदस्त!',
-        'वाह वाह वाह! देखिए देखिए... पहला स्थान पाया है '+name+' ने! '+timePart+'शानदार, ज़बरदस्त, ज़िंदाबाद!',
-        'और अब वो नाम जिसका सबको इंतज़ार था... हमारे चैंपियन — '+name+'! '+timePart+'दिल थाम के तालियाँ, वाह!',
-        'जी हाँ मेरे प्यारे दोस्तों! पहले नंबर पर, धमाकेदार अंदाज़ में — '+name+'! '+timePart+'लाजवाब! बहुत बहुत मुबारक हो!'
+        'वाह वाह वाह! क्या बात है, क्या बात है! देखिए ज़रा... आज के हमारे विजेता — '+name+'! '+timePart+'क्या ख़ूब, क्या ख़ूब! ताली बजाइए!',
+        'बड़े बड़े शहरों में ऐसे विजेता कहाँ मिलते हैं जनाब! पहला स्थान — '+name+'! '+timePart+'वाह भई वाह, लाजवाब!',
+        'अरे वाह! सुनिए सुनिए... आज का सितारा, आज का चैंपियन — '+name+'! '+timePart+'क्या अंदाज़ है, दिल जीत लिया!',
+        'जी हाँ जी हाँ! तालियों की गड़गड़ाहट के साथ, पहले नंबर पर — '+name+'! '+timePart+'वाह वाह, मज़ा आ गया! बधाई हो!'
       ];
       var text=lines[Math.floor(Math.random()*lines.length)];
       var u=new SpeechSynthesisUtterance(text);
-      u.lang='hi-IN'; u.rate=0.82; u.pitch=0.95; u.volume=1; // slow + warm = theatrical
+      u.lang='hi-IN'; u.rate=0.95; u.pitch=1.15; u.volume=1; // peppy + bright = Antakshari energy
       var v=_pickHiVoice(); if(v){ u.voice=v; u.lang=v.lang; }
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
