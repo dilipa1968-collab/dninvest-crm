@@ -1,5 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/join", "destination": "/dninvest-quiz.html" }
-  ]
-}
