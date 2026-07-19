@@ -1281,8 +1281,18 @@ window.QUIZ = (function(){
     var dbg=document.getElementById('qp-debug');
     if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
     if(player.linkOpen===false){ location.replace('https://dninvestment.in'); return; } // quiz closed → website pe bhej do
-    // session changed by host reset → rejoin under new session
+    // session change: agar player pehle se kisi session me tha aur wo badal gaya =
+    // host ne RESET kiya → client ko LOGOFF karo, dubara naam daal ke join karna padega.
     if(d.sessionId && d.sessionId!==player.sessionId){
+      if(player.sessionId){
+        if(player.unsub){ player.unsub(); player.unsub=null; }
+        player.sessionId=''; player.name=''; player.mobile='';
+        player.answered=false; player.qIndex=0; player.lastGuess=null;
+        try{ localStorage.removeItem('dnquiz_name'); localStorage.removeItem('dnquiz_mobile'); }catch(e){}
+        renderNameForm();
+        return;
+      }
+      // pehli baar join: is session ko adopt karo
       player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
       try{ PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
     }
