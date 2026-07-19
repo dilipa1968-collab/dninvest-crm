@@ -1521,40 +1521,56 @@ window.QUIZ = (function(){
     _soundArmed=true;
     var b=document.getElementById('qs-sound-btn'); if(b){ b.textContent='🔊 Sound Ready'; b.style.opacity='.55'; setTimeout(function(){ if(b) b.remove(); },1600); }
   }
+  function _tone(ctx,freq,st,dur,peak,type){
+    var o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type||'triangle'; o.frequency.value=freq;
+    g.gain.setValueAtTime(0.0001,st);
+    g.gain.exponentialRampToValueAtTime(peak||0.32,st+0.025);
+    g.gain.exponentialRampToValueAtTime(0.0001,st+dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(st); o.stop(st+dur+0.05);
+  }
   function playFanfare(){
     try{
       if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       if(_audioCtx.state==='suspended') _audioCtx.resume();
-      var ctx=_audioCtx, t0=ctx.currentTime;
-      // triumphant arpeggio: C5 E5 G5 C6
-      var notes=[[523.25,0],[659.25,0.12],[783.99,0.24],[1046.50,0.40]];
-      notes.forEach(function(n){
-        var o=ctx.createOscillator(), g=ctx.createGain();
-        o.type='triangle'; o.frequency.value=n[0];
-        var st=t0+n[1];
-        g.gain.setValueAtTime(0.0001,st);
-        g.gain.exponentialRampToValueAtTime(0.35,st+0.03);
-        g.gain.exponentialRampToValueAtTime(0.0001,st+0.55);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(st); o.stop(st+0.6);
-      });
+      var ctx=_audioCtx, t=ctx.currentTime;
+      // quick rising run → big held "ta-daa" chord (game-show style)
+      var run=[[523.25,0],[587.33,0.10],[659.25,0.20],[783.99,0.30]]; // C5 D5 E5 G5
+      run.forEach(function(n){ _tone(ctx,n[0],t+n[1],0.20,0.28,'square'); });
+      // sparkle
+      _tone(ctx,1174.66,t+0.30,0.18,0.18,'triangle');
+      // final triumphant chord (C6 + E6 + G6) held
+      var chord=[1046.50,1318.51,1567.98];
+      chord.forEach(function(f){ _tone(ctx,f,t+0.46,0.90,0.30,'triangle'); });
+      _tone(ctx,523.25,t+0.46,0.90,0.22,'sine'); // low root for body
     }catch(e){}
   }
-  function _pickHiVoice(){
+  function _pickEnVoice(){
     try{ var vs=window.speechSynthesis.getVoices()||[];
-      var hi=vs.filter(function(v){ return /hi[-_]IN/i.test(v.lang); }); if(hi.length) return hi[0];
-      var en=vs.filter(function(v){ return /en[-_]IN/i.test(v.lang); }); if(en.length) return en[0];
+      // prefer a clear English voice; nudge toward well-known expressive ones
+      var pref=vs.filter(function(v){ return /Google UK English|Google US English|Daniel|Samantha|Aria|Guy|Jenny/i.test(v.name) && /^en/i.test(v.lang); });
+      if(pref.length) return pref[0];
+      var gb=vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); }); if(gb.length) return gb[0];
+      var us=vs.filter(function(v){ return /en[-_]US/i.test(v.lang); }); if(us.length) return us[0];
+      var any=vs.filter(function(v){ return /^en/i.test(v.lang); }); if(any.length) return any[0];
     }catch(e){}
     return null;
   }
   function speakWinner(name, secs){
     if(!window.speechSynthesis) return;
     try{
-      var timePart=(secs!=null)?(', sirf '+secs+' second me'):'';
-      var text='Congratulations '+name+'! Aap hain winner, first place'+timePart+'. Shabaash!';
+      var t=(secs!=null)?secs:null;
+      var lines=[
+        'And the winner is... '+name+'! '+(t?('An amazing '+t+' seconds. '):'')+'Absolutely brilliant — take a bow!',
+        'Ladies and gentlemen, your champion is '+name+'! '+(t?('First place in just '+t+' seconds. '):'')+'What a performance!',
+        'Congratulations '+name+'! You are the winner'+(t?(', locking it in at '+t+' seconds'):'')+'. Outstanding!',
+        'Give it up for '+name+'! '+(t?('Lightning fast at '+t+' seconds. '):'')+'A well deserved first place!'
+      ];
+      var text=lines[Math.floor(Math.random()*lines.length)];
       var u=new SpeechSynthesisUtterance(text);
-      u.lang='hi-IN'; u.rate=0.95; u.pitch=1.05; u.volume=1;
-      var v=_pickHiVoice(); if(v) u.voice=v;
+      u.lang='en-GB'; u.rate=0.92; u.pitch=1.1; u.volume=1;
+      var v=_pickEnVoice(); if(v){ u.voice=v; u.lang=v.lang; }
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
     }catch(e){}
