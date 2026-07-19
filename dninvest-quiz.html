@@ -59,15 +59,15 @@ input,select,textarea,button{font-family:inherit}
 <body>
 
 <!-- ══ SEMINAR QUIZ — CLIENT (PLAYER) VIEW ══ -->
-<div id="quizPlayer" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);color:#fff;overflow-y:auto;padding:20px;box-sizing:border-box;font-family:inherit">
+<div id="quizPlayer" class="qp-anim-bg" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);color:#fff;overflow-y:auto;padding:20px;box-sizing:border-box;font-family:inherit">
   <div style="max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column">
-    <div style="text-align:center;margin:20px 0 24px">
-      <div id="qp-brand-title" style="font-size:1.6rem;font-weight:800;letter-spacing:.5px">🎯 D N Investment</div>
-      <div style="font-size:.85rem;color:#94a3b8;margin-top:2px">Seminar Quiz</div>
+    <div style="text-align:center;margin:22px 0 22px">
+      <div class="qp-brand-pill"><span id="qp-brand-title">🎯 D N Investment</span></div>
+      <div style="font-size:.78rem;color:#a5b4fc;margin-top:10px;letter-spacing:.18em;font-weight:700">✨ SEMINAR QUIZ ✨</div>
     </div>
     <div id="qp-content" style="flex:1"></div>
   </div>
-  <div id="qp-debug" style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:#64748b;font-family:monospace">📡 waiting…</div>
+  <div id="qp-debug" style="display:none;position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:#64748b;font-family:monospace">📡 waiting…</div>
 </div>
 
 <!-- ══ SEMINAR QUIZ — BIG SCREEN (LCD / projector) ══ -->
@@ -1143,12 +1143,6 @@ window.QUIZ = (function(){
 
   function C(){ return document.getElementById('qp-content'); }
 
-  // when the host has closed the quiz link, send players to the main website
-  function redirectClosed(){
-    try{ location.replace('https://dninvestment.in'); }
-    catch(e){ location.href='https://dninvestment.in'; }
-  }
-
   async function bootPlayer(){
     document.getElementById('quizPlayer').style.display='block';
     injectPlayerCSS();
@@ -1166,29 +1160,11 @@ window.QUIZ = (function(){
       var v=d.data()||{};
       player.linkOpen = v.quizOpen!==false;
       player.requireMobile = !!v.requireMobile;
-      var bt=document.getElementById('qp-brand-title');
-      if(bt){ var t=(v.screenTitle||'').trim(); bt.textContent = t ? ('🎯 '+t) : '🎯 D N Investment'; }
-      if(!player.linkOpen){ redirectClosed(); return; }
+      var bt=document.getElementById('qp-brand-title'); if(bt) bt.textContent='🎯 '+((v.screenTitle||'').trim()||'D N Investment');
+      if(!player.linkOpen){ C().innerHTML=closedCard('Quiz'); return; }
       var canAutoJoin = player.name && (!player.requireMobile || player.mobile);
-      if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } }
-    }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ maybeAutoJoin(); } else { renderNameForm(); } } });
-  }
-
-  // Auto-rejoin ONLY if the saved name belongs to the current live session
-  // (e.g. a mobile refresh mid-quiz). If the host has started a new quiz since,
-  // force the player to type their name again.
-  async function maybeAutoJoin(){
-    try{
-      var d=await DOC().get();
-      var liveSess=(d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
-      var savedSess=localStorage.getItem('dnquiz_sess')||'';
-      if(liveSess && savedSess && liveSess===savedSess){ joinAndListen(); return; }
-    }catch(e){}
-    player.name=''; player.mobile='';
-    localStorage.removeItem('dnquiz_name');
-    localStorage.removeItem('dnquiz_mobile');
-    localStorage.removeItem('dnquiz_sess');
-    renderNameForm();
+      if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } }
+    }, function(){ var canAutoJoin = player.name && (!player.requireMobile || player.mobile); if(!player.started){ player.started=true; if(canAutoJoin){ joinAndListen(); } else { renderNameForm(); } } });
   }
 
   function injectPlayerCSS(){
@@ -1211,7 +1187,21 @@ window.QUIZ = (function(){
       '.qp-a{background:linear-gradient(135deg,#e21b3c,#b3132e)}.qp-b{background:linear-gradient(135deg,#1368ce,#0d4ea0)}.qp-c{background:linear-gradient(135deg,#26890c,#1c6a08)}.qp-d{background:linear-gradient(135deg,#e0a800,#c08a00)}',
       '.qp-card-wrong{background:linear-gradient(135deg,#e21b3c,#b3132e);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 28px rgba(226,27,60,.4)}',
       '.qp-card-good{background:linear-gradient(135deg,#1368ce,#0d4ea0);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 28px rgba(19,104,206,.4)}',
-      '.qp-card-neutral{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(236,72,153,.25));border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}'
+      '.qp-card-neutral{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(236,72,153,.25));border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:32px 20px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}',
+      '.qp-anim-bg{background:linear-gradient(160deg,#0b1220,#1e1b4b,#312e81,#0f172a)!important;background-size:200% 200%!important;animation:qpShellBG 16s ease infinite}',
+      '@keyframes qpShellBG{0%{background-position:0% 0%}50%{background-position:100% 100%}100%{background-position:0% 0%}}',
+      '.qp-brand-pill{display:inline-block;padding:11px 26px;border-radius:99px;font-size:1.35rem;font-weight:900;letter-spacing:.5px;color:#fff;background:linear-gradient(90deg,#6366f1,#8b5cf6,#ec4899,#6366f1);background-size:300% 100%;box-shadow:0 8px 26px rgba(139,92,246,.5);animation:qpBG 6s ease infinite}',
+      '.qp-glass{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:28px 22px;box-shadow:0 14px 36px rgba(0,0,0,.32)}',
+      '.qp-float{animation:qpFloat 2.6s ease-in-out infinite}',
+      '@keyframes qpFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}',
+      '.qp-input{width:100%;box-sizing:border-box;padding:15px;font-size:1.1rem;border-radius:14px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.09);color:#fff;text-align:center;outline:none;transition:border-color .2s,box-shadow .2s}',
+      '.qp-input::placeholder{color:rgba(255,255,255,.5)}',
+      '.qp-input:focus{border-color:#8b5cf6;box-shadow:0 0 0 4px rgba(139,92,246,.28)}',
+      '.qp-cta{width:100%;padding:16px;font-size:1.15rem;font-weight:900;border:none;border-radius:14px;background:linear-gradient(90deg,#14b8a6,#0ea5a5,#22d3ee,#14b8a6);background-size:300% 100%;color:#fff;cursor:pointer;box-shadow:0 8px 22px rgba(20,184,166,.45);animation:qpBG 6s ease infinite;transition:transform .1s}',
+      '.qp-cta:active{transform:scale(.97)}',
+      '.qp-dots span{display:inline-block;width:10px;height:10px;margin:0 4px;border-radius:50%;background:#a5b4fc;animation:qpDots 1.2s ease-in-out infinite}',
+      '.qp-dots span:nth-child(2){animation-delay:.2s}.qp-dots span:nth-child(3){animation-delay:.4s}',
+      '@keyframes qpDots{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-7px)}}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -1225,19 +1215,22 @@ window.QUIZ = (function(){
   }
 
   function msgCard(html){
-    return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px;text-align:center;font-size:1rem">'+html+'</div>';
+    return '<div class="qp-glass qp-pop" style="text-align:center;font-size:1.05rem;line-height:1.55">'+html+'</div>';
   }
 
   function renderNameForm(){
     var mobileField = player.requireMobile
-      ? '<input id="qp-mobile" type="tel" inputmode="numeric" placeholder="Mobile Number" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      ? '<input id="qp-mobile" type="tel" inputmode="numeric" placeholder="📱 Mobile Number" class="qp-input" style="margin-bottom:14px">'
       : '';
     C().innerHTML =
-      '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px">'
-      + '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;text-align:center">Enter your name</div>'
-      + '<input id="qp-name" placeholder="Name" style="width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border-radius:12px;border:none;margin-bottom:14px;text-align:center">'
+      '<div class="qp-glass qp-pop">'
+      + '<div style="text-align:center;font-size:3rem;margin-bottom:8px" class="qp-float">🎉</div>'
+      + '<div style="font-size:1.35rem;font-weight:900;text-align:center;margin-bottom:4px">Welcome!</div>'
+      + '<div style="font-size:.9rem;color:#c7d2fe;text-align:center;margin-bottom:22px">Apna naam daalein aur quiz join karein 🏆</div>'
+      + '<input id="qp-name" placeholder="👤 Aapka Naam" class="qp-input" style="margin-bottom:14px">'
       + mobileField
-      + '<button id="qp-join-btn" style="width:100%;padding:14px;font-size:1.1rem;font-weight:700;border:none;border-radius:12px;background:#14b8a6;color:#fff;cursor:pointer">Join Quiz →</button>'
+      + '<button id="qp-join-btn" class="qp-cta">Join Quiz →</button>'
+      + '<div style="text-align:center;font-size:.75rem;color:#94a3b8;margin-top:16px">🎁 Winner ko seminar me prize milega</div>'
       + '</div>';
     var inp=document.getElementById('qp-name'); if(inp) inp.focus();
     document.getElementById('qp-join-btn').onclick=async function(){
@@ -1246,7 +1239,7 @@ window.QUIZ = (function(){
       if(player.requireMobile){
         var mEl=document.getElementById('qp-mobile');
         var mv=(mEl?mEl.value:'').replace(/\D/g,'');
-        if(mv.length<10){ if(mEl){ mEl.focus(); mEl.style.background='rgba(239,68,68,.25)'; } return; }
+        if(mv.length<10){ if(mEl){ mEl.focus(); mEl.style.borderColor='#ef4444'; mEl.style.boxShadow='0 0 0 4px rgba(239,68,68,.25)'; } return; }
         player.mobile=mv; localStorage.setItem('dnquiz_mobile', mv);
       }
       player.name=v; localStorage.setItem('dnquiz_name', v);
@@ -1259,7 +1252,6 @@ window.QUIZ = (function(){
     try{
       var d=await DOC().get();
       player.sessionId = (d.exists && d.data() && d.data().sessionId) ? d.data().sessionId : '';
-      try{ localStorage.setItem('dnquiz_sess', player.sessionId); }catch(e){}
       await PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() });
     }catch(e){}
     if(player.unsub) player.unsub();
@@ -1288,25 +1280,24 @@ window.QUIZ = (function(){
   function renderPlayerState(d){
     var dbg=document.getElementById('qp-debug');
     if(dbg) dbg.textContent='📡 state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length)+' · sess ...'+String(d.sessionId||'—').slice(-5)+' | you: ...'+String(player.sessionId||'—').slice(-5);
-    if(player.linkOpen===false){ redirectClosed(); return; }
-    // session changed by host reset → LOG OUT this player, force fresh name entry
-    if(d.sessionId && player.sessionId && d.sessionId!==player.sessionId){
-      if(player.unsub){ try{ player.unsub(); }catch(e){} player.unsub=null; }
-      try{ PLAYERS().doc(player.id).delete(); }catch(e){}
-      player.sessionId=''; player.name=''; player.mobile='';
-      player.answered=false; player.qIndex=0; player.lastGuess=null;
-      localStorage.removeItem('dnquiz_name');
-      localStorage.removeItem('dnquiz_mobile');
-      localStorage.removeItem('dnquiz_sess');
-      C().innerHTML=msgCard('🔄 <b>New Quiz Started!</b><br><br>Please Enter Your Name Again To Join.');
-      setTimeout(function(){ if(!player.name) renderNameForm(); }, 1400);
-      return;
+    if(player.linkOpen===false){ C().innerHTML=closedCard('Quiz'); return; }
+    // session changed by host reset → rejoin under new session
+    if(d.sessionId && d.sessionId!==player.sessionId){
+      player.sessionId=d.sessionId; player.qIndex=0; player.answered=false;
+      try{ PLAYERS().doc(player.id).set({ name:player.name, mobile:player.mobile||'', sessionId:player.sessionId, joinedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
     }
     if(d.qIndex!==player.qIndex){ player.qIndex=d.qIndex||0; player.answered=false; player.lastGuess=null; }
 
     if(d.state==='live'){ renderLiveQuestion(d); }
     else if(d.state==='reveal'){ renderReveal(d); }
-    else { C().innerHTML=msgCard('👋 Hi <b>'+esc(player.name)+'</b>!<br><br>Waiting For The Quiz To Start…'); }
+    else {
+      C().innerHTML='<div class="qp-glass qp-pop" style="text-align:center">'
+        + '<div style="font-size:3.4rem;margin-bottom:12px" class="qp-float">⏳</div>'
+        + '<div style="font-size:1.3rem;font-weight:900;margin-bottom:6px">Hi '+esc(player.name)+'! 👋</div>'
+        + '<div style="font-size:1rem;color:#c7d2fe;margin-bottom:18px">Quiz shuru hone wala hai… ready ho jao! 🏆</div>'
+        + '<div class="qp-dots"><span></span><span></span><span></span></div>'
+        + '</div>';
+    }
   }
 
   function renderLiveQuestion(d){
