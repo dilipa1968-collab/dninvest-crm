@@ -9947,6 +9947,10 @@ async function doImport(){
   if(importData.activeTab==='contact'){ await doContactImport(); return; }
   const tab = importData.activeTab;
   const existing = DB.get('mf_clients')||[];
+  // Naam ko normalize karo: uppercase + extra spaces hatao. Isse same aadmi ki
+  // formatting-difference (double space, case) se nayi duplicate row nahi banti.
+  const nmKey = s => String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
+  const mob10 = m => String(m||'').replace(/\D/g,'').slice(-10);
   
   // Build lookup from existing clients
   // Match on identity, in order of how much we trust it:
@@ -9954,23 +9958,25 @@ async function doImport(){
   //   2. Client ID  — RTA's stable key. Also catches records poisoned by the
   //                   old wrong-column bug, whose `pan` field literally holds
   //                   a Client ID.
-  //   3. Name       — ONLY when it is unique on both sides. 20 names in the
-  //                   AUM file belong to several different people (3 different
-  //                   RAJ KUMARs). Matching those by name would write one
-  //                   person's AUM/PAN onto another. Skip and report instead.
-  const existingMap = {}, byClientId = {}, nameMap = {}, nameCount = {};
+  //   3. Mobile     — 10-digit match. AUM file me mobile nahi hota, par contact/
+  //                   dusre imports me hota hai — tab kaam aata hai. Zero risk.
+  //   4. Name       — ONLY when it is unique on both sides. Kai naam (3 alag RAJ
+  //                   KUMAR) alag-alag logon ke hain; unhe naam se match karna ek
+  //                   ka data doosre pe likh dega. Isliye skip + report.
+  const existingMap = {}, byClientId = {}, byMobile = {}, nameMap = {}, nameCount = {};
   existing.forEach(c => {
     const p = String(c.pan||'').trim().toUpperCase();
     if(p && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) existingMap[p] = c;
     if(c.client_id) byClientId[String(c.client_id).trim()] = c;
     if(/^\d{4,}$/.test(p)) byClientId[p] = c;      // legacy: Client ID stuck in the PAN field
-    const n = String(c.name||'').toUpperCase().trim();
+    const m = mob10(c.mobile); if(m.length===10) byMobile[m] = c;
+    const n = nmKey(c.name);
     if(n){ nameCount[n] = (nameCount[n]||0)+1; nameMap[n] = c; }
   });
   // How often each name appears in the uploaded file itself
   const fileNameCount = {};
   (importData.aum||[]).forEach(r => {
-    const n = String(r.name||'').toUpperCase().trim();
+    const n = nmKey(r.name);
     if(n) fileNameCount[n] = (fileNameCount[n]||0)+1;
   });
   const ambigRows = [];      // couldn't be identified safely
@@ -9990,12 +9996,12 @@ async function doImport(){
   
   if(importData.aum){
     importData.aum.forEach(row => {
-      const upName = String(row.name||'').toUpperCase().trim();
+      const upName = nmKey(row.name);
       const sipInfo = importData.sip
         ? (importData.sip[row.pan] || importData.sip['CID:'+row.client_id] || importData.sip[upName] || {})
         : {};
 
-      let ex = (row.pan && existingMap[row.pan]) || (row.client_id && byClientId[row.client_id]) || null;
+      let ex = (row.pan && existingMap[row.pan]) || (row.client_id && byClientId[row.client_id]) || (row.mobile && byMobile[mob10(row.mobile)]) || null;
       if(!ex){
         if(nameCount[upName] === 1 && fileNameCount[upName] === 1){
           ex = nameMap[upName];                       // unique on both sides — safe
@@ -10011,6 +10017,7 @@ async function doImport(){
         // Update existing
         if(row.aum || row.aum===0) ex.aum = row.aum;   // 0 is a real value, not "skip"
         ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
+        if(row.mobile && !ex.mobile) ex.mobile = mob10(row.mobile); // mobile mile aur khaali ho to bhar do
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
         ex.aum_detail = _aumDetail(row);
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
@@ -10025,7 +10032,7 @@ async function doImport(){
         if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) rm = CU.name;
         newClients.push({
           id: uid(),
-          name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:'', email:'', rm,
+          name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:(row.mobile?mob10(row.mobile):''), email:'', rm,
           status: 'Investor',
           aum: row.aum,
           aum_detail: _aumDetail(row),
