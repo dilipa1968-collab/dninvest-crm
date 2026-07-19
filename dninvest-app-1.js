@@ -9506,7 +9506,7 @@ function showSipDetails(id){
     </tr></thead><tbody>`;
   d.forEach(x=>{
     h += `<tr>
-      <td style="text-align:left">${x.scheme||'—'}${x.folio?`<div style="font-size:.7rem;opacity:.6">Folio: ${x.folio}${x.freq?' · '+x.freq:''}</div>`:''}</td>
+      <td style="text-align:left">${x.scheme||'—'}${(x.folio||x.freq||x.trxn)?`<div style="font-size:.7rem;opacity:.6">${[x.folio?'Folio: '+x.folio:'', x.freq||'', x.trxn?'Trxn: '+x.trxn:''].filter(Boolean).join(' · ')}</div>`:''}</td>
       <td style="text-align:right;font-weight:700;color:var(--teal,#0d9488);white-space:nowrap">₹${fmtNum(x.amount||0)}</td>
       <td style="text-align:center;white-space:nowrap">${x.day||'—'}</td>
     </tr>`;
@@ -9671,7 +9671,8 @@ function parseSipExcel(rows){
     amount:     ['sipmonthlyamount','monthlyamount'],
     reg_amount: ['sipregisteredamount','registeredamount'],
     count:      ['sipcount'],
-    day:        ['sipdate']
+    day:        ['sipdate'],
+    trxn:       ['siptrxnno','siptransactionno','siptrxn','trxnno','transactionno']
   };
   let hdrIdx=-1, colMap={};
   for(let i=0; i<Math.min(rows.length,15); i++){
@@ -9722,7 +9723,8 @@ function parseSipExcel(rows){
       amount: amt,
       day:    String(at(r,'day')||'').trim(),
       folio:  String(at(r,'folio')||'').trim(),
-      freq:   String(at(r,'freq')||'').trim()
+      freq:   String(at(r,'freq')||'').trim(),
+      trxn:   String(at(r,'trxn')||'').trim()
     });
   });
   Object.values(sipMap).forEach(v => v.sip_details.sort((a,b)=>(b.amount||0)-(a.amount||0)));
@@ -9951,6 +9953,12 @@ async function doImport(){
   // formatting-difference (double space, case) se nayi duplicate row nahi banti.
   const nmKey = s => String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
   const mob10 = m => String(m||'').replace(/\D/g,'').slice(-10);
+  const validPan = p => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(p||'').trim().toUpperCase());
+
+  // Snapshot each client's SIP list BEFORE any mutation — needed to diff
+  // old vs new (added / updated / closed) for the SIP upload summary.
+  const oldSipById = {};
+  if(importData.sip) existing.forEach(c=>{ oldSipById[c.id] = Array.isArray(c.sip_details) ? c.sip_details.slice() : []; });
   
   // Build lookup from existing clients
   // Match on identity, in order of how much we trust it:
@@ -9992,6 +10000,8 @@ async function doImport(){
   });
 
   let updated = 0, added = 0;
+  const sipApplied = new Set();   // client ids that got fresh SIP data this import
+  let sipAdded = 0, sipUpdated = 0, sipClosed = 0, sipClientsCleared = 0;
   const newClients = [];
   
   if(importData.aum){
@@ -10023,6 +10033,7 @@ async function doImport(){
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
         if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
         if(sipInfo.sip_details) ex.sip_details = sipInfo.sip_details;
+        if(importData.sip && (sipInfo.sip_details||sipInfo.sip_amount||sipInfo.sip_count)) sipApplied.add(ex.id);
         ex.status = 'Investor';
         newClients.push(ex);
         updated++;
@@ -10030,8 +10041,9 @@ async function doImport(){
         // Add new
         let rm = row.rm || '';
         if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) rm = CU.name;
+        const nid = uid();
         newClients.push({
-          id: uid(),
+          id: nid,
           name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:(row.mobile?mob10(row.mobile):''), email:'', rm,
           status: 'Investor',
           aum: row.aum,
@@ -10042,38 +10054,121 @@ async function doImport(){
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created: today(), updated: today()
         });
+        if(importData.sip && (sipInfo.sip_details||sipInfo.sip_amount||sipInfo.sip_count)) sipApplied.add(nid);
         added++;
       }
     });
   } else if(importData.sip){
     // SIP only
     Object.values(importData.sip).forEach(row => {
-      const ex = existingMap[row.pan] || existingMap[row.name.toUpperCase()];
+      // Client ID (stable key) pehle, phir valid PAN. Naam se match NAHI —
+      // warna same-naam alag log ka SIP ghus jata / duplicate ban jata.
+      const ex = (row.client_id && byClientId[String(row.client_id).trim()])
+              || (validPan(row.pan) && existingMap[String(row.pan).trim().toUpperCase()])
+              || null;
       if(ex){
         ex.sip_amount = row.sip_amount;
         ex.sip_count = row.sip_count;
         ex.sip_details = row.sip_details||null;
+        sipApplied.add(ex.id);
         newClients.push(ex);
         updated++;
       } else {
+        const nid = uid();
         newClients.push({
-          id: uid(), name: row.name, pan: row.pan, mobile:'', email:'', rm: (CU.role!=='admin'&&CU.role!=='backoffice'&&!CU.backoffice_access)?CU.name:(row.rm||''),
+          id: nid, name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:'', email:'', rm: (CU.role!=='admin'&&CU.role!=='backoffice'&&!CU.backoffice_access)?CU.name:(row.rm||''),
           status:'Prospect', aum:null, sip_amount:row.sip_amount, sip_count:row.sip_count, sip_details:row.sip_details||null,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created:today(), updated:today()
         });
+        sipApplied.add(nid);
         added++;
       }
     });
     // (existing clients not present in SIP file are left untouched - no need to re-push)
+  }
+
+  // ── SIP RECONCILIATION (Trxn-based) ──────────────────────────────
+  // Running SIP Report hamesha POORA SIP book hota hai. Isliye jo SIP file me
+  // nahi aaya = closed maana jayega. Do kaam:
+  //   1. Jis existing client ko upar SIP data nahi mila (sipApplied me nahi),
+  //      use strong key (Client ID / valid PAN) se dhoondo. Mila to apply karo;
+  //      warna, agar uske purane SIP the, unhe CLOSE (clear) kar do. Naam se
+  //      match NAHI karte — same-naam alag log ka SIP galti se apply/clear ho sakta.
+  //   2. Har client ka old vs new sip_details diff → added / updated / closed.
+  //      Detail key = SIP Trxn No. (jab available ho), warna Folio+Scheme.
+  //      NOTE: is update ke baad PEHLI import me purane stored SIPs me Trxn No.
+  //      nahi hoga → us ek baar closed/added count thoda inflated dikh sakta hai;
+  //      agli import se exact ho jayega (tab tak har SIP pe Trxn No. store ho chuka hoga).
+  if(importData.sip){
+    const sm = importData.sip;
+    const touchedIds = new Set(newClients.map(c=>c.id));
+
+    // (1) Apply-or-close for clients the loops above didn't already handle
+    existing.forEach(c=>{
+      if(sipApplied.has(c.id)) return;
+      const s = (c.client_id && sm['CID:'+String(c.client_id).trim()])
+             || (validPan(c.pan) && sm[String(c.pan).trim().toUpperCase()])
+             || null;
+      const hadSips = (oldSipById[c.id]||[]).length>0 || Number(c.sip_count)>0;
+      if(s){
+        c.sip_details = s.sip_details||[]; c.sip_count = s.sip_count||0; c.sip_amount = s.sip_amount||0;
+        sipApplied.add(c.id);
+        if(!touchedIds.has(c.id)){ newClients.push(c); touchedIds.add(c.id); }
+      } else if(hadSips){
+        c.sip_details = []; c.sip_count = 0; c.sip_amount = 0;
+        sipClientsCleared++;
+        if(!touchedIds.has(c.id)){ newClients.push(c); touchedIds.add(c.id); }
+      }
+    });
+
+    // (2) Per-SIP diff for the summary
+    const dkeys = arr => {
+      const out = new Map();
+      (arr||[]).forEach(x=>{
+        const base = (x.trxn && String(x.trxn).trim())
+          ? 'T:'+String(x.trxn).trim()
+          : 'F:'+String(x.folio||'').trim()+'|'+String(x.scheme||'').trim().toUpperCase();
+        let k = base, i = 1;
+        while(out.has(k)){ k = base+'#'+(i++); }   // same folio+scheme repeated
+        out.set(k, x);
+      });
+      return out;
+    };
+    const finalById = {};
+    existing.forEach(c=> finalById[c.id] = c);
+    newClients.forEach(c=> finalById[c.id] = c);
+    Object.keys(finalById).forEach(id=>{
+      const oldD = oldSipById[id] || [];
+      const newD = Array.isArray(finalById[id].sip_details) ? finalById[id].sip_details : [];
+      if(!oldD.length && !newD.length) return;
+      const ok = dkeys(oldD), nk = dkeys(newD);
+      nk.forEach((nx,k)=>{
+        if(!ok.has(k)){ sipAdded++; }
+        else {
+          const ox = ok.get(k);
+          if((Number(ox.amount)||0)!==(Number(nx.amount)||0) || String(ox.day||'')!==String(nx.day||'')) sipUpdated++;
+        }
+      });
+      ok.forEach((ox,k)=>{ if(!nk.has(k)) sipClosed++; });
+    });
   }
   
   // newClients contains only touched/new records; setClientsBulk merges
   // them into the existing local array and writes only these docs to Firestore.
   await DB.setClientsBulk('mf_clients', newClients);
   closeModal('importModal');
-  toast(`✅ Import done! ${updated} updated + ${added} new clients`
-        + (ambigRows.length ? ` — ${ambigRows.length} rows skip (same naam, 1+ log)` : ''), 'success');
+  let _imsg = `✅ Import done! ${updated} updated + ${added} new clients`;
+  if(importData.sip){
+    const _b = [];
+    if(sipAdded)   _b.push(`${sipAdded} naye`);
+    if(sipUpdated) _b.push(`${sipUpdated} update`);
+    if(sipClosed)  _b.push(`${sipClosed} closed`);
+    _imsg += ` · SIP: ` + (_b.length ? _b.join(' · ') : 'koi change nahi')
+           + (sipClientsCleared ? ` (${sipClientsCleared} client fully closed)` : '');
+  }
+  if(ambigRows.length) _imsg += ` — ${ambigRows.length} rows skip (same naam, 1+ log)`;
+  toast(_imsg, 'success');
   renderMfTable(); refreshDash(); updateBadges();
   // Anything we refused to guess at, hand back to the user with the Client ID
   // and PAN so it can be fixed by hand.
