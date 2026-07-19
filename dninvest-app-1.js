@@ -10089,6 +10089,120 @@ async function doImport(){
 }
 
 // ══════════════════════════════════════════
+// MF DUPLICATE MERGE — review-based (admin/backoffice)
+// Group key = valid PAN ELSE 10-digit mobile ELSE normalized naam. Isse alag-PAN
+// wale same-naam log ALAG group me rehte hain (galat merge se bachao). Admin har
+// group tick karke merge karta hai; AUM ka sabse bada value rakha jata hai (double
+// nahi), baaki records delete hote hain aur unke khaali fields survivor me bharte hain.
+// ══════════════════════════════════════════
+function _mfDupKey(c){
+  const p = String(c.pan||'').trim().toUpperCase();
+  if(/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) return 'P:'+p;
+  const m = String(c.mobile||'').replace(/\D/g,'').slice(-10);
+  if(m.length===10) return 'M:'+m;
+  const n = String(c.name||'').toUpperCase().replace(/\s+/g,' ').trim();
+  return n ? 'N:'+n : '';
+}
+function findMfDupGroups(){
+  const arr = DB.get('mf_clients')||[];
+  const map = {};
+  arr.forEach(c=>{ const k=_mfDupKey(c); if(!k) return; (map[k]=map[k]||[]).push(c); });
+  return Object.keys(map).filter(k=>map[k].length>1).map(k=>({key:k, recs:map[k]}));
+}
+function _mfPrimary(recs){
+  const score=c=>(
+    (String(c.pan||'').match(/^[A-Z]{5}[0-9]{4}[A-Z]$/)?8:0)
+    + (c.client_id?4:0)
+    + (String(c.mobile||'').replace(/\D/g,'').length>=10?2:0)
+    + (Number(c.aum)>0?1:0)
+  );
+  return recs.slice().sort((a,b)=> score(b)-score(a) || String(a.created||'').localeCompare(String(b.created||'')) )[0];
+}
+function openMfDupMerge(){
+  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('Ye tool sirf admin ke liye hai','error'); return; }
+  const groups = findMfDupGroups();
+  const ov=document.createElement('div');
+  ov.id='mfDupOverlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
+  let body;
+  if(!groups.length){
+    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Koi Duplicate Nahi Mila</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">Same PAN / mobile / naam wale ek se zyada MF investor nahi hain.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'mfDupOverlay\').remove()">Band Karein</button></div></div>';
+  } else {
+    let rows='';
+    groups.forEach((g,gi)=>{
+      const prim=_mfPrimary(g.recs);
+      const kind = g.key[0]==='P'?'PAN':(g.key[0]==='M'?'Mobile':'Naam');
+      let cards='';
+      g.recs.forEach(c=>{
+        const isP=c.id===prim.id;
+        const m=String(c.mobile||'').replace(/\D/g,'').slice(-10);
+        cards+='<tr style="background:'+(isP?'#ecfdf5':'#fff')+'">'
+          +'<td style="padding:5px 8px;border-top:1px solid #eee;white-space:nowrap">'+(isP?'<span style="color:#059669;font-weight:700">✔ Rakhenge</span>':'<span style="color:#b91c1c">Hatega</span>')+'</td>'
+          +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.name||'—')+'</td>'
+          +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.pan||'—')+'</td>'
+          +'<td style="padding:5px 8px;border-top:1px solid #eee">'+(m||'—')+'</td>'
+          +'<td style="padding:5px 8px;border-top:1px solid #eee;text-align:right">'+(Number(c.aum)>0?'₹'+fmtNum(Number(c.aum)):'—')+'</td>'
+          +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.rm||'—')+'</td>'
+          +'</tr>';
+      });
+      rows+='<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">'
+        +'<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">'
+        +'<input type="checkbox" class="mfdup-chk" data-key="'+esc(g.key)+'" checked> Group '+(gi+1)+' — '+g.recs.length+' records ('+kind+' same) — merge karein</label>'
+        +'<table style="width:100%;border-collapse:collapse;font-size:.8rem">'
+        +'<tr style="background:#f1f5f9;font-size:.72rem;color:#475569"><td style="padding:5px 8px">STATUS</td><td style="padding:5px 8px">NAAM</td><td style="padding:5px 8px">PAN</td><td style="padding:5px 8px">MOBILE</td><td style="padding:5px 8px;text-align:right">AUM</td><td style="padding:5px 8px">RM</td></tr>'
+        +cards+'</table></div>';
+    });
+    body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate MF Investors — Review & Merge</div>'
+      +'<button onclick="document.getElementById(\'mfDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
+      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ "Rakhenge" = jis record me sabse zyada info hai. AUM group ka <b>sabse bada</b> value rakha jayega (double nahi hoga). Baaki records delete honge, unke khaali fields (PAN/mobile/RM/remarks) survivor me bhar diye jayenge. Jise merge nahi karna, uska tick hata do.</div>'
+      +'<div style="padding:16px 18px">'+rows
+      +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
+      +'<button class="btn btn-outline" onclick="document.getElementById(\'mfDupOverlay\').remove()">Cancel</button>'
+      +'<button class="btn btn-teal" onclick="mergeMfDupsSelected()">✔ Merge Selected</button></div></div>';
+  }
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+async function mergeMfDupsSelected(){
+  const keys=[...document.querySelectorAll('.mfdup-chk')].filter(x=>x.checked).map(x=>x.getAttribute('data-key'));
+  if(!keys.length){ toast('Koi group select nahi hua','error'); return; }
+  const groups=findMfDupGroups().filter(g=>keys.includes(g.key));
+  if(!groups.length){ toast('Kuch nahi mila','error'); return; }
+  const val=v=>String(v||'').trim();
+  const survivors=[], delIds=[]; let totalDel=0;
+  groups.forEach(g=>{
+    const prim=_mfPrimary(g.recs);
+    const survivor=Object.assign({}, prim);
+    let maxAum=Number(prim.aum)||0, maxSipAmt=Number(prim.sip_amount)||0, maxSipCnt=Number(prim.sip_count)||0;
+    g.recs.forEach(c=>{
+      if(c.id===prim.id) return;
+      ['pan','client_id','mobile','email','rm','remarks','followup_status','next_call','last_call_date','last_invest_date','sip_details','aum_detail'].forEach(f=>{
+        if(!val(survivor[f]) && val(c[f])) survivor[f]=c[f];
+      });
+      maxAum=Math.max(maxAum, Number(c.aum)||0);
+      maxSipAmt=Math.max(maxSipAmt, Number(c.sip_amount)||0);
+      maxSipCnt=Math.max(maxSipCnt, Number(c.sip_count)||0);
+      delIds.push(c.id); totalDel++;
+    });
+    survivor.aum=maxAum;
+    if(maxSipAmt) survivor.sip_amount=maxSipAmt;
+    if(maxSipCnt) survivor.sip_count=maxSipCnt;
+    survivor.updated=today();
+    survivors.push(survivor);
+  });
+  if(!confirm('Confirm: '+groups.length+' group(s) merge honge, '+totalDel+' duplicate record delete honge (survivor me info jud jayegi). Aage badhein?')) return;
+  try{
+    await DB.setClientsBulk('mf_clients', survivors);
+    await DB.deleteClientsBulk('mf_clients', delIds);
+    const ovx=document.getElementById('mfDupOverlay'); if(ovx) ovx.remove();
+    toast('✅ '+groups.length+' group merge hue, '+totalDel+' duplicate hataye','success');
+    renderMfTable(); refreshDash(); updateBadges();
+  }catch(e){ toast('Merge failed: '+(e&&e.message||e),'error'); }
+}
+
+// ══════════════════════════════════════════
 // EQUITY IMPORT (Asset Value + Last Trade Date)
 // ══════════════════════════════════════════
 var eqImportData = null;
