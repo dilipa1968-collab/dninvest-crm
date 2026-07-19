@@ -1550,10 +1550,16 @@ window.QUIZ = (function(){
     try{ var vs=window.speechSynthesis.getVoices()||[];
       var hi=vs.filter(function(v){ return /hi[-_]IN/i.test(v.lang); });
       if(hi.length){
-        // prefer a male/warm hi-IN voice if the name hints at one, else first hi-IN
-        var m=hi.filter(function(v){ return /male|hemant|madhur|Google हिन्दी/i.test(v.name); });
-        return m.length?m[0]:hi[0];
+        // 1) known MALE Hindi voices first
+        var male=hi.filter(function(v){ return /hemant|madhur|ravi|prabhat|\bmale\b/i.test(v.name); });
+        if(male.length) return male[0];
+        // 2) otherwise avoid known FEMALE voices
+        var notFemale=hi.filter(function(v){ return !/kalpana|swara|kajal|female|हिन्दी/i.test(v.name); });
+        if(notFemale.length) return notFemale[0];
+        return hi[0];
       }
+      var enInM=vs.filter(function(v){ return /en[-_]IN/i.test(v.lang) && /\bmale\b|ravi|prabhat/i.test(v.name); });
+      if(enInM.length) return enInM[0];
       var enIn=vs.filter(function(v){ return /en[-_]IN/i.test(v.lang); }); if(enIn.length) return enIn[0];
     }catch(e){}
     return null;
