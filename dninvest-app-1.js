@@ -10120,6 +10120,7 @@ function _mfPrimary(recs){
 }
 function openMfDupMerge(){
   if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('Ye tool sirf admin ke liye hai','error'); return; }
+  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const groups = findMfDupGroups();
   const ov=document.createElement('div');
   ov.id='mfDupOverlay';
