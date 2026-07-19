@@ -9712,10 +9712,14 @@ function parseSipExcel(rows){
     const clientId = cidMatch ? cidMatch[1] : '';
     const amt = num(r[amtCol]);
     const cnt = parseInt(at(r,'count'))||0;
-    const key = pan || name.toUpperCase();
+    // Bucket by Client ID first — it is unique per person. A minor can carry the
+    // guardian's PAN, so keying by PAN would merge guardian+minor SIPs (double amount/count).
+    const key = clientId ? ('CID:'+clientId) : (pan || name.toUpperCase());
     if(!key) return;
     if(!sipMap[key]){ sipMap[key] = {name, pan, client_id:clientId, sip_amount:0, sip_count:0, sip_details:[]}; }
-    if(clientId && !sipMap['CID:'+clientId]) sipMap['CID:'+clientId] = sipMap[key];   // alias, same object
+    // PAN alias ONLY when there is no Client ID — otherwise a shared PAN (guardian↔minor)
+    // would point two different people at the same bucket and double their totals.
+    if(!clientId && pan && !sipMap[pan]) sipMap[pan] = sipMap[key];
     sipMap[key].sip_amount += amt;
     sipMap[key].sip_count  += cnt;
     sipMap[key].sip_details.push({
@@ -10008,10 +10012,17 @@ async function doImport(){
     importData.aum.forEach(row => {
       const upName = nmKey(row.name);
       const sipInfo = importData.sip
-        ? (importData.sip[row.pan] || importData.sip['CID:'+row.client_id] || importData.sip[upName] || {})
+        ? (importData.sip['CID:'+row.client_id] || (row.pan && importData.sip[row.pan]) || importData.sip[upName] || {})
         : {};
 
-      let ex = (row.pan && existingMap[row.pan]) || (row.client_id && byClientId[row.client_id]) || (row.mobile && byMobile[mob10(row.mobile)]) || null;
+      // AUM By Client report always carries a Client ID — the only unique key.
+      // A minor can carry the guardian's PAN, so if a row HAS a Client ID we match
+      // strictly on it (never PAN), else a minor's AUM would land on the guardian
+      // (and the guardian's own row then gets skipped as "claimed"). Fall back to
+      // PAN only for rows that genuinely lack a Client ID.
+      let ex = row.client_id
+        ? ( byClientId[String(row.client_id).trim()] || (row.mobile && byMobile[mob10(row.mobile)]) || null )
+        : ( (row.pan && existingMap[row.pan]) || (row.mobile && byMobile[mob10(row.mobile)]) || null );
       if(!ex){
         if(nameCount[upName] === 1 && fileNameCount[upName] === 1){
           ex = nameMap[upName];                       // unique on both sides — safe
