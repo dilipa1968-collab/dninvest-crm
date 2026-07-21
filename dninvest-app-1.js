@@ -2427,27 +2427,60 @@ function renderEqActivityTrend(activeEq){
   const el = document.getElementById('eqActivityTrend');
   if(!el) return;
 
+  const isAdmin = CU.role==='admin';
+
+  // Cache the full (unfiltered) raw client rows so a later click (admin
+  // RM-wise breakdown) or an RM-filter change can reuse them without
+  // recomputing/refetching.
+  window.__eqActivityAllRows = activeEq;
+  window.__eqActivityRows = activeEq; // kept for backward-compat with showEqActivityRmSplit()
+
+  // Admin-only RM filter dropdown — populate once, keep selection sticky.
+  const rmSel = document.getElementById('eqActivityRmFilter');
+  if(rmSel){
+    if(isAdmin){
+      if(!rmSel.dataset.filled){
+        const rms=[...new Set(getSegRMs('equity'))].sort((a,b)=>a.localeCompare(b));
+        rmSel.innerHTML = '<option value="">👥 All RMs</option>' + rms.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+        rmSel.dataset.filled = '1';
+      }
+      rmSel.style.display = '';
+    } else {
+      rmSel.style.display = 'none';
+      rmSel.value = '';
+    }
+  }
+  const rmFilter = (isAdmin && rmSel) ? (rmSel.value||'').trim() : '';
+
+  // Rows this render actually shows (all, or one RM if admin has filtered).
+  const rows = rmFilter
+    ? activeEq.filter(c=>(c.rm||'').trim().toUpperCase()===rmFilter.toUpperCase())
+    : activeEq;
+
   // "Kabhi trade nahi kiya" clients ka last_trade_date blank hota hai — status
   // field unhe already chhoo nahi paata (deriveEqStatus '' return karta hai jab
   // date pata nahi), isliye unhe yahan explicitly Inactive gin lete hain taaki
   // "kabhi trade nahi kiya" wale bhi is count me shamil rahein.
-  const nActive   = activeEq.filter(c=>c.status==='Active').length;
-  const nInactive = activeEq.filter(c=>c.status==='Inactive' || (!c.status && !c.last_trade_date) || (c.status!=='Active' && !c.last_trade_date)).length;
-  const total     = activeEq.length;
+  const nActive   = rows.filter(c=>c.status==='Active').length;
+  const nInactive = rows.filter(c=>c.status==='Inactive' || (!c.status && !c.last_trade_date) || (c.status!=='Active' && !c.last_trade_date)).length;
+  const total     = rows.length;
 
-  const scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
+  // The scope that gets *saved* to the shared snapshot history is always the
+  // true full-base ('ALL') or the RM's own login scope — never the admin's
+  // filter selection, so filtering never corrupts the real daily history.
+  const scope = isAdmin ? 'ALL' : (CU.id || CU.name);
   const td = today();
-  const entry = {date:td, scope, active:nActive, inactive:nInactive, total};
-
-  // Cache the raw client rows so a later click (admin RM-wise breakdown) can
-  // reuse them without recomputing/refetching.
-  window.__eqActivityRows = activeEq;
+  const entry = {date:td, scope, active:activeEq.filter(c=>c.status==='Active').length,
+    inactive:activeEq.filter(c=>c.status==='Inactive' || (!c.status && !c.last_trade_date) || (c.status!=='Active' && !c.last_trade_date)).length,
+    total:activeEq.length};
 
   // Local history (already-known snapshots) — for yesterday's diff, without
-  // waiting on the async Firestore round-trip.
+  // waiting on the async Firestore round-trip. When admin has an RM filtered,
+  // look up that RM's own scope (id) so the diff reflects that RM, not 'ALL'.
   let hist=[];
   try{ hist = JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ hist=[]; }
-  const mine = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const diffScope = rmFilter ? rmScopeIdByName(rmFilter) : scope;
+  const mine = diffScope ? hist.filter(x=>x&&x.scope===diffScope).sort((a,b)=>String(a.date).localeCompare(String(b.date))) : [];
   const yesterdayEntry = mine.filter(x=>x.date<td).slice(-1)[0] || null;
 
   const diffLabel=(cur,prev)=>{
@@ -2458,11 +2491,12 @@ function renderEqActivityTrend(activeEq){
     return `<span style="font-size:.64rem;font-weight:700;color:${up?'var(--red)':'var(--green)'}">${up?'▲':'▼'} ${Math.abs(d)} vs yesterday</span>`;
   };
 
-  const isAdmin = CU.role==='admin';
-  const cardClick = isAdmin ? 'showEqActivityRmSplit()' : 'showEqActivityHistory()';
-  const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for date-wise history';
+  const cardClick = isAdmin ? (rmFilter ? `showEqActivityHistory('${escapeHtml(rmFilter)}')` : 'showEqActivityRmSplit()') : 'showEqActivityHistory()';
+  const cardTitle = isAdmin ? (rmFilter ? `Click for ${rmFilter}'s date-wise history` : 'Click for RM-wise breakdown') : 'Click for date-wise history';
   const footerNote = isAdmin
-    ? `📅 ${fmtDate(td)} · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showEqActivityHistory()">date-wise history</span>`
+    ? (rmFilter
+        ? `📅 ${fmtDate(td)} · showing <b>${escapeHtml(rmFilter)}</b> only · click card for day-by-day history · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showEqActivityRmSplit()">all-RM split</span>`
+        : `📅 ${fmtDate(td)} · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showEqActivityHistory()">date-wise history</span>`)
     : `📅 ${fmtDate(td)} · click card for full date-wise history`;
 
   el.innerHTML = `
@@ -2480,8 +2514,25 @@ function renderEqActivityTrend(activeEq){
     </div>
     <p style="color:var(--gray);font-size:.64rem;margin-top:5px;text-align:center">${footerNote}</p>`;
 
-  // Save today's snapshot (fire-and-forget — don't block the dashboard render)
+  // Save today's TRUE (unfiltered) snapshot (fire-and-forget — don't block
+  // the dashboard render, and don't let an admin's RM filter overwrite it).
   DB.addEqActivitySnapshot(entry).catch(e=>console.log('activity snapshot save failed',e));
+}
+
+// Re-renders the Trade Activity card using already-loaded client rows when
+// admin changes the RM filter dropdown — no refetch needed.
+function onEqActivityRmFilterChange(){
+  const rows = window.__eqActivityAllRows || [];
+  renderEqActivityTrend(rows);
+}
+
+// Maps an RM's display name (as used on client records / the filter
+// dropdown) to their user id (the scope key used when that RM's own
+// dashboard saves its daily snapshot). Returns '' if not found.
+function rmScopeIdByName(name){
+  if(!name) return '';
+  const u = (DB.get('users')||[]).find(u=>u.name && u.name.trim().toUpperCase()===name.trim().toUpperCase());
+  return u ? (u.id || u.name) : '';
 }
 
 // Admin-only: RM-wise split of Active vs Inactive equity clients (opens in the
@@ -2500,18 +2551,42 @@ function showEqActivityRmSplit(){
   const table = Object.entries(rmMap).map(([rm,v])=>{
     const total = v.active+v.inactive;
     const pct = total ? Math.round(v.active/total*100)+'%' : '—';
-    return [rm, v.active, v.inactive, total, pct];
+    // RM name is clickable (where it's a real RM, not the "no RM" bucket) —
+    // jumps back to the dashboard card filtered to just that RM.
+    const rmCell = rm==='— (no RM)' ? rm
+      : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="closeModal('reportModal');filterEqActivityByRm('${escapeHtml(rm).replace(/'/g,"\\'")}')" title="Filter dashboard card to ${escapeHtml(rm)}">${escapeHtml(rm)}</span>`;
+    return [rmCell, v.active, v.inactive, total, pct];
   }).sort((a,b)=>b[3]-a[3]);
   if(!table.length){ toast('Abhi data load nahi hua — dashboard refresh kar ke dubara try karein','info'); return; }
   showReport('📊 Trade Activity — RM-wise (Active vs Inactive)', ['RM','Active','Inactive','Total','% Active'], table);
 }
 
-function showEqActivityHistory(){
-  const scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
+// Called from the RM-wise split table — sets the dashboard card's RM filter
+// to the clicked RM and scrolls back to it.
+function filterEqActivityByRm(rmName){
+  const sel = document.getElementById('eqActivityRmFilter');
+  if(sel){ sel.value = rmName; onEqActivityRmFilterChange(); }
+  const card = document.getElementById('eqActivityCard');
+  if(card) card.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+// rmName (optional, admin-only): when passed, shows that specific RM's own
+// day-by-day history (their own login scope) instead of the admin's 'ALL'
+// base-wide history. Relies on that RM having opened their dashboard on a
+// given day (which is when their own snapshot gets saved) — if an RM hasn't
+// logged in on a particular date, that date simply won't have an entry for them.
+function showEqActivityHistory(rmName){
+  let scope;
+  if(rmName){
+    scope = rmScopeIdByName(rmName);
+    if(!scope){ toast(`${rmName} ka koi history record nahi mila`,'info'); return; }
+  } else {
+    scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
+  }
   let hist=[];
   try{ hist = JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ hist=[]; }
   const rows = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  if(!rows.length){ toast('Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
+  if(!rows.length){ toast(rmName?`${rmName} ke liye abhi tak history nahi bani — unka dashboard kal khulne par ban jayegi`:'Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
   const table = rows.map((r,i)=>{
     const prev = rows[i+1]; // next row is the earlier date (desc-sorted)
     const dA = prev ? r.active-prev.active : null;
@@ -2519,7 +2594,8 @@ function showEqActivityHistory(){
     const fmtDiff = d => d==null ? '—' : d===0 ? '0' : (d>0?'▲'+d:'▼'+Math.abs(d));
     return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total];
   });
-  showReport('📊 Active/Inactive — Date-wise History'+(scope==='ALL'?' (All)':''),
+  const label = rmName ? ` (${rmName})` : (scope==='ALL'?' (All)':'');
+  showReport('📊 Active/Inactive — Date-wise History'+label,
     ['Date','Active','Δ Active','Inactive','Δ Inactive','Total'], table);
 }
 
