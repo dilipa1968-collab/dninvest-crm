@@ -2439,6 +2439,10 @@ function renderEqActivityTrend(activeEq){
   const td = today();
   const entry = {date:td, scope, active:nActive, inactive:nInactive, total};
 
+  // Cache the raw client rows so a later click (admin RM-wise breakdown) can
+  // reuse them without recomputing/refetching.
+  window.__eqActivityRows = activeEq;
+
   // Local history (already-known snapshots) — for yesterday's diff, without
   // waiting on the async Firestore round-trip.
   let hist=[];
@@ -2447,30 +2451,59 @@ function renderEqActivityTrend(activeEq){
   const yesterdayEntry = mine.filter(x=>x.date<td).slice(-1)[0] || null;
 
   const diffLabel=(cur,prev)=>{
-    if(prev==null) return '<span style="font-size:.7rem;color:var(--gray)">no data yesterday</span>';
+    if(prev==null) return '<span style="font-size:.62rem;color:var(--gray)">no data yesterday</span>';
     const d=cur-prev;
-    if(d===0) return '<span style="font-size:.72rem;color:var(--gray)">— no change vs yesterday</span>';
+    if(d===0) return '<span style="font-size:.64rem;color:var(--gray)">— no change vs yesterday</span>';
     const up=d>0;
-    return `<span style="font-size:.72rem;font-weight:700;color:${up?'var(--red)':'var(--green)'}">${up?'▲':'▼'} ${Math.abs(d)} vs yesterday</span>`;
+    return `<span style="font-size:.64rem;font-weight:700;color:${up?'var(--red)':'var(--green)'}">${up?'▲':'▼'} ${Math.abs(d)} vs yesterday</span>`;
   };
 
+  const isAdmin = CU.role==='admin';
+  const cardClick = isAdmin ? 'showEqActivityRmSplit()' : 'showEqActivityHistory()';
+  const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for date-wise history';
+  const footerNote = isAdmin
+    ? `📅 ${fmtDate(td)} · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showEqActivityHistory()">date-wise history</span>`
+    : `📅 ${fmtDate(td)} · click card for full date-wise history`;
+
   el.innerHTML = `
-    <div style="display:flex;gap:14px;flex-wrap:wrap;cursor:pointer" onclick="showEqActivityHistory()" title="Click for date-wise history">
-      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:10px;padding:10px 12px">
-        <div style="font-size:.7rem;color:var(--gray);font-weight:700">🟢 ACTIVE (traded within 1yr)</div>
-        <div style="font-size:1.5rem;font-weight:800;color:var(--green)">${nActive}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="flex:1;min-width:100px;background:#f0fdf4;border-radius:8px;padding:6px 10px">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:700">🟢 ACTIVE (traded within 1yr)</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--green);line-height:1.3">${nActive}</div>
         ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
       </div>
-      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:10px;padding:10px 12px">
-        <div style="font-size:.7rem;color:var(--gray);font-weight:700">🔴 INACTIVE (1yr+ / never traded)</div>
-        <div style="font-size:1.5rem;font-weight:800;color:var(--red)">${nInactive}</div>
+      <div style="flex:1;min-width:100px;background:#fef2f2;border-radius:8px;padding:6px 10px">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:700">🔴 INACTIVE (1yr+ / never traded)</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--red);line-height:1.3">${nInactive}</div>
         ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
       </div>
     </div>
-    <p style="color:var(--gray);font-size:.72rem;margin-top:8px;text-align:center">📅 ${fmtDate(td)} · click card for full date-wise history</p>`;
+    <p style="color:var(--gray);font-size:.64rem;margin-top:5px;text-align:center">${footerNote}</p>`;
 
   // Save today's snapshot (fire-and-forget — don't block the dashboard render)
   DB.addEqActivitySnapshot(entry).catch(e=>console.log('activity snapshot save failed',e));
+}
+
+// Admin-only: RM-wise split of Active vs Inactive equity clients (opens in the
+// shared report modal — sortable, exportable). Uses the cached rows from the
+// last renderEqActivityTrend() call so no extra data fetch is needed.
+function showEqActivityRmSplit(){
+  const rows = window.__eqActivityRows || [];
+  const rmMap = {};
+  rows.forEach(c=>{
+    const rm = c.rm || '— (no RM)';
+    if(!rmMap[rm]) rmMap[rm] = {active:0, inactive:0};
+    const isInactive = c.status==='Inactive' || (c.status!=='Active' && !c.last_trade_date);
+    if(c.status==='Active') rmMap[rm].active++;
+    else if(isInactive) rmMap[rm].inactive++;
+  });
+  const table = Object.entries(rmMap).map(([rm,v])=>{
+    const total = v.active+v.inactive;
+    const pct = total ? Math.round(v.active/total*100)+'%' : '—';
+    return [rm, v.active, v.inactive, total, pct];
+  }).sort((a,b)=>b[3]-a[3]);
+  if(!table.length){ toast('Abhi data load nahi hua — dashboard refresh kar ke dubara try karein','info'); return; }
+  showReport('📊 Trade Activity — RM-wise (Active vs Inactive)', ['RM','Active','Inactive','Total','% Active'], table);
 }
 
 function showEqActivityHistory(){
