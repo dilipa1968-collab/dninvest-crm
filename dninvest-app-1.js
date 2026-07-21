@@ -4995,7 +4995,7 @@ function clientForm(seg, c){
     </div>
     <div class="form-section">Trading Info</div>
     <div class="form-row three">
-      <div class="form-field"><label>Trading Status</label><select id="f_status"><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option><option ${c?.status==='Closed'?'selected':''}>Closed</option></select></div>
+      <div class="form-field"><label>Trading Status ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><select id="f_status" ${(CU&&CU.role==='admin')?'':'disabled title="Sirf Admin status change kar sakta hai"'}><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option><option ${c?.status==='Closed'?'selected':''}>Closed</option></select></div>
       <div class="form-field"><label>Asset Value (₹)</label><input id="f_asset" type="number" value="${c?.asset_value||''}" placeholder="e.g. 500000"></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
@@ -5047,7 +5047,7 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       ${rmFieldHtml('mf', c, 'MF RM *')}
-      <div class="form-field"><label>Investor Status</label><select id="f_status"><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
+      <div class="form-field"><label>Investor Status ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><select id="f_status" ${(CU&&CU.role==='admin')?'':'disabled title="Sirf Admin status change kar sakta hai"'}><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
     </div>
     <div class="form-row three">
       <div class="form-field"><label>🎂 Date of Birth</label><input id="f_dob" type="date" value="${c?.dob||''}" max="${today()}"></div>
