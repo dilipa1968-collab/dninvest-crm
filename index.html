@@ -990,6 +990,10 @@ input:focus, select:focus, textarea:focus{
         </div>
         <div class="stats-row" id="dashStats"></div>
         <div class="dash-grid">
+          <div class="dash-card" style="grid-column:1 / -1" id="eqActivityCard">
+            <h3>📊 Trade Activity — Active vs Inactive (1yr no-trade)</h3>
+            <div id="eqActivityTrend"></div>
+          </div>
           <div class="dash-card collapsible" id="rmEqCard">
             <h3 onclick="toggleDashCard('rmEqCard')">Equity RM — Client Count <span class="dc-count" id="rmEqCount"></span><span class="dc-chevron">▶</span></h3>
             <div class="dc-body"><div id="rmEqChart"></div></div>
