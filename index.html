@@ -991,7 +991,12 @@ input:focus, select:focus, textarea:focus{
         <div class="stats-row" id="dashStats"></div>
         <div class="dash-grid">
           <div class="dash-card" style="grid-column:1 / -1;padding:10px 14px" id="eqActivityCard">
-            <h3 style="margin-bottom:6px">📊 Trade Activity — Active vs Inactive (1yr no-trade)</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+              <h3 style="margin-bottom:0">📊 Trade Activity — Active vs Inactive (1yr no-trade)</h3>
+              <select id="eqActivityRmFilter" onclick="event.stopPropagation()" onchange="onEqActivityRmFilterChange()" style="display:none;padding:5px 10px;font-size:.76rem;font-weight:600;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--navy2);max-width:180px">
+                <option value="">👥 All RMs</option>
+              </select>
+            </div>
             <div id="eqActivityTrend"></div>
           </div>
           <div class="dash-card collapsible" id="rmEqCard">
