@@ -169,6 +169,45 @@ const DB = {
       this._alWriting=Math.max(0,this._alWriting-1);
     }
   },
+  // ── Equity Active/Inactive daily snapshot (for the dashboard trend card) ──
+  // Har din pehli baar dashboard khulne par aaj ki Active/Inactive count save
+  // hoti hai. Merge-by-(date+scope) — same din dobara refresh hone par sirf
+  // aaj ki entry update hoti hai, purani dates chhedi nahi jati (isliye kal
+  // vs aaj ka diff sahi milta hai). scope = 'ALL' (admin, poora base) ya RM
+  // ka apna id (RM apna hi trend dekhta hai) — dono independent rehte hain
+  // taaki alag-alag users ek dusre ka data overwrite na karein.
+  _easWriting:0,
+  async addEqActivitySnapshot(entry){   // entry = {date, scope, active, inactive, total}
+    const rowId = entry.date+'__'+entry.scope;
+    let local=[];
+    try{ local=JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ local=[]; }
+    const byId={}; local.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
+    byId[rowId]=entry;
+    const capSort = arr => arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
+    const merged = capSort(Object.values(byId));
+    try{ localStorage.setItem('dninvest_eq_activity_snapshots', JSON.stringify(merged)); }catch(e){}
+    if(typeof fdb==='undefined') return merged;
+    this._easWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('eq_activity_snapshots');
+      let finalData=null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        const byId2={}; latest.forEach(x=>{ if(x&&x.date&&x.scope) byId2[x.date+'__'+x.scope]=x; });
+        byId2[rowId]=entry;
+        finalData = capSort(Object.values(byId2));
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){ try{ localStorage.setItem('dninvest_eq_activity_snapshots',JSON.stringify(finalData)); }catch(e){} }
+      return finalData;
+    }catch(e){
+      console.log('Eq activity snapshot sync error:',e);
+      return merged;
+    }finally{
+      this._easWriting=Math.max(0,this._easWriting-1);
+    }
+  },
   // Append one entry to the shared append-only call_logs array WITHOUT clobbering
   // other RMs' concurrent entries. Uses a Firestore transaction (re-fetch latest,
   // merge this entry in by id, write back) — the same proven pattern as setClientsBulk.
@@ -2204,6 +2243,9 @@ function refreshDash(){
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
 
+  // Active/Inactive daily trend (1-saal se trade nahi kiya = Inactive)
+  if(hasEq) renderEqActivityTrend(activeEq);
+
   // No-call alerts (Equity)
   const noCallEq = activeEq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
     .filter(c=>c.days===null||c.days>=60)
@@ -2361,6 +2403,91 @@ function refreshDash(){
   }
 
   updateBadges();
+}
+
+// ══════════════════════════════════════════
+// EQUITY ACTIVE/INACTIVE TREND (dashboard card)
+// ══════════════════════════════════════════
+// "Inactive" yahan wahi matlab rakhta hai jo poore app me hai (EQ_INACTIVE_DAYS
+// = 365 din, dekho fixStatusByLastTrade / deriveEqStatus): jis client ne 1 saal
+// (ya usse zyada) se trade nahi kiya — ya kabhi trade hi nahi kiya (last_trade_date
+// blank) — wo is count me Inactive maana jata hai. Closed clients already
+// getActiveEqClients() se bahar reh jate hain.
+//
+// Har roz dashboard khulne par aaj ki date ke saath Active/Inactive count ek
+// chhoti si history me save hoti hai (DB.addEqActivitySnapshot — merge-by-date,
+// purani dates chhedi nahi jati). Isse:
+//   • Aaj ka number turant dikhta hai
+//   • Kal se aaj ka diff (▲/▼) turant dikhta hai
+//   • Card par click karke pura date-wise history table khul jata hai
+//
+// scope: Admin poore base ka trend dekhta hai ('ALL'), har RM apna hi trend
+// (apne CU.id se) — dono ek dusre ka data overwrite nahi karte.
+function renderEqActivityTrend(activeEq){
+  const el = document.getElementById('eqActivityTrend');
+  if(!el) return;
+
+  // "Kabhi trade nahi kiya" clients ka last_trade_date blank hota hai — status
+  // field unhe already chhoo nahi paata (deriveEqStatus '' return karta hai jab
+  // date pata nahi), isliye unhe yahan explicitly Inactive gin lete hain taaki
+  // "kabhi trade nahi kiya" wale bhi is count me shamil rahein.
+  const nActive   = activeEq.filter(c=>c.status==='Active').length;
+  const nInactive = activeEq.filter(c=>c.status==='Inactive' || (!c.status && !c.last_trade_date) || (c.status!=='Active' && !c.last_trade_date)).length;
+  const total     = activeEq.length;
+
+  const scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
+  const td = today();
+  const entry = {date:td, scope, active:nActive, inactive:nInactive, total};
+
+  // Local history (already-known snapshots) — for yesterday's diff, without
+  // waiting on the async Firestore round-trip.
+  let hist=[];
+  try{ hist = JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ hist=[]; }
+  const mine = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const yesterdayEntry = mine.filter(x=>x.date<td).slice(-1)[0] || null;
+
+  const diffLabel=(cur,prev)=>{
+    if(prev==null) return '<span style="font-size:.7rem;color:var(--gray)">no data yesterday</span>';
+    const d=cur-prev;
+    if(d===0) return '<span style="font-size:.72rem;color:var(--gray)">— no change vs yesterday</span>';
+    const up=d>0;
+    return `<span style="font-size:.72rem;font-weight:700;color:${up?'var(--red)':'var(--green)'}">${up?'▲':'▼'} ${Math.abs(d)} vs yesterday</span>`;
+  };
+
+  el.innerHTML = `
+    <div style="display:flex;gap:14px;flex-wrap:wrap;cursor:pointer" onclick="showEqActivityHistory()" title="Click for date-wise history">
+      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:10px;padding:10px 12px">
+        <div style="font-size:.7rem;color:var(--gray);font-weight:700">🟢 ACTIVE (traded within 1yr)</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--green)">${nActive}</div>
+        ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
+      </div>
+      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:10px;padding:10px 12px">
+        <div style="font-size:.7rem;color:var(--gray);font-weight:700">🔴 INACTIVE (1yr+ / never traded)</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--red)">${nInactive}</div>
+        ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
+      </div>
+    </div>
+    <p style="color:var(--gray);font-size:.72rem;margin-top:8px;text-align:center">📅 ${fmtDate(td)} · click card for full date-wise history</p>`;
+
+  // Save today's snapshot (fire-and-forget — don't block the dashboard render)
+  DB.addEqActivitySnapshot(entry).catch(e=>console.log('activity snapshot save failed',e));
+}
+
+function showEqActivityHistory(){
+  const scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
+  let hist=[];
+  try{ hist = JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ hist=[]; }
+  const rows = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  if(!rows.length){ toast('Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
+  const table = rows.map((r,i)=>{
+    const prev = rows[i+1]; // next row is the earlier date (desc-sorted)
+    const dA = prev ? r.active-prev.active : null;
+    const dI = prev ? r.inactive-prev.inactive : null;
+    const fmtDiff = d => d==null ? '—' : d===0 ? '0' : (d>0?'▲'+d:'▼'+Math.abs(d));
+    return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total];
+  });
+  showReport('📊 Active/Inactive — Date-wise History'+(scope==='ALL'?' (All)':''),
+    ['Date','Active','Δ Active','Inactive','Δ Inactive','Total'], table);
 }
 
 function sc(n,l,cls,seg){
