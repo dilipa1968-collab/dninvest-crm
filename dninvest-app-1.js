@@ -2580,11 +2580,15 @@ function filterEqActivityByRm(rmName){
 // rmName (optional): restrict to that RM's clients only — used when viewing
 // a single RM's own history rather than the admin's whole-base 'ALL' view.
 function statusChangesByDate(dateStr, rmName){
+  // Non-admin viewing their OWN dashboard calls this without an explicit
+  // rmName — must still scope to just their own clients, never the whole
+  // base. Only admin (or an explicit rmName drill-in) sees everyone/anyone.
+  const effectiveRm = rmName || (CU && CU.role!=='admin' ? CU.name : null);
   const logs = DB.get('activity_logs')||[];
   return logs.filter(l=>{
       if(l.seg!=='equity' || l.type!=='edit' || !Array.isArray(l.changes)) return false;
       if(String(l.date||'').slice(0,10)!==dateStr) return false;
-      if(rmName && (l.rm||'').trim().toUpperCase()!==rmName.trim().toUpperCase()) return false;
+      if(effectiveRm && (l.rm||'').trim().toUpperCase()!==effectiveRm.trim().toUpperCase()) return false;
       return l.changes.some(ch=>ch.field==='status');
     })
     .map(l=>{
@@ -11164,6 +11168,19 @@ async function doEqImport(){
   if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
+
+  // Import se jo bhi status auto-correct hua (jaise 1 saal purana last trade
+  // -> Inactive) usko bhi activity_logs me daalo — warna wo sirf yahan ke
+  // one-time popup me dikhta tha aur RM/Admin ke "Changed Clients" date-wise
+  // history me kabhi nahi aata tha.
+  if(statusFixes.length){
+    DB.addActivityLog(statusFixes.map(([rm,code,name,oldStatus,newStatus])=>({
+      id: uid(), type:'edit', seg:'equity',
+      client_id: (byCode[String(code).trim().toUpperCase()]||{}).id || '',
+      client_name: name, rm, by: CU.name, date: new Date().toISOString(),
+      changes: [{field:'status', old:oldStatus, new:newStatus}]
+    })));
+  }
 
   // Jo status file se theek hue (RM ne galat mark kiya tha) — unki report dikhao
   if(statusFixes.length){
