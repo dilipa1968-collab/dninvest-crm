@@ -3395,7 +3395,7 @@ function renderLeadsTable(){
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         <button class="btn-icon" onclick="convertLead('${c.id}','equity')" title="Convert to Equity Client" style="color:var(--orange)">📈</button>
         <button class="btn-icon" onclick="convertLead('${c.id}','mf')" title="Convert to MF Investor" style="color:var(--teal)">🏦</button>
-        ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteLead('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
+        ${(CU.role==='admin'||CU.role==='rm')?`<button class="btn-icon" onclick="confirmDeleteLead('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
       </td></tr>`;
   });
   h+='</tbody></table>';
