@@ -2896,8 +2896,8 @@ const COL_CFG = {
   },
   leads: {
     cont:'leads-table',
-    keys:['name','mobile','rm','calls','lastcall','nextcall','followup','remarks','source','segment','status','actions'],
-    def:{name:150,mobile:92,rm:64,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,source:80,segment:80,status:64,actions:88}
+    keys:['name','mobile','rm','source','calls','lastcall','nextcall','followup','remarks','segment','status','actions'],
+    def:{name:150,mobile:92,rm:64,source:130,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,segment:80,status:64,actions:88}
   }
 };
 function getColW(tid){
@@ -3360,12 +3360,12 @@ function renderLeadsTable(){
     ${_lSortTh(0,'Name','name')}
     ${_lSortTh(1,'Mobile','mobile')}
     ${_lSortTh(2,'RM','rm')}
+    ${CF.th('leads','source','Source')}
     <th onclick="sortLeadsTable(3)" style="cursor:pointer;white-space:nowrap">Calls${_lArrow(3)}</th>
     <th onclick="sortLeadsTable(4)" style="cursor:pointer;white-space:nowrap">Last Call${_lArrow(4)}</th>
     <th onclick="sortLeadsTable(5)" style="cursor:pointer;white-space:nowrap">Next Call${_lArrow(5)}</th>
     ${CF.th('leads','followup_status',`<span onclick="sortLeadsTable(6)" style="cursor:pointer">Follow-up${_lArrow(6)}</span>`)}
     <th onclick="sortLeadsTable(7)" style="cursor:pointer">Remarks${_lArrow(7)}</th>
-    ${CF.th('leads','source','Source')}
     ${CF.th('leads','segment','Segment')}
     ${CF.th('leads','status','Status')}
     <th>Actions</th>
@@ -3379,6 +3379,7 @@ function renderLeadsTable(){
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${c.source||''}">${c.source||'—'}</td>
       <td style="text-align:center">${(window._leadCallCounts[c.id]||0)>0
           ? `<span onclick="event.stopPropagation();viewLeadCalls('${c.id}')" title="View call history" style="cursor:pointer;background:var(--teal,#0d9488);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;font-weight:700">📞 ${window._leadCallCounts[c.id]}</span>`
           : '<span style="color:#bbb">—</span>'}</td>
@@ -3386,6 +3387,8 @@ function renderLeadsTable(){
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td>—</td>
+      <td>—</td>
       <td>
         <button class="btn-icon" onclick="editLead('${c.id}')" title="Edit">✏️</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
@@ -3430,6 +3433,9 @@ function leadForm(c){
       <option ${c?.followup_status==='Open Demat Account'?'selected':''}>Open Demat Account</option>
       <option ${c?.followup_status==='Come To Office'?'selected':''}>Come To Office</option>
     </select></div>
+  </div>
+  <div class="form-row single">
+    <div class="form-field"><label>Source</label><input id="l_source" value="${c?.source||''}" placeholder="e.g. DSP Seminar, Reference: Name, Walk-in"></div>
   </div>
   <div class="form-row single">
     <div class="form-field"><label>Remarks</label><input id="l_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
@@ -3513,6 +3519,7 @@ async function saveLead(){
   }
   const rec={
     id:newId, name, mobile:mobileRaw, rm,
+    source:gv2('l_source'),
     last_call:gv2('l_last_call'), next_call:gv2('l_next_call'), followup_status:gv2('l_followup'), remarks:gv2('l_remarks'),
     created:currentEditLeadId?undefined:today(), updated:today()
   };
@@ -4638,6 +4645,7 @@ async function fbToLead(idx, silent){
   const rm=normRm(rmForFeedbackPerson(r, s) || (CU.role!=='admin' ? (CU.name||'') : ''));
   const rec={
     id:uid(), name:r.name||'', mobile:r.mobile||'', rm,
+    source: s&&s.name?s.name:'Seminar Feedback',
     last_call:'', next_call:'', followup_status:'Pending',
     remarks:'Seminar feedback: Interested='+fbIntLabel(r.interested)+((r.products&&r.products.length)?' | Products: '+r.products.join(', '):'')+((r.topics&&r.topics.length)?' | Topic: '+r.topics.join(', '):'')+(r.comments?' | '+String(r.comments).slice(0,90):''),
     created:today(), updated:today()
@@ -4667,6 +4675,7 @@ async function fbRefToLead(idx, refIdx){
   const rm=normRm(rmForFeedbackPerson(r, s) || (CU.role!=='admin' ? (CU.name||'') : ''));
   const rec={
     id:uid(), name:rf.name||'', mobile:rf.mobile||'', rm,
+    source:'Reference: '+(r.name||''),
     last_call:'', next_call:'', followup_status:'Pending',
     remarks:'Reference from seminar feedback — referred by '+(r.name||'')+(r.mobile?' ('+r.mobile+')':'')+(s&&s.name?' | Seminar: '+s.name:''),
     created:today(), updated:today()
