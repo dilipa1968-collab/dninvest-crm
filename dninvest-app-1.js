@@ -3684,9 +3684,13 @@ async function convertLead(id,seg){
   if(seg==='mf'){ openConvertMf(id); return; }
 
   if(seg==='equity'){
-    clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Leave blank if not yet assigned)`,'');
-    if(clientCode===null) return;
-    clientCode=clientCode.trim().toUpperCase();
+    while(true){
+      clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Required — Equity conversion cannot proceed without it)`,clientCode||'');
+      if(clientCode===null) return; // user cancelled — abort conversion
+      clientCode=clientCode.trim().toUpperCase();
+      if(clientCode) break;
+      toast('Client Code is required to convert to Equity Client','error');
+    }
   }
 
   if(!confirm(`Convert "${lead.name}" to ${label}?`)) return;

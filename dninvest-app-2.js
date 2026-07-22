@@ -1445,14 +1445,28 @@ const BULK = {
         nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
       });
       if(!create.length){ toast(`Nothing shifted — ${dup} already in Equity`,'error'); return; }
+      // Client Code is mandatory for Equity — ask per record, skip any left blank.
+      const codeMap={}; let noCode=0;
+      for(const c of create){
+        let cc=null;
+        while(true){
+          cc=prompt(`Enter Client Code / UCC (Demat Account) for "${c.name}":\n(Required — Equity conversion cannot proceed without it. Cancel to skip this client.)`,'');
+          if(cc===null) break; // skip this client
+          cc=cc.trim().toUpperCase();
+          if(cc) break;
+        }
+        if(cc){ codeMap[c.id]=cc; } else { noCode++; }
+      }
+      create=create.filter(c=>codeMap[c.id]);
+      if(!create.length){ toast('Nothing shifted — no Client Code entered for any client','error'); return; }
       this.confirm('Shift MF → Equity',
-        `<b>${create.length}</b> MF client(s) will be added to Equity <i>(MF record remains — copy)</i>.<br>`
-        + `<span style="color:var(--gray)">Client Code will stay blank — add it later via edit.</span>`
-        + (dup?`<br><span style="color:var(--gray)">${dup} already in Equity — skipped.</span>`:''),
+        `<b>${create.length}</b> MF client(s) will be added to Equity <i>(MF record remains — copy)</i>.`
+        + (dup?`<br><span style="color:var(--gray)">${dup} already in Equity — skipped.</span>`:'')
+        + (noCode?`<br><span style="color:var(--orange)">⚠️ ${noCode} skipped — no Client Code entered.</span>`:''),
         '📈 Shift','', async()=>{
           const recsNew=[], logs=[];
           create.forEach(c=>{ let id=uid(); while(eq.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
-            recsNew.push({id,code:'',name:c.name,mobile:c.mobile||'',email:c.email||'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:c.last_call_date||'',next_call:'',followup_status:'',remarks:`Shifted from MF${c.pan?' (PAN: '+c.pan+')':''}`,created:today(),updated:today()});
+            recsNew.push({id,code:codeMap[c.id],name:c.name,mobile:c.mobile||'',email:c.email||'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:c.last_call_date||'',next_call:'',followup_status:'',remarks:`Shifted from MF${c.pan?' (PAN: '+c.pan+')':''}`,created:today(),updated:today()});
             logs.push({id:uid(),type:'add',seg:'equity',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
           await DB.setClientsBulk('eq_clients',recsNew);
           if(logs.length) await DB.addActivityLog(logs);
@@ -1477,16 +1491,33 @@ const BULK = {
         nameSet.add((c.name||'').trim().toUpperCase()); create.push(c);
       });
       if(!create.length){ toast(`Nothing converted — ${dup} duplicate`,'error'); return; }
+      // Client Code is mandatory for Equity — ask per lead, skip any left blank (stays in Leads).
+      const codeMap={}; let noCode=0;
+      if(!toMf){
+        for(const c of create){
+          let cc=null;
+          while(true){
+            cc=prompt(`Enter Client Code / UCC (Demat Account) for "${c.name}":\n(Required — Equity conversion cannot proceed without it. Cancel to skip this lead.)`,'');
+            if(cc===null) break; // skip this lead — stays in Leads
+            cc=cc.trim().toUpperCase();
+            if(cc) break;
+          }
+          if(cc){ codeMap[c.id]=cc; } else { noCode++; }
+        }
+        create=create.filter(c=>codeMap[c.id]);
+        if(!create.length){ toast('Nothing converted — no Client Code entered for any lead','error'); return; }
+      }
       this.confirm(`Convert Lead → ${toMf?'MF':'Equity'}`,
         `<b>${create.length}</b> lead(s) will become ${toMf?'MF Investor':'Equity Client'}s <i>(removed from the lead list — move)</i>.`
         + (toMf&&minorCount?`<br><span style="color:var(--teal)">👶 ${minorCount} lead(s) without PAN — added as Minor.</span>`:'')
-        + (dup?`<br><span style="color:var(--gray)">${dup} duplicate — skipped.</span>`:''),
+        + (dup?`<br><span style="color:var(--gray)">${dup} duplicate — skipped.</span>`:'')
+        + (!toMf&&noCode?`<br><span style="color:var(--orange)">⚠️ ${noCode} skipped — no Client Code entered.</span>`:''),
         toMf?'🏦 Convert':'📈 Convert','', async()=>{
           const recsNew=[], logs=[], movedIds=[];
           create.forEach(c=>{ let id=uid(); while(existing.some(x=>x.id===id)||recsNew.some(x=>x.id===id)) id=uid();
             let rec = toMf
               ? {id,name:c.name,mobile:c.mobile||'',pan:(c.pan||'').trim().toUpperCase(),email:'',rm:c.rm||'',status:'Prospect',is_minor:!validPan((c.pan||'').trim().toUpperCase()),aum:null,sip_amount:null,sip_count:null,last_invest_date:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()}
-              : {id,code:'',name:c.name,mobile:c.mobile||'',email:'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()};
+              : {id,code:codeMap[c.id],name:c.name,mobile:c.mobile||'',email:'',rm:c.rm||'',status:'Active',asset_value:null,revenue:null,last_trade_date:'',last_trade_month:'',last_call_date:'',next_call:c.next_call||'',followup_status:c.followup_status||'',remarks:c.remarks||'Converted from Lead',created:today(),updated:today()};
             recsNew.push(rec); movedIds.push(c.id);
             logs.push({id:uid(),type:'add',seg:toMf?'mf':'equity',client_id:id,client_name:c.name,rm:c.rm||'',by:CU.name,date:new Date().toISOString(),changes:[]}); });
           await DB.setClientsBulk(key,recsNew);
