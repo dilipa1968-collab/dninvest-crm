@@ -5275,6 +5275,7 @@ async function saveClient(){
     };
   }
 
+  let _statusChangeMsg = '';
   if(currentEditId){
     const idx=clients.findIndex(x=>x.id===currentEditId);
     if(idx>=0){
@@ -5290,6 +5291,10 @@ async function saveClient(){
         const nv = rec[f]===null||rec[f]===undefined?'':String(rec[f]);
         if(ov!==nv) changes.push({field:f, old:ov||'—', new:nv||'—'});
       });
+      // Call out status (Active/Inactive/Closed/Investor/Prospect) changes by name explicitly,
+      // so the person saving gets immediate confirmation of WHICH client's status changed.
+      const statusCh = changes.find(ch=>ch.field==='status');
+      if(statusCh) _statusChangeMsg = `✅ ${old.name}: status changed ${statusCh.old} → ${statusCh.new}`;
       if(changes.length>0){
         DB.addActivityLog({
           id: uid(),
@@ -5326,7 +5331,7 @@ async function saveClient(){
   const _savePromise = DB.setClient(key,rec);
   maybeLogMergedCall(seg, rec.id, rec.name, rec.rm);
   closeModal('clientModal');
-  toast(currentEditId?'Client updated!':'Client added!','success');
+  toast(_statusChangeMsg || (currentEditId?'Client updated!':'Client added!'),'success');
   const pg = getCurrentPageId();
   // Instantly refresh whatever list is visible — especially the Follow-ups page,
   // which this save path previously never re-rendered, so an edited row lingered
