@@ -3378,7 +3378,7 @@ function renderLeadsTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td class="lead-source-cell" data-lid="${c.id}">
-        <span class="ls-view" onclick="editLeadSourceInline('${c.id}')" style="cursor:pointer;max-width:100px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;margin-right:8px" title="${(c.source||'').replace(/"/g,'&quot;')}">${c.source||'—'}</span>
+        <span class="ls-view" onclick="editLeadSourceInline('${c.id}')" style="cursor:pointer;max-width:90px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;margin-right:16px" title="${(c.source||'').replace(/"/g,'&quot;')}">${c.source||'—'}</span>
         <button class="btn-icon" style="padding:0 2px;font-size:.7rem" title="Edit Source" onclick="editLeadSourceInline('${c.id}')">✏️</button>
       </td>
       <td style="text-align:center">${(window._leadCallCounts[c.id]||0)>0
@@ -3389,13 +3389,11 @@ function renderLeadsTable(){
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
       <td>
-        <div style="display:flex;align-items:center;gap:9px">
         <button class="btn-icon" onclick="editLead('${c.id}')" title="Edit">✏️</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
         <button class="btn-icon" onclick="convertLead('${c.id}','equity')" title="Convert to Equity Client" style="color:var(--orange)">📈</button>
         <button class="btn-icon" onclick="convertLead('${c.id}','mf')" title="Convert to MF Investor" style="color:var(--teal)">🏦</button>
         ${CU.role==='admin'?`<button class="btn-icon" onclick="confirmDeleteLead('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
-        </div>
       </td></tr>`;
   });
   h+='</tbody></table>';
