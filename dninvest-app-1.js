@@ -3466,9 +3466,6 @@ function leadForm(c){
     </select></div>
   </div>
   <div class="form-row single">
-    <div class="form-field"><label>Source</label><input id="l_source" value="${c?.source||''}" placeholder="e.g. DSP Seminar, Reference: Name, Walk-in"></div>
-  </div>
-  <div class="form-row single">
     <div class="form-field"><label>Remarks</label><input id="l_remarks" value="${c?.remarks||''}" placeholder="Any remarks"></div>
   </div>
   ${callMergeSection()}`;
@@ -3550,7 +3547,7 @@ async function saveLead(){
   }
   const rec={
     id:newId, name, mobile:mobileRaw, rm,
-    source:gv2('l_source'),
+    source:(currentEditLeadId?leads.find(x=>x.id===currentEditLeadId)?.source:'')||'',
     last_call:gv2('l_last_call'), next_call:gv2('l_next_call'), followup_status:gv2('l_followup'), remarks:gv2('l_remarks'),
     created:currentEditLeadId?undefined:today(), updated:today()
   };
