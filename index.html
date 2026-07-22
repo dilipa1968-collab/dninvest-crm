@@ -1136,6 +1136,9 @@ input:focus, select:focus, textarea:focus{
           <div class="tab-item" onclick="switchTab('eqf','upcoming')">🔜 Upcoming (7d)</div>
           <div class="tab-item" onclick="switchTab('eqf','all')">📋 All Pending</div>
         </div>
+        <div class="filters" style="padding:8px 16px 0">
+          <select id="eqf-rm" onchange="renderFollowup('eqf')" style="display:none;min-width:160px"><option value="">👥 All RMs</option></select>
+        </div>
         <div id="eqf-content"></div>
       </div>
 
@@ -1254,6 +1257,9 @@ input:focus, select:focus, textarea:focus{
           <div class="tab-item" onclick="switchTab('mff','overdue')">🔴 Overdue</div>
           <div class="tab-item" onclick="switchTab('mff','upcoming')">🔜 Upcoming (7d)</div>
           <div class="tab-item" onclick="switchTab('mff','all')">📋 All Pending</div>
+        </div>
+        <div class="filters" style="padding:8px 16px 0">
+          <select id="mff-rm" onchange="renderFollowup('mff')" style="display:none;min-width:160px"><option value="">👥 All RMs</option></select>
         </div>
         <div id="mff-content"></div>
       </div>

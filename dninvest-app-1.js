@@ -7085,8 +7085,28 @@ function renderFollowup(group){
   try{
   const seg=group==='eqf'?'equity':'mf';
   const tab=group==='eqf'?activeEqfTab:activeMffTab;
-  const clients=group==='eqf'?getActiveEqClients():getMyMfClients();
+  let clients=group==='eqf'?getActiveEqClients():getMyMfClients();
   const t=today(), t7=addDays(t,7);
+
+  // Admin-only RM filter dropdown — populate once, keep selection sticky
+  // (same pattern used on No-Trade Alerts and the Trade Activity card).
+  const isAdmin = CU.role==='admin';
+  const rmSel = document.getElementById(group+'-rm');
+  if(rmSel){
+    if(isAdmin){
+      if(!rmSel.dataset.filled){
+        const rms=[...new Set(getSegRMs(seg))].sort((a,b)=>a.localeCompare(b));
+        rmSel.innerHTML = '<option value="">👥 All RMs</option>' + rms.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+        rmSel.dataset.filled = '1';
+      }
+      rmSel.style.display = '';
+    } else {
+      rmSel.style.display = 'none';
+      rmSel.value = '';
+    }
+  }
+  const rmFilter = (isAdmin && rmSel) ? (rmSel.value||'').trim() : '';
+  if(rmFilter) clients = clients.filter(c=>(c.rm||'').trim().toUpperCase()===rmFilter.toUpperCase());
 
   let data;
   if(tab==='today') data=clients.filter(c=>c.next_call&&c.next_call<=t);
