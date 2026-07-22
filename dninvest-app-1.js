@@ -2658,18 +2658,15 @@ function showEqActivityHistory(rmName){
     const fmtDiff = d => d==null ? '—' : d===0 ? '0' : (d>0?'▲'+d:'▼'+Math.abs(d));
     const changed = statusChangesByDate(r.date, rmName);
     const rmArg = rmName ? `'${escapeHtml(rmName).replace(/'/g,"\\'")}'` : '';
-    // If there IS a Δ (active/inactive count moved) but no logged entry exists
-    // for that date, the change almost certainly happened before this audit
-    // trail was switched on (or through a path that wasn't logged at the
-    // time) — offer a best-guess shortlist instead of a dead-end "—".
-    const hasDelta = (dA!=null && dA!==0) || (dI!=null && dI!==0);
+    // Offer the best-guess finder whenever we don't have a logged, named list
+    // — this covers both "Δ moved but no log entry" AND "no valid baseline
+    // yet to even compute a Δ" (e.g. an RM's very first tracked day), so RM
+    // and Admin both get a way to find the client, not just a dead-end "—".
     let changedCell;
     if(changed.length){
       changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showStatusChangeDrilldown('${r.date}',${rmArg})" title="Click to see client names">${changed.length} client${changed.length>1?'s':''} ▶</span>`;
-    } else if(hasDelta){
-      changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--orange,#D97706)" onclick="showLikelyStatusFlipCandidates(${rmArg})" title="No log entry for this date (change happened before tracking was on) — best-guess shortlist">🔍 find (no log)</span>`;
     } else {
-      changedCell = '—';
+      changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--orange,#D97706)" onclick="showLikelyStatusFlipCandidates(${rmArg})" title="No log entry for this date — best-guess shortlist of clients near the 1-year no-trade mark">🔍 find</span>`;
     }
     return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total, changedCell];
   });
