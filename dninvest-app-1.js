@@ -7116,11 +7116,14 @@ function renderFollowup(group){
 
   const cont=document.getElementById(group+'-content');
   if(!cont) return;
+  const countEl=document.getElementById(group+'-count');
 
   if(!data.length){
+    if(countEl) countEl.textContent='0 clients';
     cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--gray)">✅ No ${tab} follow-ups</div>`;
     return;
   }
+  if(countEl) countEl.textContent=data.length+' client'+(data.length===1?'':'s');
 
   const tableKey=group+'-fu';
   data = applySort(data, tableKey, {
