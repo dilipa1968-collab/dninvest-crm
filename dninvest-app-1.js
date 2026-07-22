@@ -3379,7 +3379,10 @@ function renderLeadsTable(){
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${c.source||''}">${c.source||'—'}</td>
+      <td class="lead-source-cell" data-lid="${c.id}">
+        <span class="ls-view" onclick="editLeadSourceInline('${c.id}')" style="cursor:pointer;max-width:110px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${(c.source||'').replace(/"/g,'&quot;')}">${c.source||'—'}</span>
+        <button class="btn-icon" style="padding:0 2px;font-size:.7rem" title="Edit Source" onclick="editLeadSourceInline('${c.id}')">✏️</button>
+      </td>
       <td style="text-align:center">${(window._leadCallCounts[c.id]||0)>0
           ? `<span onclick="event.stopPropagation();viewLeadCalls('${c.id}')" title="View call history" style="cursor:pointer;background:var(--teal,#0d9488);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;font-weight:700">📞 ${window._leadCallCounts[c.id]}</span>`
           : '<span style="color:#bbb">—</span>'}</td>
@@ -3402,6 +3405,36 @@ function renderLeadsTable(){
   enableColResize('leads');
   BULK.afterRender('leads');
   renderPg('leads',data.length,leadsPage);
+}
+
+// Inline edit — Source cell in Leads table (click text or ✏️, Enter/blur saves, Esc cancels)
+function editLeadSourceInline(id){
+  const td=document.querySelector(`td.lead-source-cell[data-lid="${id}"]`);
+  if(!td || td.querySelector('input')) return;
+  const leads=DB.get('leads')||[];
+  const lead=leads.find(x=>x.id===id);
+  if(!lead) return;
+  const cur=lead.source||'';
+  td.innerHTML=`<input type="text" value="${cur.replace(/"/g,'&quot;')}" placeholder="e.g. DSP Seminar, Reference: Name" style="width:100%;min-width:110px;font-size:.8rem;padding:3px 6px;border:1px solid var(--teal);border-radius:5px;outline:none">`;
+  const inp=td.querySelector('input');
+  inp.focus(); inp.select();
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); inp.blur(); }
+    else if(e.key==='Escape'){ e.preventDefault(); renderLeadsTable(); }
+  });
+  inp.addEventListener('blur',()=>saveLeadSourceInline(id, inp.value));
+}
+
+async function saveLeadSourceInline(id, val){
+  const leads=DB.get('leads')||[];
+  const lead=leads.find(x=>x.id===id);
+  if(!lead) return;
+  const newVal=(val||'').trim();
+  if(newVal===(lead.source||'')){ renderLeadsTable(); return; }
+  lead.source=newVal; lead.updated=today();
+  await DB.setClient('leads', lead);
+  toast('Source updated','success');
+  renderLeadsTable();
 }
 
 function leadForm(c){
