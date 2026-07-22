@@ -208,6 +208,27 @@ const DB = {
       this._easWriting=Math.max(0,this._easWriting-1);
     }
   },
+  // localStorage-only history (addEqActivitySnapshot) sirf UNHI snapshots se
+  // bharta hai jo isi browser/device se save hue hon — agar RM kal kisi doosre
+  // device se login kiya tha ya cache clear ho gaya, toh yahan "kal" ka data
+  // dikhega hi nahi chahe Firestore me maujood ho. Ye ek-baar-per-session
+  // Firestore se poora shared doc khींch kar local cache ko top-up karta hai
+  // taaki "vs yesterday" kisi bhi device pe sahi dikhe.
+  async fetchEqActivitySnapshots(){
+    if(typeof fdb==='undefined') return null;
+    try{
+      const doc = await fdb.collection('crm_data').doc('eq_activity_snapshots').get();
+      if(!doc.exists || !doc.data() || !Array.isArray(doc.data().data)) return null;
+      const remote = doc.data().data;
+      let local=[];
+      try{ local=JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ local=[]; }
+      const byId={}; local.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
+      remote.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
+      const merged = Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
+      try{ localStorage.setItem('dninvest_eq_activity_snapshots', JSON.stringify(merged)); }catch(e){}
+      return merged;
+    }catch(e){ console.log('Eq activity snapshot fetch error:',e); return null; }
+  },
   // Append one entry to the shared append-only call_logs array WITHOUT clobbering
   // other RMs' concurrent entries. Uses a Firestore transaction (re-fetch latest,
   // merge this entry in by id, write back) — the same proven pattern as setClientsBulk.
@@ -2517,6 +2538,17 @@ function renderEqActivityTrend(activeEq){
   // Save today's TRUE (unfiltered) snapshot (fire-and-forget — don't block
   // the dashboard render, and don't let an admin's RM filter overwrite it).
   DB.addEqActivitySnapshot(entry).catch(e=>console.log('activity snapshot save failed',e));
+
+  // One-time-per-session top-up from Firestore: local cache only has
+  // snapshots this exact browser has ever written, so a device Puja hasn't
+  // used before (or a cleared cache) shows "no data yesterday" even though
+  // her scope's data exists in the shared doc. Pull it once and re-render.
+  if(!window.__easSynced){
+    window.__easSynced = true;
+    DB.fetchEqActivitySnapshots().then(merged=>{
+      if(merged && window.__eqActivityAllRows) renderEqActivityTrend(window.__eqActivityAllRows);
+    });
+  }
 }
 
 // Re-renders the Trade Activity card using already-loaded client rows when
