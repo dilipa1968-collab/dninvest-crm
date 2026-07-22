@@ -2481,7 +2481,7 @@ function renderEqActivityTrend(activeEq){
   try{ hist = JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ hist=[]; }
   const diffScope = rmFilter ? rmScopeIdByName(rmFilter) : scope;
   const mine = diffScope ? hist.filter(x=>x&&x.scope===diffScope).sort((a,b)=>String(a.date).localeCompare(String(b.date))) : [];
-  const yesterdayEntry = mine.filter(x=>x.date<td).slice(-1)[0] || null;
+  const yesterdayEntry = mine.filter(x=>x.date<td && x.total>0).slice(-1)[0] || null;
 
   const diffLabel=(cur,prev)=>{
     if(prev==null) return '<span style="font-size:.62rem;color:var(--gray)">no data yesterday</span>';
@@ -2649,8 +2649,12 @@ function showEqActivityHistory(rmName){
   if(!rows.length){ toast(rmName?`${rmName} ke liye abhi tak history nahi bani — unka dashboard kal khulne par ban jayegi`:'Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
   const table = rows.map((r,i)=>{
     const prev = rows[i+1]; // next row is the earlier date (desc-sorted)
-    const dA = prev ? r.active-prev.active : null;
-    const dI = prev ? r.inactive-prev.inactive : null;
+    // A snapshot with total===0 is a placeholder/incomplete day (e.g. this
+    // RM's scope had no reliable data yet) — treat it like "no data", not a
+    // real baseline, so it doesn't produce a fake ▲198-style delta.
+    const prevValid = (prev && prev.total>0) ? prev : null;
+    const dA = prevValid ? r.active-prevValid.active : null;
+    const dI = prevValid ? r.inactive-prevValid.inactive : null;
     const fmtDiff = d => d==null ? '—' : d===0 ? '0' : (d>0?'▲'+d:'▼'+Math.abs(d));
     const changed = statusChangesByDate(r.date, rmName);
     const rmArg = rmName ? `'${escapeHtml(rmName).replace(/'/g,"\\'")}'` : '';
