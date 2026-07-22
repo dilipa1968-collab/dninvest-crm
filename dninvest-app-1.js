@@ -3685,11 +3685,12 @@ async function convertLead(id,seg){
 
   if(seg==='equity'){
     while(true){
-      clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Required — Equity conversion cannot proceed without it)`,clientCode||'');
+      clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Required — numbers only, no letters)`,clientCode||'');
       if(clientCode===null) return; // user cancelled — abort conversion
-      clientCode=clientCode.trim().toUpperCase();
-      if(clientCode) break;
-      toast('Client Code is required to convert to Equity Client','error');
+      clientCode=clientCode.trim();
+      if(!clientCode){ toast('Client Code is required to convert to Equity Client','error'); continue; }
+      if(!/^[0-9]+$/.test(clientCode)){ toast('Client Code must be numbers only (no letters)','error'); clientCode=''; continue; }
+      break;
     }
   }
 

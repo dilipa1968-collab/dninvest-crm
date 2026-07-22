@@ -1450,10 +1450,12 @@ const BULK = {
       for(const c of create){
         let cc=null;
         while(true){
-          cc=prompt(`Enter Client Code / UCC (Demat Account) for "${c.name}":\n(Required — Equity conversion cannot proceed without it. Cancel to skip this client.)`,'');
+          cc=prompt(`Enter Client Code / UCC (Demat Account) for "${c.name}":\n(Required — numbers only, no letters. Cancel to skip this client.)`,'');
           if(cc===null) break; // skip this client
-          cc=cc.trim().toUpperCase();
-          if(cc) break;
+          cc=cc.trim();
+          if(!cc) continue;
+          if(!/^[0-9]+$/.test(cc)){ alert('Client Code must be numbers only (no letters)'); cc=null; continue; }
+          break;
         }
         if(cc){ codeMap[c.id]=cc; } else { noCode++; }
       }
@@ -1497,10 +1499,12 @@ const BULK = {
         for(const c of create){
           let cc=null;
           while(true){
-            cc=prompt(`Enter Client Code / UCC (Demat Account) for "${c.name}":\n(Required — Equity conversion cannot proceed without it. Cancel to skip this lead.)`,'');
+            cc=prompt(`Enter Client Code / UCC (Demat Account) for "${c.name}":\n(Required — numbers only, no letters. Cancel to skip this lead.)`,'');
             if(cc===null) break; // skip this lead — stays in Leads
-            cc=cc.trim().toUpperCase();
-            if(cc) break;
+            cc=cc.trim();
+            if(!cc) continue;
+            if(!/^[0-9]+$/.test(cc)){ alert('Client Code must be numbers only (no letters)'); cc=null; continue; }
+            break;
           }
           if(cc){ codeMap[c.id]=cc; } else { noCode++; }
         }
