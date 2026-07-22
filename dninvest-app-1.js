@@ -2896,8 +2896,8 @@ const COL_CFG = {
   },
   leads: {
     cont:'leads-table',
-    keys:['name','mobile','rm','source','calls','lastcall','nextcall','followup','remarks','segment','status','actions'],
-    def:{name:150,mobile:92,rm:64,source:130,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,segment:80,status:64,actions:88}
+    keys:['name','mobile','rm','source','calls','lastcall','nextcall','followup','remarks','actions'],
+    def:{name:150,mobile:92,rm:64,source:130,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,actions:88}
   }
 };
 function getColW(tid){
@@ -3366,12 +3366,10 @@ function renderLeadsTable(){
     <th onclick="sortLeadsTable(5)" style="cursor:pointer;white-space:nowrap">Next Call${_lArrow(5)}</th>
     ${CF.th('leads','followup_status',`<span onclick="sortLeadsTable(6)" style="cursor:pointer">Follow-up${_lArrow(6)}</span>`)}
     <th onclick="sortLeadsTable(7)" style="cursor:pointer">Remarks${_lArrow(7)}</th>
-    ${CF.th('leads','segment','Segment')}
-    ${CF.th('leads','status','Status')}
     <th>Actions</th>
   </tr></thead><tbody>`;
 
-  if(!rows.length) h+=`<tr><td colspan="13" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
+  if(!rows.length) h+=`<tr><td colspan="11" style="text-align:center;padding:36px;color:#bbb">No leads. <a href="#" onclick="openAddLead()" style="color:var(--teal)">Add one?</a></td></tr>`;
 
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
@@ -3390,8 +3388,6 @@ function renderLeadsTable(){
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span></td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
-      <td>—</td>
-      <td>—</td>
       <td>
         <button class="btn-icon" onclick="editLead('${c.id}')" title="Edit">✏️</button>
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon" title="WhatsApp">💬</a>`:''}
