@@ -3675,102 +3675,92 @@ async function confirmConvertLeadMf(){
 }
 
 async function convertLead(id,seg){
+  if(seg==='mf'){ openConvertMf(id); return; }
+  if(seg==='equity'){ openConvertEq(id); return; }
+}
+
+// Lead → Equity conversion via colorful modal (Client Code / UCC, numbers only, RM shown clearly)
+let _ceqLeadId=null;
+function openConvertEq(id){
   const leads=DB.get('leads')||[];
   const lead=leads.find(x=>x.id===id);
   if(!lead) return;
-  const label = seg==='equity'?'Equity Client':'MF Investor';
+  _ceqLeadId=id;
+  document.getElementById('ceq-name').textContent=lead.name;
+  document.getElementById('ceq-rm').textContent=lead.rm||'— (no RM assigned)';
+  const inp=document.getElementById('ceq-code');
+  inp.value='';
+  inp.style.borderColor='';
+  const warn=document.getElementById('ceq-code-warn'); if(warn) warn.style.display='none';
+  document.getElementById('convertEqModal').classList.add('open');
+  setTimeout(()=>inp.focus(),100);
+}
 
-  let pan='', clientCode='', isMinor=false;
-  if(seg==='mf'){ openConvertMf(id); return; }
+function ceqCodeInput(el){
+  const cleaned=el.value.replace(/[^0-9]/g,'');
+  const warn=document.getElementById('ceq-code-warn');
+  if(el.value!==cleaned && warn){ warn.style.display=''; } else if(warn){ warn.style.display='none'; }
+  el.value=cleaned;
+  el.style.borderColor = cleaned ? 'var(--teal)' : '';
+}
 
-  if(seg==='equity'){
-    while(true){
-      clientCode=prompt(`Enter Client Code / UCC (Demat Account) for "${lead.name}":\n(Required — numbers only, no letters)`,clientCode||'');
-      if(clientCode===null) return; // user cancelled — abort conversion
-      clientCode=clientCode.trim();
-      if(!clientCode){ toast('Client Code is required to convert to Equity Client','error'); continue; }
-      if(!/^[0-9]+$/.test(clientCode)){ toast('Client Code must be numbers only (no letters)','error'); clientCode=''; continue; }
-      break;
-    }
-  }
+async function confirmConvertLeadEq(){
+  const id=_ceqLeadId; if(!id) return;
+  const leads=DB.get('leads')||[];
+  const lead=leads.find(x=>x.id===id);
+  if(!lead){ closeModal('convertEqModal'); return; }
 
-  if(!confirm(`Convert "${lead.name}" to ${label}?`)) return;
+  const inp=document.getElementById('ceq-code');
+  let clientCode=(inp.value||'').trim();
+  if(!clientCode){ inp.style.borderColor='var(--red)'; toast('Client Code is required to convert to Equity Client','error'); return; }
+  if(!/^[0-9]+$/.test(clientCode)){ inp.style.borderColor='var(--red)'; toast('Client Code must be numbers only (no letters)','error'); return; }
 
-  const key=seg==='equity'?'eq_clients':'mf_clients';
-  const clients=DB.get(key)||[];
-
-  // Duplicate check - MF: PAN se, Equity: Client Code se
-  if(seg==='mf' && pan && !isMinor){
-    const dupPan=clients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
-    if(dupPan){
-      const asMinor = confirm(`⚠️ This PAN already belongs to "${dupPan.name}".\n\nIf "${lead.name}" is a MINOR investing under this person (guardian), you can still add them.\n\nOK = add as Minor (guardian's PAN)\nCancel = stop`);
-      if(!asMinor) return;
-      isMinor = true;
-    }
-  }
-  if(seg==='equity' && clientCode){
-    const dupCode=clients.find(c=>c.code && c.code.trim().toUpperCase()===clientCode);
-    if(dupCode){ toast(`⚠️ Already exists as Equity Client: "${dupCode.name}" (Code: ${dupCode.code})`,'error'); return; }
-  }
+  const clients=DB.get('eq_clients')||[];
+  const dupCode=clients.find(c=>c.code && c.code.trim()===clientCode);
+  if(dupCode){ toast(`⚠️ Already exists as Equity Client: "${dupCode.name}" (Code: ${dupCode.code})`,'error'); return; }
 
   let newId=uid();
   while(clients.some(x=>x.id===newId)) newId=uid();
-
-  let rec;
-  if(seg==='equity'){
-    rec={
-      id:newId, code:clientCode, name:lead.name, mobile:lead.mobile, email:'',
-      rm:lead.rm, status:'Active',
-      asset_value:null, revenue:null,
-      last_trade_date:'', last_trade_month:'',
-      last_call_date:'', next_call:lead.next_call,
-      followup_status:lead.followup_status, remarks:lead.remarks,
-      created:today(), updated:today()
-    };
-  } else {
-    rec={
-      id:newId, name:lead.name, mobile:lead.mobile, pan, email:'',
-      rm:lead.rm, status:'Prospect', is_minor:isMinor,
-      aum:null, sip_amount:null, sip_count:null,
-      last_invest_date:'', last_call_date:'',
-      next_call:lead.next_call, followup_status:lead.followup_status, remarks:lead.remarks,
-      created:today(), updated:today()
-    };
-  }
-
-  await DB.setClient(key,rec);
+  const rec={
+    id:newId, code:clientCode, name:lead.name, mobile:lead.mobile, email:'',
+    rm:lead.rm, status:'Active',
+    asset_value:null, revenue:null,
+    last_trade_date:'', last_trade_month:'',
+    last_call_date:'', next_call:lead.next_call,
+    followup_status:lead.followup_status, remarks:lead.remarks,
+    created:today(), updated:today()
+  };
+  await DB.setClient('eq_clients',rec);
 
   // Equity: Add "Open Demat Account" entry in New Business
-  if(seg==='equity'){
-    try{
-      let biz = DB.get('mf_business');
-      // Support both old array format and new object format
-      let mfEntries = Array.isArray(biz) ? biz : (biz?.entries || []);
-      let eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries || []);
-      eqEntries.push({
-        id: uid(),
-        client_id: newId,
-        client_name: lead.name,
-        client_code: clientCode||'',
-        rm: lead.rm,
-        type: 'Open Demat Account',
-        date: today(),
-        mobile: lead.mobile||'',
-        remarks: 'Converted from Lead',
-        created_by: CU.name,
-        created: today(),
-        status: CU.role==='admin' ? 'Approved' : 'Pending',
-        decline_reason: ''
-      });
-      const newBiz = { entries: mfEntries, eq_entries: eqEntries };
-      await DB.set('mf_business', newBiz);
-    }catch(e){ console.error('eq new business entry error',e); }
-  }
+  try{
+    let biz = DB.get('mf_business');
+    let mfEntries = Array.isArray(biz) ? biz : (biz?.entries || []);
+    let eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries || []);
+    eqEntries.push({
+      id: uid(),
+      client_id: newId,
+      client_name: lead.name,
+      client_code: clientCode,
+      rm: lead.rm,
+      type: 'Open Demat Account',
+      date: today(),
+      mobile: lead.mobile||'',
+      remarks: 'Converted from Lead',
+      created_by: CU.name,
+      created: today(),
+      status: CU.role==='admin' ? 'Approved' : 'Pending',
+      decline_reason: ''
+    });
+    const newBiz = { entries: mfEntries, eq_entries: eqEntries };
+    await DB.set('mf_business', newBiz);
+  }catch(e){ console.error('eq new business entry error',e); }
 
   await DB.deleteClient('leads',id);
-  toast(`Lead converted to ${label}${seg==='equity'?' — Demat entry added in New Business!':''}!`,'success');
+  closeModal('convertEqModal');
+  toast(`✅ "${lead.name}" converted to Equity Client — Demat entry added in New Business!`,'success');
   renderLeadsTable();
-  if(seg==='equity') renderEqTable(); else renderMfTable();
+  renderEqTable();
   refreshDash();
   updateBadges();
 }

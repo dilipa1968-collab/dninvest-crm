@@ -2243,6 +2243,33 @@ input:focus, select:focus, textarea:focus{
     </div>
   </div>
 </div>
+
+<div class="modal-overlay" id="convertEqModal" onclick="if(event.target===this)closeModal('convertEqModal')">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr" style="background:linear-gradient(90deg,var(--orange) 0%,#e08a2e 60%,var(--gold) 100%)">
+      <h3 style="color:#fff">📈 Convert Lead → Equity Client</h3>
+      <button class="modal-close" onclick="closeModal('convertEqModal')" style="color:#fff">×</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div style="font-size:.85rem;color:var(--gray);margin-bottom:10px">
+        Converting <b id="ceq-name" style="color:var(--navy)"></b> to Equity Client. <span style="color:var(--orange)">The lead will be removed from the list.</span>
+      </div>
+      <div style="background:var(--teal2);border:1px solid var(--teal);border-radius:8px;padding:8px 12px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:1.1rem">👤</span>
+        <span style="font-size:.82rem;color:var(--navy)">Relationship Manager: <b id="ceq-rm" style="color:var(--teal)"></b></span>
+      </div>
+      <div class="form-field" style="margin-bottom:4px">
+        <label style="color:var(--orange);font-weight:800">Client Code / UCC <span style="color:var(--red)">(required — numbers only)</span></label>
+        <input type="text" id="ceq-code" inputmode="numeric" maxlength="20" oninput="ceqCodeInput(this)" placeholder="e.g. 123456" style="font-size:1.05rem;font-weight:700;letter-spacing:1px;border:2px solid var(--border);border-radius:8px;padding:8px 10px">
+        <div id="ceq-code-warn" style="display:none;color:var(--red);font-size:.75rem;margin-top:4px">⚠️ Letters/symbols not allowed — only numbers</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-outline" onclick="closeModal('convertEqModal')">Cancel</button>
+        <button class="btn" style="background:var(--orange);color:#fff" onclick="confirmConvertLeadEq()">✅ Convert</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeModal('userModal')">
   <div class="modal">
     <div class="modal-hdr">
