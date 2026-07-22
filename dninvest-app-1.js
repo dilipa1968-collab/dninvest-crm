@@ -4470,6 +4470,7 @@ async function openSeminarFeedback(){
     +'<td style="padding:7px 8px;white-space:nowrap;color:#888">'+(r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'')+'</td>'
     +'<td style="padding:7px 8px;font-weight:600">'+esc(r.name)+'</td>'
     +'<td style="padding:7px 8px">'+esc(r.mobile)+'</td>'
+    +'<td style="padding:7px 8px">'+(r.rm?'<span style="background:#e0f7fc;color:#0891b2;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600">'+esc(r.rm)+'</span>':'<span style="color:#ccc;font-size:.72rem">—</span>')+'</td>'
     +'<td style="padding:7px 8px;white-space:nowrap">'+stars(r.rating)+'</td>'
     +'<td style="padding:7px 8px;white-space:nowrap">'+stars(r.contentRating)+'</td>'
     +'<td style="padding:7px 8px">'+chip(r.interested)+'</td>'
@@ -4491,7 +4492,7 @@ async function openSeminarFeedback(){
     +(haan.length?'<div style="margin-bottom:10px"><button class="btn btn-teal" style="font-size:.78rem" onclick="fbAllHaanToLeads()">➕ Add all \''+'Yes'+'\' responses to Leads ('+haan.length+')</button></div>':'')
     +(resp.length
       ?'<div style="border:1px solid #eee;border-radius:8px;overflow:auto;max-height:48vh"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#f7f5fb">'
-        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;font-size:11px;color:#673ab7;position:sticky;right:0;background:#f7f5fb;box-shadow:-6px 0 8px -5px rgba(0,0,0,.12)">ACTION</th>'
+        +'<th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">DATE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">NAME</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">MOBILE</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">RM</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">EXP.</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">CONTENT</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">INTERESTED</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">PRODUCTS</th><th style="padding:8px;text-align:left;font-size:11px;color:#673ab7">REFERENCES</th><th style="padding:8px;font-size:11px;color:#673ab7;position:sticky;right:0;background:#f7f5fb;box-shadow:-6px 0 8px -5px rgba(0,0,0,.12)">ACTION</th>'
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       :'<div style="text-align:center;padding:30px;color:#999">No feedback received for this seminar yet.<br><small>💬 Use the Feedback Link button to send the link to attendees.</small></div>')
     +'</div></div>';
@@ -4548,7 +4549,7 @@ function fbExportExcel(){
 
   const respRows=list.map(r=>[
     r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'',
-    r.name||'', r.mobile||'',
+    r.name||'', r.mobile||'', r.rm||'',
     starTxt(r.rating), starTxt(r.contentRating),
     fbIntLabel(r.interested),
     (r.products||[]).join(', '),
@@ -4573,6 +4574,7 @@ function fbExportExcel(){
         {header:'DATE', width:13, align:'center', color:()=>({bg:'FFEFF3F8',font:'FF334155'})},
         {header:'NAME', width:22, color:()=>({bg:'FFF0EBF8',font:'FF4C2889'})},
         {header:'MOBILE', width:13, align:'center', color:()=>({bg:'FFE8F0FE',font:'FF1E40AF'})},
+        {header:'RM', width:14, align:'center', color:()=>({bg:'FFE0F7FC',font:'FF0891B2'})},
         {header:'OVERALL EXPERIENCE\nHOW WAS THE SEMINAR? (1\u20135 \u2605)', width:24, align:'center', color:ratingColor},
         {header:'CONTENT QUALITY\nHOW USEFUL WAS THE CONTENT? (1\u20135 \u2605)', width:26, align:'center', color:ratingColor},
         {header:'INTERESTED', width:13, align:'center', color:intColor},
@@ -4603,6 +4605,7 @@ async function fbDelete(idx){
 // ne response/reference diya" wahi RM. Admin entry kare tab bhi admin ka naam NAHI aata;
 // sirf actual client-owner RM. Kahin na mile to '' (caller non-admin fallback lagata hai).
 function rmForFeedbackPerson(r, s){
+  if(r && (r.rm||'').trim()) return r.rm.trim();
   const cm=v=>String(v||'').replace(/\D/g,'').slice(-10);
   const mob=cm(r&&r.mobile);
   if(!mob) return '';

@@ -200,6 +200,24 @@ select:focus{ border-color:var(--accent,var(--purple)); box-shadow:0 0 0 3px var
     <div class="err">⚠ Please select a seminar</div>
   </div>
 
+  <div class="card focus-ring" id="q-rm">
+    <div class="q-label">Who is your Relationship Manager (RM)?<span class="star">*</span></div>
+    <select id="f-rm">
+      <option value="">-- Select RM --</option>
+      <option>Anjali</option>
+      <option>Bharat</option>
+      <option>Khokhan</option>
+      <option>Komal</option>
+      <option>Megha</option>
+      <option>Puja</option>
+      <option>Raju</option>
+      <option>Riya</option>
+      <option>Rohit</option>
+      <option value="__notsure">Not sure / don't know</option>
+    </select>
+    <div class="err">⚠ Please select your RM</div>
+  </div>
+
   <div class="card" id="q-rating">
     <div class="q-label">How was your overall seminar experience?<span class="star">*</span></div>
     <div class="scale" id="scale-rating"></div>
@@ -368,6 +386,7 @@ async function submitForm(){
   const mobile=document.getElementById('f-mobile').value.trim();
   const semEl=document.getElementById('f-seminar');
   const semVal=(semEl.value||'').trim();
+  const rmVal=(document.getElementById('f-rm').value||'').trim();
   const rating=(document.querySelector('input[name=f-rating]:checked')||{}).value||'';
   const content=(document.querySelector('input[name=f-content]:checked')||{}).value||'';
   const interest=(document.querySelector('input[name=f-interest]:checked')||{}).value||'';
@@ -390,6 +409,7 @@ async function submitForm(){
   bad=markErr('q-name',!name)||bad;
   bad=markErr('q-mobile',!(mobile.length===10))||bad;
   bad=markErr('q-seminar',!semVal)||bad;
+  bad=markErr('q-rm',!rmVal)||bad;
   bad=markErr('q-rating',!rating)||bad;
   bad=markErr('q-content',!content)||bad;
   bad=markErr('q-interest',!interest)||bad;
@@ -400,6 +420,7 @@ async function submitForm(){
     name, mobile,
     seminarId: sem?sem.id:'',
     seminarName: sem?(sem.name+' ('+(sem.date||'')+')'):(semVal==='__other'?'Other':semVal),
+    rm: rmVal==='__notsure'?'':rmVal,
     rating:Number(rating), contentRating:Number(content),
     interested:interest, products,
     references,
@@ -423,6 +444,7 @@ function clearForm(){
   document.getElementById('f-name').value='';
   document.getElementById('f-mobile').value='';
   const s=document.getElementById('f-seminar'); if(s.tagName==='SELECT') s.value=''; else s.value='';
+  const rmSel=document.getElementById('f-rm'); if(rmSel) rmSel.value='';
   const pob=document.getElementById('f-product-other'); if(pob) pob.value='';
   const pobx=document.getElementById('prod-other-box'); if(pobx) pobx.style.display='none';
   document.querySelectorAll('#refRows .ref-row').forEach((row,i)=>{ if(i===0){ row.querySelectorAll('input').forEach(inp=>inp.value=''); } else row.remove(); });
@@ -457,16 +479,17 @@ function renderResponses(){
   const stars=n=>'★'.repeat(n||0)+'☆'.repeat(5-(n||0));
   document.getElementById('respCount').textContent=list.length+' response(s)'+(f?' — '+f:'');
   document.getElementById('respTable').innerHTML=
-    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>References</th></tr>'+
+    '<tr><th>Date</th><th>Name</th><th>Mobile</th><th>Seminar</th><th>RM</th><th>Exp.</th><th>Content</th><th>Interested</th><th>Products</th><th>References</th></tr>'+
     (list.map(r=>`<tr>
       <td style="white-space:nowrap">${r.ts?new Date(r.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''}</td>
       <td><b>${esc(r.name)}</b></td><td>${esc(r.mobile)}</td><td>${esc(r.seminarName)}</td>
+      <td>${esc(r.rm)||'<span style="color:#999">—</span>'}</td>
       <td style="color:#f59e0b;white-space:nowrap">${stars(r.rating)}</td>
       <td style="color:#f59e0b;white-space:nowrap">${stars(r.contentRating)}</td>
       <td>${chip(r.interested)}</td>
       <td style="font-size:11.5px">${(r.products||[]).map(p=>'<span style="display:inline-block;background:#f0ebf8;color:#673ab7;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(p)+'</span>').join('')||''}</td>
       <td style="font-size:11.5px">${(r.references||[]).map(rf=>'<span style="display:inline-block;background:#fdf2f8;color:#be185d;padding:1px 8px;border-radius:10px;margin:1px;font-size:10.5px">'+esc(rf.name)+(rf.mobile?' · '+esc(rf.mobile):'')+'</span>').join('')||''}</td>
-    </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
+    </tr>`).join('')||'<tr><td colspan="10" style="text-align:center;padding:24px;color:#999">No responses yet</td></tr>');
 }
 function _valStyle(v){
   return ({5:{bg:'DCFCE7',tx:'166534'},4:{bg:'CCFBF1',tx:'115E59'},3:{bg:'DBEAFE',tx:'1E40AF'},2:{bg:'FEF3C7',tx:'92400E'},1:{bg:'FEE2E2',tx:'991B1B'}})[v]||null;
@@ -480,7 +503,7 @@ function exportExcel(){
   const INT={Haan:{l:'Yes ✓',bg:'DCFCE7',tx:'166534'},Shayad:{l:'Maybe',bg:'FEF3C7',tx:'92400E'},Nahi:{l:'No',bg:'FEE2E2',tx:'991B1B'}};
   const thin={style:'thin',color:{rgb:'E2E8F0'}}, border={top:thin,bottom:thin,left:thin,right:thin};
 
-  const headers=['Date','Name','Mobile','Seminar','Experience','Content','Interested','Products','References'];
+  const headers=['Date','Name','Mobile','Seminar','RM','Experience','Content','Interested','Products','References'];
   const aoa=[headers]; const sMap={}; const put=(r,c,s)=>sMap[r+'_'+c]=s;
   // header style
   headers.forEach((h,c)=>put(0,c,{font:{bold:true,sz:11,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'1E3A8A'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:border}));
@@ -492,7 +515,7 @@ function exportExcel(){
     const intO=INT[r.interested]||null;
     aoa.push([
       r.ts?new Date(r.ts).toLocaleString('en-IN'):'',
-      r.name||'', r.mobile||'', r.seminarName||'',
+      r.name||'', r.mobile||'', r.seminarName||'', r.rm||'',
       expL, conL, (intO?intO.l:(r.interested||'')),
       (r.products||[]).join(', '),
       (r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')
@@ -500,16 +523,16 @@ function exportExcel(){
     // zebra base for whole row
     const zebra=(i%2===1)?'F8FAFC':'FFFFFF';
     for(let c=0;c<headers.length;c++){
-      put(R,c,{fill:{patternType:'solid',fgColor:{rgb:zebra}},font:{sz:10,color:{rgb:'1F2937'}},alignment:{vertical:'center',wrapText:(c>=7),horizontal:(c===0||c===2?'center':'left')},border:border});
+      put(R,c,{fill:{patternType:'solid',fgColor:{rgb:zebra}},font:{sz:10,color:{rgb:'1F2937'}},alignment:{vertical:'center',wrapText:(c>=8),horizontal:(c===0||c===2?'center':'left')},border:border});
     }
-    // colored cells: Experience(4), Content(5), Interested(6)
-    const es=_valStyle(r.rating); if(es) put(R,4,{fill:{patternType:'solid',fgColor:{rgb:es.bg}},font:{sz:10,bold:true,color:{rgb:es.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
-    const cs=_valStyle(r.contentRating); if(cs) put(R,5,{fill:{patternType:'solid',fgColor:{rgb:cs.bg}},font:{sz:10,bold:true,color:{rgb:cs.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
-    if(intO) put(R,6,{fill:{patternType:'solid',fgColor:{rgb:intO.bg}},font:{sz:10,bold:true,color:{rgb:intO.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
+    // colored cells: Experience(5), Content(6), Interested(7)
+    const es=_valStyle(r.rating); if(es) put(R,5,{fill:{patternType:'solid',fgColor:{rgb:es.bg}},font:{sz:10,bold:true,color:{rgb:es.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
+    const cs=_valStyle(r.contentRating); if(cs) put(R,6,{fill:{patternType:'solid',fgColor:{rgb:cs.bg}},font:{sz:10,bold:true,color:{rgb:cs.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
+    if(intO) put(R,7,{fill:{patternType:'solid',fgColor:{rgb:intO.bg}},font:{sz:10,bold:true,color:{rgb:intO.tx}},alignment:{horizontal:'center',vertical:'center'},border:border});
   });
 
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:18},{wch:20},{wch:13},{wch:26},{wch:14},{wch:14},{wch:10},{wch:36},{wch:34}];
+  ws['!cols']=[{wch:18},{wch:20},{wch:13},{wch:26},{wch:12},{wch:14},{wch:14},{wch:10},{wch:36},{wch:34}];
   ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:aoa.length-1,c:headers.length-1}})};
   ws['!freeze']={xSplit:0,ySplit:1};
   Object.keys(sMap).forEach(k=>{ const p=k.split('_'); const a=XLSX.utils.encode_cell({r:+p[0],c:+p[1]}); if(!ws[a])ws[a]={t:'s',v:''}; ws[a].s=sMap[k]; });
@@ -520,8 +543,8 @@ function exportCSVFallback(){
   const f=document.getElementById('respFilter').value;
   const list=f?RESP.filter(r=>r.seminarName===f):RESP;
   const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-  const rows=[['Date','Name','Mobile','Seminar','Experience(1-5)','Content(1-5)','Interested','Products','References']]
-    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')]));
+  const rows=[['Date','Name','Mobile','Seminar','RM','Experience(1-5)','Content(1-5)','Interested','Products','References']]
+    .concat(list.map(r=>[r.ts?new Date(r.ts).toLocaleString('en-IN'):'',r.name,r.mobile,r.seminarName,r.rm,r.rating,r.contentRating,r.interested,(r.products||[]).join(', '),(r.references||[]).map(rf=>rf.name+(rf.mobile?' — '+rf.mobile:'')).join('; ')]));
   const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
