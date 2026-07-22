@@ -2615,6 +2615,26 @@ function showStatusChangeDrilldown(dateStr, rmName){
   }
 }
 
+// Fallback for dates where the ▲/▼ count moved but no activity_log entry
+// exists (change happened before audit logging was switched on, or through
+// an untracked path). Shortlists Inactive clients whose last trade date is
+// right around the 365-day cutoff — the client that silently crossed over
+// is almost always in this narrow list, so admin/RM can eyeball and confirm.
+function showLikelyStatusFlipCandidates(rmName){
+  const eq = (DB.get('eq_clients')||[]).filter(c=>c.status==='Inactive');
+  const effectiveRm = rmName || (CU && CU.role!=='admin' ? CU.name : null);
+  const scoped = effectiveRm ? eq.filter(c=>(c.rm||'').trim().toUpperCase()===effectiveRm.trim().toUpperCase()) : eq;
+  const rows = scoped.map(c=>({...c, days:daysDiff(c.last_trade_date)}))
+    .filter(c=>c.days!=null && c.days>=EQ_INACTIVE_DAYS+1 && c.days<=EQ_INACTIVE_DAYS+10)
+    .sort((a,b)=>a.days-b.days)
+    .map(c=>[c.rm||'—', c.code||'', c.name, fmtDate(c.last_trade_date)||'—', c.days+'d ago']);
+  if(!rows.length){
+    toast('Koi exact match nahi mila is threshold ke aas-paas — is client ka status kisi aur wajah se badla hoga','info');
+    return;
+  }
+  showReport('🔍 Likely Client — crossed 1-year no-trade mark recently (best guess)', ['RM','Code','Name','Last Trade','Days Ago'], rows);
+}
+
 function showEqActivityHistory(rmName){
   let scope;
   if(rmName){
@@ -2634,9 +2654,19 @@ function showEqActivityHistory(rmName){
     const fmtDiff = d => d==null ? '—' : d===0 ? '0' : (d>0?'▲'+d:'▼'+Math.abs(d));
     const changed = statusChangesByDate(r.date, rmName);
     const rmArg = rmName ? `'${escapeHtml(rmName).replace(/'/g,"\\'")}'` : '';
-    const changedCell = changed.length
-      ? `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showStatusChangeDrilldown('${r.date}',${rmArg})" title="Click to see client names">${changed.length} client${changed.length>1?'s':''} ▶</span>`
-      : '—';
+    // If there IS a Δ (active/inactive count moved) but no logged entry exists
+    // for that date, the change almost certainly happened before this audit
+    // trail was switched on (or through a path that wasn't logged at the
+    // time) — offer a best-guess shortlist instead of a dead-end "—".
+    const hasDelta = (dA!=null && dA!==0) || (dI!=null && dI!==0);
+    let changedCell;
+    if(changed.length){
+      changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showStatusChangeDrilldown('${r.date}',${rmArg})" title="Click to see client names">${changed.length} client${changed.length>1?'s':''} ▶</span>`;
+    } else if(hasDelta){
+      changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--orange,#D97706)" onclick="showLikelyStatusFlipCandidates(${rmArg})" title="No log entry for this date (change happened before tracking was on) — best-guess shortlist">🔍 find (no log)</span>`;
+    } else {
+      changedCell = '—';
+    }
     return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total, changedCell];
   });
   const label = rmName ? ` (${rmName})` : (scope==='ALL'?' (All)':'');
