@@ -1144,11 +1144,14 @@ input:focus, select:focus, textarea:focus{
         <div class="page-hdr">
           <div class="page-title">No-Trade Alerts</div>
         </div>
-        <div class="tab-bar">
-          <div class="tab-item active" onclick="switchTab('nt','30')">🔴 30 Days</div>
-          <div class="tab-item" onclick="switchTab('nt','60')">🟠 60 Days</div>
-          <div class="tab-item" onclick="switchTab('nt','90')">🟡 90 Days</div>
-          <div class="tab-item" onclick="switchTab('nt','180')">⚫ 180+ Days</div>
+        <div class="filters" style="padding:10px 16px 6px">
+          <select id="nt-days" onchange="switchTab('nt', this.value)" style="min-width:140px">
+            <option value="30">🔴 30 Days</option>
+            <option value="60">🟠 60 Days</option>
+            <option value="90">🟡 90 Days</option>
+            <option value="180">⚫ 180+ Days</option>
+          </select>
+          <select id="nt-rm" onchange="renderNoTrade()" style="display:none;min-width:160px"><option value="">👥 All RMs</option></select>
         </div>
         <div id="nt-content"></div>
       </div>
