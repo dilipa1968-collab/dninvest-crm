@@ -2575,6 +2575,42 @@ function filterEqActivityByRm(rmName){
 // base-wide history. Relies on that RM having opened their dashboard on a
 // given day (which is when their own snapshot gets saved) — if an RM hasn't
 // logged in on a particular date, that date simply won't have an entry for them.
+// Returns the individual clients whose equity status changed on a given
+// calendar date (YYYY-MM-DD), read from the activity_logs audit trail.
+// rmName (optional): restrict to that RM's clients only — used when viewing
+// a single RM's own history rather than the admin's whole-base 'ALL' view.
+function statusChangesByDate(dateStr, rmName){
+  const logs = DB.get('activity_logs')||[];
+  return logs.filter(l=>{
+      if(l.seg!=='equity' || l.type!=='edit' || !Array.isArray(l.changes)) return false;
+      if(String(l.date||'').slice(0,10)!==dateStr) return false;
+      if(rmName && (l.rm||'').trim().toUpperCase()!==rmName.trim().toUpperCase()) return false;
+      return l.changes.some(ch=>ch.field==='status');
+    })
+    .map(l=>{
+      const ch = l.changes.find(ch=>ch.field==='status');
+      return {name:l.client_name||'—', rm:l.rm||'—', old:ch.old, new:ch.new};
+    });
+}
+
+// Drilldown from the date-wise history table: lists which named clients
+// flipped Active/Inactive on that specific date (with a Back link to return
+// to the date-wise table).
+function showStatusChangeDrilldown(dateStr, rmName){
+  const changes = statusChangesByDate(dateStr, rmName);
+  const rows = changes.map(c=>[escapeHtml(c.name), escapeHtml(c.rm), c.old, c.new]);
+  showReport(`📋 Status Changes — ${fmtDate(dateStr)}${rmName?' ('+rmName+')':''}`,
+    ['Client','RM','Old Status','New Status'], rows);
+  // Add a Back link above the table so admins can return to the date-wise view.
+  const body = document.getElementById('reportModalBody');
+  if(body){
+    const back = document.createElement('div');
+    back.style.cssText='margin-bottom:10px';
+    back.innerHTML = `<span style="text-decoration:underline;cursor:pointer;color:var(--blue);font-size:.8rem" onclick="showEqActivityHistory(${rmName?`'${escapeHtml(rmName).replace(/'/g,"\\'")}'`:''})">← Back to date-wise history</span>`;
+    body.prepend(back);
+  }
+}
+
 function showEqActivityHistory(rmName){
   let scope;
   if(rmName){
@@ -2592,11 +2628,16 @@ function showEqActivityHistory(rmName){
     const dA = prev ? r.active-prev.active : null;
     const dI = prev ? r.inactive-prev.inactive : null;
     const fmtDiff = d => d==null ? '—' : d===0 ? '0' : (d>0?'▲'+d:'▼'+Math.abs(d));
-    return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total];
+    const changed = statusChangesByDate(r.date, rmName);
+    const rmArg = rmName ? `'${escapeHtml(rmName).replace(/'/g,"\\'")}'` : '';
+    const changedCell = changed.length
+      ? `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showStatusChangeDrilldown('${r.date}',${rmArg})" title="Click to see client names">${changed.length} client${changed.length>1?'s':''} ▶</span>`
+      : '—';
+    return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total, changedCell];
   });
   const label = rmName ? ` (${rmName})` : (scope==='ALL'?' (All)':'');
   showReport('📊 Active/Inactive — Date-wise History'+label,
-    ['Date','Active','Δ Active','Inactive','Δ Inactive','Total'], table);
+    ['Date','Active','Δ Active','Inactive','Δ Inactive','Total','Changed Clients'], table);
 }
 
 function sc(n,l,cls,seg){
