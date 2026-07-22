@@ -116,41 +116,16 @@ input,select,textarea,button{font-family:inherit}
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
               <div style="font-weight:700;font-size:.95rem">Question Bank (5) — Fill These In Advance, Then Just Hit "Push" During The Seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(Auto-Synced To All Your Devices)</span></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center" id="quiz-subject-btns"></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
+                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#b45309" onclick="QUIZ.loadFilmiBank()">🎬 फ़िल्मी सवाल लोड करें</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
               </div>
             </div>
             <div id="quiz-bank"></div>
-          </div>
-
-          <!-- Add New Subject modal -->
-          <div id="quiz-subject-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(15,31,61,.55);align-items:center;justify-content:center;padding:16px">
-            <div style="background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:20px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                <div style="font-weight:800;font-size:1rem;color:var(--navy)">➕ Naya Subject Banao</div>
-                <button class="btn btn-outline" style="padding:4px 10px;font-size:.9rem" onclick="QUIZ.closeAddSubjectModal()">✕</button>
-              </div>
-              <label style="font-size:.8rem;font-weight:700;display:block;margin-bottom:4px">Subject Ka Naam</label>
-              <input type="text" id="quiz-newsubject-name" placeholder="जैसे: Cricket, GK, Income Tax…" style="width:100%;box-sizing:border-box;padding:8px;font-size:.88rem;border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
-              <label style="font-size:.8rem;font-weight:700;display:block;margin-bottom:4px">Sawaal Paste Karein (Kam Se Kam 5, Jitne Chahe Utne Dal Sakte Hain)</label>
-              <div style="font-size:.72rem;color:var(--gray);margin-bottom:6px;line-height:1.5">
-                Har Sawaal Is Format Me, Aur Do Sawaalon Ke Beech Ek Khaali Line Chhodein — Pehla Answer Hamesha Sahi Wala Likhein:<br>
-                <code style="background:#f1f5f9;padding:6px;border-radius:6px;display:block;margin-top:4px;white-space:pre-line">Sawaal Yahan?
-Sahi Jawaab
-Galat Jawaab 1
-Galat Jawaab 2
-Galat Jawaab 3</code>
-              </div>
-              <textarea id="quiz-newsubject-text" rows="12" oninput="QUIZ.previewSubjectCount()" placeholder="Sawaal 1?&#10;Sahi Jawaab&#10;Galat 1&#10;Galat 2&#10;Galat 3&#10;&#10;Sawaal 2?&#10;..." style="width:100%;box-sizing:border-box;padding:9px;font-size:.82rem;border:1px solid var(--border);border-radius:8px;font-family:monospace;line-height:1.5"></textarea>
-              <div id="quiz-newsubject-preview" style="font-size:.75rem;color:var(--gray);margin-top:6px"></div>
-              <div style="display:flex;gap:8px;margin-top:12px">
-                <button class="btn btn-teal" style="padding:8px 16px;font-size:.85rem" onclick="QUIZ.saveNewSubject()">💾 Subject Save Karein</button>
-                <button class="btn btn-outline" style="padding:8px 16px;font-size:.85rem" onclick="QUIZ.closeAddSubjectModal()">Cancel</button>
-              </div>
-            </div>
           </div>
 
           <!-- Live results -->
@@ -201,11 +176,8 @@ window.QUIZ = (function(){
   var host = { correctIndex:0, qIndex:0, type:'mcq', sessionId:'', startedAtServerMs:0, unsubPlayers:null, unsubResp:null };
   var BANK_KEY='dnquiz_bank';                       // legacy localStorage fallback (used only if Firestore unreachable)
   var BANKDOC = function(){ return window.fdb.collection('quiz').doc('bank'); };
-  var CUSTOMBANKS = function(){ return window.fdb.collection('quiz').doc('customBanks'); };
   host.bankCache = null;                            // synced from Firestore so ALL admin devices see the same 5 questions
   host.unsubBank = null;
-  host.customBanks = {};                            // { <id>: {name, items:[{q,a:[correct,w1,w2,w3]}]} } — synced from Firestore
-  host.unsubCustomBanks = null;
   function defaultBankArr(){
     var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
     return arr;
@@ -394,89 +366,6 @@ window.QUIZ = (function(){
     await writeBankToFirestore(arr);
   }
 
-  // ── Custom Subject Banks — host types any subject name + pastes questions, saved to Firestore, reusable forever, synced to every admin device ──
-  var SUBJECT_BTN_STYLE='padding:5px 10px;font-size:.78rem;background:#5b21b6';
-  function renderSubjectButtons(){
-    var box=document.getElementById('quiz-subject-btns'); if(!box) return;
-    var html='';
-    html+='<button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>';
-    html+='<button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>';
-    html+='<button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#b45309" onclick="QUIZ.loadFilmiBank()">🎬 फ़िल्मी सवाल लोड करें</button>';
-    var cb=host.customBanks||{};
-    Object.keys(cb).forEach(function(id){
-      var subj=cb[id]||{}; var n=(subj.items||[]).length;
-      html+='<span style="display:inline-flex;gap:2px;align-items:center">'
-        + '<button class="btn btn-teal" style="'+SUBJECT_BTN_STYLE+'" onclick="QUIZ.loadCustomBank(\''+id+'\')">📚 '+esc(subj.name||'Subject')+' Load Karein ('+n+')</button>'
-        + '<button class="btn btn-outline" style="padding:5px 7px;font-size:.72rem;color:#dc2626;border-color:#fca5a5" title="Is Subject Ko Delete Karein" onclick="QUIZ.deleteCustomSubject(\''+id+'\')">✕</button>'
-        + '</span>';
-    });
-    html+='<button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.openAddSubjectModal()">➕ Naya Subject Banao</button>';
-    box.innerHTML=html;
-  }
-  function openAddSubjectModal(){
-    var m=document.getElementById('quiz-subject-modal'); if(m) m.style.display='flex';
-    var nm=document.getElementById('quiz-newsubject-name'); if(nm) nm.value='';
-    var tx=document.getElementById('quiz-newsubject-text'); if(tx) tx.value='';
-    var pv=document.getElementById('quiz-newsubject-preview'); if(pv) pv.textContent='';
-  }
-  function closeAddSubjectModal(){
-    var m=document.getElementById('quiz-subject-modal'); if(m) m.style.display='none';
-  }
-  // Parses the pasted text into [{q, a:[correct,w1,w2,w3]}, ...]. Blocks are separated by a blank line;
-  // first non-empty line of a block = question, next up to 4 lines = options (first option = correct answer).
-  function _parseSubjectText(raw){
-    var blocks=String(raw||'').replace(/\r/g,'').split(/\n\s*\n/);
-    var out=[];
-    blocks.forEach(function(block){
-      var lines=block.split('\n').map(function(s){return s.trim();}).filter(function(s){return s.length;});
-      if(lines.length<3) return;                 // need a question + at least 2 options
-      var q=lines[0], opts=lines.slice(1,5);
-      out.push({ q:q, a:opts });
-    });
-    return out;
-  }
-  function previewSubjectCount(){
-    var tx=document.getElementById('quiz-newsubject-text');
-    var pv=document.getElementById('quiz-newsubject-preview'); if(!pv) return;
-    var n=_parseSubjectText(tx&&tx.value).length;
-    pv.textContent = n ? ('✅ '+n+' Sawaal Mile ('+(n<5?'5 Se Kam — Recommend Hai Kam Se Kam 5':'Load Karne Ke Liye Ready')+')') : '';
-  }
-  async function saveNewSubject(){
-    var nameEl=document.getElementById('quiz-newsubject-name');
-    var txtEl=document.getElementById('quiz-newsubject-text');
-    var name=(nameEl&&nameEl.value||'').trim();
-    if(!name){ alert('Subject Ka Naam Likhein.'); return; }
-    var items=_parseSubjectText(txtEl&&txtEl.value);
-    if(items.length<1){ alert('Kam Se Kam 1 Sawaal Sahi Format Me Paste Karein (Sawaal + Kam Se Kam 2 Options, Blank Line Se Alag).'); return; }
-    if(items.length<5){ if(!confirm('Sirf '+items.length+' Sawaal Mile Hain — 5 Se Kam Honge To Har Baar Wahi Ghum-Ghum Ke Aayenge. Aage Badhein?')) return; }
-    await window.waitForFdb(8000); if(!window.fdb){ alert('Firebase Connect Nahi Hua.'); return; }
-    var id='s'+Date.now();
-    try{
-      await CUSTOMBANKS().set({ subjects:{ } }, {merge:true});   // ensure doc/map exists
-      var patch={}; patch['subjects.'+id]={ name:name, items:items, updatedAt:Date.now() };
-      await CUSTOMBANKS().update(patch);
-      closeAddSubjectModal();
-      alert('✅ "'+name+'" Subject Save Ho Gaya ('+items.length+' Sawaal). Ab Button Se Kabhi Bhi Load Kar Sakte Hain.');
-    }catch(e){ alert('Save Failed: '+(e&&e.message||e)); }
-  }
-  async function loadCustomBank(id){
-    var subj=(host.customBanks||{})[id];
-    if(!subj || !subj.items || !subj.items.length){ alert('Is Subject Me Abhi Koi Sawaal Nahi Hain.'); return; }
-    if(!confirm('5 Naye "'+subj.name+'" Sawaal Slots Me Load Karein? Isse Sabhi Devices Par Maujooda 5 Sawaal Badal Jaayenge.')) return;
-    var arr=_buildBankFromTopic(subj.items);
-    host.bankCache=arr; renderBank();
-    await writeBankToFirestore(arr);
-  }
-  async function deleteCustomSubject(id){
-    var subj=(host.customBanks||{})[id];
-    if(!confirm('"'+(subj?subj.name:'Ye')+'" Subject Hamesha Ke Liye Delete Karein? Iske Sawaal Sabhi Devices Se Hat Jaayenge.')) return;
-    await window.waitForFdb(8000); if(!window.fdb) return;
-    try{
-      var patch={}; patch['subjects.'+id]=firebase.firestore.FieldValue.delete();
-      await CUSTOMBANKS().update(patch);
-    }catch(e){ alert('Delete Failed: '+(e&&e.message||e)); }
-  }
-
   function isPlayMode(){
     try{ return new URLSearchParams(location.search).has('play'); }catch(e){ return false; }
   }
@@ -498,7 +387,6 @@ window.QUIZ = (function(){
     var qr=document.getElementById('quiz-qr-box');
     if(qr){ qr.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(joinLink())+'" width="160" height="160" style="border-radius:10px;background:#fff;padding:6px" alt="Join QR">'; }
     renderBank();
-    renderSubjectButtons();
     // ensure live doc exists (also acts as a live connectivity test)
     try{
       var d=await DOC().get();
@@ -546,12 +434,6 @@ window.QUIZ = (function(){
     if(host.unsubResp) host.unsubResp();
     if(host.unsubDoc) host.unsubDoc();
     if(host.unsubBank) host.unsubBank();
-    if(host.unsubCustomBanks) host.unsubCustomBanks();
-    host.unsubCustomBanks = CUSTOMBANKS().onSnapshot(function(doc){
-      var d=doc.data()||{};
-      host.customBanks = d.subjects||{};
-      renderSubjectButtons();
-    }, function(){});
     // Question Bank sync: whichever admin device edits/loads a topic, every
     // other admin device (laptop, mobile, etc.) sees the same 5 questions.
     host.unsubBank = BANKDOC().onSnapshot(function(doc){
@@ -1934,7 +1816,6 @@ window.QUIZ = (function(){
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
     hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, pushQuestion:pushQuestion,
-    openAddSubjectModal:openAddSubjectModal, closeAddSubjectModal:closeAddSubjectModal, saveNewSubject:saveNewSubject, previewSubjectCount:previewSubjectCount, loadCustomBank:loadCustomBank, deleteCustomSubject:deleteCustomSubject,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile, saveScreenTitle:saveScreenTitle
   };
