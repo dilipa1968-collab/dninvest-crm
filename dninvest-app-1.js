@@ -2897,7 +2897,7 @@ const COL_CFG = {
   leads: {
     cont:'leads-table',
     keys:['name','mobile','rm','source','calls','lastcall','nextcall','followup','remarks','actions'],
-    def:{name:150,mobile:92,rm:64,source:130,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,actions:88}
+    def:{name:150,mobile:92,rm:64,source:170,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,actions:88}
   }
 };
 function getColW(tid){
@@ -3378,8 +3378,10 @@ function renderLeadsTable(){
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td class="lead-source-cell" data-lid="${c.id}">
-        <span class="ls-view" onclick="editLeadSourceInline('${c.id}')" style="cursor:pointer;max-width:90px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;margin-right:16px" title="${(c.source||'').replace(/"/g,'&quot;')}">${c.source||'—'}</span>
-        <button class="btn-icon" style="padding:0 2px;font-size:.7rem" title="Edit Source" onclick="editLeadSourceInline('${c.id}')">✏️</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+          <span class="ls-view" onclick="editLeadSourceInline('${c.id}')" style="cursor:pointer;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(c.source||'').replace(/"/g,'&quot;')}">${c.source||'—'}</span>
+          <button class="btn-icon" style="padding:0 2px;font-size:.7rem;flex-shrink:0" title="Edit Source" onclick="editLeadSourceInline('${c.id}')">✏️</button>
+        </div>
       </td>
       <td style="text-align:center">${(window._leadCallCounts[c.id]||0)>0
           ? `<span onclick="event.stopPropagation();viewLeadCalls('${c.id}')" title="View call history" style="cursor:pointer;background:var(--teal,#0d9488);color:#fff;border-radius:10px;padding:1px 8px;font-size:.72rem;font-weight:700">📞 ${window._leadCallCounts[c.id]}</span>`
