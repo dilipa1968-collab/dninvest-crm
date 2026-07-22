@@ -7126,7 +7126,28 @@ function renderNoTrade(){
   try{
   const days=parseInt(activeNtTab);
   const eq=getActiveEqClients();
+
+  // Admin-only RM filter dropdown — populate once, keep selection sticky
+  // (same pattern used on the Trade Activity dashboard card).
+  const isAdmin = CU.role==='admin';
+  const rmSel = document.getElementById('nt-rm');
+  if(rmSel){
+    if(isAdmin){
+      if(!rmSel.dataset.filled){
+        const rms=[...new Set(getSegRMs('equity'))].sort((a,b)=>a.localeCompare(b));
+        rmSel.innerHTML = '<option value="">👥 All RMs</option>' + rms.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+        rmSel.dataset.filled = '1';
+      }
+      rmSel.style.display = '';
+    } else {
+      rmSel.style.display = 'none';
+      rmSel.value = '';
+    }
+  }
+  const rmFilter = (isAdmin && rmSel) ? (rmSel.value||'').trim() : '';
+
   let data=eq.filter(c=>daysDiff(c.last_trade_date)>=days)
+    .filter(c=>!rmFilter || (c.rm||'').trim().toUpperCase()===rmFilter.toUpperCase())
     .map(c=>({...c,daysAgo:daysDiff(c.last_trade_date)}))
     .sort((a,b)=>b.daysAgo-a.daysAgo);
 
@@ -7167,6 +7188,7 @@ function renderNoTrade(){
       <td style="font-weight:700;color:${c.daysAgo>=180?'var(--red)':c.daysAgo>=90?'var(--orange)':'var(--gold)'}">${c.daysAgo}d</td>
       <td>${c.asset_value?'₹'+fmtNum(c.asset_value):'—'}</td>
       <td>
+        ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>`:''}
         ${c.mobile?`<a href="https://wa.me/91${c.mobile}" target="_blank" class="btn-icon">💬</a>`:''}
       </td></tr>`;
   });
