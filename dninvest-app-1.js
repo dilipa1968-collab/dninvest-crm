@@ -7236,7 +7236,7 @@ function renderNoTrade(){
   let data=eq.filter(c=>daysDiff(c.last_trade_date)>=days)
     .filter(c=>!rmFilter || (c.rm||'').trim().toUpperCase()===rmFilter.toUpperCase())
     .map(c=>({...c,daysAgo:daysDiff(c.last_trade_date)}))
-    .sort((a,b)=>b.daysAgo-a.daysAgo);
+    .sort((a,b)=>a.daysAgo-b.daysAgo);
 
   const cont=document.getElementById('nt-content');
   if(!cont) return;
