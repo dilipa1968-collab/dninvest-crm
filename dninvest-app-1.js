@@ -5143,7 +5143,7 @@ function clientForm(seg, c){
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     <div class="form-row three">
-      <div class="form-field"><label>Last Trade Date</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}"></div>
+      <div class="form-field"><label>Last Trade Date ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}" ${(CU&&CU.role==='admin')?'':'disabled title="Sirf Admin Last Trade Date change kar sakta hai"'}></div>
       <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
       <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"${_lcAttr()}></div>
     </div>
