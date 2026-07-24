@@ -1335,6 +1335,7 @@ function initApp(){
       refreshDash(); updateBadges(); populateRmDropdowns();
       if(getCurrentPageId()==='eq-clients') renderEqTable();
       if(getCurrentPageId()==='mf-clients') renderMfTable();
+      if(getCurrentPageId()==='leads') renderLeadsTable();
       checkAnnouncement();
       checkFollowupAlert();
       updateMsgBadge();
