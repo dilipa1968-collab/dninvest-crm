@@ -2212,8 +2212,9 @@ function refreshDash(){
 
   let statsHtml='';
   if(hasEq){
+    const totalRisk=Object.values((getEqRisk().code)||{}).reduce((s,r)=>s+(r.risk_val||0),0);
     statsHtml+=sc(eq.length,'Total EQ Clients','','equity');
-    statsHtml+=sc(eqActive,'Active Clients','green','equity');
+    statsHtml+=sc('₹'+fmtNum(totalRisk),'Asset','gold','equity');
   }
   if(hasMf){
     statsHtml+=sc(mf.length,'MF Investors','teal','mf');
