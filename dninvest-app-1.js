@@ -10397,13 +10397,13 @@ async function doImport(){
   
   // Build lookup from existing clients
   // Match on identity, in order of how much we trust it:
-  //   1. PAN        — exact, once the data is clean. MINORS EXCLUDED from this
+  //   1. Client ID  — RTA's stable key. Also catches records poisoned by the
+  //                   old wrong-column bug, whose `pan` field literally holds
+  //                   a Client ID.
+  //   2. PAN        — exact, once the data is clean. MINORS EXCLUDED from this
   //                   map — a minor legally carries the GUARDIAN's PAN, so
   //                   PAN-matching would misfile the minor's AUM onto the
   //                   guardian. Minors match via Client ID / Mobile instead.
-  //   2. Client ID  — RTA's stable key. Also catches records poisoned by the
-  //                   old wrong-column bug, whose `pan` field literally holds
-  //                   a Client ID.
   //   3. Mobile     — 10-digit match. AUM file me mobile nahi hota, par contact/
   //                   dusre imports me hota hai — tab kaam aata hai. Zero risk.
   //   4. Name       — ONLY when it is unique on both sides. Kai naam (3 alag RAJ
@@ -10419,7 +10419,8 @@ async function doImport(){
     const n = nmKey(c.name);
     if(n){ nameCount[n] = (nameCount[n]||0)+1; nameMap[n] = c; }
   });
-  // How often each name appears in the uploaded file itself
+  // How often each name appears in the uploaded file itself (AUM tab; SIP-only
+  // tab builds its own count just below since it's a separate object shape)
   const fileNameCount = {};
   (importData.aum||[]).forEach(r => {
     const n = nmKey(r.name);
@@ -10449,12 +10450,12 @@ async function doImport(){
         ? (importData.sip['CID:'+row.client_id] || (row.pan && importData.sip[row.pan]) || importData.sip[upName] || {})
         : {};
 
-      // Match order: PAN → Client ID → Mobile → Name.
+      // Match order: Client ID → PAN → Mobile → Name.
       // (existingMap above already excludes minors, so a minor carrying the
       // guardian's PAN will skip straight to Client ID / Mobile matching
       // instead of landing on the guardian's record.)
-      let ex = (row.pan && existingMap[row.pan])
-            || (row.client_id && byClientId[String(row.client_id).trim()])
+      let ex = (row.client_id && byClientId[String(row.client_id).trim()])
+            || (row.pan && existingMap[row.pan])
             || (row.mobile && byMobile[mob10(row.mobile)])
             || null;
       if(!ex){
@@ -10504,13 +10505,27 @@ async function doImport(){
       }
     });
   } else if(importData.sip){
-    // SIP only
+    // SIP only — same match order as AUM: Client ID → PAN → Name.
+    // (No Mobile here — the SIP report file doesn't carry a mobile column.)
+    const sipFileNameCount = {};
     Object.values(importData.sip).forEach(row => {
-      // Client ID (stable key) pehle, phir valid PAN. Naam se match NAHI —
-      // warna same-naam alag log ka SIP ghus jata / duplicate ban jata.
-      const ex = (row.client_id && byClientId[String(row.client_id).trim()])
-              || (validPan(row.pan) && existingMap[String(row.pan).trim().toUpperCase()])
-              || null;
+      const n = nmKey(row.name);
+      if(n) sipFileNameCount[n] = (sipFileNameCount[n]||0)+1;
+    });
+    Object.values(importData.sip).forEach(row => {
+      const upName = nmKey(row.name);
+      let ex = (row.client_id && byClientId[String(row.client_id).trim()])
+            || (validPan(row.pan) && existingMap[String(row.pan).trim().toUpperCase()])
+            || null;
+      if(!ex){
+        // Naam se match SIRF jab dono taraf unique ho — warna same-naam alag
+        // log ka SIP ghus jata / duplicate ban jata.
+        if(nameCount[upName] === 1 && sipFileNameCount[upName] === 1){
+          ex = nameMap[upName];
+        } else if(nameCount[upName] > 1 || sipFileNameCount[upName] > 1){
+          return;                                     // several people share this name — skip
+        }
+      }
       if(ex){
         ex.sip_amount = row.sip_amount;
         ex.sip_count = row.sip_count;
