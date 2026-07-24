@@ -2205,14 +2205,25 @@ function refreshDash(){
 
   const eqActive=activeEq.filter(c=>c.status==='Active').length;
   const mfInv=mf.filter(c=>c.status==='Investor').length;
-  const totalAUM=mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
-  const totalSIP=mf.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0);
+  // Dashboard ke KPI card ("Total AUM"/"Monthly SIP") sirf RM ke apne clients
+  // ka figure dikhaye — temp-access (absent colleague cover) wale clients
+  // in totals me na judein. Baaki jagah (lists, follow-ups) temp access
+  // waisa hi kaam karta rahega.
+  const ownMfDealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+  const ownMf = CU.role==='admin' ? mf : mf.filter(c=>ownMfDealers.includes((c.rm||'').trim().toUpperCase()));
+  const totalAUM=ownMf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
+  const totalSIP=ownMf.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0);
   const pendEq=activeEq.filter(c=>c.next_call&&c.next_call<=today()).length;
   const pendMf=mf.filter(c=>c.next_call&&c.next_call<=today()).length;
 
   let statsHtml='';
   if(hasEq){
-    const totalRisk=Object.values((getEqRisk().code)||{}).reduce((s,r)=>s+(r.risk_val||0),0);
+    // "Asset" card bhi sirf RM ke apne dealer-name wale clients ka risk_val
+    // jode — temp-access (absent colleague cover) clients ka asset ab isme
+    // nahi judega. Pehle ye poori company ka total dikhata tha (bug).
+    const ownEqDealers=(CU.eq_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    const ownEq = CU.role==='admin' ? eq : eq.filter(c=>ownEqDealers.includes((c.rm||'').trim().toUpperCase()));
+    const totalRisk=ownEq.reduce((s,c)=>{const rk=eqRiskFor(c.code); return s+(rk?(rk.risk_val||0):0);},0);
     statsHtml+=sc(eq.length,'Total EQ Clients','','equity');
     statsHtml+=sc('₹'+fmtNum(totalRisk),'Asset','gold','equity');
   }
