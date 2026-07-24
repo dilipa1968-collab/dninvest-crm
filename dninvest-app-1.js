@@ -1332,6 +1332,14 @@ async function saveCallLimits(){
 }
 
 function initApp(){
+  // Defensive: force-clear all search boxes on every fresh load, regardless
+  // of WHY they might have stray text (Chrome autofill, a 3rd-party typing
+  // tool auto-inserting saved text, stale DOM, etc). A leftover value here
+  // silently filters an entire table to "0 results" and looks like a data
+  // bug when it's really just an un-cleared search box.
+  ['leads-search','eq-search','mf-search','eqnc-search','mfnc-search'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
   // Sync from Firebase first, then setup real-time listeners.
   // If fdb isn't ready yet (slow load), wait for it so we don't skip the
   // whole sync and leave the RM staring at an empty client list.
