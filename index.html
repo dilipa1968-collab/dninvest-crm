@@ -1036,7 +1036,7 @@ input:focus, select:focus, textarea:focus{
           </div>
         </div>
         <div class="filters">
-          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterLeads()" id="leads-search">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterLeads()" id="leads-search" autocomplete="off" name="leads-search-nofill">
           <select onchange="filterLeads()" id="leads-rm"><option value="">All RMs</option></select>
           <select onchange="filterLeads()" id="leads-followup-filter"><option value="">All Follow-ups</option>
             <option value="today">Due Today</option><option value="overdue">Overdue</option>
@@ -1089,7 +1089,7 @@ input:focus, select:focus, textarea:focus{
           </div>
         </div>
         <div class="filters" id="eq-filters">
-          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search" style="background:#F8FCFB;border:1px solid #E7F1EE;border-radius:8px;color:#1F2937;font-weight:500">
+          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search" autocomplete="off" name="eq-search-nofill" style="background:#F8FCFB;border:1px solid #E7F1EE;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #ECEDF9;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterEq()" id="eq-rm" style="background:#FDF8FA;border:1px solid #F7E4EA;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
@@ -1193,7 +1193,7 @@ input:focus, select:focus, textarea:focus{
           <div class="tab-item" onclick="switchTab('eqnc','180')">⚫ 180+ Days</div>
         </div>
         <div class="filters" style="padding:10px 16px 6px">
-          <input type="text" id="eqnc-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderNoCall('equity')" style="min-width:260px">
+          <input type="text" id="eqnc-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderNoCall('equity')" autocomplete="off" name="eqnc-search-nofill" style="min-width:260px">
           <button class="btn btn-outline" onclick="document.getElementById('eqnc-search').value='';renderNoCall('equity')">✕ Clear</button>
           <span class="res-count" id="eqnc-count"></span>
         </div>
@@ -1212,7 +1212,7 @@ input:focus, select:focus, textarea:focus{
           </div>
         </div>
         <div class="filters">
-          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search" style="background:#F8FCFB;border:1px solid #E7F1EE;border-radius:8px;color:#1F2937;font-weight:500">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search" autocomplete="off" name="mf-search-nofill" style="background:#F8FCFB;border:1px solid #E7F1EE;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterMf()" id="mf-status" style="background:#F9FAFE;border:1px solid #ECEDF9;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Investor</option><option>Prospect</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterMf()" id="mf-rm" style="background:#FDF8FA;border:1px solid #F7E4EA;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
@@ -1484,7 +1484,7 @@ input:focus, select:focus, textarea:focus{
           <div class="tab-item" onclick="switchTab('mfnc','180')">⚫ 180+ Days</div>
         </div>
         <div class="filters" style="padding:10px 16px 6px">
-          <input type="text" id="mfnc-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderNoCall('mf')" style="min-width:260px">
+          <input type="text" id="mfnc-search" placeholder="🔍 Search name / mobile / RM..." oninput="renderNoCall('mf')" autocomplete="off" name="mfnc-search-nofill" style="min-width:260px">
           <button class="btn btn-outline" onclick="document.getElementById('mfnc-search').value='';renderNoCall('mf')">✕ Clear</button>
           <span class="res-count" id="mfnc-count"></span>
         </div>
