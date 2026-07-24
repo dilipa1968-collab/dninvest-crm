@@ -805,6 +805,62 @@ input:focus, select:focus, textarea:focus{
 }
 @media print{.mnav{display:none!important;}}
 </style>
+<style id="premium-skin-2">
+/* ═══ PREMIUM SKIN 2 — deeper polish, pure CSS, zero new assets ═══ */
+
+/* Solid-color buttons get subtle gradient depth instead of flat fill */
+.btn-success{background:linear-gradient(135deg,#12925a,var(--green));box-shadow:0 2px 8px rgba(15,122,69,.22)}
+.btn-danger{background:linear-gradient(135deg,#d9483a,var(--red));box-shadow:0 2px 8px rgba(192,57,43,.22)}
+.btn-gold{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#3d2c05;box-shadow:0 2px 8px rgba(201,148,42,.28)}
+.btn-teal{background:linear-gradient(135deg,#22b8d8,var(--teal));box-shadow:0 2px 8px rgba(8,145,178,.22)}
+.btn-outline:hover{border-color:var(--navy);background:#f7f9fd}
+
+/* Glossy sheen sweep on primary/gold buttons — CSS-only shine effect */
+.btn-primary,.btn-gold{position:relative;overflow:hidden}
+.btn-primary::after,.btn-gold::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);transition:left .5s ease}
+.btn-primary:hover::after,.btn-gold:hover::after{left:130%}
+
+/* Topbar — glass depth */
+.topbar{backdrop-filter:blur(6px);background:linear-gradient(90deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%),
+  linear-gradient(180deg,rgba(255,255,255,.05),transparent 40%);background-blend-mode:overlay}
+
+/* Sidebar active nav — soft gradient pill instead of flat accent */
+.sidebar .nav-item.active,.sidebar .active{background:linear-gradient(90deg,rgba(201,148,42,.14),rgba(201,148,42,.02));
+  font-weight:700;color:var(--navy)}
+
+/* KPI numbers — subtle gradient text for glanceable premium feel */
+.stat-card .stat-num,.stat-card b,.stat-card strong{
+  background:linear-gradient(135deg,var(--navy),var(--navy3));-webkit-background-clip:text;
+  background-clip:text;-webkit-text-fill-color:transparent}
+.stat-card{position:relative}
+.stat-card::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;
+  background:linear-gradient(135deg,rgba(201,148,42,.18),transparent 40%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+
+/* Badges — subtle top sheen for depth, colors untouched */
+.badge{position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+
+/* Table header — gentle gradient instead of flat navy */
+thead th{background:linear-gradient(180deg,var(--navy2),var(--navy))}
+
+/* Login card — premium glass + soft glow ring */
+.login-box{position:relative;background:rgba(255,255,255,.98)}
+.login-box::before{content:'';position:absolute;inset:-1px;border-radius:inherit;z-index:-1;
+  background:linear-gradient(135deg,var(--gold2),transparent 30%,transparent 70%,var(--gold));opacity:.5;filter:blur(6px)}
+
+/* Checkboxes/radios — brand accent instead of default OS blue */
+input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
+
+/* Content fade-in on page switch — calm, not flashy */
+.content>*{animation:dnFadeIn .25s ease}
+@keyframes dnFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* Modal entrance — soft scale-in */
+.modal{animation:dnModalIn .18s ease}
+@keyframes dnModalIn{from{opacity:0;transform:scale(.97) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+</style>
 </head>
 <body>
 
