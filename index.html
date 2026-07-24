@@ -316,7 +316,9 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .stat-card.teal{border-left-color:var(--teal);}
 .stat-card.purple{border-left-color:var(--purple);}
 .stat-card.orange{border-left-color:var(--orange);}
-.stat-n{font-size:1.6rem;font-weight:900;color:var(--navy);line-height:1;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat-n{font-size:clamp(1.1rem,5.2vw,1.6rem);font-weight:900;color:var(--navy);line-height:1.05;letter-spacing:-.3px;white-space:normal;overflow-wrap:break-word;word-break:break-word;}
+.stat-n.stat-n-md{font-size:clamp(0.95rem,4.4vw,1.28rem);}
+.stat-n.stat-n-sm{font-size:clamp(0.82rem,3.7vw,1.05rem);}
 .stat-l{font-size:.67rem;color:var(--gray);margin-top:3px;font-weight:600;}
 
 /* ── FILTERS ── */
