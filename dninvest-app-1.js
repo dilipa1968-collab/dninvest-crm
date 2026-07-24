@@ -2710,8 +2710,11 @@ function showEqActivityHistory(rmName){
 
 function sc(n,l,cls,seg){
   const segBadge=seg?`<span class="badge ${seg==='equity'?'b-eq':'b-mf'}" style="float:right;margin-top:2px">${seg==='equity'?'EQ':'MF'}</span>`:'';
+  const len=String(n).length;
+  const fs = len>9?'1.05rem':len>7?'1.28rem':'';
+  const nStyle = fs?` style="font-size:${fs}"`:'';
   return `<div class="stat-card ${cls}" onclick="showPage('${seg==='equity'?'eq-clients':seg==='mf'?'mf-clients':'eq-clients'}')">
-    ${segBadge}<div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`;
+    ${segBadge}<div class="stat-n"${nStyle}>${n}</div><div class="stat-l">${l}</div></div>`;
 }
 function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=100000) return (n/100000).toFixed(2)+'L'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return Math.round(n); }
 
