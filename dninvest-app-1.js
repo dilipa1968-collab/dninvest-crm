@@ -318,24 +318,34 @@ const DB = {
       return this._setClientSharded(key, rec);
     }
 
+    if(typeof fdb==='undefined'){
+      // Firebase SDK never connected this session — the record only exists in
+      // THIS browser's local cache. Must be flagged, else the caller shows a
+      // false "saved" message and the record silently vanishes on next sync.
+      return {ok:false, error:'Offline — Firebase se connect nahi ho paya'};
+    }
+
     this._writing[key] = (this._writing[key]||0) + 1;
     try{
-      if(typeof fdb!=='undefined'){
-        const docRef = fdb.collection('crm_data').doc(key);
-        let finalData = null;
-        await fdb.runTransaction(async (tx)=>{
-          const doc = await tx.get(docRef);
-          let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
-          const lidx = latest.findIndex(c=>c.id===rec.id);
-          if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
-          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
-          finalData = latest;
-        });
-        // adopt the merged result locally too, in case other records changed
-        if(finalData) this.setLocal(key, finalData);
-        console.log('Firebase transaction-synced:',key,rec.id);
-      }
-    }catch(e){ console.log('setClient error:',e); toast('Sync error: '+e.message,'error'); }
+      const docRef = fdb.collection('crm_data').doc(key);
+      let finalData = null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
+        const lidx = latest.findIndex(c=>c.id===rec.id);
+        if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        finalData = latest;
+      });
+      // adopt the merged result locally too, in case other records changed
+      if(finalData) this.setLocal(key, finalData);
+      console.log('Firebase transaction-synced:',key,rec.id);
+      return {ok:true};
+    }catch(e){
+      console.log('setClient error:',e);
+      toast('Sync error: '+e.message,'error');
+      return {ok:false, error:e.message};
+    }
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
   // Delete a single client record (merge-on-write delete)
@@ -3574,7 +3584,11 @@ async function saveLead(){
   } else {
     rec.created=today();
   }
-  await DB.setClient('leads',rec);
+  const _saveRes = await DB.setClient('leads',rec);
+  if(_saveRes && _saveRes.ok===false){
+    toast('⚠️ Lead server tak save NAHI hui ('+(_saveRes.error||'connection issue')+'). Internet check karke dobara "Save" dabayein — form band nahi kiya.','error');
+    return;   // modal khula rehta hai, data khota nahi
+  }
   maybeLogMergedCall('lead', newId, name, rm);
   closeModal('leadModal');
   toast(currentEditLeadId?'Lead updated!':'Lead added!','success');
