@@ -5194,6 +5194,7 @@ function clientForm(seg, c){
     </div>
     <div class="form-row three">
       <div class="form-field"><label>🎂 Date of Birth</label><input id="f_dob" type="date" value="${c?.dob||''}" max="${today()}"></div>
+      <div class="form-field"><label>Client Code</label><input id="f_client_id" value="${c?.client_id||''}" placeholder="RTA Client ID"></div>
     </div>
     <div class="form-section">Investment Details</div>
     <div class="form-row three">
@@ -5404,6 +5405,7 @@ async function saveClient(){
     rec={
       id: newId,
       name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
+      client_id: gv2('f_client_id'),
       rm, status:gv2('f_status')||'Investor',
       is_minor: document.getElementById('f_minor')?.checked || false,
       aum:parseFloat(gv2('f_aum'))||null,
@@ -5427,7 +5429,7 @@ async function saveClient(){
       // Audit log - track changed fields
       const auditFields = seg==='equity'
         ? ['name','mobile','email','dob','rm','status','code','asset_value','revenue','last_trade_date','last_call_date','next_call','followup_status','remarks']
-        : ['name','mobile','email','rm','status','pan','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
+        : ['name','mobile','email','rm','status','pan','client_id','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
       const changes = [];
       auditFields.forEach(f=>{
         const ov = old[f]===null||old[f]===undefined?'':String(old[f]);
@@ -10395,7 +10397,10 @@ async function doImport(){
   
   // Build lookup from existing clients
   // Match on identity, in order of how much we trust it:
-  //   1. PAN        — exact, once the data is clean
+  //   1. PAN        — exact, once the data is clean. MINORS EXCLUDED from this
+  //                   map — a minor legally carries the GUARDIAN's PAN, so
+  //                   PAN-matching would misfile the minor's AUM onto the
+  //                   guardian. Minors match via Client ID / Mobile instead.
   //   2. Client ID  — RTA's stable key. Also catches records poisoned by the
   //                   old wrong-column bug, whose `pan` field literally holds
   //                   a Client ID.
@@ -10407,9 +10412,9 @@ async function doImport(){
   const existingMap = {}, byClientId = {}, byMobile = {}, nameMap = {}, nameCount = {};
   existing.forEach(c => {
     const p = String(c.pan||'').trim().toUpperCase();
-    if(p && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) existingMap[p] = c;
+    if(p && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p) && !c.is_minor) existingMap[p] = c;
     if(c.client_id) byClientId[String(c.client_id).trim()] = c;
-    if(/^\d{4,}$/.test(p)) byClientId[p] = c;      // legacy: Client ID stuck in the PAN field
+    if(/^\d{4,}$/.test(p) && !c.is_minor) byClientId[p] = c;      // legacy: Client ID stuck in the PAN field
     const m = mob10(c.mobile); if(m.length===10) byMobile[m] = c;
     const n = nmKey(c.name);
     if(n){ nameCount[n] = (nameCount[n]||0)+1; nameMap[n] = c; }
@@ -10444,14 +10449,14 @@ async function doImport(){
         ? (importData.sip['CID:'+row.client_id] || (row.pan && importData.sip[row.pan]) || importData.sip[upName] || {})
         : {};
 
-      // AUM By Client report always carries a Client ID — the only unique key.
-      // A minor can carry the guardian's PAN, so if a row HAS a Client ID we match
-      // strictly on it (never PAN), else a minor's AUM would land on the guardian
-      // (and the guardian's own row then gets skipped as "claimed"). Fall back to
-      // PAN only for rows that genuinely lack a Client ID.
-      let ex = row.client_id
-        ? ( byClientId[String(row.client_id).trim()] || (row.mobile && byMobile[mob10(row.mobile)]) || null )
-        : ( (row.pan && existingMap[row.pan]) || (row.mobile && byMobile[mob10(row.mobile)]) || null );
+      // Match order: PAN → Client ID → Mobile → Name.
+      // (existingMap above already excludes minors, so a minor carrying the
+      // guardian's PAN will skip straight to Client ID / Mobile matching
+      // instead of landing on the guardian's record.)
+      let ex = (row.pan && existingMap[row.pan])
+            || (row.client_id && byClientId[String(row.client_id).trim()])
+            || (row.mobile && byMobile[mob10(row.mobile)])
+            || null;
       if(!ex){
         if(nameCount[upName] === 1 && fileNameCount[upName] === 1){
           ex = nameMap[upName];                       // unique on both sides — safe

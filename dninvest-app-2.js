@@ -406,7 +406,7 @@ function renderActivityLog(){
       detail=`<span style="color:var(--gray);font-size:.8rem">Added a new client</span>`;
     } else if(l.changes && l.changes.length){
       detail=l.changes.map(ch=>{
-        const fLabel={name:'Name',mobile:'Mobile',email:'Email',dob:'Date of Birth',rm:'RM',status:'Status',code:'Client Code',asset_value:'Asset Value',revenue:'Revenue',last_trade_date:'Last Trade',last_call_date:'Last Call',next_call:'Next Call',followup_status:'Follow-up Status',remarks:'Remarks',pan:'PAN',aum:'AUM',sip_amount:'SIP Amount',sip_count:'SIP Count',last_invest_date:'Last Invest'}[ch.field]||ch.field;
+        const fLabel={name:'Name',mobile:'Mobile',email:'Email',dob:'Date of Birth',rm:'RM',status:'Status',code:'Client Code',asset_value:'Asset Value',revenue:'Revenue',last_trade_date:'Last Trade',last_call_date:'Last Call',next_call:'Next Call',followup_status:'Follow-up Status',remarks:'Remarks',pan:'PAN',client_id:'Client Code',aum:'AUM',sip_amount:'SIP Amount',sip_count:'SIP Count',last_invest_date:'Last Invest'}[ch.field]||ch.field;
         return `<div style="font-size:.78rem;margin-bottom:2px"><b>${fLabel}:</b> <span style="color:#ef4444;text-decoration:line-through">${ch.old}</span> → <span style="color:#16a34a">${ch.new}</span></div>`;
       }).join('');
     } else {
