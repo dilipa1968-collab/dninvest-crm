@@ -3582,7 +3582,11 @@ async function saveLead(){
 }
 
 async function confirmDeleteLead(id,name){
-  if(CU.role!=='admin') return;
+  const leads = DB.get('leads')||[];
+  const lead = leads.find(x=>x.id===id);
+  // Admin can delete any lead. RM can delete ONLY their own (lead.rm === apna naam).
+  const isOwnLead = lead && CU.role==='rm' && lead.rm===CU.name;
+  if(CU.role!=='admin' && !isOwnLead){ toast('Aap sirf apni leads delete kar sakte hain','error'); return; }
   if(!confirm(`Delete lead "${name}"? This cannot be undone.`)) return;
   await DB.deleteClient('leads',id);
   toast('Lead deleted','success');
