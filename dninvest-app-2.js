@@ -2414,6 +2414,9 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 var BC_SEG_BROK_TYPE = { futures:'percent', equity_delivery:'pct_min', equity_intraday:'pct_min', options:'flat',
                           commodity_futures:'percent', commodity_options:'flat' };
 
+// Only F&O and Commodity segments trade in lots — Equity Delivery/Intraday use a plain quantity.
+var BC_USES_LOTS = { futures:true, options:true, commodity_futures:true, commodity_options:true };
+
 var BC_SEGMENT_DEFAULTS = {
   futures:          { stt:0.05,  txn:0.0019, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
   options:          { stt:0.15,  txn:0.0355, stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 },
@@ -2435,6 +2438,14 @@ function bcUpdateBrokFields(){
     ? 'Whichever is higher applies — the % amount or the Minimum ₹/Share (charged on each leg).' : '';
 }
 
+function bcUpdateQtyFields(){
+  var usesLots = !!BC_USES_LOTS[bcCurSeg];
+  document.getElementById('bcLotSizeWrap').style.display = usesLots ? '' : 'none';
+  document.getElementById('bcLotsWrap').style.display = usesLots ? '' : 'none';
+  document.getElementById('bcQtyPlainWrap').style.display = usesLots ? 'none' : '';
+  document.getElementById('bcTotalQtyWrap').style.display = usesLots ? '' : 'none';
+}
+
 function bcSetSeg(seg){
   bcCurSeg = seg;
   document.querySelectorAll('#page-brokerage-calc .bc-seg-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.seg===seg); });
@@ -2444,6 +2455,7 @@ function bcSetSeg(seg){
   document.getElementById('bcStampRate').value = d.stamp;
   document.getElementById('bcSebiRate').value = d.sebi;
   bcUpdateBrokFields();
+  bcUpdateQtyFields();
   var shape = BC_SEG_BROK_TYPE[seg];
   if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
   else if(shape==='pct_min'){ document.getElementById('bcBrokRate').value = d.brokPct; document.getElementById('bcBrokMinShare').value = d.brokMin; }
@@ -2464,10 +2476,17 @@ function bcFmt(n){
 function bcCalc(){
   var buy = parseFloat(document.getElementById('bcBuyPrice').value)||0;
   var sell = parseFloat(document.getElementById('bcSellPrice').value)||0;
-  var lotSize = parseFloat(document.getElementById('bcLotSize').value)||0;
-  var lots = parseFloat(document.getElementById('bcLots').value)||0;
-  var qty = lotSize*lots;
-  document.getElementById('bcTotalQtyShow').textContent = qty.toLocaleString('en-IN');
+  var usesLots = !!BC_USES_LOTS[bcCurSeg];
+  var qty, lots;
+  if(usesLots){
+    var lotSize = parseFloat(document.getElementById('bcLotSize').value)||0;
+    lots = parseFloat(document.getElementById('bcLots').value)||0;
+    qty = lotSize*lots;
+    document.getElementById('bcTotalQtyShow').textContent = qty.toLocaleString('en-IN');
+  } else {
+    qty = parseFloat(document.getElementById('bcQtyPlain').value)||0;
+    lots = 0;
+  }
   var brokPct = parseFloat(document.getElementById('bcBrokRate').value)||0;
   var brokFlat = parseFloat(document.getElementById('bcBrokFlat').value)||0;
   var brokMin = parseFloat(document.getElementById('bcBrokMinShare').value)||0;
