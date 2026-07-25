@@ -1745,7 +1745,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div style="font-size:.8rem;color:var(--gray);margin-bottom:14px" class="no-upper">Enter the brokerage rate — all statutory charges are applied automatically.</div>
 
         <div class="bc-card">
-          <h2>📊 Trade Details — Select Segment</h2>
+          <h2>📊 Select Segment</h2>
           <div class="bc-seg-tabs" id="bcSegTabs">
             <div class="bc-seg-tab active" data-seg="futures" onclick="bcSetSeg('futures')">Futures (F&amp;O)</div>
             <div class="bc-seg-tab" data-seg="equity_delivery" onclick="bcSetSeg('equity_delivery')">Equity Delivery</div>
@@ -1753,24 +1753,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div class="bc-seg-tab" data-seg="options" onclick="bcSetSeg('options')">Options</div>
             <div class="bc-seg-tab" data-seg="commodity_futures" onclick="bcSetSeg('commodity_futures')">Commodity Futures</div>
             <div class="bc-seg-tab" data-seg="commodity_options" onclick="bcSetSeg('commodity_options')">Commodity Options</div>
-          </div>
-          <div class="bc-grid">
-            <div class="bc-field"><label>Buy Price (₹)</label><input type="number" id="bcBuyPrice" value="750" oninput="bcCalc()"></div>
-            <div class="bc-field"><label>Sell Price (₹)</label><input type="number" id="bcSellPrice" value="770" oninput="bcCalc()"></div>
-            <div class="bc-field" id="bcLotSizeWrap"><label>Lot Size (Qty Per Lot)</label><input type="number" id="bcLotSize" value="550" min="1" oninput="bcCalc()"></div>
-            <div class="bc-field" id="bcLotsWrap"><label>No. Of Lots</label><input type="number" id="bcLots" value="1" min="1" oninput="bcCalc()"></div>
-            <div class="bc-field" id="bcQtyPlainWrap" style="display:none"><label>Quantity</label><input type="number" id="bcQtyPlain" value="550" min="1" oninput="bcCalc()"></div>
-          </div>
-          <div class="no-upper" style="font-size:.75rem;color:var(--gray);margin-top:2px" id="bcTotalQtyWrap">Total Quantity: <b id="bcTotalQtyShow" style="color:var(--navy)">550</b></div>
-          <div class="bc-toggle-rates no-upper" onclick="bcToggleAdv()">⚙️ View Statutory Rates (Auto-Set — Not Editable)</div>
-          <div id="bcAdvRates">
-            <div class="bc-mini-grid">
-              <div class="bc-field"><label>STT / CTT (%)</label><input type="number" id="bcSttRate" step="0.001" readonly></div>
-              <div class="bc-field"><label>Txn Charges (%)</label><input type="number" id="bcTxnRate" step="0.0001" readonly></div>
-              <div class="bc-field"><label>Stamp Duty (%) (Buy)</label><input type="number" id="bcStampRate" step="0.001" readonly></div>
-              <div class="bc-field"><label>SEBI Fees (%)</label><input type="number" id="bcSebiRate" step="0.0001" readonly></div>
-              <div class="bc-field"><label>GST (%)</label><input type="number" id="bcGstRate" step="0.5" value="18" readonly></div>
-            </div>
           </div>
         </div>
 
@@ -1791,6 +1773,28 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             </div>
           </div>
           <div class="no-upper" style="font-size:.7rem;color:var(--gray);margin-top:4px" id="bcBrokHint"></div>
+        </div>
+
+        <div class="bc-card">
+          <h2>📝 Trade Quantity &amp; Price</h2>
+          <div class="bc-grid">
+            <div class="bc-field"><label>Buy Price (₹)</label><input type="number" id="bcBuyPrice" placeholder="Enter Buy Price" oninput="bcCalc()"></div>
+            <div class="bc-field"><label>Sell Price (₹)</label><input type="number" id="bcSellPrice" placeholder="Enter Sell Price" oninput="bcCalc()"></div>
+            <div class="bc-field" id="bcLotSizeWrap"><label>Lot Size (Qty Per Lot)</label><input type="number" id="bcLotSize" placeholder="Enter Lot Size" min="1" oninput="bcCalc()"></div>
+            <div class="bc-field" id="bcLotsWrap"><label>No. Of Lots</label><input type="number" id="bcLots" placeholder="Enter No. Of Lots" min="1" oninput="bcCalc()"></div>
+            <div class="bc-field" id="bcQtyPlainWrap" style="display:none"><label>Quantity</label><input type="number" id="bcQtyPlain" placeholder="Enter Quantity" min="1" oninput="bcCalc()"></div>
+          </div>
+          <div class="no-upper" style="font-size:.75rem;color:var(--gray);margin-top:2px" id="bcTotalQtyWrap">Total Quantity: <b id="bcTotalQtyShow" style="color:var(--navy)">0</b></div>
+          <div class="bc-toggle-rates no-upper" onclick="bcToggleAdv()">⚙️ View Statutory Rates (Auto-Set — Not Editable)</div>
+          <div id="bcAdvRates">
+            <div class="bc-mini-grid">
+              <div class="bc-field"><label>STT / CTT (%)</label><input type="number" id="bcSttRate" step="0.001" readonly></div>
+              <div class="bc-field"><label>Txn Charges (%)</label><input type="number" id="bcTxnRate" step="0.0001" readonly></div>
+              <div class="bc-field"><label>Stamp Duty (%) (Buy)</label><input type="number" id="bcStampRate" step="0.001" readonly></div>
+              <div class="bc-field"><label>SEBI Fees (%)</label><input type="number" id="bcSebiRate" step="0.0001" readonly></div>
+              <div class="bc-field"><label>GST (%)</label><input type="number" id="bcGstRate" step="0.5" value="18" readonly></div>
+            </div>
+          </div>
         </div>
 
         <div class="bc-card">
