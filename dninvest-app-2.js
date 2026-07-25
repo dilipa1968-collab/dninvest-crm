@@ -2412,10 +2412,11 @@ window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); up
 // only the Brokerage Rate is editable by the RM.
 // ══════════════════════════════════════════
 var BC_SEG_BROK_TYPE = { futures:'percent', equity_delivery:'pct_min', equity_intraday:'pct_min', options:'flat',
-                          commodity_futures:'percent', commodity_options:'flat' };
+                          commodity_futures:'percent', commodity_options:'flat',
+                          currency_futures:'percent', currency_options:'flat' };
 
 // Only F&O and Commodity segments trade in lots — Equity Delivery/Intraday use a plain quantity.
-var BC_USES_LOTS = { futures:true, options:true, commodity_futures:true, commodity_options:true };
+var BC_USES_LOTS = { futures:true, options:true, commodity_futures:true, commodity_options:true, currency_futures:true, currency_options:true };
 
 var BC_SEGMENT_DEFAULTS = {
   futures:          { stt:0.05,  txn:0.0019, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
@@ -2423,7 +2424,9 @@ var BC_SEGMENT_DEFAULTS = {
   equity_delivery:  { stt:0.10,  txn:0.00297,stamp:0.015, sebi:0.0001, sttSide:'both', stampSide:'buy', brokPct:0.3,  brokMin:0.03 },
   equity_intraday:  { stt:0.025, txn:0.00297,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03, brokMin:0.03 },
   commodity_futures:{ stt:0.05,  txn:0.0021, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
-  commodity_options:{ stt:0.05,  txn:0.00418,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 }
+  commodity_options:{ stt:0.05,  txn:0.00418,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 },
+  currency_futures: { stt:0,     txn:0.00005,stamp:0.0001,sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },   // STT doesn't apply to currency derivatives
+  currency_options: { stt:0,     txn:0.002,  stamp:0.0001,sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 }     // STT doesn't apply to currency derivatives
 };
 // True original defaults (the "3" series) — never mutated. "Apply To All Segments" changes BC_SEGMENT_DEFAULTS
 // for the session, but "Reset" always comes back to this untouched baseline.
@@ -2734,7 +2737,7 @@ function bcApplyDigitToAllSegments(){
   }
   var rateDigit = digit, minDigit = digit;
 
-  ['futures','commodity_futures'].forEach(function(seg){
+  ['futures','commodity_futures','currency_futures'].forEach(function(seg){
     var orig = BC_ORIGINAL_DEFAULTS[seg];
     var prefix = String(orig.brokPct).slice(0, bcAutoLockChars(orig.brokPct));
     BC_SEGMENT_DEFAULTS[seg].brokPct = parseFloat(prefix + rateDigit) || 0;
@@ -2746,7 +2749,7 @@ function bcApplyDigitToAllSegments(){
     BC_SEGMENT_DEFAULTS[seg].brokPct = parseFloat(pctPrefix + rateDigit) || 0;
     BC_SEGMENT_DEFAULTS[seg].brokMin = parseFloat(minPrefix + minDigit) || 0;
   });
-  ['options','commodity_options'].forEach(function(seg){
+  ['options','commodity_options','currency_options'].forEach(function(seg){
     BC_SEGMENT_DEFAULTS[seg].brokFlat = (typedFlatValue!=null) ? typedFlatValue : (parseFloat(rateDigit)||0) * 10;
   });
 
@@ -2913,6 +2916,7 @@ function bcCalc(){
     +'Options: STT 0.15% (sell side, on premium), Transaction Charges 0.0355%, Stamp Duty 0.003% (buy side). '
     +'Equity Delivery and Intraday follow standard NSE/SEBI slabs. Commodity Futures: CTT 0.05% (sell side, on par with equity futures), MCX Transaction Charges 0.0021%, Stamp Duty 0.002%. '
     +'Commodity Options: CTT 0.05% (sell side, on premium), MCX Transaction Charges 0.00418%, Stamp Duty 0.003%. '
+    +'Currency Futures/Options: STT does not apply (currency derivatives are exempt) — Transaction Charges 0.00005% (Futures) / 0.002% (Options, on premium), Stamp Duty 0.0001%. '
     +'GST is charged at 18% on the sum of Brokerage, Transaction Charges, and SEBI Fees. Rates reflect the April 2026 Budget revision — please verify against the latest exchange circular periodically.';
 }
 
@@ -2924,7 +2928,8 @@ function bcCalc(){
 // ══════════════════════════════════════════
 var bcMultiRowCount = 0;
 var BC_MULTI_SEG_LABELS = { equity_intraday:'Equity Intraday', equity_delivery:'Equity Delivery', futures:'Futures (F&O)',
-                            options:'Options', commodity_futures:'Commodity Futures', commodity_options:'Commodity Options' };
+                            options:'Options', commodity_futures:'Commodity Futures', commodity_options:'Commodity Options',
+                            currency_futures:'Currency Futures', currency_options:'Currency Options' };
 
 function bcAddMultiRow(){
   bcMultiRowCount++;
@@ -3118,7 +3123,7 @@ function bcRenderSummaryTable(){
     return;
   }
 
-  var segs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options'];
+  var segs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
   var html = '<table class="bc-summary-table"><thead><tr><th>Client</th>'
     + segs.map(function(s){ return '<th>'+BC_MULTI_SEG_LABELS[s]+'</th>'; }).join('')
     + '<th>Trade Split Saved</th></tr></thead><tbody>';
