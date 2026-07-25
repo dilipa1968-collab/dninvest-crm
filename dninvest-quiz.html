@@ -409,6 +409,7 @@ window.QUIZ = (function(){
     host.hiddenBanks = Object.assign({}, host.hiddenBanks||{}, {filmi:true});
     renderFilmiVisibility();
   }
+  function renderCustomBankButtons(){
     var box=document.getElementById('quiz-custom-banks'); if(!box) return;
     var html='';
     Object.keys(host.customBanks||{}).sort().forEach(function(key){
