@@ -1044,7 +1044,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </div>
 
       <div class="sidebar-section" id="tools-nav-section">Tools</div>
-      <div class="nav-item" onclick="showPage('brokerage-calc')" id="nav-brokerage-calc">
+      <div class="nav-item" onclick="showPage('brokerage-calc'); bcApplyRoleAccess();" id="nav-brokerage-calc">
         <span class="icon">🧮</span> Brokerage Calculator
       </div>
 
@@ -1767,7 +1767,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div class="bc-seg-tab" data-seg="commodity_futures" onclick="bcSetSeg('commodity_futures')">Commodity Futures</div>
             <div class="bc-seg-tab" data-seg="commodity_options" onclick="bcSetSeg('commodity_options')">Commodity Options</div>
           </div>
+        </div>
 
+        <div class="bc-card bc-compact">
+          <h2>💼 Brokerage Rate — For Selected Segment</h2>
           <div class="bc-grid bc-grid-compact">
             <div class="bc-field" id="bcBrokPctWrap">
               <label id="bcBrokPctLabel">Brokerage Rate (%)</label>
@@ -1781,6 +1784,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <label>Flat Brokerage (₹/Lot)</label>
               <input type="number" id="bcBrokFlat" value="30" step="1" oninput="bcCalc()">
             </div>
+          </div>
+          <div class="no-upper" style="font-size:.68rem;color:var(--gray);margin-top:4px" id="bcBrokHint"></div>
+        </div>
+
+        <div class="bc-card bc-compact">
+          <h2>📝 Trade Quantity &amp; Price</h2>
+          <div class="bc-grid bc-grid-compact">
             <div class="bc-field"><label>Buy Price (₹)</label><input type="number" id="bcBuyPrice" placeholder="Buy Price" oninput="bcCalc()"></div>
             <div class="bc-field"><label>Sell Price (₹)</label><input type="number" id="bcSellPrice" placeholder="Sell Price" oninput="bcCalc()"></div>
             <div class="bc-field" id="bcLotSizeWrap"><label>Lot Size</label><input type="number" id="bcLotSize" placeholder="Lot Size" min="1" oninput="bcCalc()"></div>
@@ -1789,18 +1799,17 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
           <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-top:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span id="bcTotalQtyWrap">Total Quantity: <b id="bcTotalQtyShow" style="color:var(--navy)">0</b></span>
-            <span class="bc-toggle-rates" onclick="bcToggleAdv()">⚙️ View Statutory Rates</span>
+            <span class="bc-toggle-rates" onclick="bcToggleAdv()" id="bcAdvToggleLbl">⚙️ View Statutory Rates</span>
           </div>
           <div id="bcAdvRates">
             <div class="bc-mini-grid">
-              <div class="bc-field"><label>STT / CTT (%)</label><input type="number" id="bcSttRate" step="0.001" readonly></div>
-              <div class="bc-field"><label>Txn Charges (%)</label><input type="number" id="bcTxnRate" step="0.0001" readonly></div>
-              <div class="bc-field"><label>Stamp Duty (%) (Buy)</label><input type="number" id="bcStampRate" step="0.001" readonly></div>
-              <div class="bc-field"><label>SEBI Fees (%)</label><input type="number" id="bcSebiRate" step="0.0001" readonly></div>
-              <div class="bc-field"><label>GST (%)</label><input type="number" id="bcGstRate" step="0.5" value="18" readonly></div>
+              <div class="bc-field"><label>STT / CTT (%)</label><input type="number" id="bcSttRate" step="0.001" readonly oninput="bcCalc()"></div>
+              <div class="bc-field"><label>Txn Charges (%)</label><input type="number" id="bcTxnRate" step="0.0001" readonly oninput="bcCalc()"></div>
+              <div class="bc-field"><label>Stamp Duty (%) (Buy)</label><input type="number" id="bcStampRate" step="0.001" readonly oninput="bcCalc()"></div>
+              <div class="bc-field"><label>SEBI Fees (%)</label><input type="number" id="bcSebiRate" step="0.0001" readonly oninput="bcCalc()"></div>
+              <div class="bc-field"><label>GST (%)</label><input type="number" id="bcGstRate" step="0.5" value="18" readonly oninput="bcCalc()"></div>
             </div>
           </div>
-          <div class="no-upper" style="font-size:.68rem;color:var(--gray);margin-top:4px" id="bcBrokHint"></div>
         </div>
 
         <div class="bc-card bc-compact">
@@ -1821,7 +1830,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="bc-rates-note no-upper" id="bcRatesNote"></div>
         </div>
 
-        <div class="bc-footer-note no-upper">Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.</div>
+        <div class="bc-footer-note no-upper" id="bcFooterNote">Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.</div>
       </div>
       <!-- ══════ END BROKERAGE CALCULATOR PAGE ══════ -->
 

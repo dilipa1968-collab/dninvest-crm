@@ -2446,6 +2446,21 @@ function bcUpdateQtyFields(){
   document.getElementById('bcTotalQtyWrap').style.display = usesLots ? '' : 'none';
 }
 
+// Statutory rates are read-only for RM/staff; Admin can override them (e.g. after an exchange rate revision).
+function bcApplyRoleAccess(){
+  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
+  ['bcSttRate','bcTxnRate','bcStampRate','bcSebiRate','bcGstRate'].forEach(function(id){
+    var el = document.getElementById(id); if(!el) return;
+    if(isAdmin) el.removeAttribute('readonly'); else el.setAttribute('readonly','readonly');
+  });
+  var lbl = document.getElementById('bcAdvToggleLbl');
+  if(lbl) lbl.textContent = isAdmin ? '⚙️ View / Edit Statutory Rates (Admin)' : '⚙️ View Statutory Rates';
+  var footer = document.getElementById('bcFooterNote');
+  if(footer) footer.textContent = isAdmin
+    ? 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are editable by Admin only — e.g. after an exchange rate revision. RMs see them as fixed, auto-set values.'
+    : 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.';
+}
+
 function bcSetSeg(seg){
   bcCurSeg = seg;
   document.querySelectorAll('#page-brokerage-calc .bc-seg-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.seg===seg); });
@@ -2454,6 +2469,7 @@ function bcSetSeg(seg){
   document.getElementById('bcTxnRate').value = d.txn;
   document.getElementById('bcStampRate').value = d.stamp;
   document.getElementById('bcSebiRate').value = d.sebi;
+  bcApplyRoleAccess();
   bcUpdateBrokFields();
   bcUpdateQtyFields();
   var shape = BC_SEG_BROK_TYPE[seg];
