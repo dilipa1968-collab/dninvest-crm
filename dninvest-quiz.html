@@ -120,9 +120,17 @@ input,select,textarea,button{font-family:inherit}
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#b45309" onclick="QUIZ.loadFilmiBank()">🎬 फ़िल्मी सवाल लोड करें</button>
+                <div id="quiz-custom-banks" style="display:flex;gap:6px;flex-wrap:wrap"></div>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+                <span style="font-size:.72rem;color:var(--gray);font-weight:700">📤 Naya Question Bank Upload Karo (Excel):</span>
+                <input type="text" id="quiz-bank-name" placeholder="Naam (jaise Cricket, Filmi)" style="padding:5px 8px;font-size:.76rem;border:1px solid var(--border);border-radius:6px;width:170px">
+                <input type="file" id="quiz-bank-file" accept=".xlsx,.xls" style="font-size:.72rem;max-width:190px">
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.uploadBankExcel()">⬆️ Upload</button>
+                <span style="font-size:.68rem;color:#94a3b8">Columns: Question | Correct Answer | Wrong 1 | Wrong 2 | Wrong 3</span>
               </div>
             </div>
             <div id="quiz-bank"></div>
@@ -178,6 +186,10 @@ window.QUIZ = (function(){
   var BANKDOC = function(){ return window.fdb.collection('quiz').doc('bank'); };
   host.bankCache = null;                            // synced from Firestore so ALL admin devices see the same 5 questions
   host.unsubBank = null;
+  // ── Custom (uploaded Excel) question banks — any topic, unlimited, synced across devices ──
+  var CUSTOMBANKDOC = function(){ return window.fdb.collection('quiz').doc('customBanks'); };
+  host.customBanks = {};                            // { key: [{q,a:[correct,wrong1,wrong2,wrong3]}, ...] }
+  host.unsubCustomBanks = null;
   function defaultBankArr(){
     var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
     return arr;
@@ -360,10 +372,92 @@ window.QUIZ = (function(){
     await writeBankToFirestore(arr);
   }
   async function loadFilmiBank(){
-    if(!confirm('5 नए फ़िल्मी (पुरानी बॉलीवुड) सवाल स्लॉट में लोड करें? इससे सभी डिवाइस पर मौजूदा 5 सवाल बदल जाएँगे।')) return;
-    var arr=_buildBankFromTopic(FILMI_QBANK);
+    if(!confirm('5 नए फ़िल्मी सवाल स्लॉट में लोड करें? इससे सभी डिवाइस पर मौजूदा 5 सवाल बदल जाएँगे।')) return;
+    // Prefer an uploaded "Filmi" Excel bank (bigger, refreshable) — falls back to the built-in classic bank if none uploaded yet.
+    var src=(host.customBanks && host.customBanks['filmi'] && host.customBanks['filmi'].length) ? host.customBanks['filmi'] : FILMI_QBANK;
+    var arr=_buildBankFromTopic(src);
     host.bankCache=arr; renderBank();
     await writeBankToFirestore(arr);
+  }
+
+  // ── Uploaded (Excel) custom banks: sync, render buttons, load, upload ──
+  function subscribeCustomBanks(){
+    try{
+      if(host.unsubCustomBanks) host.unsubCustomBanks();
+      host.unsubCustomBanks = CUSTOMBANKDOC().onSnapshot(function(doc){
+        host.customBanks = (doc.exists && doc.data() && doc.data().banks) ? doc.data().banks : {};
+        renderCustomBankButtons();
+      });
+    }catch(e){}
+  }
+  function renderCustomBankButtons(){
+    var box=document.getElementById('quiz-custom-banks'); if(!box) return;
+    var html='';
+    Object.keys(host.customBanks||{}).sort().forEach(function(key){
+      if(key==='filmi') return;   // Filmi already has its own dedicated button above, sourced from this same data
+      var arr=host.customBanks[key]||[];
+      var label=key.charAt(0).toUpperCase()+key.slice(1).replace(/_/g,' ');
+      html+='<button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#6d28d9" onclick="QUIZ.loadCustomBank(\''+key.replace(/'/g,"\\'")+'\')">🎲 Load '+esc(label)+' Questions ('+arr.length+')</button>';
+    });
+    box.innerHTML=html;
+  }
+  async function loadCustomBank(key){
+    var arr=(host.customBanks && host.customBanks[key]) || [];
+    if(!arr.length){ alert('Ye Bank Abhi Khaali Hai — Pehle Excel Upload Karo.'); return; }
+    if(!confirm('5 Naye "'+key+'" Sawal Load Karein? Isse Sabhi Device Par Maujooda 5 Sawal Badal Jayenge.')) return;
+    var arr2=_buildBankFromTopic(arr);
+    host.bankCache=arr2; renderBank();
+    await writeBankToFirestore(arr2);
+  }
+  async function uploadBankExcel(){
+    var nameInput=document.getElementById('quiz-bank-name');
+    var fileInput=document.getElementById('quiz-bank-file');
+    var name=(nameInput && nameInput.value || '').trim();
+    if(!name){ alert('Pehle Bank Ka Naam Likho (Jaise Cricket, Sports, Filmi).'); return; }
+    var file=fileInput && fileInput.files && fileInput.files[0];
+    if(!file){ alert('Pehle Excel File Chuno.'); return; }
+    var key=name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    if(!key){ alert('Bank Ka Naam Sahi Likho.'); return; }
+    try{
+      var buf=await file.arrayBuffer();
+      var wb=XLSX.read(buf,{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){ alert('Excel Me Koi Data Nahi Mila.'); return; }
+      var firstKeys=Object.keys(rows[0]);
+      function findCol(cands){
+        for(var i=0;i<firstKeys.length;i++){
+          var k=firstKeys[i], kl=k.toLowerCase().trim();
+          for(var j=0;j<cands.length;j++){ if(kl===cands[j]) return k; }
+        }
+        return null;
+      }
+      var qCol=findCol(['question','sawal']);
+      var cCol=findCol(['correct answer','correct','answer']);
+      var w1=findCol(['wrong 1','wrong1','option b']);
+      var w2=findCol(['wrong 2','wrong2','option c']);
+      var w3=findCol(['wrong 3','wrong3','option d']);
+      if(!qCol||!cCol||!w1||!w2||!w3){
+        alert('Excel Ke Column Names Sahi Nahi Hain.\n\nZaroori Columns (Pehli Row Me): Question | Correct Answer | Wrong 1 | Wrong 2 | Wrong 3');
+        return;
+      }
+      var arr=[];
+      rows.forEach(function(r){
+        var q=String(r[qCol]||'').trim();
+        var c=String(r[cCol]||'').trim();
+        var o1=String(r[w1]||'').trim(), o2=String(r[w2]||'').trim(), o3=String(r[w3]||'').trim();
+        if(q && c && o1 && o2 && o3){ arr.push({q:q, a:[c,o1,o2,o3]}); }
+      });
+      if(!arr.length){ alert('Koi Valid Row Nahi Mili — Har Row Me 5 Column (Question + Correct + 3 Wrong) Bhare Hone Chahiye.'); return; }
+      var current=Object.assign({}, host.customBanks||{});
+      current[key]=arr;
+      await CUSTOMBANKDOC().set({ banks:current, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
+      host.customBanks=current; renderCustomBankButtons();
+      alert('✅ "'+name+'" Bank Upload Ho Gaya — '+arr.length+' Sawal. Ab "Load '+name+' Questions" Button Se Kabhi Bhi Use Kar Sakte Ho (Sabhi Device Par).');
+      if(fileInput) fileInput.value='';
+    }catch(e){
+      alert('Upload Fail Ho Gaya: '+(e && e.message ? e.message : e));
+    }
   }
 
   function isPlayMode(){
@@ -387,6 +481,7 @@ window.QUIZ = (function(){
     var qr=document.getElementById('quiz-qr-box');
     if(qr){ qr.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(joinLink())+'" width="160" height="160" style="border-radius:10px;background:#fff;padding:6px" alt="Join QR">'; }
     renderBank();
+    subscribeCustomBanks();
     // ensure live doc exists (also acts as a live connectivity test)
     try{
       var d=await DOC().get();
@@ -1815,7 +1910,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile, saveScreenTitle:saveScreenTitle
   };
