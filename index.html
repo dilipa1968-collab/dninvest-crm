@@ -1822,7 +1822,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               oninput="bcOnClientSearchInput()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;width:230px">
             <datalist id="bcClientDatalist"></datalist>
             <button type="button" class="bc-mini-btn" onclick="bcSaveClient()" title="Save this segment's Brokerage Rate for the selected client">💾 Save Rate</button>
-            <button type="button" class="bc-mini-btn" style="border-color:#7c3aed;color:#7c3aed" onclick="bcSaveClientAllSegments()" title="Apply the digit you typed to every segment's rate, in each segment's own format">💾 Save For All Segments</button>
             <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcDeleteClient()" title="Clear this client's saved brokerage profile">🗑️ Clear Saved Rates</button>
           </div>
           <button class="btn btn-outline" onclick="window.print()" style="font-size:.82rem;padding:6px 14px">🖨️ Print / Save PDF</button>
@@ -1852,7 +1851,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div class="bc-card bc-compact">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:5px">
             <h2 style="margin-bottom:0">💼 Brokerage Rate — For Selected Segment</h2>
-            <div style="display:flex;gap:6px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="bc-mini-btn" style="border-color:#7c3aed;color:#7c3aed" onclick="bcApplyDigitToAllSegments()" title="Apply the digit you just typed to every segment's default rate — no client needed">⚡ Apply To All Segments</button>
               <button type="button" class="bc-mini-btn" onclick="bcResetBrokerage()">🔄 Reset</button>
               <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcClearBrokerage()">🧹 Clear</button>
             </div>

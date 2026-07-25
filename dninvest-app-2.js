@@ -2629,6 +2629,9 @@ function bcOnClientSearchInput(){
     bcCurrentClientKey = code;
     bcApplyClientOverride();
     bcLoadMultiTradeForClient();
+  } else {
+    bcCurrentClientKey = '';
+    document.getElementById('bcClientHint').textContent = '';
   }
 }
 
@@ -2650,12 +2653,18 @@ function bcApplyClientOverride(){
 }
 
 async function bcSaveClient(){
-  if(!bcCurrentClientKey){ alert('Please select a client from the list first.'); return; }
+  var typedName = (document.getElementById('bcClientSearch').value||'').trim().replace(/\s*\(.*?\)\s*(✓ saved)?\s*$/,'');
   var myClients = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
-  var rec = myClients.find(function(c){ return c.code===bcCurrentClientKey; });
-  if(!rec){ alert('This client is not in your accessible client list.'); return; }
-  var key = rec.code;
-  var name = rec.name;
+  var rec = bcCurrentClientKey ? myClients.find(function(c){ return c.code===bcCurrentClientKey; }) : null;
+  var key, name;
+  if(rec){ key = rec.code; name = rec.name; }
+  else if(typedName){
+    // Not one of your CRM clients (e.g. a new/prospective client) — save under a walk-in profile by name instead.
+    key = 'custom_' + typedName.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    name = typedName;
+    bcCurrentClientKey = key;
+  } else { alert('Type or select a client name first.'); return; }
+
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
   var rateValue;
   if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
@@ -2677,22 +2686,15 @@ async function bcSaveClient(){
     try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
     catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
   }
-  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for this segment.';
+  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for this segment'+(rec?'':' (walk-in/prospective client)')+'.';
   document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 
-// Applies the digit the RM just typed into EVERY segment's own natural rate format —
-// e.g. typing "2" saves Futures/Commodity Futures as 0.02%, Equity Delivery as 0.2%, Equity Intraday as 0.02%,
-// and Options/Commodity Options as ₹2/lot — all six segments end up consistent with that one digit.
-async function bcSaveClientAllSegments(){
-  if(!bcCurrentClientKey){ alert('Please select a client from the list first.'); return; }
-  var myClients = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
-  var rec = myClients.find(function(c){ return c.code===bcCurrentClientKey; });
-  if(!rec){ alert('This client is not in your accessible client list.'); return; }
-  var key = rec.code;
-  var name = rec.name;
+// Applies the digit the RM just typed into EVERY segment's DEFAULT rate (this session only — no client, no Firestore).
+// e.g. typing "2" makes Futures/Commodity Futures default to 0.02%, Equity Delivery 0.2%, Equity Intraday 0.02%,
+// and Options/Commodity Options ₹20/lot (flat segments scale ×10, so a "3" stays ₹30/lot, "2" → ₹20/lot, "1" → ₹10/lot).
+function bcApplyDigitToAllSegments(){
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-
   var rateDigit, minDigit;
   if(shape==='flat'){
     rateDigit = String(parseFloat(document.getElementById('bcBrokFlat').value)||0);
@@ -2704,39 +2706,24 @@ async function bcSaveClientAllSegments(){
       : rateDigit;
   }
 
-  var result = {};
   ['futures','commodity_futures'].forEach(function(seg){
     var def = BC_SEGMENT_DEFAULTS[seg];
-    var lockChars = bcAutoLockChars(def.brokPct);
-    var prefix = String(def.brokPct).slice(0, lockChars);
-    result[seg] = parseFloat(prefix + rateDigit) || 0;
+    var prefix = String(def.brokPct).slice(0, bcAutoLockChars(def.brokPct));
+    def.brokPct = parseFloat(prefix + rateDigit) || 0;
   });
   ['equity_delivery','equity_intraday'].forEach(function(seg){
     var def = BC_SEGMENT_DEFAULTS[seg];
     var pctPrefix = String(def.brokPct).slice(0, bcAutoLockChars(def.brokPct));
     var minPrefix = String(def.brokMin).slice(0, bcAutoLockChars(def.brokMin));
-    result[seg] = { pct: parseFloat(pctPrefix + rateDigit)||0, min: parseFloat(minPrefix + minDigit)||0 };
+    def.brokPct = parseFloat(pctPrefix + rateDigit) || 0;
+    def.brokMin = parseFloat(minPrefix + minDigit) || 0;
   });
   ['options','commodity_options'].forEach(function(seg){
-    result[seg] = parseFloat(rateDigit)||0;
+    BC_SEGMENT_DEFAULTS[seg].brokFlat = (parseFloat(rateDigit)||0) * 10;
   });
 
-  try{
-    var updatePayload = {};
-    updatePayload['clients.'+key+'.label'] = name;
-    Object.keys(result).forEach(function(seg){ updatePayload['clients.'+key+'.'+seg] = result[seg]; });
-    await BCCLIENTDOC().set({}, {merge:true});
-    await BCCLIENTDOC().update(updatePayload);
-  }catch(e){
-    var current = JSON.parse(JSON.stringify(bcClients||{}));
-    if(!current[key]) current[key] = { label:name };
-    current[key].label = name;
-    Object.keys(result).forEach(function(seg){ current[key][seg] = result[seg]; });
-    try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
-    catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
-  }
-  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate across all 6 segments (digit "'+rateDigit+'" applied to each).';
-  document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
+  bcSetSeg(bcCurSeg);   // refresh the currently-shown segment with its (possibly just-updated) default
+  document.getElementById('bcClientHint').textContent = 'Applied digit "'+rateDigit+'" as the new default across all 6 segments for this session.';
 }
 
 async function bcDeleteClient(){
@@ -3070,7 +3057,7 @@ function bcRenderSummaryTable(){
   if(!wrap) return;
   var accessibleCodes = {};
   (bcAllMyClients||[]).forEach(function(c){ if(c.code) accessibleCodes[c.code]=true; });
-  var codes = Object.keys(bcClients||{}).filter(function(k){ return accessibleCodes[k]; })
+  var codes = Object.keys(bcClients||{}).filter(function(k){ return accessibleCodes[k] || k.indexOf('custom_')===0; })
     .sort(function(a,b){ return (bcClients[a].label||'').localeCompare(bcClients[b].label||''); });
 
   if(!codes.length){
