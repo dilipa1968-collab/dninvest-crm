@@ -2511,6 +2511,38 @@ function bcSetSeg(seg){
   bcCalc();
 }
 
+// Reload the default Brokerage Rate for the currently-selected segment — no full page refresh needed.
+function bcResetBrokerage(){
+  var seg = bcCurSeg;
+  var d = BC_SEGMENT_DEFAULTS[seg];
+  var shape = BC_SEG_BROK_TYPE[seg];
+  if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
+  else if(shape==='pct_min'){
+    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
+  } else {
+    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+  }
+  bcCalc();
+}
+
+// Blank out the Brokerage Rate field(s) so the RM can type in the client's actual rate fresh.
+function bcClearBrokerage(){
+  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  if(shape==='flat'){
+    document.getElementById('bcBrokFlat').value = '';
+  } else if(shape==='pct_min'){
+    document.getElementById('bcBrokRateDigit').value = '';
+    document.getElementById('bcBrokRate').value = 0;
+    document.getElementById('bcBrokMinShareDigit').value = '';
+    document.getElementById('bcBrokMinShare').value = 0;
+  } else {
+    document.getElementById('bcBrokRateDigit').value = '';
+    document.getElementById('bcBrokRate').value = 0;
+  }
+  bcCalc();
+}
+
 function bcToggleAdv(){
   document.getElementById('bcAdvRates').classList.toggle('open');
 }
