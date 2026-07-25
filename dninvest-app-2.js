@@ -2485,7 +2485,22 @@ function bcSetLockedRate(hiddenId, prefixId, digitId, value, lockChars){
   digitEl.dataset.floorVal = parseFloat(prefix + '1');
   var warnEl = document.getElementById(digitId.replace(/Digit$/,'') + 'Warn');
   if(warnEl) warnEl.textContent = '';
+  bcHideToast();
 }
+// Prominent top-of-page popup — used for the brokerage range warning so it's impossible to miss.
+function bcShowToast(msg){
+  var t = document.getElementById('bcToast');
+  if(!t) return;
+  t.innerHTML = '<span class="bc-toast-icon">⚠️</span><span class="bc-toast-msg">'+msg+'</span><span class="bc-toast-close" onclick="bcHideToast()">✕</span>';
+  t.classList.add('show');
+  clearTimeout(window._bcToastTimer);
+  window._bcToastTimer = setTimeout(bcHideToast, 5000);
+}
+function bcHideToast(){
+  var t = document.getElementById('bcToast');
+  if(t) t.classList.remove('show');
+}
+
 function bcOnDigitChange(hiddenId, prefixId, digitId){
   var digitEl = document.getElementById(digitId);
   var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(0,3);
@@ -2498,9 +2513,13 @@ function bcOnDigitChange(hiddenId, prefixId, digitId){
   if(warnEl){
     var ceil = parseFloat(digitEl.dataset.defaultVal);
     var floor = parseFloat(digitEl.dataset.floorVal);
-    if(!isNaN(ceil) && combined > ceil) warnEl.textContent = '⚠️ Default rate ('+ceil+'%) se zyada hai — confirm kar lein.';
-    else if(!isNaN(floor) && combined < floor) warnEl.textContent = '⚠️ Bahut kam hai — minimum '+floor+'% rakhna behtar hai.';
-    else warnEl.textContent = '';
+    if(!isNaN(ceil) && combined > ceil){
+      var msg1 = '⚠️ Default rate ('+ceil+'%) se zyada hai — confirm kar lein.';
+      warnEl.textContent = msg1; bcShowToast(msg1);
+    } else if(!isNaN(floor) && combined < floor){
+      var msg2 = '⚠️ Bahut kam hai — minimum '+floor+'% rakhna behtar hai.';
+      warnEl.textContent = msg2; bcShowToast(msg2);
+    } else { warnEl.textContent = ''; bcHideToast(); }
   }
   bcCalc();
 }
@@ -2512,9 +2531,13 @@ function bcOnFlatChange(){
   var warnEl = document.getElementById('bcBrokFlatWarn');
   if(warnEl){
     var ceil = parseFloat(el.dataset.defaultVal);
-    if(!isNaN(val) && !isNaN(ceil) && val > ceil) warnEl.textContent = '⚠️ Default rate (₹'+ceil+'/lot) se zyada hai — confirm kar lein.';
-    else if(!isNaN(val) && val < 1) warnEl.textContent = '⚠️ Bahut kam hai — minimum ₹1/lot rakhna behtar hai.';
-    else warnEl.textContent = '';
+    if(!isNaN(val) && !isNaN(ceil) && val > ceil){
+      var msg1 = '⚠️ Default rate (₹'+ceil+'/lot) se zyada hai — confirm kar lein.';
+      warnEl.textContent = msg1; bcShowToast(msg1);
+    } else if(!isNaN(val) && val < 1){
+      var msg2 = '⚠️ Bahut kam hai — minimum ₹1/lot rakhna behtar hai.';
+      warnEl.textContent = msg2; bcShowToast(msg2);
+    } else { warnEl.textContent = ''; bcHideToast(); }
   }
   bcCalc();
 }
@@ -2525,6 +2548,7 @@ function bcSetFlatBrokerage(value){
   el.dataset.defaultVal = value;
   var warnEl = document.getElementById('bcBrokFlatWarn');
   if(warnEl) warnEl.textContent = '';
+  bcHideToast();
 }
 
 function bcSetSeg(seg){
@@ -2579,6 +2603,7 @@ function bcClearBrokerage(){
   ['bcBrokRateWarn','bcBrokMinShareWarn','bcBrokFlatWarn'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.textContent='';
   });
+  bcHideToast();
   if(shape==='flat'){
     document.getElementById('bcBrokFlat').value = '';
   } else if(shape==='pct_min'){
