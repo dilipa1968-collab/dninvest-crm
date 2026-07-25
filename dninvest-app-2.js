@@ -2484,22 +2484,15 @@ function bcSetLockedRate(hiddenId, prefixId, digitId, value, lockChars){
   var digitEl = document.getElementById(digitId);
   digitEl.dataset.defaultVal = value;
   digitEl.dataset.floorVal = parseFloat(prefix + '1');
-  var warnEl = document.getElementById(digitId.replace(/Digit$/,'') + 'Warn');
-  if(warnEl) warnEl.textContent = '';
-  bcHideToast();
+  bcSetWarnBox(digitId.replace(/Digit$/,'') + 'Warn', '');
 }
-// Prominent top-of-page popup — used for the brokerage range warning so it's impossible to miss.
-function bcShowToast(msg){
-  var t = document.getElementById('bcToast');
-  if(!t) return;
-  t.innerHTML = '<span class="bc-toast-icon">⚠️</span><span class="bc-toast-msg">'+msg+'</span><span class="bc-toast-close" onclick="bcHideToast()">✕</span>';
-  t.classList.add('show');
-  clearTimeout(window._bcToastTimer);
-  window._bcToastTimer = setTimeout(bcHideToast, 5000);
-}
-function bcHideToast(){
-  var t = document.getElementById('bcToast');
-  if(t) t.classList.remove('show');
+
+// Solid red square alert that sits right beside the brokerage box — shows/hides based on whether msg is non-empty.
+function bcSetWarnBox(warnId, msg){
+  var el = document.getElementById(warnId);
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.toggle('show', !!msg);
 }
 
 function bcOnDigitChange(hiddenId, prefixId, digitId){
@@ -2510,18 +2503,12 @@ function bcOnDigitChange(hiddenId, prefixId, digitId){
   var combined = parseFloat(prefix + (d||'0'));
   document.getElementById(hiddenId).value = isNaN(combined) ? 0 : combined;
 
-  var warnEl = document.getElementById(digitId.replace(/Digit$/,'') + 'Warn');
-  if(warnEl){
-    var ceil = parseFloat(digitEl.dataset.defaultVal);
-    var floor = parseFloat(digitEl.dataset.floorVal);
-    if(!isNaN(ceil) && combined > ceil){
-      var msg1 = '⚠️ Default rate ('+ceil+'%) se zyada hai — confirm kar lein.';
-      warnEl.textContent = msg1; bcShowToast(msg1);
-    } else if(!isNaN(floor) && combined < floor){
-      var msg2 = '⚠️ Bahut kam hai — minimum '+floor+'% rakhna behtar hai.';
-      warnEl.textContent = msg2; bcShowToast(msg2);
-    } else { warnEl.textContent = ''; bcHideToast(); }
-  }
+  var warnId = digitId.replace(/Digit$/,'') + 'Warn';
+  var ceil = parseFloat(digitEl.dataset.defaultVal);
+  var floor = parseFloat(digitEl.dataset.floorVal);
+  if(!isNaN(ceil) && combined > ceil) bcSetWarnBox(warnId, '⚠️ Default ('+ceil+'%) se zyada!');
+  else if(!isNaN(floor) && combined < floor) bcSetWarnBox(warnId, '⚠️ Bahut kam! Min '+floor+'%');
+  else bcSetWarnBox(warnId, '');
   bcCalc();
 }
 
@@ -2529,17 +2516,10 @@ function bcOnDigitChange(hiddenId, prefixId, digitId){
 function bcOnFlatChange(){
   var el = document.getElementById('bcBrokFlat');
   var val = parseFloat(el.value);
-  var warnEl = document.getElementById('bcBrokFlatWarn');
-  if(warnEl){
-    var ceil = parseFloat(el.dataset.defaultVal);
-    if(!isNaN(val) && !isNaN(ceil) && val > ceil){
-      var msg1 = '⚠️ Default rate (₹'+ceil+'/lot) se zyada hai — confirm kar lein.';
-      warnEl.textContent = msg1; bcShowToast(msg1);
-    } else if(!isNaN(val) && val < 1){
-      var msg2 = '⚠️ Bahut kam hai — minimum ₹1/lot rakhna behtar hai.';
-      warnEl.textContent = msg2; bcShowToast(msg2);
-    } else { warnEl.textContent = ''; bcHideToast(); }
-  }
+  var ceil = parseFloat(el.dataset.defaultVal);
+  if(!isNaN(val) && !isNaN(ceil) && val > ceil) bcSetWarnBox('bcBrokFlatWarn', '⚠️ Default (₹'+ceil+') se zyada!');
+  else if(!isNaN(val) && val < 1) bcSetWarnBox('bcBrokFlatWarn', '⚠️ Bahut kam! Min ₹1');
+  else bcSetWarnBox('bcBrokFlatWarn', '');
   bcCalc();
 }
 
@@ -2547,9 +2527,7 @@ function bcSetFlatBrokerage(value){
   var el = document.getElementById('bcBrokFlat');
   el.value = value;
   el.dataset.defaultVal = value;
-  var warnEl = document.getElementById('bcBrokFlatWarn');
-  if(warnEl) warnEl.textContent = '';
-  bcHideToast();
+  bcSetWarnBox('bcBrokFlatWarn', '');
 }
 
 function bcSetSeg(seg){
@@ -2601,10 +2579,7 @@ function bcResetBrokerage(){
 // Blank out the Brokerage Rate field(s) so the RM can type in the client's actual rate fresh.
 function bcClearBrokerage(){
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-  ['bcBrokRateWarn','bcBrokMinShareWarn','bcBrokFlatWarn'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.textContent='';
-  });
-  bcHideToast();
+  ['bcBrokRateWarn','bcBrokMinShareWarn','bcBrokFlatWarn'].forEach(function(id){ bcSetWarnBox(id, ''); });
   if(shape==='flat'){
     document.getElementById('bcBrokFlat').value = '';
   } else if(shape==='pct_min'){
