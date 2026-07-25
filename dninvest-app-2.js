@@ -2573,29 +2573,35 @@ function bcSubscribeClients(){
   }catch(e){}
 }
 
-function bcRenderClientDropdown(){
+// Builds the option list from the RM's own (or Admin's all) real Equity client records — searchable by name/code.
+function bcFilterClientList(){
   var sel = document.getElementById('bcClientSelect');
+  var search = (document.getElementById('bcClientSearch').value||'').trim().toLowerCase();
   if(!sel) return;
-  var keep = sel.value;
-  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
-  var myUser = (typeof CU!=='undefined' && CU && CU.username) ? CU.username : '';
-  var keys = Object.keys(bcClients).filter(function(k){
-    return isAdmin || bcClients[k].owner === myUser;
-  }).sort(function(a,b){ return (bcClients[a].label||a).localeCompare(bcClients[b].label||b); });
+  var list = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
+  if(search){
+    list = list.filter(function(c){
+      return (c.name||'').toLowerCase().indexOf(search)!==-1 || (c.code||'').toLowerCase().indexOf(search)!==-1;
+    });
+  }
+  list = list.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).slice(0, 200);
   var html = '<option value="">— No Client (Defaults) —</option>';
-  keys.forEach(function(k){
-    var c = bcClients[k];
-    var lbl = (isAdmin && c.ownerName) ? c.label+' — '+c.ownerName : c.label;
-    html += '<option value="'+k+'">'+lbl+'</option>';
+  list.forEach(function(c){
+    if(!c.code) return;
+    var saved = bcClients[c.code] ? ' ✓' : '';
+    html += '<option value="'+c.code+'">'+c.name+' ('+c.code+')'+saved+'</option>';
   });
   sel.innerHTML = html;
-  if(keys.indexOf(keep)!==-1) sel.value = keep; else bcCurrentClientKey = '';
+}
+
+function bcRenderClientDropdown(){
+  bcFilterClientList();
+  var sel = document.getElementById('bcClientSelect');
+  if(sel && bcCurrentClientKey && sel.querySelector('option[value="'+bcCurrentClientKey+'"]')) sel.value = bcCurrentClientKey;
 }
 
 function bcOnClientSelect(){
   bcCurrentClientKey = document.getElementById('bcClientSelect').value;
-  var nameInput = document.getElementById('bcClientNameInput');
-  if(bcCurrentClientKey && bcClients[bcCurrentClientKey]) nameInput.value = bcClients[bcCurrentClientKey].label;
   bcApplyClientOverride();
 }
 
@@ -2617,20 +2623,12 @@ function bcApplyClientOverride(){
 }
 
 async function bcSaveClient(){
-  var nameInput = document.getElementById('bcClientNameInput');
-  var name = (nameInput.value||'').trim() || (bcCurrentClientKey && bcClients[bcCurrentClientKey] ? bcClients[bcCurrentClientKey].label : '');
-  if(!name){ alert('Please enter the client name.'); return; }
-  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
-  var myUser = (typeof CU!=='undefined' && CU && CU.username) ? CU.username : '';
-  var myName = (typeof CU!=='undefined' && CU && CU.name) ? CU.name : myUser;
-
-  // Non-admins may only edit their own client; block if they somehow have another RM's key selected.
-  if(bcCurrentClientKey && bcClients[bcCurrentClientKey] && !isAdmin && bcClients[bcCurrentClientKey].owner !== myUser){
-    alert('You can only save rates for your own clients.'); return;
-  }
-
-  var key = bcCurrentClientKey || (myUser||'admin')+'_'+name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('client_'+Date.now());
-  var isNew = !bcClients[key];
+  if(!bcCurrentClientKey){ alert('Please select a client from the list first.'); return; }
+  var myClients = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
+  var rec = myClients.find(function(c){ return c.code===bcCurrentClientKey; });
+  if(!rec){ alert('This client is not in your accessible client list.'); return; }
+  var key = rec.code;
+  var name = rec.name;
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
   var rateValue;
   if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
@@ -2641,29 +2639,24 @@ async function bcSaveClient(){
     var updatePayload = {};
     updatePayload['clients.'+key+'.label'] = name;
     updatePayload['clients.'+key+'.'+bcCurSeg] = rateValue;
-    if(isNew){ updatePayload['clients.'+key+'.owner'] = myUser; updatePayload['clients.'+key+'.ownerName'] = myName; }
     await BCCLIENTDOC().set({}, {merge:true});   // ensure the doc exists before a dotted-path update
     await BCCLIENTDOC().update(updatePayload);
   }catch(e){
     // Fallback: full-document rewrite if update() fails (e.g. doc didn't exist yet)
     var current = JSON.parse(JSON.stringify(bcClients||{}));
-    if(!current[key]) current[key] = { label:name, owner:myUser, ownerName:myName };
+    if(!current[key]) current[key] = { label:name };
     current[key].label = name;
     current[key][bcCurSeg] = rateValue;
     try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
     catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
   }
-  bcCurrentClientKey = key;
   document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for this segment.';
 }
 
 async function bcDeleteClient(){
-  if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey]){ alert('Select a saved client to delete first.'); return; }
-  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
-  var myUser = (typeof CU!=='undefined' && CU && CU.username) ? CU.username : '';
-  if(!isAdmin && bcClients[bcCurrentClientKey].owner !== myUser){ alert('You can only delete your own clients.'); return; }
+  if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey]){ alert('Select a client with a saved rate first.'); return; }
   var label = bcClients[bcCurrentClientKey].label;
-  if(!confirm('Delete "'+label+'" and all their saved brokerage rates? This cannot be undone.')) return;
+  if(!confirm('Clear all saved brokerage rates for "'+label+'"? This only removes their saved rates here — their CRM client record is not affected.')) return;
   try{
     var del = {}; del['clients.'+bcCurrentClientKey] = firebase.firestore.FieldValue.delete();
     await BCCLIENTDOC().update(del);
@@ -2672,8 +2665,6 @@ async function bcDeleteClient(){
     delete current[bcCurrentClientKey];
     try{ await BCCLIENTDOC().set({ clients: current }); }catch(e2){ alert('Could not delete: '+(e2&&e2.message?e2.message:e2)); return; }
   }
-  bcCurrentClientKey = '';
-  document.getElementById('bcClientNameInput').value = '';
   document.getElementById('bcClientHint').textContent = '';
 }
 

@@ -1782,12 +1782,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div class="page-hdr">
           <div class="page-title">🧮 Brokerage &amp; Charges Calculator</div>
           <div class="no-upper" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <select id="bcClientSelect" onchange="bcOnClientSelect()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;max-width:160px">
+            <input type="text" id="bcClientSearch" placeholder="Search client (name / code)…" oninput="bcFilterClientList()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;width:150px">
+            <select id="bcClientSelect" onchange="bcOnClientSelect()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;max-width:190px">
               <option value="">— No Client (Defaults) —</option>
             </select>
-            <input type="text" id="bcClientNameInput" placeholder="Client name" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;width:120px">
-            <button type="button" class="bc-mini-btn" onclick="bcSaveClient()" title="Save this segment's Brokerage Rate under this client name">💾 Save</button>
-            <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcDeleteClient()" title="Delete the selected client">🗑️ Delete</button>
+            <button type="button" class="bc-mini-btn" onclick="bcSaveClient()" title="Save this segment's Brokerage Rate for the selected client">💾 Save Rate</button>
+            <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcDeleteClient()" title="Clear this client's saved brokerage profile">🗑️ Clear Saved Rates</button>
           </div>
           <button class="btn btn-outline" onclick="window.print()" style="font-size:.82rem;padding:6px 14px">🖨️ Print / Save PDF</button>
         </div>
