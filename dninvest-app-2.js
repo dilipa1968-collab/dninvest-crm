@@ -2717,11 +2717,17 @@ async function bcSaveClient(){
 // and Options/Commodity Options ₹20/lot (flat segments scale ×10, so a "3" stays ₹30/lot, "2" → ₹20/lot, "1" → ₹10/lot).
 function bcApplyDigitToAllSegments(){
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-  // A single digit drives everything — whichever ONE field the RM just edited (Rate, or Flat for Options/Commodity
-  // Options). Min. Brokerage always mirrors this same digit, so the RM never has to touch two fields separately.
-  var digit = (shape==='flat')
-    ? String(parseFloat(document.getElementById('bcBrokFlat').value)||0)
-    : ((document.getElementById('bcBrokRateDigit').value||'').replace(/[^0-9]/g,'') || '0');
+  // A single digit drives everything. If starting FROM a flat segment (Options/Commodity Options), the typed
+  // ₹ value is used as-is for both flat segments (no rescaling), and the equivalent "digit" for percent-based
+  // segments is derived by dividing by 10 (₹20 → digit "2" → 0.02%). If starting from a percent-based segment,
+  // the typed digit applies directly there, and flat segments scale up ×10 (digit "2" → ₹20/lot).
+  var typedFlatValue = null, digit;
+  if(shape==='flat'){
+    typedFlatValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
+    digit = String(Math.round(typedFlatValue/10));
+  } else {
+    digit = (document.getElementById('bcBrokRateDigit').value||'').replace(/[^0-9]/g,'') || '0';
+  }
   var rateDigit = digit, minDigit = digit;
 
   ['futures','commodity_futures'].forEach(function(seg){
@@ -2737,7 +2743,7 @@ function bcApplyDigitToAllSegments(){
     BC_SEGMENT_DEFAULTS[seg].brokMin = parseFloat(minPrefix + minDigit) || 0;
   });
   ['options','commodity_options'].forEach(function(seg){
-    BC_SEGMENT_DEFAULTS[seg].brokFlat = (parseFloat(rateDigit)||0) * 10;
+    BC_SEGMENT_DEFAULTS[seg].brokFlat = (typedFlatValue!=null) ? typedFlatValue : (parseFloat(rateDigit)||0) * 10;
   });
 
   bcAllSegmentsApplied = true;
