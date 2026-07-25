@@ -397,9 +397,29 @@ window.QUIZ = (function(){
       if(key==='filmi') return;   // Filmi already has its own dedicated button above, sourced from this same data
       var arr=host.customBanks[key]||[];
       var label=key.charAt(0).toUpperCase()+key.slice(1).replace(/_/g,' ');
-      html+='<button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#6d28d9" onclick="QUIZ.loadCustomBank(\''+key.replace(/'/g,"\\'")+'\')">🎲 Load '+esc(label)+' Questions ('+arr.length+')</button>';
+      html+='<span style="display:inline-flex;align-items:center;gap:2px">'
+        +'<button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#6d28d9" onclick="QUIZ.loadCustomBank(\''+key.replace(/'/g,"\\'")+'\')">🎲 Load '+esc(label)+' Questions ('+arr.length+')</button>'
+        +'<button class="btn btn-outline" title="इस बैंक को हमेशा के लिए हटाएँ" style="padding:5px 8px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteCustomBank(\''+key.replace(/'/g,"\\'")+'\')">✕</button>'
+        +'</span>';
     });
+    if(host.customBanks && host.customBanks['filmi'] && host.customBanks['filmi'].length){
+      html+='<button class="btn btn-outline" title="Uploaded Filmi Bank Hataa Ke Purane 38 Wale Par Wapas Jao" style="padding:5px 8px;font-size:.72rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteCustomBank(\'filmi\')">✕ Uploaded Filmi Hataao</button>';
+    }
     box.innerHTML=html;
+  }
+  async function deleteCustomBank(key){
+    if(!confirm('"'+key+'" Bank Hamesha Ke Liye Delete Karein? Ye Sabhi Device Se Hat Jayega — Wapas Nahi Aayega (Dobara Upload Karna Padega).')) return;
+    try{
+      await CUSTOMBANKDOC().update({ ['banks.'+key]: firebase.firestore.FieldValue.delete() });
+    }catch(e){
+      // doc/field may not exist in the shape update() expects — fall back to full rewrite
+      var current=Object.assign({}, host.customBanks||{});
+      delete current[key];
+      try{ await CUSTOMBANKDOC().set({ banks:current, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e2){ alert('Delete Fail Ho Gaya: '+(e2&&e2.message?e2.message:e2)); return; }
+    }
+    var current2=Object.assign({}, host.customBanks||{});
+    delete current2[key];
+    host.customBanks=current2; renderCustomBankButtons();
   }
   async function loadCustomBank(key){
     var arr=(host.customBanks && host.customBanks[key]) || [];
@@ -1910,7 +1930,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, deleteCustomBank:deleteCustomBank, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile, saveScreenTitle:saveScreenTitle
   };
