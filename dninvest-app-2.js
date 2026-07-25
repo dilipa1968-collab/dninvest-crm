@@ -2425,8 +2425,12 @@ var BC_SEGMENT_DEFAULTS = {
   commodity_futures:{ stt:0.05,  txn:0.0021, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
   commodity_options:{ stt:0.05,  txn:0.00418,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 }
 };
+// True original defaults (the "3" series) — never mutated. "Apply To All Segments" changes BC_SEGMENT_DEFAULTS
+// for the session, but "Reset" always comes back to this untouched baseline.
+var BC_ORIGINAL_DEFAULTS = JSON.parse(JSON.stringify(BC_SEGMENT_DEFAULTS));
 
 var bcCurSeg = 'futures';
+var bcAllSegmentsApplied = false;   // true right after "Apply To All Segments" — next "Save Rate" saves every segment
 
 function bcUpdateBrokFields(){
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
@@ -2496,6 +2500,7 @@ function bcSetWarnBox(warnId, msg){
 }
 
 function bcOnDigitChange(hiddenId, prefixId, digitId){
+  bcAllSegmentsApplied = false;
   var digitEl = document.getElementById(digitId);
   var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(0,3);
   digitEl.value = d;
@@ -2514,6 +2519,7 @@ function bcOnDigitChange(hiddenId, prefixId, digitId){
 
 // Flat Brokerage (₹/Lot) — same soft min-1/max-default range check, for Options & Commodity Options.
 function bcOnFlatChange(){
+  bcAllSegmentsApplied = false;
   var el = document.getElementById('bcBrokFlat');
   var val = parseFloat(el.value);
   var ceil = parseFloat(el.dataset.defaultVal);
@@ -2665,16 +2671,28 @@ async function bcSaveClient(){
     bcCurrentClientKey = key;
   } else { alert('Type or select a client name first.'); return; }
 
-  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-  var rateValue;
-  if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
-  else if(shape==='pct_min') rateValue = { pct: parseFloat(document.getElementById('bcBrokRate').value)||0, min: parseFloat(document.getElementById('bcBrokMinShare').value)||0 };
-  else rateValue = parseFloat(document.getElementById('bcBrokRate').value)||0;
+  var segsToSave = {};
+  if(bcAllSegmentsApplied){
+    Object.keys(BC_SEGMENT_DEFAULTS).forEach(function(seg){
+      var def = BC_SEGMENT_DEFAULTS[seg];
+      var shape = BC_SEG_BROK_TYPE[seg];
+      if(shape==='flat') segsToSave[seg] = def.brokFlat;
+      else if(shape==='pct_min') segsToSave[seg] = { pct: def.brokPct, min: def.brokMin };
+      else segsToSave[seg] = def.brokPct;
+    });
+  } else {
+    var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+    var rateValue;
+    if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
+    else if(shape==='pct_min') rateValue = { pct: parseFloat(document.getElementById('bcBrokRate').value)||0, min: parseFloat(document.getElementById('bcBrokMinShare').value)||0 };
+    else rateValue = parseFloat(document.getElementById('bcBrokRate').value)||0;
+    segsToSave[bcCurSeg] = rateValue;
+  }
 
   try{
     var updatePayload = {};
     updatePayload['clients.'+key+'.label'] = name;
-    updatePayload['clients.'+key+'.'+bcCurSeg] = rateValue;
+    Object.keys(segsToSave).forEach(function(seg){ updatePayload['clients.'+key+'.'+seg] = segsToSave[seg]; });
     await BCCLIENTDOC().set({}, {merge:true});   // ensure the doc exists before a dotted-path update
     await BCCLIENTDOC().update(updatePayload);
   }catch(e){
@@ -2682,11 +2700,14 @@ async function bcSaveClient(){
     var current = JSON.parse(JSON.stringify(bcClients||{}));
     if(!current[key]) current[key] = { label:name };
     current[key].label = name;
-    current[key][bcCurSeg] = rateValue;
+    Object.keys(segsToSave).forEach(function(seg){ current[key][seg] = segsToSave[seg]; });
     try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
     catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
   }
-  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for this segment'+(rec?'':' (walk-in/prospective client)')+'.';
+  var savedAll = bcAllSegmentsApplied;
+  document.getElementById('bcClientHint').textContent = savedAll
+    ? ('Saved '+name+'\'s rate across all 6 segments'+(rec?'':' (walk-in/prospective client)')+'.')
+    : ('Saved '+name+'\'s rate for this segment'+(rec?'':' (walk-in/prospective client)')+'.');
   document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 
@@ -2707,21 +2728,22 @@ function bcApplyDigitToAllSegments(){
   }
 
   ['futures','commodity_futures'].forEach(function(seg){
-    var def = BC_SEGMENT_DEFAULTS[seg];
-    var prefix = String(def.brokPct).slice(0, bcAutoLockChars(def.brokPct));
-    def.brokPct = parseFloat(prefix + rateDigit) || 0;
+    var orig = BC_ORIGINAL_DEFAULTS[seg];
+    var prefix = String(orig.brokPct).slice(0, bcAutoLockChars(orig.brokPct));
+    BC_SEGMENT_DEFAULTS[seg].brokPct = parseFloat(prefix + rateDigit) || 0;
   });
   ['equity_delivery','equity_intraday'].forEach(function(seg){
-    var def = BC_SEGMENT_DEFAULTS[seg];
-    var pctPrefix = String(def.brokPct).slice(0, bcAutoLockChars(def.brokPct));
-    var minPrefix = String(def.brokMin).slice(0, bcAutoLockChars(def.brokMin));
-    def.brokPct = parseFloat(pctPrefix + rateDigit) || 0;
-    def.brokMin = parseFloat(minPrefix + minDigit) || 0;
+    var orig = BC_ORIGINAL_DEFAULTS[seg];
+    var pctPrefix = String(orig.brokPct).slice(0, bcAutoLockChars(orig.brokPct));
+    var minPrefix = String(orig.brokMin).slice(0, bcAutoLockChars(orig.brokMin));
+    BC_SEGMENT_DEFAULTS[seg].brokPct = parseFloat(pctPrefix + rateDigit) || 0;
+    BC_SEGMENT_DEFAULTS[seg].brokMin = parseFloat(minPrefix + minDigit) || 0;
   });
   ['options','commodity_options'].forEach(function(seg){
     BC_SEGMENT_DEFAULTS[seg].brokFlat = (parseFloat(rateDigit)||0) * 10;
   });
 
+  bcAllSegmentsApplied = true;
   bcSetSeg(bcCurSeg);   // refresh the currently-shown segment with its (possibly just-updated) default
   document.getElementById('bcClientHint').textContent = 'Applied digit "'+rateDigit+'" as the new default across all 6 segments for this session.';
 }
@@ -2755,7 +2777,7 @@ function bcClearTradeFields(){
 
 function bcResetBrokerage(){
   var seg = bcCurSeg;
-  var d = BC_SEGMENT_DEFAULTS[seg];
+  var d = BC_ORIGINAL_DEFAULTS[seg];
   var shape = BC_SEG_BROK_TYPE[seg];
   if(shape==='flat') bcSetFlatBrokerage(d.brokFlat);
   else if(shape==='pct_min'){
@@ -2764,12 +2786,14 @@ function bcResetBrokerage(){
   } else {
     bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
   }
+  bcAllSegmentsApplied = false;
   bcClearTradeFields();
   bcCalc();
 }
 
 // Blank out the Brokerage Rate field(s) so the RM can type in the client's actual rate fresh.
 function bcClearBrokerage(){
+  bcAllSegmentsApplied = false;
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
   ['bcBrokRateWarn','bcBrokMinShareWarn','bcBrokFlatWarn'].forEach(function(id){ bcSetWarnBox(id, ''); });
   if(shape==='flat'){
