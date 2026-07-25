@@ -2530,6 +2530,17 @@ function bcSetFlatBrokerage(value){
   bcSetWarnBox('bcBrokFlatWarn', '');
 }
 
+function bcApplyDefaultBrokerage(seg){
+  var d = BC_SEGMENT_DEFAULTS[seg];
+  var shape = BC_SEG_BROK_TYPE[seg];
+  if(shape==='flat') bcSetFlatBrokerage(d.brokFlat);
+  else if(shape==='pct_min'){
+    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
+  }
+  else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+}
+
 function bcSetSeg(seg){
   bcCurSeg = seg;
   document.querySelectorAll('#page-brokerage-calc .bc-seg-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.seg===seg); });
@@ -2541,13 +2552,7 @@ function bcSetSeg(seg){
   bcApplyRoleAccess();
   bcUpdateBrokFields();
   bcUpdateQtyFields();
-  var shape = BC_SEG_BROK_TYPE[seg];
-  if(shape==='flat') bcSetFlatBrokerage(d.brokFlat);
-  else if(shape==='pct_min'){
-    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
-    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
-  }
-  else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+  bcApplyDefaultBrokerage(seg);
   bcApplyClientOverride();
   bcCalc();
 }
@@ -2573,36 +2578,45 @@ function bcSubscribeClients(){
   }catch(e){}
 }
 
-// Builds the option list from the RM's own (or Admin's all) real Equity client records — searchable by name/code.
-function bcFilterClientList(){
-  var sel = document.getElementById('bcClientSelect');
-  var search = (document.getElementById('bcClientSearch').value||'').trim().toLowerCase();
-  if(!sel) return;
+// Populates the <datalist> from the RM's own (or Admin's all) real Equity client records.
+var bcClientLookup = {};   // "Name (CODE)" -> code
+function bcPopulateClientDatalist(){
+  var dl = document.getElementById('bcClientDatalist');
+  if(!dl) return;
   var list = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
-  if(search){
-    list = list.filter(function(c){
-      return (c.name||'').toLowerCase().indexOf(search)!==-1 || (c.code||'').toLowerCase().indexOf(search)!==-1;
-    });
-  }
-  list = list.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).slice(0, 200);
-  var html = '<option value="">— No Client (Defaults) —</option>';
+  list = list.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).slice(0, 1000);
+  bcClientLookup = {};
+  var html = '';
   list.forEach(function(c){
     if(!c.code) return;
-    var saved = bcClients[c.code] ? ' ✓' : '';
-    html += '<option value="'+c.code+'">'+c.name+' ('+c.code+')'+saved+'</option>';
+    var saved = bcClients[c.code] ? ' ✓ saved' : '';
+    var label = c.name+' ('+c.code+')'+saved;
+    bcClientLookup[label] = c.code;
+    html += '<option value="'+label.replace(/"/g,'&quot;')+'">';
   });
-  sel.innerHTML = html;
+  dl.innerHTML = html;
 }
 
 function bcRenderClientDropdown(){
-  bcFilterClientList();
-  var sel = document.getElementById('bcClientSelect');
-  if(sel && bcCurrentClientKey && sel.querySelector('option[value="'+bcCurrentClientKey+'"]')) sel.value = bcCurrentClientKey;
+  bcPopulateClientDatalist();
 }
 
-function bcOnClientSelect(){
-  bcCurrentClientKey = document.getElementById('bcClientSelect').value;
-  bcApplyClientOverride();
+// Fires on every keystroke — as soon as the typed text exactly matches a suggestion, that client loads immediately.
+// Clearing the box entirely goes back to segment defaults, same as before any client was picked.
+function bcOnClientSearchInput(){
+  var val = (document.getElementById('bcClientSearch').value||'').trim();
+  if(!val){
+    bcCurrentClientKey = '';
+    bcApplyDefaultBrokerage(bcCurSeg);
+    document.getElementById('bcClientHint').textContent = '';
+    bcCalc();
+    return;
+  }
+  var code = bcClientLookup[val];
+  if(code){
+    bcCurrentClientKey = code;
+    bcApplyClientOverride();
+  }
 }
 
 // If a client is selected and has a saved rate for the CURRENT segment, load it into the fields.
@@ -2651,6 +2665,7 @@ async function bcSaveClient(){
     catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
   }
   document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for this segment.';
+  document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 
 async function bcDeleteClient(){
@@ -2665,6 +2680,8 @@ async function bcDeleteClient(){
     delete current[bcCurrentClientKey];
     try{ await BCCLIENTDOC().set({ clients: current }); }catch(e2){ alert('Could not delete: '+(e2&&e2.message?e2.message:e2)); return; }
   }
+  bcCurrentClientKey = '';
+  document.getElementById('bcClientSearch').value = '';
   document.getElementById('bcClientHint').textContent = '';
 }
 
