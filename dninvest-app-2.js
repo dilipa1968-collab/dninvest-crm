@@ -2577,9 +2577,17 @@ function bcRenderClientDropdown(){
   var sel = document.getElementById('bcClientSelect');
   if(!sel) return;
   var keep = sel.value;
-  var keys = Object.keys(bcClients).sort(function(a,b){ return (bcClients[a].label||a).localeCompare(bcClients[b].label||b); });
+  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
+  var myUser = (typeof CU!=='undefined' && CU && CU.username) ? CU.username : '';
+  var keys = Object.keys(bcClients).filter(function(k){
+    return isAdmin || bcClients[k].owner === myUser;
+  }).sort(function(a,b){ return (bcClients[a].label||a).localeCompare(bcClients[b].label||b); });
   var html = '<option value="">— No Client (Defaults) —</option>';
-  keys.forEach(function(k){ html += '<option value="'+k+'">'+bcClients[k].label+'</option>'; });
+  keys.forEach(function(k){
+    var c = bcClients[k];
+    var lbl = (isAdmin && c.ownerName) ? c.label+' — '+c.ownerName : c.label;
+    html += '<option value="'+k+'">'+lbl+'</option>';
+  });
   sel.innerHTML = html;
   if(keys.indexOf(keep)!==-1) sel.value = keep; else bcCurrentClientKey = '';
 }
@@ -2612,7 +2620,17 @@ async function bcSaveClient(){
   var nameInput = document.getElementById('bcClientNameInput');
   var name = (nameInput.value||'').trim() || (bcCurrentClientKey && bcClients[bcCurrentClientKey] ? bcClients[bcCurrentClientKey].label : '');
   if(!name){ alert('Please enter the client name.'); return; }
-  var key = bcCurrentClientKey || name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('client_'+Date.now());
+  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
+  var myUser = (typeof CU!=='undefined' && CU && CU.username) ? CU.username : '';
+  var myName = (typeof CU!=='undefined' && CU && CU.name) ? CU.name : myUser;
+
+  // Non-admins may only edit their own client; block if they somehow have another RM's key selected.
+  if(bcCurrentClientKey && bcClients[bcCurrentClientKey] && !isAdmin && bcClients[bcCurrentClientKey].owner !== myUser){
+    alert('You can only save rates for your own clients.'); return;
+  }
+
+  var key = bcCurrentClientKey || (myUser||'admin')+'_'+name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('client_'+Date.now());
+  var isNew = !bcClients[key];
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
   var rateValue;
   if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
@@ -2623,12 +2641,13 @@ async function bcSaveClient(){
     var updatePayload = {};
     updatePayload['clients.'+key+'.label'] = name;
     updatePayload['clients.'+key+'.'+bcCurSeg] = rateValue;
+    if(isNew){ updatePayload['clients.'+key+'.owner'] = myUser; updatePayload['clients.'+key+'.ownerName'] = myName; }
     await BCCLIENTDOC().set({}, {merge:true});   // ensure the doc exists before a dotted-path update
     await BCCLIENTDOC().update(updatePayload);
   }catch(e){
     // Fallback: full-document rewrite if update() fails (e.g. doc didn't exist yet)
     var current = JSON.parse(JSON.stringify(bcClients||{}));
-    if(!current[key]) current[key] = { label:name };
+    if(!current[key]) current[key] = { label:name, owner:myUser, ownerName:myName };
     current[key].label = name;
     current[key][bcCurSeg] = rateValue;
     try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
@@ -2640,6 +2659,9 @@ async function bcSaveClient(){
 
 async function bcDeleteClient(){
   if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey]){ alert('Select a saved client to delete first.'); return; }
+  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
+  var myUser = (typeof CU!=='undefined' && CU && CU.username) ? CU.username : '';
+  if(!isAdmin && bcClients[bcCurrentClientKey].owner !== myUser){ alert('You can only delete your own clients.'); return; }
   var label = bcClients[bcCurrentClientKey].label;
   if(!confirm('Delete "'+label+'" and all their saved brokerage rates? This cannot be undone.')) return;
   try{
