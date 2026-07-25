@@ -2463,8 +2463,14 @@ function bcApplyRoleAccess(){
 
 // "Locked prefix" rate control — RM can only change the decimal digits after "0." (e.g. 03, 3, or 35),
 // so the leading "0." can't be accidentally deleted or fat-fingered into a whole-number rate.
+function bcAutoLockChars(value){
+  var str = String(value);
+  if(str.indexOf('0.0')===0) return 3;   // e.g. 0.03, 0.035 → lock "0.0"
+  if(str.indexOf('0.')===0) return 2;    // e.g. 0.3, 0.1  → lock "0."
+  return 0;
+}
 function bcSetLockedRate(hiddenId, prefixId, digitId, value, lockChars){
-  lockChars = lockChars || 2;   // 2 = lock "0." ; 3 = lock "0.0"
+  lockChars = lockChars || bcAutoLockChars(value);
   var str = String(value);
   var prefix, digits;
   if(str.indexOf('0.')===0 && str.length>=lockChars){ prefix=str.slice(0,lockChars); digits=str.slice(lockChars); }
@@ -2498,10 +2504,10 @@ function bcSetSeg(seg){
   var shape = BC_SEG_BROK_TYPE[seg];
   if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
   else if(shape==='pct_min'){
-    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct, 2);
-    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin, 3);
+    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
   }
-  else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct, 2);
+  else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
   bcCalc();
 }
 
