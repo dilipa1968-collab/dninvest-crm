@@ -2548,7 +2548,111 @@ function bcSetSeg(seg){
     bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
   }
   else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+  bcApplyClientOverride();
   bcCalc();
+}
+
+// ══════════════════════════════════════════
+// CLIENT BROKERAGE PROFILES — shared across all RMs via Firestore.
+// Saving stores the CURRENTLY-DISPLAYED segment's rate under the client name;
+// switching segments for a saved client loads that segment's saved rate if present, else the default.
+// ══════════════════════════════════════════
+function BCCLIENTDOC(){ return window.fdb.collection('crm_data').doc('brokerage_clients'); }
+var bcClients = {};
+var bcClientsUnsub = null;
+var bcCurrentClientKey = '';
+
+function bcSubscribeClients(){
+  try{
+    if(bcClientsUnsub) bcClientsUnsub();
+    bcClientsUnsub = BCCLIENTDOC().onSnapshot(function(doc){
+      bcClients = (doc.exists && doc.data() && doc.data().clients) ? doc.data().clients : {};
+      bcRenderClientDropdown();
+      bcApplyClientOverride();
+    });
+  }catch(e){}
+}
+
+function bcRenderClientDropdown(){
+  var sel = document.getElementById('bcClientSelect');
+  if(!sel) return;
+  var keep = sel.value;
+  var keys = Object.keys(bcClients).sort(function(a,b){ return (bcClients[a].label||a).localeCompare(bcClients[b].label||b); });
+  var html = '<option value="">— No Client (Defaults) —</option>';
+  keys.forEach(function(k){ html += '<option value="'+k+'">'+bcClients[k].label+'</option>'; });
+  sel.innerHTML = html;
+  if(keys.indexOf(keep)!==-1) sel.value = keep; else bcCurrentClientKey = '';
+}
+
+function bcOnClientSelect(){
+  bcCurrentClientKey = document.getElementById('bcClientSelect').value;
+  var nameInput = document.getElementById('bcClientNameInput');
+  if(bcCurrentClientKey && bcClients[bcCurrentClientKey]) nameInput.value = bcClients[bcCurrentClientKey].label;
+  bcApplyClientOverride();
+}
+
+// If a client is selected and has a saved rate for the CURRENT segment, load it into the fields.
+function bcApplyClientOverride(){
+  var hintEl = document.getElementById('bcClientHint');
+  if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey]){ if(hintEl) hintEl.textContent=''; return; }
+  var c = bcClients[bcCurrentClientKey];
+  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  var saved = c[bcCurSeg];
+  if(saved==null){ if(hintEl) hintEl.textContent = c.label+' — no saved rate for this segment yet (showing default).'; return; }
+  if(shape==='flat') bcSetFlatBrokerage(saved);
+  else if(shape==='pct_min'){
+    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', saved.pct);
+    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', saved.min);
+  } else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', saved);
+  if(hintEl) hintEl.textContent = 'Showing saved rate for '+c.label+' (this segment).';
+  bcCalc();
+}
+
+async function bcSaveClient(){
+  var nameInput = document.getElementById('bcClientNameInput');
+  var name = (nameInput.value||'').trim() || (bcCurrentClientKey && bcClients[bcCurrentClientKey] ? bcClients[bcCurrentClientKey].label : '');
+  if(!name){ alert('Please enter the client name.'); return; }
+  var key = bcCurrentClientKey || name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('client_'+Date.now());
+  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  var rateValue;
+  if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
+  else if(shape==='pct_min') rateValue = { pct: parseFloat(document.getElementById('bcBrokRate').value)||0, min: parseFloat(document.getElementById('bcBrokMinShare').value)||0 };
+  else rateValue = parseFloat(document.getElementById('bcBrokRate').value)||0;
+
+  try{
+    var updatePayload = {};
+    updatePayload['clients.'+key+'.label'] = name;
+    updatePayload['clients.'+key+'.'+bcCurSeg] = rateValue;
+    await BCCLIENTDOC().set({}, {merge:true});   // ensure the doc exists before a dotted-path update
+    await BCCLIENTDOC().update(updatePayload);
+  }catch(e){
+    // Fallback: full-document rewrite if update() fails (e.g. doc didn't exist yet)
+    var current = JSON.parse(JSON.stringify(bcClients||{}));
+    if(!current[key]) current[key] = { label:name };
+    current[key].label = name;
+    current[key][bcCurSeg] = rateValue;
+    try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
+    catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
+  }
+  bcCurrentClientKey = key;
+  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for this segment.';
+}
+
+async function bcDeleteClient(){
+  if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey]){ alert('Select a saved client to delete first.'); return; }
+  var label = bcClients[bcCurrentClientKey].label;
+  if(!confirm('Delete "'+label+'" and all their saved brokerage rates? This cannot be undone.')) return;
+  try{
+    var del = {}; del['clients.'+bcCurrentClientKey] = firebase.firestore.FieldValue.delete();
+    await BCCLIENTDOC().update(del);
+  }catch(e){
+    var current = JSON.parse(JSON.stringify(bcClients||{}));
+    delete current[bcCurrentClientKey];
+    try{ await BCCLIENTDOC().set({ clients: current }); }catch(e2){ alert('Could not delete: '+(e2&&e2.message?e2.message:e2)); return; }
+  }
+  bcCurrentClientKey = '';
+  document.getElementById('bcClientNameInput').value = '';
+  document.getElementById('bcClientHint').textContent = '';
 }
 
 // Reload the default Brokerage Rate for the currently-selected segment — no full page refresh needed.
@@ -2699,3 +2803,4 @@ function bcCalc(){
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
 bcSetSeg('equity_intraday');
+bcSubscribeClients();
