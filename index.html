@@ -1822,6 +1822,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               oninput="bcOnClientSearchInput()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;width:230px">
             <datalist id="bcClientDatalist"></datalist>
             <button type="button" class="bc-mini-btn" onclick="bcSaveClient()" title="Save this segment's Brokerage Rate for the selected client">💾 Save Rate</button>
+            <button type="button" class="bc-mini-btn" style="border-color:#7c3aed;color:#7c3aed" onclick="bcSaveClientAllMatching()" title="Save this rate for both segments of this type (e.g. Equity Delivery + Intraday)">💾 Save For Both (Same Type)</button>
             <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcDeleteClient()" title="Clear this client's saved brokerage profile">🗑️ Clear Saved Rates</button>
           </div>
           <button class="btn btn-outline" onclick="window.print()" style="font-size:.82rem;padding:6px 14px">🖨️ Print / Save PDF</button>

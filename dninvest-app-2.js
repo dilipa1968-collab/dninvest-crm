@@ -2681,6 +2681,47 @@ async function bcSaveClient(){
   document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 
+// Segment pairs that share the same rate "shape" — saving one usually means the other should match too.
+var BC_SHAPE_PAIRS = {
+  percent: ['futures','commodity_futures'],
+  pct_min: ['equity_delivery','equity_intraday'],
+  flat: ['options','commodity_options']
+};
+
+async function bcSaveClientAllMatching(){
+  if(!bcCurrentClientKey){ alert('Please select a client from the list first.'); return; }
+  var myClients = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
+  var rec = myClients.find(function(c){ return c.code===bcCurrentClientKey; });
+  if(!rec){ alert('This client is not in your accessible client list.'); return; }
+  var key = rec.code;
+  var name = rec.name;
+  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  var rateValue;
+  if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
+  else if(shape==='pct_min') rateValue = { pct: parseFloat(document.getElementById('bcBrokRate').value)||0, min: parseFloat(document.getElementById('bcBrokMinShare').value)||0 };
+  else rateValue = parseFloat(document.getElementById('bcBrokRate').value)||0;
+
+  var targetSegs = BC_SHAPE_PAIRS[shape] || [bcCurSeg];
+
+  try{
+    var updatePayload = {};
+    updatePayload['clients.'+key+'.label'] = name;
+    targetSegs.forEach(function(seg){ updatePayload['clients.'+key+'.'+seg] = rateValue; });
+    await BCCLIENTDOC().set({}, {merge:true});
+    await BCCLIENTDOC().update(updatePayload);
+  }catch(e){
+    var current = JSON.parse(JSON.stringify(bcClients||{}));
+    if(!current[key]) current[key] = { label:name };
+    current[key].label = name;
+    targetSegs.forEach(function(seg){ current[key][seg] = rateValue; });
+    try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
+    catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
+  }
+  var segLabels = targetSegs.map(function(s){ return BC_MULTI_SEG_LABELS[s]; }).join(' + ');
+  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for '+segLabels+'.';
+  document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
+}
+
 async function bcDeleteClient(){
   if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey]){ alert('Select a client with a saved rate first.'); return; }
   var label = bcClients[bcCurrentClientKey].label;
