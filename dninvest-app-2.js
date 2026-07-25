@@ -2476,6 +2476,7 @@ function bcSetLockedRate(hiddenId, prefixId, digitId, value, lockChars){
   if(str.indexOf('0.')===0 && str.length>=lockChars){ prefix=str.slice(0,lockChars); digits=str.slice(lockChars); }
   else if(str.indexOf('0.')===0){ prefix=str; digits=''; }
   else { prefix=''; digits=str; }   // fallback for a rate ≥ 1 (not expected for brokerage %, but stays safe)
+  if(lockChars===2 && digits.length===1) digits += '0';   // e.g. 0.3 → shows as "0." + "30" = 0.30, same value, clearer display
   document.getElementById(prefixId).textContent = prefix;
   document.getElementById(digitId).value = digits;
   document.getElementById(hiddenId).value = value;
