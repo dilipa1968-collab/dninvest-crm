@@ -2435,7 +2435,7 @@ function bcUpdateBrokFields(){
   document.getElementById('bcBrokFlatWrap').style.display = (shape==='flat') ? '' : 'none';
   document.getElementById('bcBrokPctLabel').textContent = (shape==='pct_min') ? 'Brokerage Rate (%)' : 'Brokerage Rate (%) — Editable';
   document.getElementById('bcBrokHint').textContent = (shape==='pct_min')
-    ? 'Whichever is higher applies — the % amount or the Minimum ₹/Share (charged on each leg).' : '';
+    ? 'Whichever amount is higher applies — the percentage rate or the minimum per-share charge — calculated separately for each leg.' : '';
 }
 
 function bcUpdateQtyFields(){
@@ -2457,8 +2457,8 @@ function bcApplyRoleAccess(){
   if(lbl) lbl.textContent = isAdmin ? '⚙️ View / Edit Statutory Rates (Admin)' : '⚙️ View Statutory Rates';
   var footer = document.getElementById('bcFooterNote');
   if(footer) footer.textContent = isAdmin
-    ? 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are editable by Admin only — e.g. after an exchange rate revision. RMs see them as fixed, auto-set values.'
-    : 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.';
+    ? 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) can be edited by Admin only — for example, after an exchange rate revision. RMs see these as fixed, auto-applied values.'
+    : 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange and government rules, and are applied automatically for each segment. Only the Brokerage Rate needs to be entered.';
 }
 
 // "Locked prefix" rate control — RM can only change the decimal digits after "0." (e.g. 03, 3, or 35),
@@ -2506,8 +2506,8 @@ function bcOnDigitChange(hiddenId, prefixId, digitId){
   var warnId = digitId.replace(/Digit$/,'') + 'Warn';
   var ceil = parseFloat(digitEl.dataset.defaultVal);
   var floor = parseFloat(digitEl.dataset.floorVal);
-  if(!isNaN(ceil) && combined > ceil) bcSetWarnBox(warnId, '⚠️ Default ('+ceil+'%) se zyada!');
-  else if(!isNaN(floor) && combined < floor) bcSetWarnBox(warnId, '⚠️ Bahut kam! Min '+floor+'%');
+  if(!isNaN(ceil) && combined > ceil) bcSetWarnBox(warnId, '⚠️ Exceeds default ('+ceil+'%)');
+  else if(!isNaN(floor) && combined < floor) bcSetWarnBox(warnId, '⚠️ Too low — min '+floor+'%');
   else bcSetWarnBox(warnId, '');
   bcCalc();
 }
@@ -2517,8 +2517,8 @@ function bcOnFlatChange(){
   var el = document.getElementById('bcBrokFlat');
   var val = parseFloat(el.value);
   var ceil = parseFloat(el.dataset.defaultVal);
-  if(!isNaN(val) && !isNaN(ceil) && val > ceil) bcSetWarnBox('bcBrokFlatWarn', '⚠️ Default (₹'+ceil+') se zyada!');
-  else if(!isNaN(val) && val < 1) bcSetWarnBox('bcBrokFlatWarn', '⚠️ Bahut kam! Min ₹1');
+  if(!isNaN(val) && !isNaN(ceil) && val > ceil) bcSetWarnBox('bcBrokFlatWarn', '⚠️ Exceeds default (₹'+ceil+')');
+  else if(!isNaN(val) && val < 1) bcSetWarnBox('bcBrokFlatWarn', '⚠️ Too low — min ₹1');
   else bcSetWarnBox('bcBrokFlatWarn', '');
   bcCalc();
 }
@@ -2688,13 +2688,13 @@ function bcCalc(){
     + ' − Charges ' + bcFmt(totalCharges) + ' = Net ' + (isProfit?'Profit':'Loss');
 
   document.getElementById('bcRatesNote').innerHTML =
-    '<b>Note:</b> Only the Brokerage Rate above is editable — enter the client\'s actual rate. Switching the Segment tab automatically shows the right field type (% / Minimum / Flat). '
-    +'Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates and apply the same to every client: '
-    +'Futures — STT 0.05% (sell side), Stamp Duty 0.002% (buy side), Transaction Charges ~0.0019%, SEBI Fees 0.0001%. '
-    +'Options — STT 0.15% (sell side, on premium), Transaction Charges 0.0355%, Stamp Duty 0.003% (buy side). '
-    +'Equity Delivery/Intraday use standard NSE/SEBI slabs. Commodity Futures — CTT 0.05% (sell side, on par with equity futures), MCX Transaction Charges 0.0021%, Stamp Duty 0.002%. '
-    +'Commodity Options — CTT 0.05% (sell side, on premium), MCX Transaction Charges 0.00418%, Stamp Duty 0.003%. '
-    +'GST is 18% of (Brokerage + Transaction Charges + SEBI Fees). Rates reflect the April 2026 Budget revision — cross-check with the latest exchange circular periodically.';
+    '<b>Note:</b> Only the Brokerage Rate is editable — please enter the client\'s actual rate. Selecting a segment automatically displays the appropriate field type (Percentage / Minimum / Flat). '
+    +'Statutory charges — STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, and GST — are fixed government and exchange rates applied uniformly to every client: '
+    +'Futures: STT 0.05% (sell side), Stamp Duty 0.002% (buy side), Transaction Charges ≈0.0019%, SEBI Fees 0.0001%. '
+    +'Options: STT 0.15% (sell side, on premium), Transaction Charges 0.0355%, Stamp Duty 0.003% (buy side). '
+    +'Equity Delivery and Intraday follow standard NSE/SEBI slabs. Commodity Futures: CTT 0.05% (sell side, on par with equity futures), MCX Transaction Charges 0.0021%, Stamp Duty 0.002%. '
+    +'Commodity Options: CTT 0.05% (sell side, on premium), MCX Transaction Charges 0.00418%, Stamp Duty 0.003%. '
+    +'GST is charged at 18% on the sum of Brokerage, Transaction Charges, and SEBI Fees. Rates reflect the April 2026 Budget revision — please verify against the latest exchange circular periodically.';
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
