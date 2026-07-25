@@ -2930,12 +2930,21 @@ function bcAddMultiRow(){
   row.className = 'bc-multi-row';
   row.id = 'bcMultiRow'+id;
   row.innerHTML =
-    '<div><label>Segment</label><select id="bcMultiSeg'+id+'">'+opts+'</select></div>'
+    '<div><label>Segment</label><select id="bcMultiSeg'+id+'" onchange="bcUpdateMultiRowFields('+id+')">'+opts+'</select></div>'
     +'<div><label>Buy Price (₹)</label><input type="number" id="bcMultiBuy'+id+'" placeholder="Buy Price"></div>'
     +'<div><label>Sell Price (₹)</label><input type="number" id="bcMultiSell'+id+'" placeholder="Sell Price"></div>'
-    +'<div><label>Quantity</label><input type="number" id="bcMultiQty'+id+'" placeholder="Quantity" min="1"></div>'
+    +'<div><label>Quantity (Total Shares)</label><input type="number" id="bcMultiQty'+id+'" placeholder="Quantity" min="1"></div>'
+    +'<div id="bcMultiLotWrap'+id+'" style="display:none"><label>Lot Size</label><input type="number" id="bcMultiLot'+id+'" placeholder="Lot Size" min="1"></div>'
     +'<button type="button" class="bc-multi-remove" onclick="bcRemoveMultiRow('+id+')" title="Remove this line">✕</button>';
   document.getElementById('bcMultiRows').appendChild(row);
+}
+
+// Options/Commodity Options are flat-₹-per-lot — show a Lot Size field for that row so turnover
+// (Quantity × Price) and brokerage (lots × flat rate) both use real, consistent numbers.
+function bcUpdateMultiRowFields(id){
+  var seg = document.getElementById('bcMultiSeg'+id).value;
+  var isFlat = BC_SEG_BROK_TYPE[seg]==='flat';
+  document.getElementById('bcMultiLotWrap'+id).style.display = isFlat ? '' : 'none';
 }
 
 function bcRemoveMultiRow(id){
@@ -2968,8 +2977,11 @@ function bcCalcMultiTrade(){
     var brokerage;
     if(shape==='flat'){
       var flatRate = (clientRate!=null) ? clientRate : d.brokFlat;
-      brokerage = flatRate * qty * 2;   // approximation: Quantity treated as lot-count for Options/Commodity Options rows
-      anyApproxOptions = true;
+      var lotSizeEl = document.getElementById('bcMultiLot'+id);
+      var lotSize = lotSizeEl ? (parseFloat(lotSizeEl.value)||0) : 0;
+      var lots = lotSize>0 ? (qty/lotSize) : qty;   // if Lot Size wasn't entered, fall back to treating Quantity itself as lots
+      brokerage = flatRate * lots * 2;
+      if(!(lotSize>0)) anyApproxOptions = true;
     } else if(shape==='pct_min'){
       var pct = (clientRate!=null) ? clientRate.pct : d.brokPct;
       var min = (clientRate!=null) ? clientRate.min : d.brokMin;
@@ -3008,7 +3020,7 @@ function bcCalcMultiTrade(){
     +'<tbody>'+rowsHtml+'</tbody></table>'
     +netBoxHtml
     +(bcCurrentClientKey && bcClients[bcCurrentClientKey] ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:6px">Using '+bcClients[bcCurrentClientKey].label+'\'s saved rate where available, segment default otherwise.</div>' : '')
-    +(anyApproxOptions ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:2px">Options/Commodity Options rows treat "Quantity" as lot count (flat brokerage × lots × 2 legs).</div>' : '');
+    +(anyApproxOptions ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:2px">⚠️ Lot Size wasn\'t entered for one or more Options/Commodity Options rows — Quantity was treated as the lot count directly. Fill in Lot Size for an accurate turnover + brokerage split.</div>' : '');
 }
 
 // Saves the current Multiple-Trades row layout (segment/buy/sell/qty for each line) under the selected client,
@@ -3021,11 +3033,13 @@ async function bcSaveMultiTrade(){
   var lines = [];
   rows.forEach(function(rowEl){
     var id = rowEl.id.replace('bcMultiRow','');
+    var lotEl = document.getElementById('bcMultiLot'+id);
     lines.push({
       seg: document.getElementById('bcMultiSeg'+id).value,
       buy: parseFloat(document.getElementById('bcMultiBuy'+id).value)||0,
       sell: parseFloat(document.getElementById('bcMultiSell'+id).value)||0,
-      qty: parseFloat(document.getElementById('bcMultiQty'+id).value)||0
+      qty: parseFloat(document.getElementById('bcMultiQty'+id).value)||0,
+      lotSize: lotEl ? (parseFloat(lotEl.value)||0) : 0
     });
   });
   if(!lines.length){ alert('Add at least one trade line first.'); return; }
@@ -3058,6 +3072,8 @@ function bcLoadMultiTradeForClient(){
     document.getElementById('bcMultiBuy'+id).value = line.buy||'';
     document.getElementById('bcMultiSell'+id).value = line.sell||'';
     document.getElementById('bcMultiQty'+id).value = line.qty||'';
+    bcUpdateMultiRowFields(id);
+    if(line.lotSize) document.getElementById('bcMultiLot'+id).value = line.lotSize;
   });
 }
 
