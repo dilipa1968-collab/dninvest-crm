@@ -1802,7 +1802,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div class="bc-field" id="bcBrokMinWrap" style="display:none">
               <label>Min. Brokerage (₹/Share)</label>
               <div class="bc-locked-rate">
-                <span class="bc-rate-prefix" id="bcBrokMinSharePrefix">0.0</span><input type="text" id="bcBrokMinShareDigit" class="bc-rate-digit" maxlength="3" inputmode="numeric" onfocus="this.select()" value="3" oninput="bcOnDigitChange('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit')">
+                <span class="bc-rate-prefix" id="bcBrokMinSharePrefix">0.0</span><input type="text" id="bcBrokMinShareDigit" class="bc-rate-digit" maxlength="2" inputmode="numeric" onfocus="this.select()" value="3" oninput="bcOnDigitChange('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit')">
               </div>
               <input type="hidden" id="bcBrokMinShare" value="0.03">
             </div>
