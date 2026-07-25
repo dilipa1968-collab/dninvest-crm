@@ -183,10 +183,10 @@ window.dnXlsx = function(filename, title, columns, rows, totalRow){
   --teal:#0891b2;--teal2:#e0f7fc;
   --purple:#6d28d9;--purple2:#ede9fe;
   --orange:#c2600a;--orange2:#fff4e5;
-  --bg:#eef2f9;--white:#fff;
-  --border:#dde3f0;--gray:#5d6e8a;
-  --shadow:0 2px 12px rgba(10,20,50,.08);
-  --shadow2:0 8px 32px rgba(10,20,50,.15);
+  --bg:#f4f6fa;--white:#fff;
+  --border:#e3e8f0;--gray:#5d6e8a;
+  --shadow:0 1px 3px rgba(16,30,60,.06);
+  --shadow2:0 6px 20px rgba(16,30,60,.10);
   --radius:12px;--radius-sm:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -680,10 +680,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 
 /* Base & background — soft depth instead of flat grey */
 body{
-  background:
-    radial-gradient(1200px 500px at 85% -10%, rgba(201,148,42,.07), transparent 60%),
-    radial-gradient(900px 420px at -10% 110%, rgba(26,86,219,.06), transparent 60%),
-    var(--bg);
+  background:var(--bg);
   -webkit-font-smoothing:antialiased;
 }
 
@@ -703,13 +700,13 @@ body{
 
 /* Cards, filters, tables — softer borders, layered shadows, rounder */
 .filters, .tbl-wrap, .stat-card, .ann-card, .modal{
-  border:1px solid #e4e9f5;
-  box-shadow:0 1px 2px rgba(16,30,60,.04), 0 10px 30px rgba(16,30,60,.06);
+  border:1px solid #e6eaf3;
+  box-shadow:0 1px 2px rgba(16,30,60,.05);
 }
 .filters{border-radius:14px;padding:10px 14px;gap:8px}
 .tbl-wrap{border-radius:14px}
-.stat-card{border-radius:14px;transition:transform .18s, box-shadow .18s;border-left-width:4px}
-.stat-card:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(16,30,60,.08), 0 18px 44px rgba(16,30,60,.12)}
+.stat-card{border-radius:14px;transition:transform .15s, box-shadow .15s;border-left-width:3px}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,30,60,.10)}
 
 /* MORE SCREEN, LESS SCROLL — table stretches to viewport height */
 .tbl-scroll{max-height:calc(100vh - 235px)}
@@ -815,35 +812,21 @@ input:focus, select:focus, textarea:focus{
 .btn-teal{background:linear-gradient(135deg,#22b8d8,var(--teal));box-shadow:0 2px 8px rgba(8,145,178,.22)}
 .btn-outline:hover{border-color:var(--navy);background:#f7f9fd}
 
-/* Glossy sheen sweep on primary/gold buttons — CSS-only shine effect */
-.btn-primary,.btn-gold{position:relative;overflow:hidden}
-.btn-primary::after,.btn-gold::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
-  background:linear-gradient(120deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);transition:left .5s ease}
-.btn-primary:hover::after,.btn-gold:hover::after{left:130%}
-
-/* Topbar — glass depth */
-.topbar{backdrop-filter:blur(6px);background:linear-gradient(90deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%),
-  linear-gradient(180deg,rgba(255,255,255,.05),transparent 40%);background-blend-mode:overlay}
+/* Topbar — flat, clean navy (no glass/blend noise) */
+.topbar{background:linear-gradient(90deg,var(--navy) 0%,var(--navy2) 60%,var(--navy3) 100%)}
 
 /* Sidebar active nav — soft gradient pill instead of flat accent */
 .sidebar .nav-item.active,.sidebar .active{background:linear-gradient(90deg,rgba(201,148,42,.14),rgba(201,148,42,.02));
   font-weight:700;color:var(--navy)}
 
-/* KPI numbers — subtle gradient text for glanceable premium feel */
-.stat-card .stat-num,.stat-card b,.stat-card strong{
-  background:linear-gradient(135deg,var(--navy),var(--navy3));-webkit-background-clip:text;
-  background-clip:text;-webkit-text-fill-color:transparent}
-.stat-card{position:relative}
-.stat-card::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;
-  background:linear-gradient(135deg,rgba(201,148,42,.18),transparent 40%);
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+/* KPI numbers — plain bold solid colour, clean glanceable style */
+.stat-card .stat-num,.stat-card b,.stat-card strong{color:var(--navy);font-weight:800}
 
 /* Badges — subtle top sheen for depth, colors untouched */
 .badge{position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
 
-/* Table header — gentle gradient instead of flat navy */
-thead th{background:linear-gradient(180deg,var(--navy2),var(--navy))}
+/* Table header — flat navy, clean */
+thead th{background:var(--navy)}
 
 /* Login card — premium glass + soft glow ring */
 .login-box{position:relative;background:rgba(255,255,255,.98)}
