@@ -2461,6 +2461,26 @@ function bcApplyRoleAccess(){
     : 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.';
 }
 
+// "Locked prefix" rate control — RM can only change the last digit (e.g. in 0.03, only the 3),
+// so a rate can't accidentally be fat-fingered from 0.03 into something like 3 or 0.3.
+function bcSetLockedRate(hiddenId, prefixId, digitId, value){
+  var str = String(value);
+  var prefix = str.slice(0, -1);
+  var digit = str.slice(-1);
+  document.getElementById(prefixId).textContent = prefix;
+  document.getElementById(digitId).value = digit;
+  document.getElementById(hiddenId).value = value;
+}
+function bcOnDigitChange(hiddenId, prefixId, digitId){
+  var digitEl = document.getElementById(digitId);
+  var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(-1);
+  digitEl.value = d;
+  var prefix = document.getElementById(prefixId).textContent;
+  var combined = parseFloat(prefix + (d||'0'));
+  document.getElementById(hiddenId).value = isNaN(combined) ? 0 : combined;
+  bcCalc();
+}
+
 function bcSetSeg(seg){
   bcCurSeg = seg;
   document.querySelectorAll('#page-brokerage-calc .bc-seg-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.seg===seg); });
@@ -2474,8 +2494,11 @@ function bcSetSeg(seg){
   bcUpdateQtyFields();
   var shape = BC_SEG_BROK_TYPE[seg];
   if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
-  else if(shape==='pct_min'){ document.getElementById('bcBrokRate').value = d.brokPct; document.getElementById('bcBrokMinShare').value = d.brokMin; }
-  else document.getElementById('bcBrokRate').value = d.brokPct;
+  else if(shape==='pct_min'){
+    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
+    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
+  }
+  else bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
   bcCalc();
 }
 

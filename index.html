@@ -856,6 +856,14 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   font-size:.9rem;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
 #page-brokerage-calc .bc-field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,148,42,.15)}
 #page-brokerage-calc .bc-field input[readonly]{background:var(--bg);color:var(--gray);cursor:not-allowed}
+#page-brokerage-calc .bc-locked-rate{display:flex;align-items:stretch;border:1.5px solid var(--border);border-radius:9px;overflow:hidden}
+#page-brokerage-calc .bc-rate-prefix{background:var(--bg);color:var(--gray);padding:9px 2px 9px 10px;font-size:.9rem;
+  display:flex;align-items:center;user-select:none;white-space:pre}
+#page-brokerage-calc .bc-rate-digit{width:38px;padding:9px 4px;border:none;border-left:1.5px solid var(--gold);
+  font-size:.9rem;font-weight:800;text-align:center;color:var(--navy);outline:none;background:#fff9ec}
+#page-brokerage-calc .bc-rate-digit:focus{background:#fff2cc;box-shadow:inset 0 0 0 2px var(--gold)}
+#page-brokerage-calc .bc-grid-compact .bc-locked-rate{margin-top:0}
+#page-brokerage-calc .bc-grid-compact .bc-rate-prefix,#page-brokerage-calc .bc-grid-compact .bc-rate-digit{padding-top:6px;padding-bottom:6px;font-size:.82rem}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
   font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
@@ -1774,11 +1782,17 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="bc-grid bc-grid-compact">
             <div class="bc-field" id="bcBrokPctWrap">
               <label id="bcBrokPctLabel">Brokerage Rate (%)</label>
-              <input type="number" id="bcBrokRate" value="0.03" step="0.001" oninput="bcCalc()">
+              <div class="bc-locked-rate">
+                <span class="bc-rate-prefix" id="bcBrokRatePrefix">0.0</span><input type="text" id="bcBrokRateDigit" class="bc-rate-digit" maxlength="1" inputmode="numeric" value="3" oninput="bcOnDigitChange('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit')">
+              </div>
+              <input type="hidden" id="bcBrokRate" value="0.03">
             </div>
             <div class="bc-field" id="bcBrokMinWrap" style="display:none">
               <label>Min. Brokerage (₹/Share)</label>
-              <input type="number" id="bcBrokMinShare" value="0.03" step="0.01" oninput="bcCalc()">
+              <div class="bc-locked-rate">
+                <span class="bc-rate-prefix" id="bcBrokMinSharePrefix">0.0</span><input type="text" id="bcBrokMinShareDigit" class="bc-rate-digit" maxlength="1" inputmode="numeric" value="3" oninput="bcOnDigitChange('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit')">
+              </div>
+              <input type="hidden" id="bcBrokMinShare" value="0.03">
             </div>
             <div class="bc-field" id="bcBrokFlatWrap" style="display:none">
               <label>Flat Brokerage (₹/Lot)</label>
