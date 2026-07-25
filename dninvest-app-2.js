@@ -2479,6 +2479,12 @@ function bcSetLockedRate(hiddenId, prefixId, digitId, value, lockChars){
   document.getElementById(prefixId).textContent = prefix;
   document.getElementById(digitId).value = digits;
   document.getElementById(hiddenId).value = value;
+  // Remember this segment's default (ceiling) and a floor of "...1" (e.g. 0.01) for the range warning below.
+  var digitEl = document.getElementById(digitId);
+  digitEl.dataset.defaultVal = value;
+  digitEl.dataset.floorVal = parseFloat(prefix + '1');
+  var warnEl = document.getElementById(digitId.replace(/Digit$/,'') + 'Warn');
+  if(warnEl) warnEl.textContent = '';
 }
 function bcOnDigitChange(hiddenId, prefixId, digitId){
   var digitEl = document.getElementById(digitId);
@@ -2487,7 +2493,38 @@ function bcOnDigitChange(hiddenId, prefixId, digitId){
   var prefix = document.getElementById(prefixId).textContent;
   var combined = parseFloat(prefix + (d||'0'));
   document.getElementById(hiddenId).value = isNaN(combined) ? 0 : combined;
+
+  var warnEl = document.getElementById(digitId.replace(/Digit$/,'') + 'Warn');
+  if(warnEl){
+    var ceil = parseFloat(digitEl.dataset.defaultVal);
+    var floor = parseFloat(digitEl.dataset.floorVal);
+    if(!isNaN(ceil) && combined > ceil) warnEl.textContent = '⚠️ Default rate ('+ceil+'%) se zyada hai — confirm kar lein.';
+    else if(!isNaN(floor) && combined < floor) warnEl.textContent = '⚠️ Bahut kam hai — minimum '+floor+'% rakhna behtar hai.';
+    else warnEl.textContent = '';
+  }
   bcCalc();
+}
+
+// Flat Brokerage (₹/Lot) — same soft min-1/max-default range check, for Options & Commodity Options.
+function bcOnFlatChange(){
+  var el = document.getElementById('bcBrokFlat');
+  var val = parseFloat(el.value);
+  var warnEl = document.getElementById('bcBrokFlatWarn');
+  if(warnEl){
+    var ceil = parseFloat(el.dataset.defaultVal);
+    if(!isNaN(val) && !isNaN(ceil) && val > ceil) warnEl.textContent = '⚠️ Default rate (₹'+ceil+'/lot) se zyada hai — confirm kar lein.';
+    else if(!isNaN(val) && val < 1) warnEl.textContent = '⚠️ Bahut kam hai — minimum ₹1/lot rakhna behtar hai.';
+    else warnEl.textContent = '';
+  }
+  bcCalc();
+}
+
+function bcSetFlatBrokerage(value){
+  var el = document.getElementById('bcBrokFlat');
+  el.value = value;
+  el.dataset.defaultVal = value;
+  var warnEl = document.getElementById('bcBrokFlatWarn');
+  if(warnEl) warnEl.textContent = '';
 }
 
 function bcSetSeg(seg){
@@ -2502,7 +2539,7 @@ function bcSetSeg(seg){
   bcUpdateBrokFields();
   bcUpdateQtyFields();
   var shape = BC_SEG_BROK_TYPE[seg];
-  if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
+  if(shape==='flat') bcSetFlatBrokerage(d.brokFlat);
   else if(shape==='pct_min'){
     bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
     bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
@@ -2525,7 +2562,7 @@ function bcResetBrokerage(){
   var seg = bcCurSeg;
   var d = BC_SEGMENT_DEFAULTS[seg];
   var shape = BC_SEG_BROK_TYPE[seg];
-  if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
+  if(shape==='flat') bcSetFlatBrokerage(d.brokFlat);
   else if(shape==='pct_min'){
     bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
     bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
@@ -2539,6 +2576,9 @@ function bcResetBrokerage(){
 // Blank out the Brokerage Rate field(s) so the RM can type in the client's actual rate fresh.
 function bcClearBrokerage(){
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  ['bcBrokRateWarn','bcBrokMinShareWarn','bcBrokFlatWarn'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.textContent='';
+  });
   if(shape==='flat'){
     document.getElementById('bcBrokFlat').value = '';
   } else if(shape==='pct_min'){
