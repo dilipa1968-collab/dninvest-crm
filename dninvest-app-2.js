@@ -2850,8 +2850,8 @@ function bcCalc(){
     brokerage = brokFlat * lots * 2;   // charged on both the buy order and the sell order
     brokLbl = 'Brokerage (₹'+brokFlat+' × '+lots+' lot(s) × 2 legs)';
   } else if(brokShape==='pct_min'){
-    var buyBrok = Math.max(buyTurnover*brokPct/100, qty*brokMin);
-    var sellBrok = Math.max(sellTurnover*brokPct/100, qty*brokMin);
+    var buyBrok = (buy>0) ? Math.max(buyTurnover*brokPct/100, qty*brokMin) : 0;
+    var sellBrok = (sell>0) ? Math.max(sellTurnover*brokPct/100, qty*brokMin) : 0;
     brokerage = buyBrok + sellBrok;
     brokLbl = 'Brokerage ('+brokPct+'% or ₹'+brokMin+'/share, whichever higher — both legs)';
   } else {
@@ -2970,7 +2970,9 @@ function bcCalcMultiTrade(){
     } else if(shape==='pct_min'){
       var pct = (clientRate!=null) ? clientRate.pct : d.brokPct;
       var min = (clientRate!=null) ? clientRate.min : d.brokMin;
-      brokerage = Math.max(buyTurnover*pct/100, qty*min) + Math.max(sellTurnover*pct/100, qty*min);
+      var buyBrok2 = (buy>0) ? Math.max(buyTurnover*pct/100, qty*min) : 0;
+      var sellBrok2 = (sell>0) ? Math.max(sellTurnover*pct/100, qty*min) : 0;
+      brokerage = buyBrok2 + sellBrok2;
     } else {
       var pctOnly = (clientRate!=null) ? clientRate : d.brokPct;
       brokerage = totalTurnover * pctOnly/100;
