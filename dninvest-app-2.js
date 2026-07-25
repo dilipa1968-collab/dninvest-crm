@@ -2681,14 +2681,10 @@ async function bcSaveClient(){
   document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 
-// Segment pairs that share the same rate "shape" — saving one usually means the other should match too.
-var BC_SHAPE_PAIRS = {
-  percent: ['futures','commodity_futures'],
-  pct_min: ['equity_delivery','equity_intraday'],
-  flat: ['options','commodity_options']
-};
-
-async function bcSaveClientAllMatching(){
+// Applies the digit the RM just typed into EVERY segment's own natural rate format —
+// e.g. typing "2" saves Futures/Commodity Futures as 0.02%, Equity Delivery as 0.2%, Equity Intraday as 0.02%,
+// and Options/Commodity Options as ₹2/lot — all six segments end up consistent with that one digit.
+async function bcSaveClientAllSegments(){
   if(!bcCurrentClientKey){ alert('Please select a client from the list first.'); return; }
   var myClients = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
   var rec = myClients.find(function(c){ return c.code===bcCurrentClientKey; });
@@ -2696,29 +2692,50 @@ async function bcSaveClientAllMatching(){
   var key = rec.code;
   var name = rec.name;
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-  var rateValue;
-  if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
-  else if(shape==='pct_min') rateValue = { pct: parseFloat(document.getElementById('bcBrokRate').value)||0, min: parseFloat(document.getElementById('bcBrokMinShare').value)||0 };
-  else rateValue = parseFloat(document.getElementById('bcBrokRate').value)||0;
 
-  var targetSegs = BC_SHAPE_PAIRS[shape] || [bcCurSeg];
+  var rateDigit, minDigit;
+  if(shape==='flat'){
+    rateDigit = String(parseFloat(document.getElementById('bcBrokFlat').value)||0);
+    minDigit = rateDigit;
+  } else {
+    rateDigit = (document.getElementById('bcBrokRateDigit').value||'').replace(/[^0-9]/g,'') || '0';
+    minDigit = (shape==='pct_min')
+      ? ((document.getElementById('bcBrokMinShareDigit').value||'').replace(/[^0-9]/g,'') || rateDigit)
+      : rateDigit;
+  }
+
+  var result = {};
+  ['futures','commodity_futures'].forEach(function(seg){
+    var def = BC_SEGMENT_DEFAULTS[seg];
+    var lockChars = bcAutoLockChars(def.brokPct);
+    var prefix = String(def.brokPct).slice(0, lockChars);
+    result[seg] = parseFloat(prefix + rateDigit) || 0;
+  });
+  ['equity_delivery','equity_intraday'].forEach(function(seg){
+    var def = BC_SEGMENT_DEFAULTS[seg];
+    var pctPrefix = String(def.brokPct).slice(0, bcAutoLockChars(def.brokPct));
+    var minPrefix = String(def.brokMin).slice(0, bcAutoLockChars(def.brokMin));
+    result[seg] = { pct: parseFloat(pctPrefix + rateDigit)||0, min: parseFloat(minPrefix + minDigit)||0 };
+  });
+  ['options','commodity_options'].forEach(function(seg){
+    result[seg] = parseFloat(rateDigit)||0;
+  });
 
   try{
     var updatePayload = {};
     updatePayload['clients.'+key+'.label'] = name;
-    targetSegs.forEach(function(seg){ updatePayload['clients.'+key+'.'+seg] = rateValue; });
+    Object.keys(result).forEach(function(seg){ updatePayload['clients.'+key+'.'+seg] = result[seg]; });
     await BCCLIENTDOC().set({}, {merge:true});
     await BCCLIENTDOC().update(updatePayload);
   }catch(e){
     var current = JSON.parse(JSON.stringify(bcClients||{}));
     if(!current[key]) current[key] = { label:name };
     current[key].label = name;
-    targetSegs.forEach(function(seg){ current[key][seg] = rateValue; });
+    Object.keys(result).forEach(function(seg){ current[key][seg] = result[seg]; });
     try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
     catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
   }
-  var segLabels = targetSegs.map(function(s){ return BC_MULTI_SEG_LABELS[s]; }).join(' + ');
-  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate for '+segLabels+'.';
+  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate across all 6 segments (digit "'+rateDigit+'" applied to each).';
   document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 
