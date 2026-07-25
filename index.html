@@ -892,6 +892,23 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-multi-table td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--border)}
 #page-brokerage-calc .bc-multi-table td:first-child{text-align:left;font-weight:700;color:var(--navy)}
 #page-brokerage-calc .bc-multi-table tr.bc-multi-total td{font-weight:800;border-top:2px solid var(--navy);border-bottom:none;background:var(--bg)}
+#page-brokerage-calc .bc-multi-card{border:none;background:linear-gradient(180deg,#f5f0ff 0%,#fff 90px);box-shadow:0 2px 10px rgba(124,58,237,.12);
+  border:1.5px solid #e4d8fb}
+#page-brokerage-calc .bc-multi-hdr{background:linear-gradient(90deg,#7c3aed,#c026d3);margin:-10px -16px 0 -16px;padding:10px 16px;border-radius:14px 14px 0 0}
+#page-brokerage-calc .bc-multi-btn-add{border-color:#7c3aed;color:#7c3aed}
+#page-brokerage-calc .bc-multi-btn-add:hover{background:#f3e8ff}
+#page-brokerage-calc .bc-multi-btn-calc{border-color:#c026d3;color:#c026d3}
+#page-brokerage-calc .bc-multi-btn-calc:hover{background:#fce8fb}
+#page-brokerage-calc .bc-multi-btn-save{border-color:var(--green);color:var(--green)}
+#page-brokerage-calc .bc-multi-btn-save:hover{background:var(--green2)}
+#page-brokerage-calc .bc-multi-table thead th{background:linear-gradient(90deg,#7c3aed,#c026d3)}
+#page-brokerage-calc .bc-multi-table tbody tr:nth-child(odd) td{background:#faf5ff}
+#page-brokerage-calc .bc-multi-table tr.bc-multi-total td{background:linear-gradient(90deg,#f3e8ff,#fce8fb);border-top:2px solid #7c3aed}
+#page-brokerage-calc .bc-multi-net-box{margin-top:10px;padding:12px;border-radius:10px;text-align:center}
+#page-brokerage-calc .bc-multi-net-box.bc-profit{background:var(--green2);color:var(--green)}
+#page-brokerage-calc .bc-multi-net-box.bc-loss{background:var(--red2);color:var(--red)}
+#page-brokerage-calc .bc-multi-net-box .bc-amt{font-size:1.15rem;font-weight:900}
+#page-brokerage-calc .bc-multi-net-box .bc-lbl2{font-size:.68rem;font-weight:700;margin-top:2px}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
   font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
@@ -1899,15 +1916,18 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="bc-rates-note no-upper" id="bcRatesNote"></div>
         </div>
 
-        <div class="bc-card bc-compact">
-          <h2>➕ Multiple Trades — Combined Bill</h2>
-          <div class="no-upper" style="font-size:.74rem;color:var(--gray);margin-bottom:8px">
+        <div class="bc-card bc-compact bc-multi-card">
+          <div class="bc-multi-hdr">
+            <h2 style="color:#fff;margin-bottom:0">➕ Multiple Trades — Combined Bill</h2>
+          </div>
+          <div class="no-upper" style="font-size:.74rem;color:var(--gray);margin:8px 0">
             For a client who split one position across segments — e.g. bought 200 shares, kept 100 as Intraday and 100 as Delivery — add a line for each part and get the combined bill.
           </div>
           <div id="bcMultiRows"></div>
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <button type="button" class="bc-mini-btn" onclick="bcAddMultiRow()">➕ Add Trade Line</button>
-            <button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy)" onclick="bcCalcMultiTrade()">📊 Calculate Combined Bill</button>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+            <button type="button" class="bc-mini-btn bc-multi-btn-add" onclick="bcAddMultiRow()">➕ Add Trade Line</button>
+            <button type="button" class="bc-mini-btn bc-multi-btn-calc" onclick="bcCalcMultiTrade()">📊 Calculate Combined Bill</button>
+            <button type="button" class="bc-mini-btn bc-multi-btn-save" onclick="bcSaveMultiTrade()">💾 Save For Client</button>
           </div>
           <div id="bcMultiResults" class="no-upper" style="margin-top:10px"></div>
         </div>

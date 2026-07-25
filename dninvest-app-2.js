@@ -2627,6 +2627,7 @@ function bcOnClientSearchInput(){
   if(code){
     bcCurrentClientKey = code;
     bcApplyClientOverride();
+    bcLoadMultiTradeForClient();
   }
 }
 
@@ -2878,7 +2879,7 @@ function bcCalcMultiTrade(){
   var resultsEl = document.getElementById('bcMultiResults');
   if(!rows.length){ resultsEl.innerHTML = '<div style="color:#dc2626;font-weight:700;font-size:.8rem">Add at least one trade line first.</div>'; return; }
 
-  var grand = {brokerage:0, charges:0, total:0};
+  var grand = {brokerage:0, charges:0, total:0, grossPL:0};
   var rowsHtml = '';
   var anyApproxOptions = false;
 
@@ -2918,16 +2919,75 @@ function bcCalcMultiTrade(){
     var total = brokerage + otherCharges;
 
     grand.brokerage += brokerage; grand.charges += otherCharges; grand.total += total;
+    grand.grossPL += (sellTurnover - buyTurnover);
     rowsHtml += '<tr><td>'+BC_MULTI_SEG_LABELS[seg]+' ('+qty+' qty)</td><td>'+bcFmt(totalTurnover)+'</td><td>'+bcFmt(brokerage)+'</td><td>'+bcFmt(otherCharges)+'</td><td>'+bcFmt(total)+'</td></tr>';
   });
 
   rowsHtml += '<tr class="bc-multi-total"><td>Combined Total</td><td></td><td>'+bcFmt(grand.brokerage)+'</td><td>'+bcFmt(grand.charges)+'</td><td>'+bcFmt(grand.total)+'</td></tr>';
 
+  var netPL = grand.grossPL - grand.total;
+  var isProfit = netPL >= 0;
+  var netBoxHtml = '<div class="bc-multi-net-box '+(isProfit?'bc-profit':'bc-loss')+'">'
+    +'<div class="bc-amt">'+bcFmt(netPL)+'</div>'
+    +'<div class="bc-lbl2">Gross '+(grand.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(grand.grossPL))+' − Total Bill '+bcFmt(grand.total)+' = Net '+(isProfit?'Profit':'Loss')+'</div>'
+    +'</div>';
+
   resultsEl.innerHTML =
     '<table class="bc-multi-table"><thead><tr><th>Segment</th><th>Turnover</th><th>Brokerage</th><th>Other Charges</th><th>Total Bill</th></tr></thead>'
     +'<tbody>'+rowsHtml+'</tbody></table>'
+    +netBoxHtml
     +(bcCurrentClientKey && bcClients[bcCurrentClientKey] ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:6px">Using '+bcClients[bcCurrentClientKey].label+'\'s saved rate where available, segment default otherwise.</div>' : '')
     +(anyApproxOptions ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:2px">Options/Commodity Options rows treat "Quantity" as lot count (flat brokerage × lots × 2 legs).</div>' : '');
+}
+
+// Saves the current Multiple-Trades row layout (segment/buy/sell/qty for each line) under the selected client,
+// so it can be reloaded next time that client is picked.
+async function bcSaveMultiTrade(){
+  if(!bcCurrentClientKey || !bcAllMyClients){ alert('Please select a client above first.'); return; }
+  var rec = bcAllMyClients.find(function(c){ return c.code===bcCurrentClientKey; });
+  if(!rec){ alert('This client is not in your accessible client list.'); return; }
+  var rows = document.querySelectorAll('#bcMultiRows .bc-multi-row');
+  var lines = [];
+  rows.forEach(function(rowEl){
+    var id = rowEl.id.replace('bcMultiRow','');
+    lines.push({
+      seg: document.getElementById('bcMultiSeg'+id).value,
+      buy: parseFloat(document.getElementById('bcMultiBuy'+id).value)||0,
+      sell: parseFloat(document.getElementById('bcMultiSell'+id).value)||0,
+      qty: parseFloat(document.getElementById('bcMultiQty'+id).value)||0
+    });
+  });
+  if(!lines.length){ alert('Add at least one trade line first.'); return; }
+
+  try{
+    var updatePayload = {};
+    updatePayload['clients.'+bcCurrentClientKey+'.label'] = rec.name;
+    updatePayload['clients.'+bcCurrentClientKey+'.multiTrade'] = lines;
+    await BCCLIENTDOC().set({}, {merge:true});
+    await BCCLIENTDOC().update(updatePayload);
+  }catch(e){
+    var current = JSON.parse(JSON.stringify(bcClients||{}));
+    if(!current[bcCurrentClientKey]) current[bcCurrentClientKey] = { label:rec.name };
+    current[bcCurrentClientKey].multiTrade = lines;
+    try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
+    catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
+  }
+  document.getElementById('bcClientHint').textContent = 'Saved this trade split for '+rec.name+'.';
+}
+
+// If the selected client has a saved trade split, load it into the Multiple-Trades rows.
+function bcLoadMultiTradeForClient(){
+  if(!bcCurrentClientKey || !bcClients[bcCurrentClientKey] || !bcClients[bcCurrentClientKey].multiTrade) return;
+  var lines = bcClients[bcCurrentClientKey].multiTrade;
+  document.getElementById('bcMultiRows').innerHTML = '';
+  lines.forEach(function(line){
+    bcAddMultiRow();
+    var id = bcMultiRowCount;
+    document.getElementById('bcMultiSeg'+id).value = line.seg;
+    document.getElementById('bcMultiBuy'+id).value = line.buy||'';
+    document.getElementById('bcMultiSell'+id).value = line.sell||'';
+    document.getElementById('bcMultiQty'+id).value = line.qty||'';
+  });
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
