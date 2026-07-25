@@ -119,7 +119,10 @@ input,select,textarea,button{font-family:inherit}
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
-                <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#b45309" onclick="QUIZ.loadFilmiBank()">🎬 फ़िल्मी सवाल लोड करें</button>
+                <span id="quiz-filmi-wrap" style="display:inline-flex;align-items:center;gap:2px">
+                  <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#b45309" onclick="QUIZ.loadFilmiBank()">🎬 फ़िल्मी सवाल लोड करें</button>
+                  <button class="btn btn-outline" title="Filmi Bank Ko List Se Hataaein" style="padding:5px 8px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteFilmiButton()">✕</button>
+                </span>
                 <div id="quiz-custom-banks" style="display:flex;gap:6px;flex-wrap:wrap"></div>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.saveBank()">💾 Save</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
@@ -189,6 +192,7 @@ window.QUIZ = (function(){
   // ── Custom (uploaded Excel) question banks — any topic, unlimited, synced across devices ──
   var CUSTOMBANKDOC = function(){ return window.fdb.collection('quiz').doc('customBanks'); };
   host.customBanks = {};                            // { key: [{q,a:[correct,wrong1,wrong2,wrong3]}, ...] }
+  host.hiddenBanks = {};                            // { filmi: true } — built-in banks the admin chose to remove from the list
   host.unsubCustomBanks = null;
   function defaultBankArr(){
     var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
@@ -385,12 +389,26 @@ window.QUIZ = (function(){
     try{
       if(host.unsubCustomBanks) host.unsubCustomBanks();
       host.unsubCustomBanks = CUSTOMBANKDOC().onSnapshot(function(doc){
-        host.customBanks = (doc.exists && doc.data() && doc.data().banks) ? doc.data().banks : {};
+        var d=(doc.exists && doc.data()) ? doc.data() : {};
+        host.customBanks = d.banks || {};
+        host.hiddenBanks = d.hidden || {};
         renderCustomBankButtons();
+        renderFilmiVisibility();
       });
     }catch(e){}
   }
-  function renderCustomBankButtons(){
+  function renderFilmiVisibility(){
+    var wrap=document.getElementById('quiz-filmi-wrap'); if(!wrap) return;
+    wrap.style.display = (host.hiddenBanks && host.hiddenBanks.filmi) ? 'none' : 'inline-flex';
+  }
+  async function deleteFilmiButton(){
+    if(!confirm('"Filmi" Bank Ko List Se Hataayein? Button Gayab Ho Jayega (Sabhi Device Se). Wapas Chahiye To Mujhe Bata Dena, Dobara Jod Denge.')) return;
+    try{
+      await CUSTOMBANKDOC().set({ hidden:{ filmi:true }, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
+    }catch(e){ alert('Delete Fail Ho Gaya: '+(e && e.message ? e.message : e)); return; }
+    host.hiddenBanks = Object.assign({}, host.hiddenBanks||{}, {filmi:true});
+    renderFilmiVisibility();
+  }
     var box=document.getElementById('quiz-custom-banks'); if(!box) return;
     var html='';
     Object.keys(host.customBanks||{}).sort().forEach(function(key){
@@ -402,9 +420,6 @@ window.QUIZ = (function(){
         +'<button class="btn btn-outline" title="इस बैंक को हमेशा के लिए हटाएँ" style="padding:5px 8px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteCustomBank(\''+key.replace(/'/g,"\\'")+'\')">✕</button>'
         +'</span>';
     });
-    if(host.customBanks && host.customBanks['filmi'] && host.customBanks['filmi'].length){
-      html+='<button class="btn btn-outline" title="Uploaded Filmi Bank Hataa Ke Purane 38 Wale Par Wapas Jao" style="padding:5px 8px;font-size:.72rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.deleteCustomBank(\'filmi\')">✕ Uploaded Filmi Hataao</button>';
-    }
     box.innerHTML=html;
   }
   async function deleteCustomBank(key){
@@ -1930,7 +1945,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, deleteCustomBank:deleteCustomBank, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, deleteCustomBank:deleteCustomBank, deleteFilmiButton:deleteFilmiButton, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile, saveScreenTitle:saveScreenTitle
   };
