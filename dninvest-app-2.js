@@ -2574,6 +2574,7 @@ function bcSubscribeClients(){
       bcClients = (doc.exists && doc.data() && doc.data().clients) ? doc.data().clients : {};
       bcRenderClientDropdown();
       bcApplyClientOverride();
+      if(bcSummaryOpen) bcRenderSummaryTable();
     });
   }catch(e){}
 }
@@ -2988,6 +2989,49 @@ function bcLoadMultiTradeForClient(){
     document.getElementById('bcMultiSell'+id).value = line.sell||'';
     document.getElementById('bcMultiQty'+id).value = line.qty||'';
   });
+}
+
+var bcSummaryOpen = false;
+function bcToggleSummary(){
+  bcSummaryOpen = !bcSummaryOpen;
+  document.getElementById('bcSummaryWrap').style.display = bcSummaryOpen ? '' : 'none';
+  if(bcSummaryOpen) bcRenderSummaryTable();
+}
+
+function bcFmtSegCell(seg, entry){
+  if(!entry || entry[seg]==null) return '<td class="bc-summary-empty">—</td>';
+  var v = entry[seg];
+  var shape = BC_SEG_BROK_TYPE[seg];
+  if(shape==='flat') return '<td>₹'+v+'/lot</td>';
+  if(shape==='pct_min') return '<td>'+v.pct+'% / ₹'+v.min+'</td>';
+  return '<td>'+v+'%</td>';
+}
+
+function bcRenderSummaryTable(){
+  var wrap = document.getElementById('bcSummaryTable');
+  if(!wrap) return;
+  var accessibleCodes = {};
+  (bcAllMyClients||[]).forEach(function(c){ if(c.code) accessibleCodes[c.code]=true; });
+  var codes = Object.keys(bcClients||{}).filter(function(k){ return accessibleCodes[k]; })
+    .sort(function(a,b){ return (bcClients[a].label||'').localeCompare(bcClients[b].label||''); });
+
+  if(!codes.length){
+    wrap.innerHTML = '<div style="font-size:.8rem;color:var(--gray)">No saved client rates yet — select a client above, set a rate, and click "Save Rate".</div>';
+    return;
+  }
+
+  var segs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options'];
+  var html = '<table class="bc-summary-table"><thead><tr><th>Client</th>'
+    + segs.map(function(s){ return '<th>'+BC_MULTI_SEG_LABELS[s]+'</th>'; }).join('')
+    + '<th>Trade Split Saved</th></tr></thead><tbody>';
+  codes.forEach(function(code){
+    var entry = bcClients[code];
+    html += '<tr><td>'+entry.label+' ('+code+')</td>'
+      + segs.map(function(s){ return bcFmtSegCell(s, entry); }).join('')
+      + '<td>'+(entry.multiTrade && entry.multiTrade.length ? entry.multiTrade.length+' lines' : '<span class="bc-summary-empty">—</span>')+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden

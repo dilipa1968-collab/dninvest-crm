@@ -909,6 +909,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-multi-net-box.bc-loss{background:var(--red2);color:var(--red)}
 #page-brokerage-calc .bc-multi-net-box .bc-amt{font-size:1.15rem;font-weight:900}
 #page-brokerage-calc .bc-multi-net-box .bc-lbl2{font-size:.68rem;font-weight:700;margin-top:2px}
+#page-brokerage-calc .bc-summary-table{width:100%;border-collapse:collapse;font-size:.76rem}
+#page-brokerage-calc .bc-summary-table th{background:var(--navy);color:#fff;padding:6px 8px;text-align:center;font-weight:700}
+#page-brokerage-calc .bc-summary-table th:first-child{text-align:left}
+#page-brokerage-calc .bc-summary-table td{padding:5px 8px;text-align:center;border-bottom:1px solid var(--border)}
+#page-brokerage-calc .bc-summary-table td:first-child{text-align:left;font-weight:700;color:var(--navy)}
+#page-brokerage-calc .bc-summary-table tbody tr:nth-child(odd) td{background:var(--bg)}
+#page-brokerage-calc .bc-summary-table td.bc-summary-empty{color:#c7ccd6}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
   font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
@@ -1821,6 +1828,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
         <div class="no-upper" id="bcClientHint" style="font-size:.68rem;color:var(--gray);margin-bottom:4px"></div>
         <div style="font-size:.76rem;color:var(--gray);margin-bottom:6px" class="no-upper">Select a segment, enter the brokerage rate, and all applicable statutory charges will be calculated automatically.</div>
+        <div class="no-upper bc-toggle-rates" onclick="bcToggleSummary()" style="margin-bottom:10px">📋 View All Saved Client Rates</div>
+        <div id="bcSummaryWrap" style="display:none">
+          <div class="bc-card bc-compact">
+            <h2>📋 Saved Client Rates — Summary</h2>
+            <div id="bcSummaryTable" class="no-upper"></div>
+          </div>
+        </div>
 
         <div class="bc-card bc-compact">
           <h2>📊 Select Segment</h2>
