@@ -2606,4 +2606,4 @@ function bcCalc(){
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
-bcSetSeg('futures');
+bcSetSeg('equity_intraday');
