@@ -2602,10 +2602,14 @@ function bcPopulateClientDatalist(search){
     bcClientLookup[c.name+' ('+c.code+')'+saved] = c.code;
   });
 
-  var list = bcAllMyClients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var list;
   if(search){
     var s = search.toLowerCase();
-    list = list.filter(function(c){ return (c.name||'').toLowerCase().indexOf(s)!==-1 || (c.code||'').toLowerCase().indexOf(s)!==-1; });
+    list = bcAllMyClients.filter(function(c){ return (c.name||'').toLowerCase().indexOf(s)!==-1 || (c.code||'').toLowerCase().indexOf(s)!==-1; });
+    list.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  } else {
+    // Nothing typed yet — lead with the newest clients rather than an alphabetical A-Z wall.
+    list = bcAllMyClients.slice().sort(function(a,b){ return (b.created||'').localeCompare(a.created||''); });
   }
   list = list.slice(0, 60);   // cap the visible suggestion list for performance; full list is still searchable by typing more
   var html = '';
@@ -2950,6 +2954,14 @@ function bcUpdateMultiRowFields(id){
 function bcRemoveMultiRow(id){
   var row = document.getElementById('bcMultiRow'+id);
   if(row) row.remove();
+}
+
+// Removes every trade line and starts fresh with two blank rows, like the page's initial state.
+function bcClearMultiTrade(){
+  document.getElementById('bcMultiRows').innerHTML = '';
+  document.getElementById('bcMultiResults').innerHTML = '';
+  bcAddMultiRow();
+  bcAddMultiRow();
 }
 
 function bcCalcMultiTrade(){
