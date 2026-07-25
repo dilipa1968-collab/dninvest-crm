@@ -2671,23 +2671,24 @@ async function bcSaveClient(){
     bcCurrentClientKey = key;
   } else { alert('Type or select a client name first.'); return; }
 
+  // Sync whatever is currently typed/shown for the active segment into BC_SEGMENT_DEFAULTS,
+  // so it's included below along with every other segment's current default.
+  var curShape = BC_SEG_BROK_TYPE[bcCurSeg];
+  if(curShape==='flat') BC_SEGMENT_DEFAULTS[bcCurSeg].brokFlat = parseFloat(document.getElementById('bcBrokFlat').value)||0;
+  else if(curShape==='pct_min'){
+    BC_SEGMENT_DEFAULTS[bcCurSeg].brokPct = parseFloat(document.getElementById('bcBrokRate').value)||0;
+    BC_SEGMENT_DEFAULTS[bcCurSeg].brokMin = parseFloat(document.getElementById('bcBrokMinShare').value)||0;
+  } else BC_SEGMENT_DEFAULTS[bcCurSeg].brokPct = parseFloat(document.getElementById('bcBrokRate').value)||0;
+
+  // Always save all 6 segments — whatever's currently set as each one's rate (default or edited).
   var segsToSave = {};
-  if(bcAllSegmentsApplied){
-    Object.keys(BC_SEGMENT_DEFAULTS).forEach(function(seg){
-      var def = BC_SEGMENT_DEFAULTS[seg];
-      var shape = BC_SEG_BROK_TYPE[seg];
-      if(shape==='flat') segsToSave[seg] = def.brokFlat;
-      else if(shape==='pct_min') segsToSave[seg] = { pct: def.brokPct, min: def.brokMin };
-      else segsToSave[seg] = def.brokPct;
-    });
-  } else {
-    var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-    var rateValue;
-    if(shape==='flat') rateValue = parseFloat(document.getElementById('bcBrokFlat').value)||0;
-    else if(shape==='pct_min') rateValue = { pct: parseFloat(document.getElementById('bcBrokRate').value)||0, min: parseFloat(document.getElementById('bcBrokMinShare').value)||0 };
-    else rateValue = parseFloat(document.getElementById('bcBrokRate').value)||0;
-    segsToSave[bcCurSeg] = rateValue;
-  }
+  Object.keys(BC_SEGMENT_DEFAULTS).forEach(function(seg){
+    var def = BC_SEGMENT_DEFAULTS[seg];
+    var shape = BC_SEG_BROK_TYPE[seg];
+    if(shape==='flat') segsToSave[seg] = def.brokFlat;
+    else if(shape==='pct_min') segsToSave[seg] = { pct: def.brokPct, min: def.brokMin };
+    else segsToSave[seg] = def.brokPct;
+  });
 
   try{
     var updatePayload = {};
@@ -2704,10 +2705,7 @@ async function bcSaveClient(){
     try{ await BCCLIENTDOC().set({ clients: current }, {merge:true}); }
     catch(e2){ alert('Could not save: '+(e2&&e2.message?e2.message:e2)); return; }
   }
-  var savedAll = bcAllSegmentsApplied;
-  document.getElementById('bcClientHint').textContent = savedAll
-    ? ('Saved '+name+'\'s rate across all 6 segments'+(rec?'':' (walk-in/prospective client)')+'.')
-    : ('Saved '+name+'\'s rate for this segment'+(rec?'':' (walk-in/prospective client)')+'.');
+  document.getElementById('bcClientHint').textContent = 'Saved '+name+'\'s rate across all 6 segments'+(rec?'':' (walk-in/prospective client)')+'.';
   document.getElementById('bcClientSearch').value = name+' ('+key+') ✓ saved';
 }
 

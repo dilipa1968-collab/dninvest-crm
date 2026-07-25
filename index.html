@@ -1821,7 +1821,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <input type="text" id="bcClientSearch" list="bcClientDatalist" placeholder="Type client name or code — or leave blank for Defaults" autocomplete="off"
               oninput="bcOnClientSearchInput()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;width:230px">
             <datalist id="bcClientDatalist"></datalist>
-            <button type="button" class="bc-mini-btn" onclick="bcSaveClient()" title="Save this segment's Brokerage Rate for the selected client">💾 Save Rate</button>
+            <button type="button" class="bc-mini-btn" onclick="bcSaveClient()" title="Saves the current Brokerage Rate for ALL 6 segments (whatever's shown/default for each) under this client">💾 Save Rate</button>
             <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcDeleteClient()" title="Clear this client's saved brokerage profile">🗑️ Clear Saved Rates</button>
           </div>
           <button class="btn btn-outline" onclick="window.print()" style="font-size:.82rem;padding:6px 14px">🖨️ Print / Save PDF</button>
