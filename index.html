@@ -877,6 +877,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-mini-btn:hover{background:var(--bg);color:var(--navy)}
 #page-brokerage-calc .bc-mini-btn-clear{border-color:#fca5a5;color:#dc2626}
 #page-brokerage-calc .bc-mini-btn-clear:hover{background:var(--red2)}
+#page-brokerage-calc .bc-rate-warn{font-size:.66rem;color:#b45309;font-weight:700;margin-top:3px;min-height:12px}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
   font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
@@ -1809,6 +1810,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
                 <span class="bc-rate-prefix" id="bcBrokRatePrefix">0.0</span><input type="text" id="bcBrokRateDigit" class="bc-rate-digit" maxlength="3" inputmode="numeric" onfocus="this.select()" value="3" oninput="bcOnDigitChange('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit')">
               </div>
               <input type="hidden" id="bcBrokRate" value="0.03">
+              <div class="bc-rate-warn no-upper" id="bcBrokRateWarn"></div>
             </div>
             <div class="bc-field" id="bcBrokMinWrap" style="display:none">
               <label>Min. Brokerage (₹/Share)</label>
@@ -1816,11 +1818,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
                 <span class="bc-rate-prefix" id="bcBrokMinSharePrefix">0.0</span><input type="text" id="bcBrokMinShareDigit" class="bc-rate-digit" maxlength="2" inputmode="numeric" onfocus="this.select()" value="3" oninput="bcOnDigitChange('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit')">
               </div>
               <input type="hidden" id="bcBrokMinShare" value="0.03">
+              <div class="bc-rate-warn no-upper" id="bcBrokMinShareWarn"></div>
             </div>
             <div class="bc-field" id="bcBrokFlatWrap" style="display:none">
               <label>Flat Brokerage (₹/Lot)</label>
-              <input type="number" class="bc-flat-input" id="bcBrokFlat" value="30" step="1" oninput="bcCalc()">
-            </div>
+              <input type="number" class="bc-flat-input" id="bcBrokFlat" value="30" step="1" oninput="bcOnFlatChange()">
+              <div class="bc-rate-warn no-upper" id="bcBrokFlatWarn"></div>            </div>
           </div>
           <div class="no-upper" style="font-size:.68rem;color:var(--gray);margin-top:4px" id="bcBrokHint"></div>
         </div>
