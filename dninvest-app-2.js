@@ -2474,7 +2474,7 @@ function bcSetLockedRate(hiddenId, prefixId, digitId, value){
 }
 function bcOnDigitChange(hiddenId, prefixId, digitId){
   var digitEl = document.getElementById(digitId);
-  var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(0,2);
+  var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(0,3);
   digitEl.value = d;
   var prefix = document.getElementById(prefixId).textContent;
   var combined = parseFloat(prefix + (d||'0'));
