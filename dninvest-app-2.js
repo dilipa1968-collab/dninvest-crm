@@ -2776,37 +2776,33 @@ function bcClearTradeFields(){
 }
 
 function bcResetBrokerage(){
-  var seg = bcCurSeg;
-  var d = BC_ORIGINAL_DEFAULTS[seg];
-  var shape = BC_SEG_BROK_TYPE[seg];
-  if(shape==='flat') bcSetFlatBrokerage(d.brokFlat);
-  else if(shape==='pct_min'){
-    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
-    bcSetLockedRate('bcBrokMinShare','bcBrokMinSharePrefix','bcBrokMinShareDigit', d.brokMin);
-  } else {
-    bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
-  }
+  // Undo any "Apply To All Segments" mutation — every segment's default goes back to the true original.
+  Object.keys(BC_SEGMENT_DEFAULTS).forEach(function(seg){
+    var orig = BC_ORIGINAL_DEFAULTS[seg];
+    BC_SEGMENT_DEFAULTS[seg].brokPct = orig.brokPct;
+    BC_SEGMENT_DEFAULTS[seg].brokMin = orig.brokMin;
+    BC_SEGMENT_DEFAULTS[seg].brokFlat = orig.brokFlat;
+  });
+  bcApplyDefaultBrokerage(bcCurSeg);   // refresh the currently-shown segment's fields
   bcAllSegmentsApplied = false;
   bcClearTradeFields();
   bcCalc();
 }
 
-// Blank out the Brokerage Rate field(s) so the RM can type in the client's actual rate fresh.
+// Blank out the Brokerage Rate for EVERY segment (session-wide) — not just the one currently shown.
 function bcClearBrokerage(){
   bcAllSegmentsApplied = false;
-  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  Object.keys(BC_SEGMENT_DEFAULTS).forEach(function(seg){
+    BC_SEGMENT_DEFAULTS[seg].brokPct = 0;
+    BC_SEGMENT_DEFAULTS[seg].brokMin = 0;
+    BC_SEGMENT_DEFAULTS[seg].brokFlat = 0;
+  });
   ['bcBrokRateWarn','bcBrokMinShareWarn','bcBrokFlatWarn'].forEach(function(id){ bcSetWarnBox(id, ''); });
-  if(shape==='flat'){
-    document.getElementById('bcBrokFlat').value = '';
-  } else if(shape==='pct_min'){
-    document.getElementById('bcBrokRateDigit').value = '';
-    document.getElementById('bcBrokRate').value = 0;
-    document.getElementById('bcBrokMinShareDigit').value = '';
-    document.getElementById('bcBrokMinShare').value = 0;
-  } else {
-    document.getElementById('bcBrokRateDigit').value = '';
-    document.getElementById('bcBrokRate').value = 0;
-  }
+  document.getElementById('bcBrokFlat').value = '';
+  document.getElementById('bcBrokRateDigit').value = '';
+  document.getElementById('bcBrokRate').value = 0;
+  document.getElementById('bcBrokMinShareDigit').value = '';
+  document.getElementById('bcBrokMinShare').value = 0;
   bcClearTradeFields();
   bcCalc();
 }
