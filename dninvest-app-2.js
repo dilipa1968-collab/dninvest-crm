@@ -2512,6 +2512,15 @@ function bcSetSeg(seg){
 }
 
 // Reload the default Brokerage Rate for the currently-selected segment — no full page refresh needed.
+// Blanks Buy Price, Sell Price, and Lot Size/No. Of Lots/Quantity (whichever applies to the current segment).
+function bcClearTradeFields(){
+  document.getElementById('bcBuyPrice').value = '';
+  document.getElementById('bcSellPrice').value = '';
+  document.getElementById('bcLotSize').value = '';
+  document.getElementById('bcLots').value = '';
+  document.getElementById('bcQtyPlain').value = '';
+}
+
 function bcResetBrokerage(){
   var seg = bcCurSeg;
   var d = BC_SEGMENT_DEFAULTS[seg];
@@ -2523,6 +2532,7 @@ function bcResetBrokerage(){
   } else {
     bcSetLockedRate('bcBrokRate','bcBrokRatePrefix','bcBrokRateDigit', d.brokPct);
   }
+  bcClearTradeFields();
   bcCalc();
 }
 
@@ -2540,6 +2550,7 @@ function bcClearBrokerage(){
     document.getElementById('bcBrokRateDigit').value = '';
     document.getElementById('bcBrokRate').value = 0;
   }
+  bcClearTradeFields();
   bcCalc();
 }
 
