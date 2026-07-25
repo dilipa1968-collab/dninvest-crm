@@ -2484,10 +2484,13 @@ function bcSetLockedRate(hiddenId, prefixId, digitId, value, lockChars){
   document.getElementById(prefixId).textContent = prefix;
   document.getElementById(digitId).value = digits;
   document.getElementById(hiddenId).value = value;
-  // Remember this segment's default (ceiling) and a floor of "...1" (e.g. 0.01) for the range warning below.
+  // Range-warning bounds ALWAYS reference the true original ("3" series) default for this segment/field —
+  // never the current session default (which "Apply To All Segments" may have changed) or a client's saved rate.
   var digitEl = document.getElementById(digitId);
-  digitEl.dataset.defaultVal = value;
-  digitEl.dataset.floorVal = parseFloat(prefix + '1');
+  var origVal = (hiddenId==='bcBrokMinShare') ? BC_ORIGINAL_DEFAULTS[bcCurSeg].brokMin : BC_ORIGINAL_DEFAULTS[bcCurSeg].brokPct;
+  var origPrefix = String(origVal).slice(0, bcAutoLockChars(origVal));
+  digitEl.dataset.defaultVal = origVal;
+  digitEl.dataset.floorVal = parseFloat(origPrefix + '1') || 0;
   bcSetWarnBox(digitId.replace(/Digit$/,'') + 'Warn', '');
 }
 
@@ -2532,7 +2535,7 @@ function bcOnFlatChange(){
 function bcSetFlatBrokerage(value){
   var el = document.getElementById('bcBrokFlat');
   el.value = value;
-  el.dataset.defaultVal = value;
+  el.dataset.defaultVal = BC_ORIGINAL_DEFAULTS[bcCurSeg].brokFlat;
   bcSetWarnBox('bcBrokFlatWarn', '');
 }
 
@@ -2714,16 +2717,12 @@ async function bcSaveClient(){
 // and Options/Commodity Options ₹20/lot (flat segments scale ×10, so a "3" stays ₹30/lot, "2" → ₹20/lot, "1" → ₹10/lot).
 function bcApplyDigitToAllSegments(){
   var shape = BC_SEG_BROK_TYPE[bcCurSeg];
-  var rateDigit, minDigit;
-  if(shape==='flat'){
-    rateDigit = String(parseFloat(document.getElementById('bcBrokFlat').value)||0);
-    minDigit = rateDigit;
-  } else {
-    rateDigit = (document.getElementById('bcBrokRateDigit').value||'').replace(/[^0-9]/g,'') || '0';
-    minDigit = (shape==='pct_min')
-      ? ((document.getElementById('bcBrokMinShareDigit').value||'').replace(/[^0-9]/g,'') || rateDigit)
-      : rateDigit;
-  }
+  // A single digit drives everything — whichever ONE field the RM just edited (Rate, or Flat for Options/Commodity
+  // Options). Min. Brokerage always mirrors this same digit, so the RM never has to touch two fields separately.
+  var digit = (shape==='flat')
+    ? String(parseFloat(document.getElementById('bcBrokFlat').value)||0)
+    : ((document.getElementById('bcBrokRateDigit').value||'').replace(/[^0-9]/g,'') || '0');
+  var rateDigit = digit, minDigit = digit;
 
   ['futures','commodity_futures'].forEach(function(seg){
     var orig = BC_ORIGINAL_DEFAULTS[seg];
