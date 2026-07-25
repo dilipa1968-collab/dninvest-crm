@@ -2578,21 +2578,31 @@ function bcSubscribeClients(){
   }catch(e){}
 }
 
-// Populates the <datalist> from the RM's own (or Admin's all) real Equity client records.
+// Full lookup (all accessible clients) so exact-match selection always works, even beyond the visible suggestion cap.
 var bcClientLookup = {};   // "Name (CODE)" -> code
-function bcPopulateClientDatalist(){
+var bcAllMyClients = [];
+function bcPopulateClientDatalist(search){
   var dl = document.getElementById('bcClientDatalist');
   if(!dl) return;
-  var list = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
-  list = list.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).slice(0, 1000);
+  bcAllMyClients = (typeof getMyEqClients==='function') ? getMyEqClients() : [];
   bcClientLookup = {};
+  bcAllMyClients.forEach(function(c){
+    if(!c.code) return;
+    var saved = bcClients[c.code] ? ' ✓ saved' : '';
+    bcClientLookup[c.name+' ('+c.code+')'+saved] = c.code;
+  });
+
+  var list = bcAllMyClients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  if(search){
+    var s = search.toLowerCase();
+    list = list.filter(function(c){ return (c.name||'').toLowerCase().indexOf(s)!==-1 || (c.code||'').toLowerCase().indexOf(s)!==-1; });
+  }
+  list = list.slice(0, 60);   // cap the visible suggestion list for performance; full list is still searchable by typing more
   var html = '';
   list.forEach(function(c){
     if(!c.code) return;
     var saved = bcClients[c.code] ? ' ✓ saved' : '';
-    var label = c.name+' ('+c.code+')'+saved;
-    bcClientLookup[label] = c.code;
-    html += '<option value="'+label.replace(/"/g,'&quot;')+'">';
+    html += '<option value="'+(c.name+' ('+c.code+')'+saved).replace(/"/g,'&quot;')+'">';
   });
   dl.innerHTML = html;
 }
@@ -2601,10 +2611,11 @@ function bcRenderClientDropdown(){
   bcPopulateClientDatalist();
 }
 
-// Fires on every keystroke — as soon as the typed text exactly matches a suggestion, that client loads immediately.
-// Clearing the box entirely goes back to segment defaults, same as before any client was picked.
+// Fires on every keystroke — re-filters the suggestion list ourselves, and loads the client as soon as the typed
+// text exactly matches one (either picked from suggestions or typed in full). Clearing the box goes back to defaults.
 function bcOnClientSearchInput(){
   var val = (document.getElementById('bcClientSearch').value||'').trim();
+  bcPopulateClientDatalist(val);
   if(!val){
     bcCurrentClientKey = '';
     bcApplyDefaultBrokerage(bcCurSeg);
@@ -2831,6 +2842,96 @@ function bcCalc(){
     +'GST is charged at 18% on the sum of Brokerage, Transaction Charges, and SEBI Fees. Rates reflect the April 2026 Budget revision — please verify against the latest exchange circular periodically.';
 }
 
+// ══════════════════════════════════════════
+// MULTIPLE TRADES — COMBINED BILL
+// Lets an RM split one client's position across segments (e.g. 100 Intraday + 100 Delivery)
+// and get a single combined bill. Uses the selected client's saved rate per segment when available,
+// else that segment's default rate.
+// ══════════════════════════════════════════
+var bcMultiRowCount = 0;
+var BC_MULTI_SEG_LABELS = { equity_intraday:'Equity Intraday', equity_delivery:'Equity Delivery', futures:'Futures (F&O)',
+                            options:'Options', commodity_futures:'Commodity Futures', commodity_options:'Commodity Options' };
+
+function bcAddMultiRow(){
+  bcMultiRowCount++;
+  var id = bcMultiRowCount;
+  var opts = Object.keys(BC_MULTI_SEG_LABELS).map(function(k){ return '<option value="'+k+'">'+BC_MULTI_SEG_LABELS[k]+'</option>'; }).join('');
+  var row = document.createElement('div');
+  row.className = 'bc-multi-row';
+  row.id = 'bcMultiRow'+id;
+  row.innerHTML =
+    '<div><label>Segment</label><select id="bcMultiSeg'+id+'">'+opts+'</select></div>'
+    +'<div><label>Buy Price (₹)</label><input type="number" id="bcMultiBuy'+id+'" placeholder="Buy Price"></div>'
+    +'<div><label>Sell Price (₹)</label><input type="number" id="bcMultiSell'+id+'" placeholder="Sell Price"></div>'
+    +'<div><label>Quantity</label><input type="number" id="bcMultiQty'+id+'" placeholder="Quantity" min="1"></div>'
+    +'<button type="button" class="bc-multi-remove" onclick="bcRemoveMultiRow('+id+')" title="Remove this line">✕</button>';
+  document.getElementById('bcMultiRows').appendChild(row);
+}
+
+function bcRemoveMultiRow(id){
+  var row = document.getElementById('bcMultiRow'+id);
+  if(row) row.remove();
+}
+
+function bcCalcMultiTrade(){
+  var rows = document.querySelectorAll('#bcMultiRows .bc-multi-row');
+  var resultsEl = document.getElementById('bcMultiResults');
+  if(!rows.length){ resultsEl.innerHTML = '<div style="color:#dc2626;font-weight:700;font-size:.8rem">Add at least one trade line first.</div>'; return; }
+
+  var grand = {brokerage:0, charges:0, total:0};
+  var rowsHtml = '';
+  var anyApproxOptions = false;
+
+  rows.forEach(function(rowEl){
+    var id = rowEl.id.replace('bcMultiRow','');
+    var seg = document.getElementById('bcMultiSeg'+id).value;
+    var buy = parseFloat(document.getElementById('bcMultiBuy'+id).value)||0;
+    var sell = parseFloat(document.getElementById('bcMultiSell'+id).value)||0;
+    var qty = parseFloat(document.getElementById('bcMultiQty'+id).value)||0;
+    if(!qty) return;
+
+    var d = BC_SEGMENT_DEFAULTS[seg];
+    var shape = BC_SEG_BROK_TYPE[seg];
+    var clientRate = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey][seg] : null;
+
+    var buyTurnover = buy*qty, sellTurnover = sell*qty, totalTurnover = buyTurnover+sellTurnover;
+    var brokerage;
+    if(shape==='flat'){
+      var flatRate = (clientRate!=null) ? clientRate : d.brokFlat;
+      brokerage = flatRate * qty * 2;   // approximation: Quantity treated as lot-count for Options/Commodity Options rows
+      anyApproxOptions = true;
+    } else if(shape==='pct_min'){
+      var pct = (clientRate!=null) ? clientRate.pct : d.brokPct;
+      var min = (clientRate!=null) ? clientRate.min : d.brokMin;
+      brokerage = Math.max(buyTurnover*pct/100, qty*min) + Math.max(sellTurnover*pct/100, qty*min);
+    } else {
+      var pctOnly = (clientRate!=null) ? clientRate : d.brokPct;
+      brokerage = totalTurnover * pctOnly/100;
+    }
+
+    var txn = totalTurnover * d.txn/100;
+    var sebi = totalTurnover * d.sebi/100;
+    var stamp = buyTurnover * d.stamp/100;
+    var stt = (d.sttSide==='both') ? totalTurnover*d.stt/100 : sellTurnover*d.stt/100;
+    var gst = (brokerage+txn+sebi) * 0.18;
+    var otherCharges = txn+sebi+stamp+stt+gst;
+    var total = brokerage + otherCharges;
+
+    grand.brokerage += brokerage; grand.charges += otherCharges; grand.total += total;
+    rowsHtml += '<tr><td>'+BC_MULTI_SEG_LABELS[seg]+' ('+qty+' qty)</td><td>'+bcFmt(totalTurnover)+'</td><td>'+bcFmt(brokerage)+'</td><td>'+bcFmt(otherCharges)+'</td><td>'+bcFmt(total)+'</td></tr>';
+  });
+
+  rowsHtml += '<tr class="bc-multi-total"><td>Combined Total</td><td></td><td>'+bcFmt(grand.brokerage)+'</td><td>'+bcFmt(grand.charges)+'</td><td>'+bcFmt(grand.total)+'</td></tr>';
+
+  resultsEl.innerHTML =
+    '<table class="bc-multi-table"><thead><tr><th>Segment</th><th>Turnover</th><th>Brokerage</th><th>Other Charges</th><th>Total Bill</th></tr></thead>'
+    +'<tbody>'+rowsHtml+'</tbody></table>'
+    +(bcCurrentClientKey && bcClients[bcCurrentClientKey] ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:6px">Using '+bcClients[bcCurrentClientKey].label+'\'s saved rate where available, segment default otherwise.</div>' : '')
+    +(anyApproxOptions ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:2px">Options/Commodity Options rows treat "Quantity" as lot count (flat brokerage × lots × 2 legs).</div>' : '');
+}
+
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
 bcSetSeg('equity_intraday');
 bcSubscribeClients();
+bcAddMultiRow();
+bcAddMultiRow();

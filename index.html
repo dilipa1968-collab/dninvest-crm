@@ -880,6 +880,18 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-rate-warn-box{display:none;background:var(--red);color:#fff;font-weight:800;font-size:.72rem;
   padding:8px 10px;border-radius:8px;line-height:1.25;max-width:180px;align-items:center;text-align:center}
 #page-brokerage-calc .bc-rate-warn-box.show{display:flex}
+#page-brokerage-calc .bc-multi-row{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;
+  padding-bottom:8px;border-bottom:1px dashed var(--border)}
+#page-brokerage-calc .bc-multi-row label{display:block;font-size:.6rem;font-weight:700;color:var(--gray);text-transform:uppercase;margin-bottom:3px}
+#page-brokerage-calc .bc-multi-row select,#page-brokerage-calc .bc-multi-row input{width:100%;padding:6px 7px;border:1.5px solid var(--border);
+  border-radius:7px;font-size:.78rem;font-family:inherit}
+#page-brokerage-calc .bc-multi-row .bc-multi-remove{background:none;border:none;color:#dc2626;font-size:1.1rem;cursor:pointer;padding:4px 8px}
+#page-brokerage-calc .bc-multi-table{width:100%;border-collapse:collapse;font-size:.78rem}
+#page-brokerage-calc .bc-multi-table th{background:var(--navy);color:#fff;padding:6px 9px;text-align:right;font-weight:700}
+#page-brokerage-calc .bc-multi-table th:first-child{text-align:left}
+#page-brokerage-calc .bc-multi-table td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--border)}
+#page-brokerage-calc .bc-multi-table td:first-child{text-align:left;font-weight:700;color:var(--navy)}
+#page-brokerage-calc .bc-multi-table tr.bc-multi-total td{font-weight:800;border-top:2px solid var(--navy);border-bottom:none;background:var(--bg)}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
   font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
@@ -1885,6 +1897,19 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div class="bc-lbl2" id="bcNetLbl">Net Profit</div>
           </div>
           <div class="bc-rates-note no-upper" id="bcRatesNote"></div>
+        </div>
+
+        <div class="bc-card bc-compact">
+          <h2>➕ Multiple Trades — Combined Bill</h2>
+          <div class="no-upper" style="font-size:.74rem;color:var(--gray);margin-bottom:8px">
+            For a client who split one position across segments — e.g. bought 200 shares, kept 100 as Intraday and 100 as Delivery — add a line for each part and get the combined bill.
+          </div>
+          <div id="bcMultiRows"></div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button type="button" class="bc-mini-btn" onclick="bcAddMultiRow()">➕ Add Trade Line</button>
+            <button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy)" onclick="bcCalcMultiTrade()">📊 Calculate Combined Bill</button>
+          </div>
+          <div id="bcMultiResults" class="no-upper" style="margin-top:10px"></div>
         </div>
 
         <div class="bc-footer-note no-upper" id="bcFooterNote">Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.</div>
