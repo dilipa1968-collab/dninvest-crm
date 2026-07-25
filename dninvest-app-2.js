@@ -2461,19 +2461,20 @@ function bcApplyRoleAccess(){
     : 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.';
 }
 
-// "Locked prefix" rate control — RM can only change the last digit (e.g. in 0.03, only the 3),
-// so a rate can't accidentally be fat-fingered from 0.03 into something like 3 or 0.3.
+// "Locked prefix" rate control — RM can only change the decimal digits after "0." (e.g. 03, 3, or 35),
+// so the leading "0." can't be accidentally deleted or fat-fingered into a whole-number rate.
 function bcSetLockedRate(hiddenId, prefixId, digitId, value){
   var str = String(value);
-  var prefix = str.slice(0, -1);
-  var digit = str.slice(-1);
+  var prefix, digits;
+  if(str.indexOf('0.')===0){ prefix='0.'; digits=str.slice(2); }
+  else { prefix=''; digits=str; }   // fallback for a rate ≥ 1 (not expected for brokerage %, but stays safe)
   document.getElementById(prefixId).textContent = prefix;
-  document.getElementById(digitId).value = digit;
+  document.getElementById(digitId).value = digits;
   document.getElementById(hiddenId).value = value;
 }
 function bcOnDigitChange(hiddenId, prefixId, digitId){
   var digitEl = document.getElementById(digitId);
-  var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(-1);
+  var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(0,2);
   digitEl.value = d;
   var prefix = document.getElementById(prefixId).textContent;
   var combined = parseFloat(prefix + (d||'0'));
