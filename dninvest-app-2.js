@@ -2602,17 +2602,13 @@ function bcPopulateClientDatalist(search){
     bcClientLookup[c.name+' ('+c.code+')'+saved] = c.code;
   });
 
-  var list;
+  var list = bcAllMyClients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
   if(search){
     var s = search.toLowerCase();
-    list = bcAllMyClients.filter(function(c){ return (c.name||'').toLowerCase().indexOf(s)!==-1 || (c.code||'').toLowerCase().indexOf(s)!==-1; });
-    list.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
-  } else {
-    // Nothing typed yet — lead with the newest clients rather than an alphabetical A-Z wall.
-    list = bcAllMyClients.slice().sort(function(a,b){ return (b.created||'').localeCompare(a.created||''); });
+    list = list.filter(function(c){ return (c.name||'').toLowerCase().indexOf(s)!==-1 || (c.code||'').toLowerCase().indexOf(s)!==-1; });
   }
   list = list.slice(0, 60);   // cap the visible suggestion list for performance; full list is still searchable by typing more
-  var html = '';
+  var html = '<option value="➕ New Client (type any name — for a walk-in/prospective client)">';
   list.forEach(function(c){
     if(!c.code) return;
     var saved = bcClients[c.code] ? ' ✓ saved' : '';
@@ -2629,11 +2625,15 @@ function bcRenderClientDropdown(){
 // text exactly matches one (either picked from suggestions or typed in full). Clearing the box goes back to defaults.
 function bcOnClientSearchInput(){
   var val = (document.getElementById('bcClientSearch').value||'').trim();
+  if(val.indexOf('➕ New Client')===0){
+    document.getElementById('bcClientSearch').value = '';
+    val = '';
+  }
   bcPopulateClientDatalist(val);
   if(!val){
     bcCurrentClientKey = '';
     bcApplyDefaultBrokerage(bcCurSeg);
-    document.getElementById('bcClientHint').textContent = '';
+    document.getElementById('bcClientHint').textContent = 'Type any new client\'s name to calculate/save a rate for them, even if they\'re not in the client list yet.';
     bcCalc();
     return;
   }
