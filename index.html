@@ -844,6 +844,46 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 .modal{animation:dnModalIn .18s ease}
 @keyframes dnModalIn{from{opacity:0;transform:scale(.97) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
 </style>
+<style id="brokerage-calc-style">
+/* ═══ BROKERAGE CALCULATOR — scoped to #page-brokerage-calc, reuses CRM's own colour variables ═══ */
+#page-brokerage-calc .bc-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;
+  box-shadow:0 1px 2px rgba(16,30,60,.05)}
+#page-brokerage-calc .bc-card h2{font-size:.92rem;font-weight:800;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+#page-brokerage-calc .bc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+#page-brokerage-calc .bc-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase;
+  letter-spacing:.4px;margin-bottom:5px}
+#page-brokerage-calc .bc-field input{width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:9px;
+  font-size:.9rem;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
+#page-brokerage-calc .bc-field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,148,42,.15)}
+#page-brokerage-calc .bc-field input[readonly]{background:var(--bg);color:var(--gray);cursor:not-allowed}
+#page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+#page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
+  font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
+#page-brokerage-calc .bc-seg-tab.active{background:var(--navy);border-color:var(--navy);color:#fff}
+#page-brokerage-calc .bc-result-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+  border-bottom:1px solid #f0f2f8;font-size:.86rem}
+#page-brokerage-calc .bc-result-row:last-child{border-bottom:none}
+#page-brokerage-calc .bc-result-row.bc-total{border-top:2px solid var(--navy);margin-top:6px;padding-top:12px;font-weight:800;font-size:1rem}
+#page-brokerage-calc .bc-result-row .bc-lbl{color:var(--gray)}
+#page-brokerage-calc .bc-result-row.bc-total .bc-lbl{color:var(--navy)}
+#page-brokerage-calc .bc-result-row .bc-val{font-weight:700;font-variant-numeric:tabular-nums}
+#page-brokerage-calc .bc-net-box{margin-top:14px;padding:16px;border-radius:12px;text-align:center}
+#page-brokerage-calc .bc-net-box.bc-profit{background:var(--green2);color:var(--green)}
+#page-brokerage-calc .bc-net-box.bc-loss{background:var(--red2);color:var(--red)}
+#page-brokerage-calc .bc-net-box .bc-amt{font-size:1.6rem;font-weight:900;letter-spacing:-.3px}
+#page-brokerage-calc .bc-net-box .bc-lbl2{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+#page-brokerage-calc .bc-rates-note{font-size:.72rem;color:var(--gray);margin-top:10px;line-height:1.6;background:var(--bg);
+  border:1px dashed var(--border);border-radius:8px;padding:10px 12px}
+#page-brokerage-calc .bc-rates-note b{color:var(--navy)}
+#page-brokerage-calc .bc-toggle-rates{font-size:.72rem;color:var(--gold);font-weight:700;cursor:pointer;user-select:none}
+#page-brokerage-calc #bcAdvRates{display:none;margin-top:10px}
+#page-brokerage-calc #bcAdvRates.open{display:block}
+#page-brokerage-calc .bc-mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px}
+#page-brokerage-calc .bc-mini-grid .bc-field label{font-size:.62rem}
+#page-brokerage-calc .bc-mini-grid .bc-field input{padding:6px 8px;font-size:.78rem}
+#page-brokerage-calc .bc-footer-note{font-size:.72rem;color:var(--gray);text-align:center;margin-top:8px}
+@media print{ #page-brokerage-calc .bc-toggle-rates,#page-brokerage-calc .bc-seg-tabs{display:none} }
+</style>
 </head>
 <body>
 
@@ -988,6 +1028,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="sidebar-section" id="op-nav-section">Other Products</div>
       <div class="nav-item" onclick="showPage('other-products')" id="nav-other-products">
         <span class="icon">🎯</span><span>Other Products</span><span class="badge-num" id="badge-op"></span>
+      </div>
+
+      <div class="sidebar-section" id="tools-nav-section">Tools</div>
+      <div class="nav-item" onclick="showPage('brokerage-calc')" id="nav-brokerage-calc">
+        <span class="icon">🧮</span> Brokerage Calculator
       </div>
 
       <div class="sidebar-section" id="reports-nav-section">Reports</div>
@@ -1690,6 +1735,81 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div id="op-table" style="overflow-x:auto"></div>
       </div>
       <!-- ══════ END OTHER PRODUCTS PAGE ══════ -->
+
+      <!-- ══════ BROKERAGE CALCULATOR PAGE ══════ -->
+      <div class="page" id="page-brokerage-calc">
+        <div class="page-hdr">
+          <div class="page-title">🧮 Brokerage &amp; Charges Calculator</div>
+          <button class="btn btn-outline" onclick="window.print()" style="font-size:.82rem;padding:6px 14px">🖨️ Print / Save PDF</button>
+        </div>
+        <div style="font-size:.8rem;color:var(--gray);margin-bottom:14px" class="no-upper">Enter the brokerage rate — all statutory charges are applied automatically.</div>
+
+        <div class="bc-card">
+          <h2>💼 Brokerage Rate</h2>
+          <div class="bc-grid">
+            <div class="bc-field" id="bcBrokPctWrap">
+              <label id="bcBrokPctLabel">Brokerage Rate (%) — Editable</label>
+              <input type="number" id="bcBrokRate" value="0.03" step="0.001" oninput="bcCalc()">
+            </div>
+            <div class="bc-field" id="bcBrokMinWrap" style="display:none">
+              <label>Minimum Brokerage (₹ Per Share) — Editable</label>
+              <input type="number" id="bcBrokMinShare" value="0.03" step="0.01" oninput="bcCalc()">
+            </div>
+            <div class="bc-field" id="bcBrokFlatWrap" style="display:none">
+              <label>Flat Brokerage (₹ Per Lot) — Editable</label>
+              <input type="number" id="bcBrokFlat" value="30" step="1" oninput="bcCalc()">
+            </div>
+          </div>
+          <div class="no-upper" style="font-size:.7rem;color:var(--gray);margin-top:4px" id="bcBrokHint"></div>
+        </div>
+
+        <div class="bc-card">
+          <h2>📊 Trade Details</h2>
+          <div class="bc-seg-tabs" id="bcSegTabs">
+            <div class="bc-seg-tab active" data-seg="futures" onclick="bcSetSeg('futures')">Futures (F&amp;O)</div>
+            <div class="bc-seg-tab" data-seg="equity_delivery" onclick="bcSetSeg('equity_delivery')">Equity Delivery</div>
+            <div class="bc-seg-tab" data-seg="equity_intraday" onclick="bcSetSeg('equity_intraday')">Equity Intraday</div>
+            <div class="bc-seg-tab" data-seg="options" onclick="bcSetSeg('options')">Options</div>
+            <div class="bc-seg-tab" data-seg="commodity_futures" onclick="bcSetSeg('commodity_futures')">Commodity Futures</div>
+            <div class="bc-seg-tab" data-seg="commodity_options" onclick="bcSetSeg('commodity_options')">Commodity Options</div>
+          </div>
+          <div class="bc-grid">
+            <div class="bc-field"><label>Buy Price (₹)</label><input type="number" id="bcBuyPrice" value="750" oninput="bcCalc()"></div>
+            <div class="bc-field"><label>Sell Price (₹)</label><input type="number" id="bcSellPrice" value="770" oninput="bcCalc()"></div>
+            <div class="bc-field"><label>Lot Size (Qty Per Lot)</label><input type="number" id="bcLotSize" value="550" min="1" oninput="bcCalc()"></div>
+            <div class="bc-field"><label>No. Of Lots</label><input type="number" id="bcLots" value="1" min="1" oninput="bcCalc()"></div>
+          </div>
+          <div class="no-upper" style="font-size:.75rem;color:var(--gray);margin-top:2px">Total Quantity: <b id="bcTotalQtyShow" style="color:var(--navy)">550</b></div>
+          <div class="bc-toggle-rates no-upper" onclick="bcToggleAdv()">⚙️ View Statutory Rates (Auto-Set — Not Editable)</div>
+          <div id="bcAdvRates">
+            <div class="bc-mini-grid">
+              <div class="bc-field"><label>STT / CTT (%)</label><input type="number" id="bcSttRate" step="0.001" readonly></div>
+              <div class="bc-field"><label>Txn Charges (%)</label><input type="number" id="bcTxnRate" step="0.0001" readonly></div>
+              <div class="bc-field"><label>Stamp Duty (%) (Buy)</label><input type="number" id="bcStampRate" step="0.001" readonly></div>
+              <div class="bc-field"><label>SEBI Fees (%)</label><input type="number" id="bcSebiRate" step="0.0001" readonly></div>
+              <div class="bc-field"><label>GST (%)</label><input type="number" id="bcGstRate" step="0.5" value="18" readonly></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bc-card">
+          <h2>📈 Turnover</h2>
+          <div id="bcTurnoverBox" class="no-upper"></div>
+        </div>
+
+        <div class="bc-card">
+          <h2>💰 Charges Breakdown</h2>
+          <div id="bcBreakdown" class="no-upper"></div>
+          <div id="bcNetBox" class="bc-net-box bc-profit no-upper">
+            <div class="bc-amt" id="bcNetAmt">₹0</div>
+            <div class="bc-lbl2" id="bcNetLbl">Net Profit</div>
+          </div>
+          <div class="bc-rates-note no-upper" id="bcRatesNote"></div>
+        </div>
+
+        <div class="bc-footer-note no-upper">Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange/government rules and set automatically per segment. Only the Brokerage Rate needs to be entered.</div>
+      </div>
+      <!-- ══════ END BROKERAGE CALCULATOR PAGE ══════ -->
 
       <div class="page" id="page-reports">
         <div class="page-hdr"><div class="page-title">Reports</div></div>

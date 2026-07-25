@@ -2403,3 +2403,148 @@ function selectOpClient(clientId, seg){
 // Load on app start
 window.addEventListener('load', ()=>{ setTimeout(()=>{ loadOpFromFirestore(); updateOpBadge(); }, 3000); });
 
+
+// ══════════════════════════════════════════
+// BROKERAGE CALCULATOR (Tools > Brokerage Calculator)
+// Segment brokerage "shape": futures/commodity_futures=%, options/commodity_options=flat ₹/lot,
+// equity_delivery/equity_intraday=% with a minimum ₹/share floor (whichever is higher).
+// Statutory rates (STT/CTT, Stamp, Txn Charges, SEBI, GST) are fixed per segment and read-only —
+// only the Brokerage Rate is editable by the RM.
+// ══════════════════════════════════════════
+var BC_SEG_BROK_TYPE = { futures:'percent', equity_delivery:'pct_min', equity_intraday:'pct_min', options:'flat',
+                          commodity_futures:'percent', commodity_options:'flat' };
+
+var BC_SEGMENT_DEFAULTS = {
+  futures:          { stt:0.05,  txn:0.0019, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
+  options:          { stt:0.15,  txn:0.0355, stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 },
+  equity_delivery:  { stt:0.10,  txn:0.00297,stamp:0.015, sebi:0.0001, sttSide:'both', stampSide:'buy', brokPct:0.3,  brokMin:0.03 },
+  equity_intraday:  { stt:0.025, txn:0.00297,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03, brokMin:0.03 },
+  commodity_futures:{ stt:0.05,  txn:0.0021, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
+  commodity_options:{ stt:0.05,  txn:0.00418,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 }
+};
+
+var bcCurSeg = 'futures';
+
+function bcUpdateBrokFields(){
+  var shape = BC_SEG_BROK_TYPE[bcCurSeg];
+  document.getElementById('bcBrokPctWrap').style.display = (shape==='percent'||shape==='pct_min') ? '' : 'none';
+  document.getElementById('bcBrokMinWrap').style.display = (shape==='pct_min') ? '' : 'none';
+  document.getElementById('bcBrokFlatWrap').style.display = (shape==='flat') ? '' : 'none';
+  document.getElementById('bcBrokPctLabel').textContent = (shape==='pct_min') ? 'Brokerage Rate (%)' : 'Brokerage Rate (%) — Editable';
+  document.getElementById('bcBrokHint').textContent = (shape==='pct_min')
+    ? 'Whichever is higher applies — the % amount or the Minimum ₹/Share (charged on each leg).' : '';
+}
+
+function bcSetSeg(seg){
+  bcCurSeg = seg;
+  document.querySelectorAll('#page-brokerage-calc .bc-seg-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.seg===seg); });
+  var d = BC_SEGMENT_DEFAULTS[seg];
+  document.getElementById('bcSttRate').value = d.stt;
+  document.getElementById('bcTxnRate').value = d.txn;
+  document.getElementById('bcStampRate').value = d.stamp;
+  document.getElementById('bcSebiRate').value = d.sebi;
+  bcUpdateBrokFields();
+  var shape = BC_SEG_BROK_TYPE[seg];
+  if(shape==='flat') document.getElementById('bcBrokFlat').value = d.brokFlat;
+  else if(shape==='pct_min'){ document.getElementById('bcBrokRate').value = d.brokPct; document.getElementById('bcBrokMinShare').value = d.brokMin; }
+  else document.getElementById('bcBrokRate').value = d.brokPct;
+  bcCalc();
+}
+
+function bcToggleAdv(){
+  document.getElementById('bcAdvRates').classList.toggle('open');
+}
+
+function bcFmt(n){
+  var neg = n<0; n=Math.abs(n);
+  var s = n.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  return (neg?'-':'') + '₹' + s;
+}
+
+function bcCalc(){
+  var buy = parseFloat(document.getElementById('bcBuyPrice').value)||0;
+  var sell = parseFloat(document.getElementById('bcSellPrice').value)||0;
+  var lotSize = parseFloat(document.getElementById('bcLotSize').value)||0;
+  var lots = parseFloat(document.getElementById('bcLots').value)||0;
+  var qty = lotSize*lots;
+  document.getElementById('bcTotalQtyShow').textContent = qty.toLocaleString('en-IN');
+  var brokPct = parseFloat(document.getElementById('bcBrokRate').value)||0;
+  var brokFlat = parseFloat(document.getElementById('bcBrokFlat').value)||0;
+  var brokMin = parseFloat(document.getElementById('bcBrokMinShare').value)||0;
+  var sttPct = parseFloat(document.getElementById('bcSttRate').value)||0;
+  var txnPct = parseFloat(document.getElementById('bcTxnRate').value)||0;
+  var stampPct = parseFloat(document.getElementById('bcStampRate').value)||0;
+  var sebiPct = parseFloat(document.getElementById('bcSebiRate').value)||0;
+  var gstPct = parseFloat(document.getElementById('bcGstRate').value)||0;
+  var d = BC_SEGMENT_DEFAULTS[bcCurSeg];
+  var brokShape = BC_SEG_BROK_TYPE[bcCurSeg];
+
+  var buyTurnover = buy*qty, sellTurnover = sell*qty;
+  var totalTurnover = buyTurnover+sellTurnover;
+
+  var brokerage, brokLbl;
+  if(brokShape==='flat'){
+    brokerage = brokFlat * lots * 2;   // charged on both the buy order and the sell order
+    brokLbl = 'Brokerage (₹'+brokFlat+' × '+lots+' lot(s) × 2 legs)';
+  } else if(brokShape==='pct_min'){
+    var buyBrok = Math.max(buyTurnover*brokPct/100, qty*brokMin);
+    var sellBrok = Math.max(sellTurnover*brokPct/100, qty*brokMin);
+    brokerage = buyBrok + sellBrok;
+    brokLbl = 'Brokerage ('+brokPct+'% or ₹'+brokMin+'/share, whichever higher — both legs)';
+  } else {
+    brokerage = totalTurnover * brokPct/100;
+    brokLbl = 'Brokerage ('+brokPct+'% of turnover)';
+  }
+  var txnCharges = totalTurnover * txnPct/100;
+  var sebiFees = totalTurnover * sebiPct/100;
+  var stamp = buyTurnover * stampPct/100;   // buy-side only
+  var stt;
+  if(d.sttSide==='both') stt = totalTurnover * sttPct/100;
+  else stt = sellTurnover * sttPct/100;      // sell-side only (F&O convention)
+
+  var gstBase = brokerage + txnCharges + sebiFees;
+  var gst = gstBase * gstPct/100;
+
+  var totalCharges = brokerage + stt + txnCharges + stamp + sebiFees + gst;
+  var grossPL = sellTurnover - buyTurnover;
+  var netPL = grossPL - totalCharges;
+
+  var turnoverHtml =
+    '<div class="bc-result-row"><span class="bc-lbl">Buy Turnover ('+qty.toLocaleString('en-IN')+' Qty × ₹'+buy+')</span><span class="bc-val">'+bcFmt(buyTurnover)+'</span></div>'
+    +'<div class="bc-result-row"><span class="bc-lbl">Sell Turnover ('+qty.toLocaleString('en-IN')+' Qty × ₹'+sell+')</span><span class="bc-val">'+bcFmt(sellTurnover)+'</span></div>'
+    +'<div class="bc-result-row bc-total" style="border-top:2px solid var(--gold);margin-top:2px;padding-top:10px"><span class="bc-lbl">Total Turnover</span><span class="bc-val">'+bcFmt(totalTurnover)+'</span></div>';
+  document.getElementById('bcTurnoverBox').innerHTML = turnoverHtml;
+
+  var rows = [
+    [brokLbl, brokerage],
+    ['STT / CTT'+(d.sttSide==='both'?' (buy + sell)':' (sell side)'), stt],
+    ['Exchange Transaction Charges', txnCharges],
+    ['Stamp Duty (buy side)', stamp],
+    ['SEBI Turnover Fees', sebiFees],
+    ['GST (' + gstPct + '% on Brokerage+Txn+SEBI)', gst]
+  ];
+  var html = rows.map(function(r){
+    return '<div class="bc-result-row"><span class="bc-lbl">'+r[0]+'</span><span class="bc-val">'+bcFmt(r[1])+'</span></div>';
+  }).join('');
+  html += '<div class="bc-result-row bc-total"><span class="bc-lbl">Total Charges</span><span class="bc-val">'+bcFmt(totalCharges)+'</span></div>';
+  document.getElementById('bcBreakdown').innerHTML = html;
+
+  var box = document.getElementById('bcNetBox');
+  var isProfit = netPL >= 0;
+  box.className = 'bc-net-box ' + (isProfit ? 'bc-profit' : 'bc-loss');
+  document.getElementById('bcNetAmt').textContent = bcFmt(netPL);
+  document.getElementById('bcNetLbl').textContent = 'Gross ' + (grossPL>=0?'Profit':'Loss') + ' ' + bcFmt(Math.abs(grossPL))
+    + ' − Charges ' + bcFmt(totalCharges) + ' = Net ' + (isProfit?'Profit':'Loss');
+
+  document.getElementById('bcRatesNote').innerHTML =
+    '<b>Note:</b> Only the Brokerage Rate above is editable — enter the client\'s actual rate. Switching the Segment tab automatically shows the right field type (% / Minimum / Flat). '
+    +'Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates and apply the same to every client: '
+    +'Futures — STT 0.05% (sell side), Stamp Duty 0.002% (buy side), Transaction Charges ~0.0019%, SEBI Fees 0.0001%. '
+    +'Options — STT 0.15% (sell side, on premium), Transaction Charges 0.0355%, Stamp Duty 0.003% (buy side). '
+    +'Equity Delivery/Intraday use standard NSE/SEBI slabs. Commodity Futures — CTT 0.05% (sell side, on par with equity futures), MCX Transaction Charges 0.0021%, Stamp Duty 0.002%. '
+    +'Commodity Options — CTT 0.05% (sell side, on premium), MCX Transaction Charges 0.00418%, Stamp Duty 0.003%. '
+    +'GST is 18% of (Brokerage + Transaction Charges + SEBI Fees). Rates reflect the April 2026 Budget revision — cross-check with the latest exchange circular periodically.';
+}
+
+// Initialize on script load — all fields exist in the DOM even while the page is hidden
+bcSetSeg('futures');
