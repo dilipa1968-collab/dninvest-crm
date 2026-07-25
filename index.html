@@ -856,14 +856,15 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   font-size:.9rem;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
 #page-brokerage-calc .bc-field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,148,42,.15)}
 #page-brokerage-calc .bc-field input[readonly]{background:var(--bg);color:var(--gray);cursor:not-allowed}
-#page-brokerage-calc .bc-locked-rate{display:flex;align-items:stretch;border:1.5px solid var(--border);border-radius:9px;overflow:hidden}
-#page-brokerage-calc .bc-rate-prefix{background:var(--bg);color:var(--gray);padding:9px 2px 9px 10px;font-size:.9rem;
-  display:flex;align-items:center;user-select:none;white-space:pre}
-#page-brokerage-calc .bc-rate-digit{width:38px;padding:9px 4px;border:none;border-left:1.5px solid var(--gold);
+#page-brokerage-calc .bc-locked-rate{display:inline-flex;align-items:stretch;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;width:auto;max-width:110px}
+#page-brokerage-calc .bc-rate-prefix{background:var(--bg);color:var(--gray);padding:9px 0 9px 10px;font-size:.9rem;
+  display:flex;align-items:center;user-select:none;white-space:pre;flex:0 0 auto}
+#page-brokerage-calc .bc-field input.bc-rate-digit{width:34px!important;flex:0 0 34px;padding:9px 4px;border:none;border-left:1.5px solid var(--gold);
   font-size:.9rem;font-weight:800;text-align:center;color:var(--navy);outline:none;background:#fff9ec}
 #page-brokerage-calc .bc-rate-digit:focus{background:#fff2cc;box-shadow:inset 0 0 0 2px var(--gold)}
-#page-brokerage-calc .bc-grid-compact .bc-locked-rate{margin-top:0}
-#page-brokerage-calc .bc-grid-compact .bc-rate-prefix,#page-brokerage-calc .bc-grid-compact .bc-rate-digit{padding-top:6px;padding-bottom:6px;font-size:.82rem}
+#page-brokerage-calc .bc-grid-compact .bc-locked-rate{margin-top:0;max-width:92px}
+#page-brokerage-calc .bc-grid-compact .bc-rate-prefix{padding-top:6px;padding-bottom:6px;font-size:.8rem}
+#page-brokerage-calc .bc-grid-compact .bc-field input.bc-rate-digit{padding-top:6px;padding-bottom:6px;font-size:.8rem;width:28px!important;flex-basis:28px}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
   font-size:.8rem;font-weight:700;color:var(--gray);transition:all .15s}
