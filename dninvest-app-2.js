@@ -2626,8 +2626,8 @@ function bcRenderClientDropdown(){
 function bcOnClientSearchInput(){
   var val = (document.getElementById('bcClientSearch').value||'').trim();
   if(val.indexOf('➕ New Client')===0){
-    document.getElementById('bcClientSearch').value = '';
-    val = '';
+    document.getElementById('bcClientSearch').value = 'New Client';
+    val = 'New Client';
   }
   bcPopulateClientDatalist(val);
   if(!val){
