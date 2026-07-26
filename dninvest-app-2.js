@@ -2906,7 +2906,8 @@ function bcCalc(){
   var isProfit = netPL >= 0;
   box.className = 'bc-net-box ' + (isProfit ? 'bc-profit' : 'bc-loss');
   document.getElementById('bcNetAmt').textContent = bcFmt(netPL);
-  document.getElementById('bcNetLbl').textContent = 'Gross ' + (grossPL>=0?'Profit':'Loss') + ' ' + bcFmt(Math.abs(grossPL))
+  var clientTag = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? (bcClients[bcCurrentClientKey].label + ' — ') : '';
+  document.getElementById('bcNetLbl').textContent = clientTag + 'Gross ' + (grossPL>=0?'Profit':'Loss') + ' ' + bcFmt(Math.abs(grossPL))
     + ' − Charges ' + bcFmt(totalCharges) + ' = Net ' + (isProfit?'Profit':'Loss');
 
   document.getElementById('bcRatesNote').innerHTML =
@@ -3027,9 +3028,10 @@ function bcCalcMultiTrade(){
 
   var netPL = grand.grossPL - grand.total;
   var isProfit = netPL >= 0;
+  var multiClientTag = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? (bcClients[bcCurrentClientKey].label + ' — ') : '';
   var netBoxHtml = '<div class="bc-multi-net-box '+(isProfit?'bc-profit':'bc-loss')+'">'
     +'<div class="bc-amt">'+bcFmt(netPL)+'</div>'
-    +'<div class="bc-lbl2">Gross '+(grand.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(grand.grossPL))+' − Total Bill '+bcFmt(grand.total)+' = Net '+(isProfit?'Profit':'Loss')+'</div>'
+    +'<div class="bc-lbl2">'+multiClientTag+'Gross '+(grand.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(grand.grossPL))+' − Total Bill '+bcFmt(grand.total)+' = Net '+(isProfit?'Profit':'Loss')+'</div>'
     +'</div>';
 
   resultsEl.innerHTML =
