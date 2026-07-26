@@ -72,6 +72,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-s
 
 <div class="wrap">
   <div class="locked-banner" id="lockedBanner" style="display:none">🔒 Brokerage rate is fixed by D N Investment for your account.</div>
+  <div class="locked-banner" id="openBanner" style="display:none;background:var(--blue2);border-color:var(--blue);color:#1e3a8a">✏️ Enter your Brokerage Rate below as per your plan with D N Investment.</div>
   <div class="card">
     <h2>📊 Select Segment</h2>
     <div class="seg-scroll" id="segTabs">
@@ -144,11 +145,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-s
     <h2>🔗 Share With Client (RM Only)</h2>
     <div class="qty-note" style="margin-bottom:8px">Set each segment's rate above as needed, add the client's name (optional), then generate a link. The client can enter their own trade but can't change the rate.</div>
     <div class="field trade" style="margin-bottom:8px"><label>Client Name (Optional)</label><input type="text" id="rmClientName" placeholder="e.g. Rekha Agarwal"></div>
-    <button class="print-btn" style="background:var(--navy);color:#fff" onclick="generateClientLink()">🔗 Generate Client Link</button>
+    <button class="print-btn" style="background:var(--navy);color:#fff" onclick="generateClientLink()">🔗 Generate Client Link (Rate Locked)</button>
     <div id="linkResult" style="display:none;margin-top:10px">
       <div class="qty-note" style="margin-bottom:6px">Share this link — it opens with your rates locked in:</div>
       <textarea id="linkOutput" readonly style="width:100%;padding:8px;border:1.5px solid var(--gold);border-radius:8px;font-size:.72rem;height:60px;font-family:monospace;background:var(--gold3)"></textarea>
       <button class="print-btn" style="margin-top:6px" onclick="copyClientLink()">📋 Copy Link</button>
+    </div>
+
+    <div style="border-top:1px dashed var(--border);margin:14px 0 10px"></div>
+    <div class="qty-note" style="margin-bottom:8px">Or share a general-purpose link — not tied to any one client — where the person can enter their own brokerage rate.</div>
+    <button class="print-btn" style="background:var(--blue);color:#fff" onclick="generateOpenLink()">🔓 Generate Open Link (Rate Editable)</button>
+    <div id="openLinkResult" style="display:none;margin-top:10px">
+      <div class="qty-note" style="margin-bottom:6px">Share this link — the Brokerage Rate stays editable for whoever opens it:</div>
+      <textarea id="openLinkOutput" readonly style="width:100%;padding:8px;border:1.5px solid var(--blue);border-radius:8px;font-size:.72rem;height:60px;font-family:monospace;background:var(--blue2)"></textarea>
+      <button class="print-btn" style="margin-top:6px" onclick="copyOpenLink()">📋 Copy Link</button>
     </div>
   </div>
 
@@ -313,6 +323,21 @@ document.querySelectorAll('input').forEach(function(el){
 function loadFromUrlIfLocked(){
   var params = new URLSearchParams(window.location.search);
   var r = params.get('r');
+  var mode = params.get('mode');
+  var name = params.get('n');
+
+  if(mode === 'open'){
+    // Open link: brokerage stays editable, but this is still a client-facing link — hide the RM tools.
+    document.getElementById('rmToolsCard').style.display = 'none';
+    document.getElementById('openBanner').style.display = '';
+    if(name){
+      var nameEl2 = document.getElementById('clientNameShow');
+      nameEl2.textContent = 'Prepared for: ' + name;
+      nameEl2.style.display = '';
+    }
+    return true;
+  }
+
   if(!r) return false;
   try{
     var decoded = JSON.parse(decodeURIComponent(escape(atob(r.replace(/-/g,'+').replace(/_/g,'/')))));
@@ -326,7 +351,6 @@ function loadFromUrlIfLocked(){
     isLocked = true;
     document.getElementById('rmToolsCard').style.display = 'none';
     document.getElementById('lockedBanner').style.display = '';
-    var name = params.get('n');
     if(name){
       var nameEl = document.getElementById('clientNameShow');
       nameEl.textContent = 'Prepared for: ' + name;
@@ -336,7 +360,7 @@ function loadFromUrlIfLocked(){
   }catch(e){ return false; }
 }
 
-// ── RM mode: build a shareable link encoding every segment's currently-set rate ──
+// ── RM mode: build a shareable link encoding every segment's currently-set rate (locked) ──
 function generateClientLink(){
   syncCurrentFieldsToDefaults();
   var rates = {};
@@ -355,6 +379,21 @@ function generateClientLink(){
 
 function copyClientLink(){
   var box = document.getElementById('linkOutput');
+  box.select(); box.setSelectionRange(0, 99999);
+  try{ document.execCommand('copy'); }catch(e){}
+  if(navigator.clipboard) navigator.clipboard.writeText(box.value).catch(function(){});
+}
+
+// ── RM mode: build a general-purpose link — no client, no fixed rate; the person can set their own ──
+function generateOpenLink(){
+  var name = (document.getElementById('rmClientName').value||'').trim();
+  var url = window.location.origin + window.location.pathname + '?mode=open' + (name ? '&n=' + encodeURIComponent(name) : '');
+  document.getElementById('openLinkOutput').value = url;
+  document.getElementById('openLinkResult').style.display = '';
+}
+
+function copyOpenLink(){
+  var box = document.getElementById('openLinkOutput');
   box.select(); box.setSelectionRange(0, 99999);
   try{ document.execCommand('copy'); }catch(e){}
   if(navigator.clipboard) navigator.clipboard.writeText(box.value).catch(function(){});
