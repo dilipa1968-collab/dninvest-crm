@@ -916,6 +916,23 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-summary-table td:first-child{text-align:left;font-weight:700;color:var(--navy)}
 #page-brokerage-calc .bc-summary-table tbody tr:nth-child(odd) td{background:var(--bg)}
 #page-brokerage-calc .bc-summary-table td.bc-summary-empty{color:#c7ccd6}
+#page-brokerage-calc .bc-allseg-table{overflow-x:auto}
+#page-brokerage-calc .bc-allseg-row{display:grid;grid-template-columns:1.1fr 1.3fr 0.8fr 0.8fr 0.9fr 1fr 1.1fr;
+  gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);min-width:900px}
+#page-brokerage-calc .bc-allseg-row:nth-child(odd){background:var(--bg)}
+#page-brokerage-calc .bc-allseg-row.bc-allseg-head{background:var(--navy);color:#fff;font-weight:700;font-size:.68rem;
+  text-transform:uppercase;padding:8px 6px;border-radius:8px 8px 0 0;min-width:900px}
+#page-brokerage-calc .bc-allseg-seg{font-weight:800;color:var(--navy);font-size:.78rem;padding-left:6px}
+#page-brokerage-calc .bc-allseg-brok{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+#page-brokerage-calc .bc-allseg-brok input{width:100%;min-width:50px;padding:5px 6px;border:1.5px solid var(--green);
+  background:var(--green2);border-radius:6px;font-size:.74rem;font-weight:700;color:var(--green);text-align:center}
+#page-brokerage-calc .bc-allseg-brok .bc-allseg-brok-flat{border-color:var(--gold);background:var(--gold3);color:#7a5c0e}
+#page-brokerage-calc .bc-allseg-row input.bc-allseg-trade{width:100%;padding:5px 6px;border:1.5px solid var(--blue);
+  background:var(--blue2);border-radius:6px;font-size:.74rem;font-weight:700;color:var(--navy);text-align:center}
+#page-brokerage-calc .bc-allseg-charges{font-size:.74rem;font-weight:700;color:var(--gray)}
+#page-brokerage-calc .bc-allseg-net{font-size:.78rem;font-weight:800;padding:4px 6px;border-radius:6px;text-align:center}
+#page-brokerage-calc .bc-allseg-net.bc-profit{background:var(--green2);color:var(--green)}
+#page-brokerage-calc .bc-allseg-net.bc-loss{background:var(--red2);color:var(--red)}
 #page-brokerage-calc .bc-summary-table .bc-mini-btn{padding:3px 7px;font-size:.66rem;white-space:nowrap}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
@@ -1860,6 +1877,15 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="bc-card bc-compact">
             <h2>📋 Saved Client Rates — Summary</h2>
             <div id="bcSummaryTable" class="no-upper"></div>
+          </div>
+        </div>
+
+        <div class="no-upper bc-toggle-rates" onclick="bcToggleAllSegView()" style="margin-bottom:10px">🗂️ All Segments — One Screen (no tab switching)</div>
+        <div id="bcAllSegWrap" style="display:none">
+          <div class="bc-card bc-compact">
+            <h2>🗂️ All Segments — Brokerage &amp; Trade, One Screen</h2>
+            <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-bottom:10px">Every segment's own Brokerage Rate on the left, its own Trade Qty &amp; Price on the right — fill in whichever segments you need, results update live.</div>
+            <div id="bcAllSegTable" class="no-upper"></div>
           </div>
         </div>
 

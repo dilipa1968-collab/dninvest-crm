@@ -2588,6 +2588,7 @@ function bcSubscribeClients(){
       bcRenderClientDropdown();
       bcApplyClientOverride();
       if(bcSummaryOpen) bcRenderSummaryTable();
+      if(bcAllSegOpen) bcRenderAllSegTable();
     });
   }catch(e){}
 }
@@ -2646,6 +2647,7 @@ function bcOnClientSearchInput(){
     bcCurrentClientKey = code;
     bcApplyClientOverride();
     bcLoadMultiTradeForClient();
+    if(bcAllSegOpen) bcRenderAllSegTable();
   } else {
     bcCurrentClientKey = '';
     document.getElementById('bcClientHint').textContent = '';
@@ -3167,6 +3169,7 @@ function bcSelectClientFromSummary(code){
   searchBox.value = (code.indexOf('custom_')===0) ? entry.label : (entry.label + ' (' + code + ')');
   bcApplyClientOverride();
   bcLoadMultiTradeForClient();
+  if(bcAllSegOpen) bcRenderAllSegTable();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -3259,6 +3262,94 @@ function bcPrintSummary(){
 
   document.getElementById('bcPrintView').innerHTML = html;
   window.print();
+}
+
+// ══════════════════════════════════════════
+// ALL SEGMENTS — ONE SCREEN
+// Every segment gets its own row: its own Brokerage Rate on the left, its own Trade Qty & Price on the right —
+// no tab-switching needed. Uses the selected client's saved rate per segment where available, else the default.
+// ══════════════════════════════════════════
+var bcAllSegOpen = false;
+var BC_ALL_SEGS = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
+
+function bcToggleAllSegView(){
+  bcAllSegOpen = !bcAllSegOpen;
+  document.getElementById('bcAllSegWrap').style.display = bcAllSegOpen ? '' : 'none';
+  if(bcAllSegOpen) bcRenderAllSegTable();
+}
+
+function bcRenderAllSegTable(){
+  var wrap = document.getElementById('bcAllSegTable');
+  if(!wrap) return;
+  var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
+
+  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Buy Price</div><div>Sell Price</div><div>Quantity</div><div>Total Charges</div><div>Net P/L</div></div>';
+
+  BC_ALL_SEGS.forEach(function(seg){
+    var shape = BC_SEG_BROK_TYPE[seg];
+    var d = BC_SEGMENT_DEFAULTS[seg];
+    var saved = clientEntry ? clientEntry[seg] : null;
+    var brokCell;
+    if(shape==='flat'){
+      var flatVal = (saved!=null) ? saved : d.brokFlat;
+      brokCell = '<input type="number" class="bc-allseg-brok-flat" id="bcAllBrokFlat_'+seg+'" value="'+flatVal+'" title="₹ per lot" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+    } else if(shape==='pct_min'){
+      var pctVal = (saved!=null) ? saved.pct : d.brokPct;
+      var minVal = (saved!=null) ? saved.min : d.brokMin;
+      brokCell = '<input type="number" id="bcAllBrokPct_'+seg+'" value="'+pctVal+'" step="0.01" title="Rate %" oninput="bcCalcAllSegRow(\''+seg+'\')">'
+               + '<input type="number" id="bcAllBrokMin_'+seg+'" value="'+minVal+'" step="0.01" title="Min ₹/Share" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+    } else {
+      var pctOnly = (saved!=null) ? saved : d.brokPct;
+      brokCell = '<input type="number" id="bcAllBrokPct_'+seg+'" value="'+pctOnly+'" step="0.01" title="Rate %" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+    }
+    html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
+      + '<div class="bc-allseg-seg">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
+      + '<div class="bc-allseg-brok">'+brokCell+'</div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div class="bc-allseg-charges" id="bcAllCharges_'+seg+'">₹0.00</div>'
+      + '<div class="bc-allseg-net bc-profit" id="bcAllNet_'+seg+'">₹0.00</div>'
+      + '</div>';
+  });
+  wrap.innerHTML = '<div class="bc-allseg-table">'+html+'</div>';
+}
+
+function bcCalcAllSegRow(seg){
+  var buy = parseFloat(document.getElementById('bcAllBuy_'+seg).value)||0;
+  var sell = parseFloat(document.getElementById('bcAllSell_'+seg).value)||0;
+  var qty = parseFloat(document.getElementById('bcAllQty_'+seg).value)||0;
+  var d = BC_SEGMENT_DEFAULTS[seg];
+  var shape = BC_SEG_BROK_TYPE[seg];
+
+  var buyTurnover = buy*qty, sellTurnover = sell*qty, totalTurnover = buyTurnover+sellTurnover;
+  var brokerage;
+  if(shape==='flat'){
+    var flatRate = parseFloat(document.getElementById('bcAllBrokFlat_'+seg).value)||0;
+    brokerage = flatRate * qty * 2;   // Quantity treated as lot count for flat-brokerage segments
+  } else if(shape==='pct_min'){
+    var pct = parseFloat(document.getElementById('bcAllBrokPct_'+seg).value)||0;
+    var min = parseFloat(document.getElementById('bcAllBrokMin_'+seg).value)||0;
+    var buyBrok = (buy>0) ? Math.max(buyTurnover*pct/100, qty*min) : 0;
+    var sellBrok = (sell>0) ? Math.max(sellTurnover*pct/100, qty*min) : 0;
+    brokerage = buyBrok + sellBrok;
+  } else {
+    var pctOnly = parseFloat(document.getElementById('bcAllBrokPct_'+seg).value)||0;
+    brokerage = totalTurnover * pctOnly/100;
+  }
+
+  var txn = totalTurnover * d.txn/100;
+  var sebi = totalTurnover * d.sebi/100;
+  var stamp = buyTurnover * d.stamp/100;
+  var stt = (d.sttSide==='both') ? totalTurnover*d.stt/100 : sellTurnover*d.stt/100;
+  var gst = (brokerage+txn+sebi) * 0.18;
+  var totalCharges = brokerage+stt+txn+stamp+sebi+gst;
+  var netPL = (sellTurnover-buyTurnover) - totalCharges;
+
+  document.getElementById('bcAllCharges_'+seg).textContent = bcFmt(totalCharges);
+  var netEl = document.getElementById('bcAllNet_'+seg);
+  netEl.textContent = bcFmt(netPL);
+  netEl.className = 'bc-allseg-net ' + (netPL>=0 ? 'bc-profit' : 'bc-loss');
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
