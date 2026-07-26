@@ -3126,15 +3126,39 @@ function bcRenderSummaryTable(){
   var segs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
   var html = '<table class="bc-summary-table"><thead><tr><th>Client</th>'
     + segs.map(function(s){ return '<th>'+BC_MULTI_SEG_LABELS[s]+'</th>'; }).join('')
-    + '<th>Trade Split Saved</th></tr></thead><tbody>';
+    + '<th>Trade Split Saved</th><th>Share Link</th></tr></thead><tbody>';
   codes.forEach(function(code){
     var entry = bcClients[code];
     html += '<tr><td>'+entry.label+' ('+code+')</td>'
       + segs.map(function(s){ return bcFmtSegCell(s, entry); }).join('')
-      + '<td>'+(entry.multiTrade && entry.multiTrade.length ? entry.multiTrade.length+' lines' : '<span class="bc-summary-empty">—</span>')+'</td></tr>';
+      + '<td>'+(entry.multiTrade && entry.multiTrade.length ? entry.multiTrade.length+' lines' : '<span class="bc-summary-empty">—</span>')+'</td>'
+      + '<td><button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy);white-space:nowrap" onclick="bcShareClientLink(\''+code.replace(/'/g,"\\'")+'\')">🔗 Share Link</button></td></tr>';
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+// Builds a locked client link (same encoding the standalone DN_Client_Calculator.html page reads) from this
+// client's already-saved rates, and copies it to the clipboard.
+function bcShareClientLink(code){
+  var entry = bcClients[code];
+  if(!entry){ alert('No saved rates found for this client.'); return; }
+  var rates = {};
+  Object.keys(BC_SEGMENT_DEFAULTS).forEach(function(seg){
+    if(entry[seg]!=null) rates[seg] = entry[seg];
+  });
+  if(!Object.keys(rates).length){ alert('This client has no saved segment rates yet.'); return; }
+  var encoded = btoa(unescape(encodeURIComponent(JSON.stringify(rates)))).replace(/\+/g,'-').replace(/\//g,'_');
+  var url = window.location.origin + '/DN_Client_Calculator.html?r=' + encoded + '&n=' + encodeURIComponent(entry.label);
+  var copied = false;
+  try{
+    var ta = document.createElement('textarea');
+    ta.value = url; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,99999);
+    copied = document.execCommand('copy');
+    document.body.removeChild(ta);
+  }catch(e){}
+  prompt(copied ? 'Link copied! Share this with '+entry.label+':' : 'Copy this link and share with '+entry.label+':', url);
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
