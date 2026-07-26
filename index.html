@@ -846,6 +846,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 </style>
 <style id="brokerage-calc-style">
 /* ═══ BROKERAGE CALCULATOR — scoped to #page-brokerage-calc, reuses CRM's own colour variables ═══ */
+#page-brokerage-calc .page-hdr{margin-bottom:6px}
 #page-brokerage-calc .bc-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;
   box-shadow:0 1px 2px rgba(16,30,60,.05)}
 #page-brokerage-calc .bc-card h2{font-size:.92rem;font-weight:800;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:7px}
@@ -918,10 +919,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-summary-table td.bc-summary-empty{color:#c7ccd6}
 #page-brokerage-calc .bc-allseg-table{overflow-x:auto;width:100%}
 #page-brokerage-calc .bc-allseg-row{display:grid;grid-template-columns:0.9fr 1.3fr 0.62fr 0.62fr 0.68fr 0.78fr 0.86fr;
-  gap:3px;align-items:start;padding:4px 0;border-bottom:1px solid var(--border);width:100%}
+  gap:3px;align-items:start;padding:2px 0;border-bottom:1px solid var(--border);width:100%}
 #page-brokerage-calc .bc-allseg-row:nth-child(odd){background:var(--bg)}
-#page-brokerage-calc .bc-allseg-row.bc-allseg-head{background:var(--navy);color:#fff;font-weight:700;font-size:.6rem;
-  text-transform:uppercase;padding:5px 4px;border-radius:8px 8px 0 0;width:100%}
+#page-brokerage-calc .bc-allseg-row.bc-allseg-head{background:var(--navy);color:#fff;font-weight:700;font-size:.58rem;
+  text-transform:uppercase;padding:4px 4px;border-radius:8px 8px 0 0;width:100%}
 #page-brokerage-calc .bc-allseg-seg{font-weight:800;color:var(--navy);font-size:.68rem;padding-left:3px;padding-top:4px;line-height:1.15}
 #page-brokerage-calc .bc-allseg-brok{display:flex;flex-direction:row;flex-wrap:wrap;gap:3px;align-items:flex-start;padding:1px 0}
 #page-brokerage-calc .bc-allseg-brok-item{display:flex;flex-direction:column;gap:1px}
@@ -977,23 +978,24 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px}
 #page-brokerage-calc .bc-mini-grid .bc-field label{font-size:.62rem}
 #page-brokerage-calc .bc-mini-grid .bc-field input{padding:6px 8px;font-size:.78rem}
-#page-brokerage-calc .bc-footer-note{font-size:.68rem;color:var(--gray);text-align:center;margin-top:5px}
-#page-brokerage-calc .bc-compact{padding:10px 16px;margin-bottom:6px}
-#page-brokerage-calc .bc-compact h2{margin-bottom:5px;font-size:.82rem}
+#page-brokerage-calc .bc-footer-note{font-size:.6rem;color:var(--gray);text-align:center;margin-top:2px}
+#page-brokerage-calc .bc-compact{padding:6px 14px;margin-bottom:4px}
+#page-brokerage-calc .bc-compact h2{margin-bottom:2px;font-size:.76rem}
 #page-brokerage-calc .bc-grid-compact{gap:5px 12px}
 #page-brokerage-calc .bc-grid-compact .bc-field label{font-size:.6rem;margin-bottom:2px}
 #page-brokerage-calc .bc-grid-compact .bc-field input{padding:5px 8px;font-size:.8rem}
 #page-brokerage-calc .bc-two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
-#page-brokerage-calc .bc-two-col h2{font-size:.78rem;margin-bottom:3px}
-#page-brokerage-calc .bc-two-col .bc-result-row{padding:3px 0;font-size:.74rem}
+#page-brokerage-calc .bc-two-col h2{font-size:.7rem;margin-bottom:1px}
+#page-brokerage-calc .bc-two-col .bc-result-row{padding:1px 0;font-size:.68rem}
 #page-brokerage-calc .bc-compact .bc-seg-tabs{margin-bottom:6px}
 #page-brokerage-calc .bc-compact .bc-seg-tab{padding:5px 12px;font-size:.72rem}
-#page-brokerage-calc .bc-compact .bc-net-box{padding:7px;margin-top:5px}
-#page-brokerage-calc .bc-compact .bc-net-box .bc-amt{font-size:1.1rem}
-#page-brokerage-calc .bc-compact .bc-net-box .bc-lbl2{font-size:.66rem;margin-top:1px}
-#page-brokerage-calc .bc-compact .bc-rates-note{font-size:.66rem;margin-top:5px;padding:6px 10px;line-height:1.45}
-#page-brokerage-calc .bc-compact #bcAdvRates{margin-top:5px}
-#page-brokerage-calc .bc-compact .bc-mini-grid{gap:6px;margin-top:5px}
+#page-brokerage-calc .bc-compact .bc-net-box{padding:4px;margin-top:2px}
+#page-brokerage-calc .bc-compact .bc-net-box .bc-amt{font-size:.92rem}
+#page-brokerage-calc .bc-compact .bc-net-box .bc-lbl2{font-size:.6rem;margin-top:0}
+#page-brokerage-calc .bc-compact .bc-rates-note{font-size:.6rem;margin-top:2px;padding:4px 8px;line-height:1.3}
+#page-brokerage-calc .bc-compact #bcAdvRates{margin-top:3px}
+#page-brokerage-calc .bc-compact .bc-mini-grid{gap:4px;margin-top:3px}
+#page-brokerage-calc .bc-two-col .bc-result-row.bc-total{padding-top:4px;margin-top:2px;font-size:.76rem}
 @media (max-width:760px){ #page-brokerage-calc .bc-two-col{grid-template-columns:1fr;gap:0} }
 @media print{ #page-brokerage-calc .bc-toggle-rates,#page-brokerage-calc .bc-seg-tabs{display:none} }
 #bcPrintView{display:none}
@@ -1888,9 +1890,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
           <button class="btn btn-outline" onclick="bcPrintSummary()" style="font-size:.82rem;padding:6px 14px">🖨️ Print / Save PDF</button>
         </div>
-        <div class="no-upper" id="bcClientHint" style="font-size:.68rem;color:var(--gray);margin-bottom:4px">Type any new client's name to calculate/save a rate for them, even if they're not in the client list yet.</div>
-        <div style="font-size:.76rem;color:var(--gray);margin-bottom:6px" class="no-upper">Select a segment, enter the brokerage rate, and all applicable statutory charges will be calculated automatically.</div>
-        <div class="no-upper bc-toggle-rates" onclick="bcToggleSummary()" style="margin-bottom:10px">📋 View All Saved Client Rates</div>
+        <div class="no-upper" id="bcClientHint" style="font-size:.64rem;color:var(--gray);margin-bottom:2px">Type any new client's name to calculate/save a rate for them, even if they're not in the client list yet.</div>
+        <div style="font-size:.68rem;color:var(--gray);margin-bottom:3px" class="no-upper">Select a segment, enter the brokerage rate, and all applicable statutory charges will be calculated automatically.</div>
+        <div class="no-upper bc-toggle-rates" onclick="bcToggleSummary()" style="margin-bottom:4px">📋 View All Saved Client Rates</div>
         <div id="bcSummaryWrap" style="display:none">
           <div class="bc-card bc-compact">
             <h2>📋 Saved Client Rates — Summary</h2>
@@ -1900,7 +1902,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
         <div id="bcAllSegWrap">
           <div class="bc-card bc-compact">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:2px">
               <h2 style="margin-bottom:0">🗂️ All Segments — Brokerage &amp; Trade, One Screen</h2>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button type="button" class="bc-mini-btn" style="border-color:#7c3aed;color:#7c3aed" onclick="bcApplyDigitToAllSegments()" title="Apply the last-edited row's digit to every segment's rate">⚡ Apply To All Segments</button>
@@ -1908,7 +1910,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
                 <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcClearBrokerage()">🧹 Clear All</button>
               </div>
             </div>
-            <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-bottom:10px">Every segment's own Brokerage Rate on the left, its own Trade Qty &amp; Price on the right — fill in whichever segments you need, results update live.</div>
+            <div class="no-upper" style="font-size:.64rem;color:var(--gray);margin-bottom:3px">Every segment's own Brokerage Rate on the left, its own Trade Qty &amp; Price on the right — fill in whichever segments you need, results update live.</div>
             <div id="bcAllSegTable" class="no-upper"></div>
           </div>
         </div>
@@ -1995,7 +1997,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
 
         <div class="bc-card bc-compact">
-          <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-bottom:6px">Detailed breakdown for: <b id="bcDetailSegLabel" style="color:var(--navy)">Equity Intraday</b> (whichever row you last edited above)</div>
+          <div class="no-upper" style="font-size:.64rem;color:var(--gray);margin-bottom:2px">Detailed breakdown for: <b id="bcDetailSegLabel" style="color:var(--navy)">Equity Intraday</b> (whichever row you last edited above)</div>
           <div class="bc-two-col">
             <div>
               <h2>📈 Turnover</h2>
