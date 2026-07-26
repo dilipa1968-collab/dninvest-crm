@@ -11126,10 +11126,15 @@ async function fixStatusByLastTrade(){
   if(CU.role!=='admin') return;
   const list = DB.get('eq_clients')||[];
   const toFix = [];
-  let nBlank=0, nBadDate=0;
+  let nBlankSkippedClosed=0, nBadDate=0;
   list.forEach(c=>{
     if(c.status==='Closed') return;              // Closed chhedna nahi
-    if(!c.last_trade_date){ nBlank++; return; }  // last trade pata nahi -> chhodo
+    if(!c.last_trade_date){
+      // Kabhi trade nahi kiya (ya date missing) — inhe bhi Inactive maano, jab tak Closed na ho.
+      if(c.status!=='Inactive') toFix.push({c, from:c.status||'—', to:'Inactive'});
+      else nBlankSkippedClosed++;
+      return;
+    }
     // daysDiff() wahi function hai jo table me "6299D AGO" dikhata hai — isse
     // har format (YYYY-MM-DD / 17-Apr-2009 / Date object) sahi parse hota hai.
     const days = daysDiff(c.last_trade_date);
@@ -11139,15 +11144,16 @@ async function fixStatusByLastTrade(){
   });
   if(nBadDate) console.log('Fix Status: date parse fail ->', nBadDate, 'clients');
   if(!toFix.length){
-    toast(`✅ Sab clients ka status already last trade ke hisab se sahi hai${nBadDate?` (${nBadDate} ki date samajh nahi aayi)`:''}`,'success');
+    toast(`✅ Sab clients ka status already sahi hai${nBadDate?` (${nBadDate} ki date samajh nahi aayi)`:''}`,'success');
     return;
   }
   const nInact = toFix.filter(x=>x.to==='Inactive').length;
   const nAct   = toFix.filter(x=>x.to==='Active').length;
-  if(!confirm(`${toFix.length} clients ka status last trade se match nahi kar raha:\n\n`+
-              `🟡 ${nInact} ko Inactive karna hai (1 saal se trade nahi)\n`+
+  const nBlankInact = toFix.filter(x=>x.to==='Inactive' && !x.c.last_trade_date).length;
+  if(!confirm(`${toFix.length} clients ka status update hoga:\n\n`+
+              `🟡 ${nInact} ko Inactive karna hai (${nBlankInact} jinka last trade blank hai, baaki 1 saal se trade nahi)\n`+
               `🟢 ${nAct} ko Active karna hai (1 saal ke andar trade hua)\n\n`+
-              `Chhue nahi jayenge: Closed clients, ${nBlank} jinka last trade blank hai`+
+              `Chhue nahi jayenge: Closed clients`+
               `${nBadDate?`, ${nBadDate} jinki date parse nahi hui`:''}.\n\nUpdate karu?`)) return;
   const touched=[];
   toFix.forEach(x=>{ x.c.status = x.to; touched.push(x.c); });
