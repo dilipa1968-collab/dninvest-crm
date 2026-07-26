@@ -916,27 +916,27 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-summary-table td:first-child{text-align:left;font-weight:700;color:var(--navy)}
 #page-brokerage-calc .bc-summary-table tbody tr:nth-child(odd) td{background:var(--bg)}
 #page-brokerage-calc .bc-summary-table td.bc-summary-empty{color:#c7ccd6}
-#page-brokerage-calc .bc-allseg-table{overflow-x:auto}
-#page-brokerage-calc .bc-allseg-row{display:grid;grid-template-columns:1.1fr 1.5fr 0.8fr 0.8fr 0.9fr 1fr 1.1fr;
-  gap:6px;align-items:start;padding:5px 0;border-bottom:1px solid var(--border);min-width:900px}
+#page-brokerage-calc .bc-allseg-table{overflow-x:auto;width:100%}
+#page-brokerage-calc .bc-allseg-row{display:grid;grid-template-columns:0.9fr 1.3fr 0.62fr 0.62fr 0.68fr 0.78fr 0.86fr;
+  gap:3px;align-items:start;padding:4px 0;border-bottom:1px solid var(--border);width:100%}
 #page-brokerage-calc .bc-allseg-row:nth-child(odd){background:var(--bg)}
-#page-brokerage-calc .bc-allseg-row.bc-allseg-head{background:var(--navy);color:#fff;font-weight:700;font-size:.66rem;
-  text-transform:uppercase;padding:6px 6px;border-radius:8px 8px 0 0;min-width:900px}
-#page-brokerage-calc .bc-allseg-seg{font-weight:800;color:var(--navy);font-size:.75rem;padding-left:6px;padding-top:4px}
-#page-brokerage-calc .bc-allseg-brok{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;align-items:flex-start;padding:1px 0}
+#page-brokerage-calc .bc-allseg-row.bc-allseg-head{background:var(--navy);color:#fff;font-weight:700;font-size:.6rem;
+  text-transform:uppercase;padding:5px 4px;border-radius:8px 8px 0 0;width:100%}
+#page-brokerage-calc .bc-allseg-seg{font-weight:800;color:var(--navy);font-size:.68rem;padding-left:3px;padding-top:4px;line-height:1.15}
+#page-brokerage-calc .bc-allseg-brok{display:flex;flex-direction:row;flex-wrap:wrap;gap:3px;align-items:flex-start;padding:1px 0}
 #page-brokerage-calc .bc-allseg-brok-item{display:flex;flex-direction:column;gap:1px}
-#page-brokerage-calc .bc-allseg-brok-lbl{font-size:.56rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.2px}
-#page-brokerage-calc .bc-allseg-brok .bc-allseg-brok-flat{width:100px;padding:5px 6px;border:1.5px solid var(--gold);
-  background:var(--gold3);border-radius:6px;font-size:.78rem;font-weight:800;color:#7a5c0e;text-align:center}
-#page-brokerage-calc .bc-allseg-brok .bc-locked-rate{width:92px;margin:0}
-#page-brokerage-calc .bc-allseg-brok .bc-rate-prefix{font-size:.7rem;padding:5px 2px 5px 7px;font-weight:800}
-#page-brokerage-calc .bc-allseg-brok input.bc-rate-digit{width:32px!important;flex:0 0 32px;padding:5px 3px;font-size:.74rem;
+#page-brokerage-calc .bc-allseg-brok-lbl{font-size:.5rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.1px}
+#page-brokerage-calc .bc-allseg-brok .bc-allseg-brok-flat{width:100%;max-width:74px;padding:4px 3px;border:1.5px solid var(--gold);
+  background:var(--gold3);border-radius:6px;font-size:.7rem;font-weight:800;color:#7a5c0e;text-align:center}
+#page-brokerage-calc .bc-allseg-brok .bc-locked-rate{width:66px;margin:0}
+#page-brokerage-calc .bc-allseg-brok .bc-rate-prefix{font-size:.62rem;padding:4px 1px 4px 5px;font-weight:800}
+#page-brokerage-calc .bc-allseg-brok input.bc-rate-digit{width:24px!important;flex:0 0 24px;padding:4px 2px;font-size:.66rem;
   color:var(--green)!important;font-weight:800!important}
-#page-brokerage-calc .bc-allseg-brok .bc-rate-warn-box{font-size:.58rem;padding:2px 4px;max-width:120px;margin:0}
-#page-brokerage-calc .bc-allseg-row input.bc-allseg-trade{width:100%;padding:4px 5px;border:1.5px solid var(--blue);
-  background:var(--blue2);border-radius:6px;font-size:.72rem;font-weight:700;color:var(--navy);text-align:center}
-#page-brokerage-calc .bc-allseg-charges{font-size:.72rem;font-weight:700;color:var(--gray)}
-#page-brokerage-calc .bc-allseg-net{font-size:.76rem;font-weight:800;padding:3px 5px;border-radius:6px;text-align:center}
+#page-brokerage-calc .bc-allseg-brok .bc-rate-warn-box{font-size:.5rem;padding:1px 3px;max-width:80px;margin:0}
+#page-brokerage-calc .bc-allseg-row input.bc-allseg-trade{width:100%;padding:3px 2px;border:1.5px solid var(--blue);
+  background:var(--blue2);border-radius:6px;font-size:.66rem;font-weight:700;color:var(--navy);text-align:center}
+#page-brokerage-calc .bc-allseg-charges{font-size:.64rem;font-weight:700;color:var(--gray);word-break:break-word}
+#page-brokerage-calc .bc-allseg-net{font-size:.68rem;font-weight:800;padding:3px 3px;border-radius:6px;text-align:center;word-break:break-word}
 #page-brokerage-calc .bc-allseg-net.bc-profit{background:var(--green2);color:var(--green)}
 #page-brokerage-calc .bc-allseg-net.bc-loss{background:var(--red2);color:var(--red)}
 #page-brokerage-calc .bc-allseg-grandtotal{margin-top:14px;padding:16px 20px;border-radius:14px;
