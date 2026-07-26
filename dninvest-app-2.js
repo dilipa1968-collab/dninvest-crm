@@ -3360,7 +3360,7 @@ function bcRenderAllSegTable(){
   if(!wrap) return;
   var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
 
-  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Quantity</div><div>Buy Price</div><div>Sell Price</div><div>Total Charges</div><div>Net Receivable/Payable</div><div></div></div>';
+  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brok. Rate</div><div>Qty</div><div>Buy</div><div>Sell</div><div>Charges</div><div>Net Recv/Pay</div><div></div></div>';
 
   BC_ALL_SEGS.forEach(function(seg){
     var shape = BC_SEG_BROK_TYPE[seg];
@@ -3379,7 +3379,7 @@ function bcRenderAllSegTable(){
                  +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div></div>'
                + '<input type="hidden" id="bcAllRate_'+seg+'" value="'+pctVal+'">'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>'
-               + '<div class="bc-allseg-brok-item"><span class="bc-allseg-brok-lbl">Min ₹/Share</span><div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllMinPfx_'+seg+'">0.0</span>'
+               + '<div class="bc-allseg-brok-item"><span class="bc-allseg-brok-lbl">Min ₹/Sh</span><div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllMinPfx_'+seg+'">0.0</span>'
                  +'<input type="text" class="bc-rate-digit" id="bcAllMinDigit_'+seg+'" maxlength="2" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',true)"></div></div>'
                + '<input type="hidden" id="bcAllMin_'+seg+'" value="'+minVal+'">'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllMinWarn_'+seg+'"></div>';
