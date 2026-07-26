@@ -2433,6 +2433,7 @@ var BC_SEGMENT_DEFAULTS = {
 var BC_ORIGINAL_DEFAULTS = JSON.parse(JSON.stringify(BC_SEGMENT_DEFAULTS));
 
 var bcCurSeg = 'futures';
+var bcLastCalc = {};
 var bcAllSegmentsApplied = false;   // true right after "Apply To All Segments" — next "Save Rate" saves every segment
 
 function bcUpdateBrokFields(){
@@ -2910,6 +2911,15 @@ function bcCalc(){
   document.getElementById('bcNetLbl').textContent = clientTag + 'Gross ' + (grossPL>=0?'Profit':'Loss') + ' ' + bcFmt(Math.abs(grossPL))
     + ' − Charges ' + bcFmt(totalCharges) + ' = Net ' + (isProfit?'Profit':'Loss');
 
+  bcLastCalc = {
+    clientLabel: (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey].label : '',
+    segLabel: BC_MULTI_SEG_LABELS[bcCurSeg] || bcCurSeg,
+    buy:buy, sell:sell, qty:qty,
+    buyTurnover:buyTurnover, sellTurnover:sellTurnover, totalTurnover:totalTurnover,
+    rows:rows, totalCharges:totalCharges,
+    grossPL:grossPL, netPL:netPL, isProfit:isProfit
+  };
+
   document.getElementById('bcRatesNote').innerHTML =
     '<b>Note:</b> Only the Brokerage Rate is editable — please enter the client\'s actual rate. Selecting a segment automatically displays the appropriate field type (Percentage / Minimum / Flat). '
     +'Statutory charges — STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, and GST — are fixed government and exchange rates applied uniformly to every client: '
@@ -3178,6 +3188,44 @@ function bcShareClientLink(code){
     document.body.removeChild(ta);
   }catch(e){}
   prompt(copied ? 'Link copied! Share this with '+entry.label+':' : 'Copy this link and share with '+entry.label+':', url);
+}
+
+// Builds a clean, standalone summary (segment, rate, trade, turnover, charges, net P&L) for Print / Save PDF —
+// everything else on the page is hidden during print via the @media print rules.
+function bcPrintSummary(){
+  var c = bcLastCalc;
+  if(!c || c.qty==null){ bcCalc(); c = bcLastCalc; }
+  var today = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+
+  var rowsHtml = c.rows.map(function(r){
+    return '<div class="pv-row"><span class="pv-lbl">'+r[0]+'</span><span class="pv-val">'+bcFmt(r[1])+'</span></div>';
+  }).join('');
+
+  var html =
+    '<div class="pv-hdr"><h1>D N <span class="pv-gold">INVESTMENT</span></h1><div class="pv-sub">Brokerage &amp; Charges Calculation</div></div>'
+    +'<div class="pv-meta"><span>'+(c.clientLabel ? 'Client: '+c.clientLabel : 'Client: —')+'</span><span>'+today+'</span></div>'
+    +'<div class="pv-section"><h2>Segment: '+c.segLabel+'</h2>'
+      +'<div class="pv-row"><span class="pv-lbl">Buy Price</span><span class="pv-val">₹'+c.buy+'</span></div>'
+      +'<div class="pv-row"><span class="pv-lbl">Sell Price</span><span class="pv-val">₹'+c.sell+'</span></div>'
+      +'<div class="pv-row"><span class="pv-lbl">Quantity</span><span class="pv-val">'+c.qty.toLocaleString('en-IN')+'</span></div>'
+    +'</div>'
+    +'<div class="pv-section"><h2>Turnover</h2>'
+      +'<div class="pv-row"><span class="pv-lbl">Buy Turnover</span><span class="pv-val">'+bcFmt(c.buyTurnover)+'</span></div>'
+      +'<div class="pv-row"><span class="pv-lbl">Sell Turnover</span><span class="pv-val">'+bcFmt(c.sellTurnover)+'</span></div>'
+      +'<div class="pv-row pv-total"><span class="pv-lbl">Total Turnover</span><span class="pv-val">'+bcFmt(c.totalTurnover)+'</span></div>'
+    +'</div>'
+    +'<div class="pv-section"><h2>Charges Breakdown</h2>'
+      +rowsHtml
+      +'<div class="pv-row pv-total"><span class="pv-lbl">Total Charges</span><span class="pv-val">'+bcFmt(c.totalCharges)+'</span></div>'
+    +'</div>'
+    +'<div class="pv-net '+(c.isProfit?'pv-profit':'pv-loss')+'">'
+      +'<div class="pv-amt">'+bcFmt(c.netPL)+'</div>'
+      +'<div class="pv-lbl2">Gross '+(c.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(c.grossPL))+' − Charges '+bcFmt(c.totalCharges)+' = Net '+(c.isProfit?'Profit':'Loss')+'</div>'
+    +'</div>'
+    +'<div class="pv-footer">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates. Please verify against your latest contract note.</div>';
+
+  document.getElementById('bcPrintView').innerHTML = html;
+  window.print();
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
