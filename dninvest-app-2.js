@@ -3313,7 +3313,7 @@ function bcRenderAllSegTable(){
   if(!wrap) return;
   var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
 
-  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Buy Price</div><div>Sell Price</div><div>Quantity</div><div>Total Charges</div><div>Net P/L</div><div></div></div>';
+  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Quantity</div><div>Buy Price</div><div>Sell Price</div><div>Total Charges</div><div>Net P/L</div><div></div></div>';
 
   BC_ALL_SEGS.forEach(function(seg){
     var shape = BC_SEG_BROK_TYPE[seg];
@@ -3346,9 +3346,9 @@ function bcRenderAllSegTable(){
     html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
       + '<div class="bc-allseg-seg" onclick="bcCalcAllSegRow(\''+seg+'\')" style="cursor:pointer" title="Click to select this segment">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
       + '<div class="bc-allseg-brok">'+brokCell+'</div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
-      + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div class="bc-allseg-charges" id="bcAllCharges_'+seg+'">₹0.00</div>'
       + '<div class="bc-allseg-net bc-profit" id="bcAllNet_'+seg+'">₹0.00</div>'
       + '<div><button type="button" class="bc-allseg-clear-btn" onclick="bcClearAllSegRow(\''+seg+'\')" title="Clear this segment\'s trade">✕</button></div>'
