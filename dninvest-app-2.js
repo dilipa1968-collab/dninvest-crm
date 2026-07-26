@@ -3350,7 +3350,7 @@ function bcRenderAllSegTable(){
       qtyCell = '<div class="bc-allseg-qty-item"><span class="bc-allseg-brok-lbl">Qty</span>'
               + '<input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
               + '<div class="bc-allseg-qty-item"><span class="bc-allseg-brok-lbl">Lot</span>'
-              + '<input type="number" class="bc-allseg-trade bc-allseg-lot" id="bcAllLots_'+seg+'" placeholder="Lot" min="1" value="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>';
+              + '<input type="number" class="bc-allseg-trade bc-allseg-lot" id="bcAllLots_'+seg+'" placeholder="Lot" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>';
     } else {
       qtyCell = '<input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')">';
     }
@@ -3460,7 +3460,7 @@ function bcRefreshAllSegBrokerageInputs(clearTrade){
         var el = document.getElementById(pfx+seg); if(el) el.value = '';
       });
       var lotEl = document.getElementById('bcAllLots_'+seg);
-      if(lotEl) lotEl.value = 1;
+      if(lotEl) lotEl.value = '';
     }
     if(document.getElementById('bcAllBuy_'+seg)) bcCalcAllSegRow(seg);
   });
@@ -3473,7 +3473,7 @@ function bcClearAllSegRow(seg){
     var el = document.getElementById(pfx+seg); if(el) el.value = '';
   });
   var lotEl = document.getElementById('bcAllLots_'+seg);
-  if(lotEl) lotEl.value = 1;
+  if(lotEl) lotEl.value = '';
   bcCalcAllSegRow(seg);
 }
 
