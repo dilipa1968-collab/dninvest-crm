@@ -3503,7 +3503,10 @@ function bcCalcAllSegRow(seg){
   document.getElementById('bcSellPrice').value = sell;
   document.getElementById('bcQtyPlain').value = qty;
   document.getElementById('bcLotSize').value = qty;
-  document.getElementById('bcLots').value = 1;
+  // For flat-brokerage segments, bcCalc()'s brokerage formula uses "lots" directly (brokFlat * lots * 2),
+  // so it must mirror the row's actual qty (treated as lot count) — not a hardcoded 1 — otherwise a row
+  // with no quantity entered still showed a flat brokerage charge (e.g. ₹60 with 0 qty).
+  document.getElementById('bcLots').value = (shape==='flat') ? qty : 1;
   if(shape==='flat'){
     document.getElementById('bcBrokFlat').value = document.getElementById('bcAllBrokFlat_'+seg).value;
   } else if(shape==='pct_min'){
