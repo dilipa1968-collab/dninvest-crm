@@ -3323,32 +3323,32 @@ function bcRenderAllSegTable(){
     if(shape==='flat'){
       var flatVal = (saved!=null) ? saved : d.brokFlat;
       brokCell = '<div class="bc-allseg-brok-item"><span class="bc-allseg-brok-lbl">₹/Lot</span>'
-               + '<input type="number" class="bc-allseg-brok-flat" id="bcAllBrokFlat_'+seg+'" value="'+flatVal+'" title="₹ per lot" onfocus="bcCalcAllSegRow(\''+seg+'\')" oninput="bcOnAllFlatChange(\''+seg+'\')"></div>'
+               + '<input type="number" class="bc-allseg-brok-flat" id="bcAllBrokFlat_'+seg+'" value="'+flatVal+'" title="₹ per lot" oninput="bcOnAllFlatChange(\''+seg+'\')"></div>'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllFlatWarn_'+seg+'"></div>';
     } else if(shape==='pct_min'){
       var pctVal = (saved!=null) ? saved.pct : d.brokPct;
       var minVal = (saved!=null) ? saved.min : d.brokMin;
       brokCell = '<div class="bc-allseg-brok-item"><span class="bc-allseg-brok-lbl">Rate</span><div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllRatePfx_'+seg+'">0.0</span>'
-                 +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select();bcCalcAllSegRow(\''+seg+'\')" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div></div>'
+                 +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div></div>'
                + '<input type="hidden" id="bcAllRate_'+seg+'" value="'+pctVal+'">'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>'
                + '<div class="bc-allseg-brok-item"><span class="bc-allseg-brok-lbl">Min ₹/Share</span><div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllMinPfx_'+seg+'">0.0</span>'
-                 +'<input type="text" class="bc-rate-digit" id="bcAllMinDigit_'+seg+'" maxlength="2" inputmode="numeric" onfocus="this.select();bcCalcAllSegRow(\''+seg+'\')" oninput="bcOnAllDigitChange(\''+seg+'\',true)"></div></div>'
+                 +'<input type="text" class="bc-rate-digit" id="bcAllMinDigit_'+seg+'" maxlength="2" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',true)"></div></div>'
                + '<input type="hidden" id="bcAllMin_'+seg+'" value="'+minVal+'">'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllMinWarn_'+seg+'"></div>';
     } else {
       var pctOnly = (saved!=null) ? saved : d.brokPct;
       brokCell = '<div class="bc-allseg-brok-item"><span class="bc-allseg-brok-lbl">Rate</span><div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllRatePfx_'+seg+'">0.0</span>'
-                 +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select();bcCalcAllSegRow(\''+seg+'\')" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div></div>'
+                 +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div></div>'
                + '<input type="hidden" id="bcAllRate_'+seg+'" value="'+pctOnly+'">'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>';
     }
     html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
       + '<div class="bc-allseg-seg" onclick="bcCalcAllSegRow(\''+seg+'\')" style="cursor:pointer" title="Click to select this segment">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
       + '<div class="bc-allseg-brok">'+brokCell+'</div>'
-      + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" onfocus="bcCalcAllSegRow(\''+seg+'\')" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
-      + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" onfocus="bcCalcAllSegRow(\''+seg+'\')" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
-      + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" onfocus="bcCalcAllSegRow(\''+seg+'\')" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div class="bc-allseg-charges" id="bcAllCharges_'+seg+'">₹0.00</div>'
       + '<div class="bc-allseg-net bc-profit" id="bcAllNet_'+seg+'">₹0.00</div>'
       + '</div>';
