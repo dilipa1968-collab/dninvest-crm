@@ -3124,9 +3124,12 @@ function bcRenderSummaryTable(){
   }
 
   var segs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
+  var shortLabels = { equity_intraday:'Eq Intraday', equity_delivery:'Eq Delivery', futures:'Futures',
+                       options:'Options', commodity_futures:'Com Fut', commodity_options:'Com Opt',
+                       currency_futures:'Cur Fut', currency_options:'Cur Opt' };
   var html = '<table class="bc-summary-table"><thead><tr><th>Client</th>'
-    + segs.map(function(s){ return '<th>'+BC_MULTI_SEG_LABELS[s]+'</th>'; }).join('')
-    + '<th>Trade Split Saved</th><th>Share Link</th></tr></thead><tbody>';
+    + segs.map(function(s){ return '<th>'+shortLabels[s]+'</th>'; }).join('')
+    + '<th>Split</th><th>Link</th></tr></thead><tbody>';
   codes.forEach(function(code){
     var entry = bcClients[code];
     html += '<tr><td>'+entry.label+' ('+code+')</td>'
