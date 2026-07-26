@@ -1882,13 +1882,20 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
         <div id="bcAllSegWrap">
           <div class="bc-card bc-compact">
-            <h2>🗂️ All Segments — Brokerage &amp; Trade, One Screen</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:5px">
+              <h2 style="margin-bottom:0">🗂️ All Segments — Brokerage &amp; Trade, One Screen</h2>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" class="bc-mini-btn" style="border-color:#7c3aed;color:#7c3aed" onclick="bcApplyDigitToAllSegments()" title="Apply the last-edited row's digit to every segment's rate">⚡ Apply To All Segments</button>
+                <button type="button" class="bc-mini-btn" onclick="bcResetBrokerage()">🔄 Reset All</button>
+                <button type="button" class="bc-mini-btn bc-mini-btn-clear" onclick="bcClearBrokerage()">🧹 Clear All</button>
+              </div>
+            </div>
             <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-bottom:10px">Every segment's own Brokerage Rate on the left, its own Trade Qty &amp; Price on the right — fill in whichever segments you need, results update live.</div>
             <div id="bcAllSegTable" class="no-upper"></div>
           </div>
         </div>
 
-        <div class="bc-card bc-compact">
+        <div class="bc-card bc-compact" style="display:none">
           <h2>📊 Select Segment</h2>
           <div class="bc-seg-tabs" id="bcSegTabs">
             <div class="bc-seg-tab active" data-seg="equity_intraday" onclick="bcSetSeg('equity_intraday')">Equity Intraday</div>
@@ -1902,7 +1909,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
 
-        <div class="bc-card bc-compact">
+        <div class="bc-card bc-compact" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:5px">
             <h2 style="margin-bottom:0">💼 Brokerage Rate — For Selected Segment</h2>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1943,8 +1950,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="no-upper" style="font-size:.68rem;color:var(--gray);margin-top:4px" id="bcBrokHint"></div>
         </div>
 
-        <div class="bc-card bc-compact">
-          <h2>📝 Trade Quantity &amp; Price</h2>
+        <div class="bc-card bc-compact" style="display:none">
           <div class="bc-grid bc-grid-compact">
             <div class="bc-field"><label>Buy Price (₹)</label><input type="number" class="bc-trade-input" id="bcBuyPrice" placeholder="Buy Price" oninput="bcCalc()"></div>
             <div class="bc-field"><label>Sell Price (₹)</label><input type="number" class="bc-trade-input" id="bcSellPrice" placeholder="Sell Price" oninput="bcCalc()"></div>
@@ -1954,8 +1960,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
           <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-top:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span id="bcTotalQtyWrap">Total Quantity: <b id="bcTotalQtyShow" style="color:var(--navy)">0</b></span>
-            <span class="bc-toggle-rates" onclick="bcToggleAdv()" id="bcAdvToggleLbl">⚙️ View Statutory Rates</span>
           </div>
+        </div>
+
+        <div class="bc-card bc-compact">
+          <span class="bc-toggle-rates" onclick="bcToggleAdv()" id="bcAdvToggleLbl">⚙️ View Statutory Rates</span>
           <div id="bcAdvRates">
             <div class="bc-mini-grid">
               <div class="bc-field"><label>STT / CTT (%)</label><input type="number" id="bcSttRate" step="0.001" readonly oninput="bcCalc()"></div>
@@ -1968,6 +1977,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
 
         <div class="bc-card bc-compact">
+          <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-bottom:6px">Detailed breakdown for: <b id="bcDetailSegLabel" style="color:var(--navy)">Equity Intraday</b> (whichever row you last edited above)</div>
           <div class="bc-two-col">
             <div>
               <h2>📈 Turnover</h2>

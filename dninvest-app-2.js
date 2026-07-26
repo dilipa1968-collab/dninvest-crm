@@ -2758,6 +2758,7 @@ function bcApplyDigitToAllSegments(){
 
   bcAllSegmentsApplied = true;
   bcApplyDefaultBrokerage(bcCurSeg);   // refresh the currently-shown segment's fields — without re-loading any client override
+  bcRefreshAllSegBrokerageInputs(false);
   bcCalc();
   document.getElementById('bcClientHint').textContent = 'Applied digit "'+rateDigit+'" as the new default across all 6 segments for this session.';
 }
@@ -2800,6 +2801,7 @@ function bcResetBrokerage(){
   bcApplyDefaultBrokerage(bcCurSeg);   // refresh the currently-shown segment's fields
   bcAllSegmentsApplied = false;
   bcClearTradeFields();
+  bcRefreshAllSegBrokerageInputs(true);
   bcCalc();
 }
 
@@ -2818,6 +2820,7 @@ function bcClearBrokerage(){
   document.getElementById('bcBrokMinShareDigit').value = '';
   document.getElementById('bcBrokMinShare').value = 0;
   bcClearTradeFields();
+  bcRefreshAllSegBrokerageInputs(true);
   bcCalc();
 }
 
@@ -3315,6 +3318,29 @@ function bcRenderAllSegTable(){
   wrap.innerHTML = '<div class="bc-allseg-table">'+html+'</div>';
 }
 
+// Refreshes every All-Segments row's Brokerage input(s) from BC_SEGMENT_DEFAULTS (used after Apply-To-All / Reset /
+// Clear), without touching Buy/Sell/Qty unless clearTrade is true — then recomputes each row's result.
+function bcRefreshAllSegBrokerageInputs(clearTrade){
+  BC_ALL_SEGS.forEach(function(seg){
+    var shape = BC_SEG_BROK_TYPE[seg];
+    var d = BC_SEGMENT_DEFAULTS[seg];
+    if(shape==='flat'){
+      var elFlat = document.getElementById('bcAllBrokFlat_'+seg); if(elFlat) elFlat.value = d.brokFlat;
+    } else if(shape==='pct_min'){
+      var elPct = document.getElementById('bcAllBrokPct_'+seg); if(elPct) elPct.value = d.brokPct;
+      var elMin = document.getElementById('bcAllBrokMin_'+seg); if(elMin) elMin.value = d.brokMin;
+    } else {
+      var elPct2 = document.getElementById('bcAllBrokPct_'+seg); if(elPct2) elPct2.value = d.brokPct;
+    }
+    if(clearTrade){
+      ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
+        var el = document.getElementById(pfx+seg); if(el) el.value = '';
+      });
+    }
+    if(document.getElementById('bcAllBuy_'+seg)) bcCalcAllSegRow(seg);
+  });
+}
+
 function bcCalcAllSegRow(seg){
   var buy = parseFloat(document.getElementById('bcAllBuy_'+seg).value)||0;
   var sell = parseFloat(document.getElementById('bcAllSell_'+seg).value)||0;
@@ -3350,6 +3376,29 @@ function bcCalcAllSegRow(seg){
   var netEl = document.getElementById('bcAllNet_'+seg);
   netEl.textContent = bcFmt(netPL);
   netEl.className = 'bc-allseg-net ' + (netPL>=0 ? 'bc-profit' : 'bc-loss');
+
+  // Mirror this row into the (hidden) single-segment fields so the detailed Turnover/Charges/Net cards,
+  // Save Rate, Print Summary, and Apply-To-All all continue to work against whichever row was just edited.
+  bcCurSeg = seg;
+  document.getElementById('bcDetailSegLabel').textContent = BC_MULTI_SEG_LABELS[seg];
+  document.getElementById('bcSttRate').value = d.stt;
+  document.getElementById('bcTxnRate').value = d.txn;
+  document.getElementById('bcStampRate').value = d.stamp;
+  document.getElementById('bcSebiRate').value = d.sebi;
+  document.getElementById('bcBuyPrice').value = buy;
+  document.getElementById('bcSellPrice').value = sell;
+  document.getElementById('bcQtyPlain').value = qty;
+  document.getElementById('bcLotSize').value = qty;
+  document.getElementById('bcLots').value = 1;
+  if(shape==='flat'){
+    document.getElementById('bcBrokFlat').value = document.getElementById('bcAllBrokFlat_'+seg).value;
+  } else if(shape==='pct_min'){
+    document.getElementById('bcBrokRate').value = document.getElementById('bcAllBrokPct_'+seg).value;
+    document.getElementById('bcBrokMinShare').value = document.getElementById('bcAllBrokMin_'+seg).value;
+  } else {
+    document.getElementById('bcBrokRate').value = document.getElementById('bcAllBrokPct_'+seg).value;
+  }
+  bcCalc();
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
