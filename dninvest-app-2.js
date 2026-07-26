@@ -3252,17 +3252,17 @@ function bcPrintSummary(){
   var searchBoxVal = (document.getElementById('bcClientSearch').value||'').trim();
   var clientLabel = (usedSegs.length && bcAllSegFullResults[usedSegs[0]].clientLabel) ? bcAllSegFullResults[usedSegs[0]].clientLabel : (searchBoxVal || 'New Client');
 
-  // One compact row per used segment — Buy/Sell/Qty/Turnover/Brokerage/Other Charges/Total/Net — fits everything on one page.
+  // One row per used segment — every individual charge shown separately (Brokerage, STT, Txn, Stamp, SEBI, GST) — landscape page fits it all.
   var segRowsHtml = usedSegs.map(function(seg){
     var c = bcAllSegFullResults[seg];
-    var otherCharges = c.totalCharges - c.rows[0][1];   // rows[0] is always the brokerage line
     return '<tr><td>'+c.segLabel+'</td><td>₹'+c.buy+'</td><td>₹'+c.sell+'</td><td>'+c.qty.toLocaleString('en-IN')+'</td>'
-      +'<td>'+bcFmt(c.totalTurnover)+'</td><td>'+bcFmt(c.rows[0][1])+'</td><td>'+bcFmt(otherCharges)+'</td>'
+      +'<td>'+bcFmt(c.totalTurnover)+'</td><td>'+bcFmt(c.rows[0][1])+'</td><td>'+bcFmt(c.rows[1][1])+'</td>'
+      +'<td>'+bcFmt(c.rows[2][1])+'</td><td>'+bcFmt(c.rows[3][1])+'</td><td>'+bcFmt(c.rows[4][1])+'</td><td>'+bcFmt(c.rows[5][1])+'</td>'
       +'<td>'+bcFmt(c.totalCharges)+'</td><td class="pv-net-cell '+(c.isProfit?'pv-profit':'pv-loss')+'">'+bcFmt(c.netPL)+'</td></tr>';
   }).join('');
   var segTableHtml = usedSegs.length
     ? '<div class="pv-section"><h2>Trade Summary</h2><table class="pv-seg-table"><thead><tr>'
-      +'<th>Segment</th><th>Buy</th><th>Sell</th><th>Qty</th><th>Turnover</th><th>Brokerage</th><th>Other Chg.</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
+      +'<th>Segment</th><th>Buy</th><th>Sell</th><th>Qty</th><th>Turnover</th><th>Brokerage</th><th>STT/CTT</th><th>Txn Chg.</th><th>Stamp Duty</th><th>SEBI Fees</th><th>GST</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
       +'</tr></thead><tbody>'+segRowsHtml+'</tbody></table></div>'
     : '';
 

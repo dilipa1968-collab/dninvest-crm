@@ -1016,35 +1016,36 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 @media (max-width:760px){ #page-brokerage-calc .bc-two-col{grid-template-columns:1fr;gap:0} }
 @media print{ #page-brokerage-calc .bc-toggle-rates,#page-brokerage-calc .bc-seg-tabs{display:none} }
 #bcPrintView{display:none}
+@page{ size:landscape; margin:10mm; }
 @media print{
   body *{ visibility:hidden; }
   #page-brokerage-calc, #page-brokerage-calc *{ visibility:visible; -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; color-adjust:exact!important; }
   #page-brokerage-calc{ position:absolute; left:0; top:0; width:100%; }
   #page-brokerage-calc > *:not(#bcPrintView){ display:none!important; }
-  #bcPrintView{ display:block!important; padding:14px 18px; font-family:Arial,sans-serif; }
-  #bcPrintView .pv-hdr{ background:linear-gradient(135deg,var(--navy),var(--navy3))!important; color:#fff; padding:10px 16px; border-radius:10px; margin-bottom:10px; }
-  #bcPrintView .pv-hdr h1{ font-size:1.05rem; font-weight:800; }
+  #bcPrintView{ display:block!important; padding:10px 16px; font-family:Arial,sans-serif; }
+  #bcPrintView .pv-hdr{ background:linear-gradient(135deg,var(--navy),var(--navy3))!important; color:#fff; padding:8px 16px; border-radius:10px; margin-bottom:8px; }
+  #bcPrintView .pv-hdr h1{ font-size:1rem; font-weight:800; }
   #bcPrintView .pv-hdr .pv-gold{ color:var(--gold2); }
-  #bcPrintView .pv-hdr .pv-sub{ font-size:.72rem; color:#c8d2ea; margin-top:2px; }
-  #bcPrintView .pv-meta{ display:flex; justify-content:space-between; font-size:.76rem; color:var(--gray); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
-  #bcPrintView .pv-section{ margin-bottom:10px; }
-  #bcPrintView .pv-section h2{ font-size:.78rem; font-weight:800; color:var(--navy); margin-bottom:6px; border-bottom:2px solid var(--gold)!important; padding-bottom:3px; display:inline-block; }
-  #bcPrintView .pv-rates-grid{ display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; }
-  #bcPrintView .pv-row{ display:flex; justify-content:space-between; padding:3px 0; font-size:.74rem; border-bottom:1px solid #f0f2f8; }
+  #bcPrintView .pv-hdr .pv-sub{ font-size:.68rem; color:#c8d2ea; margin-top:2px; }
+  #bcPrintView .pv-meta{ display:flex; justify-content:space-between; font-size:.72rem; color:var(--gray); margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+  #bcPrintView .pv-section{ margin-bottom:8px; }
+  #bcPrintView .pv-section h2{ font-size:.74rem; font-weight:800; color:var(--navy); margin-bottom:5px; border-bottom:2px solid var(--gold)!important; padding-bottom:3px; display:inline-block; }
+  #bcPrintView .pv-rates-grid{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:3px 14px; }
+  #bcPrintView .pv-row{ display:flex; justify-content:space-between; padding:2px 0; font-size:.68rem; border-bottom:1px solid #f0f2f8; }
   #bcPrintView .pv-row .pv-lbl{ color:var(--gray); }
   #bcPrintView .pv-row .pv-val{ font-weight:700; }
-  #bcPrintView .pv-row.pv-used{ background:var(--gold3)!important; border-radius:4px; padding:3px 6px; }
-  #bcPrintView .pv-total{ border-top:2px solid var(--navy); margin-top:3px; padding-top:5px; font-weight:800; font-size:.8rem; }
-  #bcPrintView .pv-net{ margin-top:10px; padding:10px 14px; border-radius:10px; text-align:center; }
+  #bcPrintView .pv-row.pv-used{ background:var(--gold3)!important; border-radius:4px; padding:2px 5px; }
+  #bcPrintView .pv-total{ border-top:2px solid var(--navy); margin-top:3px; padding-top:5px; font-weight:800; font-size:.78rem; }
+  #bcPrintView .pv-net{ margin-top:8px; padding:8px 14px; border-radius:10px; text-align:center; }
   #bcPrintView .pv-net.pv-profit{ background:var(--green2)!important; color:var(--green); }
   #bcPrintView .pv-net.pv-loss{ background:var(--red2)!important; color:var(--red); }
-  #bcPrintView .pv-net .pv-amt{ font-size:1.25rem; font-weight:900; }
-  #bcPrintView .pv-net .pv-lbl2{ font-size:.7rem; font-weight:700; margin-top:3px; }
-  #bcPrintView .pv-footer{ font-size:.62rem; color:var(--gray); text-align:center; margin-top:10px; }
-  #bcPrintView .pv-seg-table{ width:100%; border-collapse:collapse; font-size:.72rem; }
-  #bcPrintView .pv-seg-table th{ background:var(--navy)!important; color:#fff; padding:6px 6px; text-align:right; font-weight:700; }
+  #bcPrintView .pv-net .pv-amt{ font-size:1.15rem; font-weight:900; }
+  #bcPrintView .pv-net .pv-lbl2{ font-size:.66rem; font-weight:700; margin-top:3px; }
+  #bcPrintView .pv-footer{ font-size:.58rem; color:var(--gray); text-align:center; margin-top:8px; }
+  #bcPrintView .pv-seg-table{ width:100%; border-collapse:collapse; font-size:.64rem; }
+  #bcPrintView .pv-seg-table th{ background:var(--navy)!important; color:#fff; padding:5px 4px; text-align:right; font-weight:700; }
   #bcPrintView .pv-seg-table th:first-child{ text-align:left; }
-  #bcPrintView .pv-seg-table td{ padding:5px 6px; text-align:right; border-bottom:1px solid var(--border); }
+  #bcPrintView .pv-seg-table td{ padding:4px 4px; text-align:right; border-bottom:1px solid var(--border); }
   #bcPrintView .pv-seg-table td:first-child{ text-align:left; font-weight:700; color:var(--navy); }
   #bcPrintView .pv-seg-table tbody tr:nth-child(odd) td{ background:var(--bg)!important; }
   #bcPrintView .pv-seg-table td.pv-net-cell.pv-profit{ color:var(--green); font-weight:800; }
