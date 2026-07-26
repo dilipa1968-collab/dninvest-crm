@@ -3255,15 +3255,31 @@ function bcPrintSummary(){
   // One row per used segment — every individual charge shown separately (Brokerage, STT, Txn, Stamp, SEBI, GST) — landscape page fits it all.
   var segRowsHtml = usedSegs.map(function(seg){
     var c = bcAllSegFullResults[seg];
-    return '<tr><td>'+c.segLabel+'</td><td>'+(c.shareName||'—')+'</td><td>₹'+c.buy+'</td><td>₹'+c.sell+'</td><td>'+c.qty.toLocaleString('en-IN')+'</td>'
+    return '<tr><td>'+c.segLabel+'</td><td>'+(c.shareName||'—')+'</td><td>'+c.qty.toLocaleString('en-IN')+'</td><td>₹'+c.buy+'</td><td>₹'+c.sell+'</td>'
       +'<td>'+bcFmt(c.totalTurnover)+'</td><td>'+bcFmt(c.rows[0][1])+'</td><td>'+bcFmt(c.rows[1][1])+'</td>'
       +'<td>'+bcFmt(c.rows[2][1])+'</td><td>'+bcFmt(c.rows[3][1])+'</td><td>'+bcFmt(c.rows[4][1])+'</td><td>'+bcFmt(c.rows[5][1])+'</td>'
       +'<td>'+bcFmt(c.totalCharges)+'</td><td class="pv-net-cell '+(c.isProfit?'pv-profit':'pv-loss')+'">'+bcFmt(c.netPL)+'</td></tr>';
   }).join('');
+
+  var totRow = '';
+  if(usedSegs.length){
+    var sums = {qty:0, turnover:0, brok:0, stt:0, txn:0, stamp:0, sebi:0, gst:0, charges:0, net:0};
+    usedSegs.forEach(function(seg){
+      var c = bcAllSegFullResults[seg];
+      sums.qty += c.qty; sums.turnover += c.totalTurnover; sums.brok += c.rows[0][1]; sums.stt += c.rows[1][1];
+      sums.txn += c.rows[2][1]; sums.stamp += c.rows[3][1]; sums.sebi += c.rows[4][1]; sums.gst += c.rows[5][1];
+      sums.charges += c.totalCharges; sums.net += c.netPL;
+    });
+    totRow = '<tr class="pv-tot-row"><td>TOTAL</td><td>—</td><td>'+sums.qty.toLocaleString('en-IN')+'</td><td>—</td><td>—</td>'
+      +'<td>'+bcFmt(sums.turnover)+'</td><td>'+bcFmt(sums.brok)+'</td><td>'+bcFmt(sums.stt)+'</td><td>'+bcFmt(sums.txn)+'</td>'
+      +'<td>'+bcFmt(sums.stamp)+'</td><td>'+bcFmt(sums.sebi)+'</td><td>'+bcFmt(sums.gst)+'</td><td>'+bcFmt(sums.charges)+'</td>'
+      +'<td class="pv-net-cell '+(sums.net>=0?'pv-profit':'pv-loss')+'">'+bcFmt(sums.net)+'</td></tr>';
+  }
+
   var segTableHtml = usedSegs.length
     ? '<div class="pv-section"><h2>Trade Summary</h2><table class="pv-seg-table"><thead><tr>'
-      +'<th>Segment</th><th>Share Name</th><th>Buy</th><th>Sell</th><th>Qty</th><th>Turnover</th><th>Brokerage</th><th>STT/CTT</th><th>Txn Chg.</th><th>Stamp Duty</th><th>SEBI Fees</th><th>GST</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
-      +'</tr></thead><tbody>'+segRowsHtml+'</tbody></table></div>'
+      +'<th>Segment</th><th>Share Name</th><th>Qty</th><th>Buy</th><th>Sell</th><th>Turnover</th><th>Brokerage</th><th>STT/CTT</th><th>Txn Chg.</th><th>Stamp Duty</th><th>SEBI Fees</th><th>GST</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
+      +'</tr></thead><tbody>'+segRowsHtml+totRow+'</tbody></table></div>'
     : '';
 
   var totalsHtml;
