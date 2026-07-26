@@ -2916,7 +2916,7 @@ function bcCalc(){
   document.getElementById('bcNetAmt').textContent = bcFmt(netPL);
   var clientTag = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? (bcClients[bcCurrentClientKey].label + ' — ') : '';
   document.getElementById('bcNetLbl').textContent = clientTag + 'Gross ' + (grossPL>=0?'Profit':'Loss') + ' ' + bcFmt(Math.abs(grossPL))
-    + ' − Charges ' + bcFmt(totalCharges) + ' = Net ' + (isProfit?'Profit':'Loss');
+    + ' − Charges ' + bcFmt(totalCharges) + ' = Net ' + (isProfit?'Receivable':'Payable');
 
   bcLastCalc = {
     clientLabel: (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey].label : '',
@@ -3049,7 +3049,7 @@ function bcCalcMultiTrade(){
   var multiClientTag = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? (bcClients[bcCurrentClientKey].label + ' — ') : '';
   var netBoxHtml = '<div class="bc-multi-net-box '+(isProfit?'bc-profit':'bc-loss')+'">'
     +'<div class="bc-amt">'+bcFmt(netPL)+'</div>'
-    +'<div class="bc-lbl2">'+multiClientTag+'Gross '+(grand.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(grand.grossPL))+' − Total Bill '+bcFmt(grand.total)+' = Net '+(isProfit?'Profit':'Loss')+'</div>'
+    +'<div class="bc-lbl2">'+multiClientTag+'Gross '+(grand.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(grand.grossPL))+' − Total Bill '+bcFmt(grand.total)+' = Net '+(isProfit?'Receivable':'Payable')+'</div>'
     +'</div>';
 
   resultsEl.innerHTML =
@@ -3271,7 +3271,7 @@ function bcPrintSummary(){
         +rowsHtml
         +'<div class="pv-row pv-total"><span class="pv-lbl">Total Charges</span><span class="pv-val">'+bcFmt(c.totalCharges)+'</span></div>'
       +'</div>'
-      +'<div class="pv-row pv-seg-net '+(c.isProfit?'pv-profit':'pv-loss')+'"><span class="pv-lbl">Net '+(c.isProfit?'Profit':'Loss')+' — '+c.segLabel+'</span><span class="pv-val">'+bcFmt(c.netPL)+'</span></div>'
+      +'<div class="pv-row pv-seg-net '+(c.isProfit?'pv-profit':'pv-loss')+'"><span class="pv-lbl">Net '+(c.isProfit?'Receivable':'Payable')+' — '+c.segLabel+'</span><span class="pv-val">'+bcFmt(c.netPL)+'</span></div>'
     +'</div>';
   }).join('');
 
@@ -3287,13 +3287,13 @@ function bcPrintSummary(){
     totalsHtml = '<div class="pv-net '+(isProfit?'pv-profit':'pv-loss')+'">'
       +'<div class="pv-lbl2" style="margin-top:0;margin-bottom:4px">Combined Total — '+usedSegs.length+' Segments ('+segNames+')</div>'
       +'<div class="pv-amt">'+bcFmt(totNet)+'</div>'
-      +'<div class="pv-lbl2">Gross '+(totGross>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(totGross))+' − Charges '+bcFmt(totCharges)+' = Net '+(isProfit?'Profit':'Loss')+'</div>'
+      +'<div class="pv-lbl2">Gross '+(totGross>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(totGross))+' − Charges '+bcFmt(totCharges)+' = Net '+(isProfit?'Receivable':'Payable')+'</div>'
     +'</div>';
   } else if(usedSegs.length===1){
     var c1 = bcAllSegFullResults[usedSegs[0]];
     totalsHtml = '<div class="pv-net '+(c1.isProfit?'pv-profit':'pv-loss')+'">'
       +'<div class="pv-amt">'+bcFmt(c1.netPL)+'</div>'
-      +'<div class="pv-lbl2">Gross '+(c1.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(c1.grossPL))+' − Charges '+bcFmt(c1.totalCharges)+' = Net '+(c1.isProfit?'Profit':'Loss')+'</div>'
+      +'<div class="pv-lbl2">Gross '+(c1.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(c1.grossPL))+' − Charges '+bcFmt(c1.totalCharges)+' = Net '+(c1.isProfit?'Receivable':'Payable')+'</div>'
     +'</div>';
   } else {
     totalsHtml = '<div class="pv-footer">No trade entered in any segment yet.</div>';
@@ -3344,7 +3344,7 @@ function bcCalcAllSegGrandTotal(){
     +'<div class="bc-agt-row">'
       +'<div class="bc-agt-item"><div class="bc-agt-lbl">Gross '+(totGross>=0?'Profit':'Loss')+'</div><div class="bc-agt-val">'+bcFmt(Math.abs(totGross))+'</div></div>'
       +'<div class="bc-agt-item"><div class="bc-agt-lbl">Total Charges</div><div class="bc-agt-val">'+bcFmt(totCharges)+'</div></div>'
-      +'<div class="bc-agt-item"><div class="bc-agt-lbl">Net '+(isProfit?'Profit':'Loss')+'</div><div class="bc-agt-net '+(isProfit?'bc-profit':'bc-loss')+'">'+bcFmt(totNet)+'</div></div>'
+      +'<div class="bc-agt-item"><div class="bc-agt-lbl">Net '+(isProfit?'Receivable':'Payable')+'</div><div class="bc-agt-net '+(isProfit?'bc-profit':'bc-loss')+'">'+bcFmt(totNet)+'</div></div>'
     +'</div>'
   +'</div>';
 }
@@ -3360,7 +3360,7 @@ function bcRenderAllSegTable(){
   if(!wrap) return;
   var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
 
-  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Quantity</div><div>Buy Price</div><div>Sell Price</div><div>Total Charges</div><div>Net P/L</div><div></div></div>';
+  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Quantity</div><div>Buy Price</div><div>Sell Price</div><div>Total Charges</div><div>Net Receivable/Payable</div><div></div></div>';
 
   BC_ALL_SEGS.forEach(function(seg){
     var shape = BC_SEG_BROK_TYPE[seg];

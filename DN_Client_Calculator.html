@@ -137,7 +137,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-s
     <div id="breakdown"></div>
     <div id="netBox" class="net-box profit">
       <div class="amt" id="netAmt">₹0</div>
-      <div class="lbl2" id="netLbl">Net Profit</div>
+      <div class="lbl2" id="netLbl">Net Receivable</div>
     </div>
   </div>
 
@@ -308,7 +308,7 @@ function calc(){
   var isProfit = netPL>=0;
   document.getElementById('netBox').className = 'net-box ' + (isProfit?'profit':'loss');
   document.getElementById('netAmt').textContent = fmt(netPL);
-  document.getElementById('netLbl').textContent = 'Gross '+(grossPL>=0?'Profit':'Loss')+' '+fmt(Math.abs(grossPL))+' − Charges '+fmt(totalCharges)+' = Net '+(isProfit?'Profit':'Loss');
+  document.getElementById('netLbl').textContent = 'Gross '+(grossPL>=0?'Profit':'Loss')+' '+fmt(Math.abs(grossPL))+' − Charges '+fmt(totalCharges)+' = Net '+(isProfit?'Receivable':'Payable');
 }
 
 document.querySelectorAll('.seg-tab').forEach(function(t){ t.addEventListener('click', function(){ setSeg(t.dataset.seg); }); });
