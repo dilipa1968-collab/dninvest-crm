@@ -3197,6 +3197,19 @@ function bcPrintSummary(){
   if(!c || c.qty==null){ bcCalc(); c = bcLastCalc; }
   var today = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 
+  var allSegs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
+  var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
+  var allRatesHtml = allSegs.map(function(seg){
+    var shape = BC_SEG_BROK_TYPE[seg];
+    var v = clientEntry && clientEntry[seg]!=null ? clientEntry[seg] : (
+      shape==='flat' ? BC_SEGMENT_DEFAULTS[seg].brokFlat :
+      shape==='pct_min' ? {pct:BC_SEGMENT_DEFAULTS[seg].brokPct, min:BC_SEGMENT_DEFAULTS[seg].brokMin} :
+      BC_SEGMENT_DEFAULTS[seg].brokPct );
+    var display = (shape==='flat') ? ('₹'+v+'/lot') : (shape==='pct_min') ? (v.pct+'% / ₹'+v.min+' min') : (v+'%');
+    var isCurrent = (seg===bcCurSeg);
+    return '<div class="pv-row"'+(isCurrent?' style="background:'+"var(--gold3)"+'"':'')+'><span class="pv-lbl">'+BC_MULTI_SEG_LABELS[seg]+(isCurrent?' (this trade)':'')+'</span><span class="pv-val">'+display+'</span></div>';
+  }).join('');
+
   var rowsHtml = c.rows.map(function(r){
     return '<div class="pv-row"><span class="pv-lbl">'+r[0]+'</span><span class="pv-val">'+bcFmt(r[1])+'</span></div>';
   }).join('');
@@ -3204,6 +3217,9 @@ function bcPrintSummary(){
   var html =
     '<div class="pv-hdr"><h1>D N <span class="pv-gold">INVESTMENT</span></h1><div class="pv-sub">Brokerage &amp; Charges Calculation</div></div>'
     +'<div class="pv-meta"><span>'+(c.clientLabel ? 'Client: '+c.clientLabel : 'Client: —')+'</span><span>'+today+'</span></div>'
+    +'<div class="pv-section"><h2>Brokerage Rate — All Segments</h2>'
+      +allRatesHtml
+    +'</div>'
     +'<div class="pv-section"><h2>Segment: '+c.segLabel+'</h2>'
       +'<div class="pv-row"><span class="pv-lbl">Buy Price</span><span class="pv-val">₹'+c.buy+'</span></div>'
       +'<div class="pv-row"><span class="pv-lbl">Sell Price</span><span class="pv-val">₹'+c.sell+'</span></div>'
