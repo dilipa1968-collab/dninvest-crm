@@ -3246,34 +3246,25 @@ function bcPrintSummary(){
       BC_SEGMENT_DEFAULTS[seg].brokPct );
     var display = (shape==='flat') ? ('₹'+v+'/lot') : (shape==='pct_min') ? (v.pct+'% / ₹'+v.min+' min') : (v+'%');
     var isUsed = (usedSegs.indexOf(seg)!==-1);
-    return '<div class="pv-row"'+(isUsed?' style="background:'+"var(--gold3)"+'"':'')+'><span class="pv-lbl">'+BC_MULTI_SEG_LABELS[seg]+(isUsed?' (this trade)':'')+'</span><span class="pv-val">'+display+'</span></div>';
+    return '<div class="pv-row'+(isUsed?' pv-used':'')+'"><span class="pv-lbl">'+BC_MULTI_SEG_LABELS[seg]+(isUsed?' ★':'')+'</span><span class="pv-val">'+display+'</span></div>';
   }).join('');
 
-  var clientLabel = usedSegs.length ? (bcAllSegFullResults[usedSegs[0]].clientLabel || '') : '';
+  var searchBoxVal = (document.getElementById('bcClientSearch').value||'').trim();
+  var clientLabel = (usedSegs.length && bcAllSegFullResults[usedSegs[0]].clientLabel) ? bcAllSegFullResults[usedSegs[0]].clientLabel : (searchBoxVal || 'New Client');
 
-  var segSectionsHtml = usedSegs.map(function(seg){
+  // One compact row per used segment — Buy/Sell/Qty/Turnover/Brokerage/Other Charges/Total/Net — fits everything on one page.
+  var segRowsHtml = usedSegs.map(function(seg){
     var c = bcAllSegFullResults[seg];
-    var rowsHtml = c.rows.map(function(r){
-      return '<div class="pv-row"><span class="pv-lbl">'+r[0]+'</span><span class="pv-val">'+bcFmt(r[1])+'</span></div>';
-    }).join('');
-    return '<div class="pv-seg-block">'
-      +'<div class="pv-section"><h2>Segment: '+c.segLabel+'</h2>'
-        +'<div class="pv-row"><span class="pv-lbl">Buy Price</span><span class="pv-val">₹'+c.buy+'</span></div>'
-        +'<div class="pv-row"><span class="pv-lbl">Sell Price</span><span class="pv-val">₹'+c.sell+'</span></div>'
-        +'<div class="pv-row"><span class="pv-lbl">Quantity</span><span class="pv-val">'+c.qty.toLocaleString('en-IN')+'</span></div>'
-      +'</div>'
-      +'<div class="pv-section"><h2>Turnover</h2>'
-        +'<div class="pv-row"><span class="pv-lbl">Buy Turnover</span><span class="pv-val">'+bcFmt(c.buyTurnover)+'</span></div>'
-        +'<div class="pv-row"><span class="pv-lbl">Sell Turnover</span><span class="pv-val">'+bcFmt(c.sellTurnover)+'</span></div>'
-        +'<div class="pv-row pv-total"><span class="pv-lbl">Total Turnover</span><span class="pv-val">'+bcFmt(c.totalTurnover)+'</span></div>'
-      +'</div>'
-      +'<div class="pv-section"><h2>Charges Breakdown</h2>'
-        +rowsHtml
-        +'<div class="pv-row pv-total"><span class="pv-lbl">Total Charges</span><span class="pv-val">'+bcFmt(c.totalCharges)+'</span></div>'
-      +'</div>'
-      +'<div class="pv-row pv-seg-net '+(c.isProfit?'pv-profit':'pv-loss')+'"><span class="pv-lbl">Net '+(c.isProfit?'Receivable':'Payable')+' — '+c.segLabel+'</span><span class="pv-val">'+bcFmt(c.netPL)+'</span></div>'
-    +'</div>';
+    var otherCharges = c.totalCharges - c.rows[0][1];   // rows[0] is always the brokerage line
+    return '<tr><td>'+c.segLabel+'</td><td>₹'+c.buy+'</td><td>₹'+c.sell+'</td><td>'+c.qty.toLocaleString('en-IN')+'</td>'
+      +'<td>'+bcFmt(c.totalTurnover)+'</td><td>'+bcFmt(c.rows[0][1])+'</td><td>'+bcFmt(otherCharges)+'</td>'
+      +'<td>'+bcFmt(c.totalCharges)+'</td><td class="pv-net-cell '+(c.isProfit?'pv-profit':'pv-loss')+'">'+bcFmt(c.netPL)+'</td></tr>';
   }).join('');
+  var segTableHtml = usedSegs.length
+    ? '<div class="pv-section"><h2>Trade Summary</h2><table class="pv-seg-table"><thead><tr>'
+      +'<th>Segment</th><th>Buy</th><th>Sell</th><th>Qty</th><th>Turnover</th><th>Brokerage</th><th>Other Chg.</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
+      +'</tr></thead><tbody>'+segRowsHtml+'</tbody></table></div>'
+    : '';
 
   var totalsHtml;
   if(usedSegs.length>1){
@@ -3301,11 +3292,11 @@ function bcPrintSummary(){
 
   var html =
     '<div class="pv-hdr"><h1>D N <span class="pv-gold">INVESTMENT</span></h1><div class="pv-sub">Brokerage &amp; Charges Calculation</div></div>'
-    +'<div class="pv-meta"><span>'+(clientLabel ? 'Client: '+clientLabel : 'Client: —')+'</span><span>'+today+'</span></div>'
+    +'<div class="pv-meta"><span>Client: '+clientLabel+'</span><span>'+today+'</span></div>'
     +'<div class="pv-section"><h2>Brokerage Rate — All Segments</h2>'
-      +allRatesHtml
+      +'<div class="pv-rates-grid">'+allRatesHtml+'</div>'
     +'</div>'
-    +segSectionsHtml
+    +segTableHtml
     +totalsHtml
     +'<div class="pv-footer">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates. Please verify against your latest contract note.</div>';
 
