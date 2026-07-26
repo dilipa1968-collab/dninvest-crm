@@ -3295,15 +3295,25 @@ function bcRenderAllSegTable(){
     var brokCell;
     if(shape==='flat'){
       var flatVal = (saved!=null) ? saved : d.brokFlat;
-      brokCell = '<input type="number" class="bc-allseg-brok-flat" id="bcAllBrokFlat_'+seg+'" value="'+flatVal+'" title="₹ per lot" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+      brokCell = '<input type="number" class="bc-allseg-brok-flat" id="bcAllBrokFlat_'+seg+'" value="'+flatVal+'" title="₹ per lot" oninput="bcOnAllFlatChange(\''+seg+'\')">'
+               + '<div class="bc-rate-warn-box no-upper" id="bcAllFlatWarn_'+seg+'"></div>';
     } else if(shape==='pct_min'){
       var pctVal = (saved!=null) ? saved.pct : d.brokPct;
       var minVal = (saved!=null) ? saved.min : d.brokMin;
-      brokCell = '<input type="number" id="bcAllBrokPct_'+seg+'" value="'+pctVal+'" step="0.01" title="Rate %" oninput="bcCalcAllSegRow(\''+seg+'\')">'
-               + '<input type="number" id="bcAllBrokMin_'+seg+'" value="'+minVal+'" step="0.01" title="Min ₹/Share" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+      brokCell = '<div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllRatePfx_'+seg+'">0.0</span>'
+                 +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div>'
+               + '<input type="hidden" id="bcAllRate_'+seg+'" value="'+pctVal+'">'
+               + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>'
+               + '<div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllMinPfx_'+seg+'">0.0</span>'
+                 +'<input type="text" class="bc-rate-digit" id="bcAllMinDigit_'+seg+'" maxlength="2" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',true)"></div>'
+               + '<input type="hidden" id="bcAllMin_'+seg+'" value="'+minVal+'">'
+               + '<div class="bc-rate-warn-box no-upper" id="bcAllMinWarn_'+seg+'"></div>';
     } else {
       var pctOnly = (saved!=null) ? saved : d.brokPct;
-      brokCell = '<input type="number" id="bcAllBrokPct_'+seg+'" value="'+pctOnly+'" step="0.01" title="Rate %" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+      brokCell = '<div class="bc-locked-rate"><span class="bc-rate-prefix" id="bcAllRatePfx_'+seg+'">0.0</span>'
+                 +'<input type="text" class="bc-rate-digit" id="bcAllRateDigit_'+seg+'" maxlength="3" inputmode="numeric" onfocus="this.select()" oninput="bcOnAllDigitChange(\''+seg+'\',false)"></div>'
+               + '<input type="hidden" id="bcAllRate_'+seg+'" value="'+pctOnly+'">'
+               + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>';
     }
     html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
       + '<div class="bc-allseg-seg">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
@@ -3316,6 +3326,79 @@ function bcRenderAllSegTable(){
       + '</div>';
   });
   wrap.innerHTML = '<div class="bc-allseg-table">'+html+'</div>';
+
+  // Now that the locked-rate elements exist, format each one's prefix/digit and set its range-warning bounds.
+  BC_ALL_SEGS.forEach(function(seg){
+    var shape = BC_SEG_BROK_TYPE[seg];
+    if(shape==='flat'){
+      bcSetAllFlatBounds(seg);
+    } else if(shape==='pct_min'){
+      bcSetLockedRateForSeg('bcAllRate_'+seg,'bcAllRatePfx_'+seg,'bcAllRateDigit_'+seg, parseFloat(document.getElementById('bcAllRate_'+seg).value)||0, seg, false);
+      bcSetLockedRateForSeg('bcAllMin_'+seg,'bcAllMinPfx_'+seg,'bcAllMinDigit_'+seg, parseFloat(document.getElementById('bcAllMin_'+seg).value)||0, seg, true);
+    } else {
+      bcSetLockedRateForSeg('bcAllRate_'+seg,'bcAllRatePfx_'+seg,'bcAllRateDigit_'+seg, parseFloat(document.getElementById('bcAllRate_'+seg).value)||0, seg, false);
+    }
+  });
+}
+
+// Same "locked prefix + editable digit" control as the old single-segment view, but scoped to one row's segment
+// (rather than the globally-active bcCurSeg) — so ceiling/floor warnings always reference THAT segment's own
+// original ("3" series) default, regardless of which row you're editing.
+function bcSetLockedRateForSeg(hiddenId, prefixId, digitId, value, seg, isMin){
+  var lockChars = bcAutoLockChars(value);
+  var str = String(value);
+  var prefix, digits;
+  if(str.indexOf('0.')===0 && str.length>=lockChars){ prefix=str.slice(0,lockChars); digits=str.slice(lockChars); }
+  else if(str.indexOf('0.')===0){ prefix=str; digits=''; }
+  else { prefix=''; digits=str; }
+  if(lockChars===2 && digits.length===1) digits += '0';
+  document.getElementById(prefixId).textContent = prefix;
+  document.getElementById(digitId).value = digits;
+  document.getElementById(hiddenId).value = value;
+
+  var origVal = isMin ? BC_ORIGINAL_DEFAULTS[seg].brokMin : BC_ORIGINAL_DEFAULTS[seg].brokPct;
+  var origPrefix = String(origVal).slice(0, bcAutoLockChars(origVal));
+  var digitEl = document.getElementById(digitId);
+  digitEl.dataset.defaultVal = origVal;
+  digitEl.dataset.floorVal = parseFloat(origPrefix + '1') || 0;
+  bcSetWarnBox((isMin ? 'bcAllMinWarn_' : 'bcAllRateWarn_') + seg, '');
+}
+
+function bcSetAllFlatBounds(seg){
+  var el = document.getElementById('bcAllBrokFlat_'+seg);
+  el.dataset.defaultVal = BC_ORIGINAL_DEFAULTS[seg].brokFlat;
+  bcSetWarnBox('bcAllFlatWarn_'+seg, '');
+}
+
+function bcOnAllDigitChange(seg, isMin){
+  var digitId = (isMin ? 'bcAllMinDigit_' : 'bcAllRateDigit_') + seg;
+  var hiddenId = (isMin ? 'bcAllMin_' : 'bcAllRate_') + seg;
+  var prefixId = (isMin ? 'bcAllMinPfx_' : 'bcAllRatePfx_') + seg;
+  var warnId = (isMin ? 'bcAllMinWarn_' : 'bcAllRateWarn_') + seg;
+  var digitEl = document.getElementById(digitId);
+  var d = (digitEl.value||'').replace(/[^0-9]/g,'').slice(0,3);
+  digitEl.value = d;
+  var prefix = document.getElementById(prefixId).textContent;
+  var combined = parseFloat(prefix + (d||'0'));
+  document.getElementById(hiddenId).value = isNaN(combined) ? 0 : combined;
+
+  var ceil = parseFloat(digitEl.dataset.defaultVal);
+  var floor = parseFloat(digitEl.dataset.floorVal);
+  if(!isNaN(ceil) && combined > ceil) bcSetWarnBox(warnId, '⚠️ Exceeds default ('+ceil+'%)');
+  else if(!isNaN(floor) && combined < floor) bcSetWarnBox(warnId, '⚠️ Too low — min '+floor+'%');
+  else bcSetWarnBox(warnId, '');
+  bcCalcAllSegRow(seg);
+}
+
+function bcOnAllFlatChange(seg){
+  var el = document.getElementById('bcAllBrokFlat_'+seg);
+  var val = parseFloat(el.value);
+  var ceil = parseFloat(el.dataset.defaultVal);
+  var warnId = 'bcAllFlatWarn_'+seg;
+  if(!isNaN(val) && !isNaN(ceil) && val > ceil) bcSetWarnBox(warnId, '⚠️ Exceeds default (₹'+ceil+')');
+  else if(!isNaN(val) && val < 1) bcSetWarnBox(warnId, '⚠️ Too low — min ₹1');
+  else bcSetWarnBox(warnId, '');
+  bcCalcAllSegRow(seg);
 }
 
 // Refreshes every All-Segments row's Brokerage input(s) from BC_SEGMENT_DEFAULTS (used after Apply-To-All / Reset /
@@ -3325,12 +3408,12 @@ function bcRefreshAllSegBrokerageInputs(clearTrade){
     var shape = BC_SEG_BROK_TYPE[seg];
     var d = BC_SEGMENT_DEFAULTS[seg];
     if(shape==='flat'){
-      var elFlat = document.getElementById('bcAllBrokFlat_'+seg); if(elFlat) elFlat.value = d.brokFlat;
+      var elFlat = document.getElementById('bcAllBrokFlat_'+seg); if(elFlat){ elFlat.value = d.brokFlat; bcSetAllFlatBounds(seg); }
     } else if(shape==='pct_min'){
-      var elPct = document.getElementById('bcAllBrokPct_'+seg); if(elPct) elPct.value = d.brokPct;
-      var elMin = document.getElementById('bcAllBrokMin_'+seg); if(elMin) elMin.value = d.brokMin;
+      if(document.getElementById('bcAllRate_'+seg)) bcSetLockedRateForSeg('bcAllRate_'+seg,'bcAllRatePfx_'+seg,'bcAllRateDigit_'+seg, d.brokPct, seg, false);
+      if(document.getElementById('bcAllMin_'+seg)) bcSetLockedRateForSeg('bcAllMin_'+seg,'bcAllMinPfx_'+seg,'bcAllMinDigit_'+seg, d.brokMin, seg, true);
     } else {
-      var elPct2 = document.getElementById('bcAllBrokPct_'+seg); if(elPct2) elPct2.value = d.brokPct;
+      if(document.getElementById('bcAllRate_'+seg)) bcSetLockedRateForSeg('bcAllRate_'+seg,'bcAllRatePfx_'+seg,'bcAllRateDigit_'+seg, d.brokPct, seg, false);
     }
     if(clearTrade){
       ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
@@ -3354,13 +3437,13 @@ function bcCalcAllSegRow(seg){
     var flatRate = parseFloat(document.getElementById('bcAllBrokFlat_'+seg).value)||0;
     brokerage = flatRate * qty * 2;   // Quantity treated as lot count for flat-brokerage segments
   } else if(shape==='pct_min'){
-    var pct = parseFloat(document.getElementById('bcAllBrokPct_'+seg).value)||0;
-    var min = parseFloat(document.getElementById('bcAllBrokMin_'+seg).value)||0;
+    var pct = parseFloat(document.getElementById('bcAllRate_'+seg).value)||0;
+    var min = parseFloat(document.getElementById('bcAllMin_'+seg).value)||0;
     var buyBrok = (buy>0) ? Math.max(buyTurnover*pct/100, qty*min) : 0;
     var sellBrok = (sell>0) ? Math.max(sellTurnover*pct/100, qty*min) : 0;
     brokerage = buyBrok + sellBrok;
   } else {
-    var pctOnly = parseFloat(document.getElementById('bcAllBrokPct_'+seg).value)||0;
+    var pctOnly = parseFloat(document.getElementById('bcAllRate_'+seg).value)||0;
     brokerage = totalTurnover * pctOnly/100;
   }
 
@@ -3393,10 +3476,10 @@ function bcCalcAllSegRow(seg){
   if(shape==='flat'){
     document.getElementById('bcBrokFlat').value = document.getElementById('bcAllBrokFlat_'+seg).value;
   } else if(shape==='pct_min'){
-    document.getElementById('bcBrokRate').value = document.getElementById('bcAllBrokPct_'+seg).value;
-    document.getElementById('bcBrokMinShare').value = document.getElementById('bcAllBrokMin_'+seg).value;
+    document.getElementById('bcBrokRate').value = document.getElementById('bcAllRate_'+seg).value;
+    document.getElementById('bcBrokMinShare').value = document.getElementById('bcAllMin_'+seg).value;
   } else {
-    document.getElementById('bcBrokRate').value = document.getElementById('bcAllBrokPct_'+seg).value;
+    document.getElementById('bcBrokRate').value = document.getElementById('bcAllRate_'+seg).value;
   }
   bcCalc();
 }
