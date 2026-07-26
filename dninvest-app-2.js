@@ -3217,12 +3217,26 @@ function bcShareClientLink(code){
 
 // Builds a clean, standalone summary (segment, rate, trade, turnover, charges, net P&L) for Print / Save PDF —
 // everything else on the page is hidden during print via the @media print rules.
+// If a trade is entered in more than one segment, every used segment gets its own full breakdown block,
+// followed by a Combined Total across all of them.
 function bcPrintSummary(){
-  var c = bcLastCalc;
-  if(!c || c.qty==null){ bcCalc(); c = bcLastCalc; }
   var today = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
-
   var allSegs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
+
+  // Which segments actually have a trade entered — same "used" rule as the on-screen Combined Total.
+  var usedSegs = allSegs.filter(function(seg){ return bcAllSegFullResults[seg] && bcAllSegFullResults[seg].qty>0; });
+
+  // Fallback: nothing tracked yet in the All-Segments table (e.g. single-segment tab used directly) —
+  // make sure at least the currently-active segment is calculated and included.
+  if(!usedSegs.length){
+    var c0 = bcLastCalc;
+    if(!c0 || c0.qty==null) { bcCalc(); c0 = bcLastCalc; }
+    if(c0 && c0.qty>0){
+      bcAllSegFullResults[bcCurSeg] = c0;
+      usedSegs = [bcCurSeg];
+    }
+  }
+
   var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
   var allRatesHtml = allSegs.map(function(seg){
     var shape = BC_SEG_BROK_TYPE[seg];
@@ -3231,38 +3245,68 @@ function bcPrintSummary(){
       shape==='pct_min' ? {pct:BC_SEGMENT_DEFAULTS[seg].brokPct, min:BC_SEGMENT_DEFAULTS[seg].brokMin} :
       BC_SEGMENT_DEFAULTS[seg].brokPct );
     var display = (shape==='flat') ? ('₹'+v+'/lot') : (shape==='pct_min') ? (v.pct+'% / ₹'+v.min+' min') : (v+'%');
-    var isCurrent = (seg===bcCurSeg);
-    return '<div class="pv-row"'+(isCurrent?' style="background:'+"var(--gold3)"+'"':'')+'><span class="pv-lbl">'+BC_MULTI_SEG_LABELS[seg]+(isCurrent?' (this trade)':'')+'</span><span class="pv-val">'+display+'</span></div>';
+    var isUsed = (usedSegs.indexOf(seg)!==-1);
+    return '<div class="pv-row"'+(isUsed?' style="background:'+"var(--gold3)"+'"':'')+'><span class="pv-lbl">'+BC_MULTI_SEG_LABELS[seg]+(isUsed?' (this trade)':'')+'</span><span class="pv-val">'+display+'</span></div>';
   }).join('');
 
-  var rowsHtml = c.rows.map(function(r){
-    return '<div class="pv-row"><span class="pv-lbl">'+r[0]+'</span><span class="pv-val">'+bcFmt(r[1])+'</span></div>';
+  var clientLabel = usedSegs.length ? (bcAllSegFullResults[usedSegs[0]].clientLabel || '') : '';
+
+  var segSectionsHtml = usedSegs.map(function(seg){
+    var c = bcAllSegFullResults[seg];
+    var rowsHtml = c.rows.map(function(r){
+      return '<div class="pv-row"><span class="pv-lbl">'+r[0]+'</span><span class="pv-val">'+bcFmt(r[1])+'</span></div>';
+    }).join('');
+    return '<div class="pv-seg-block">'
+      +'<div class="pv-section"><h2>Segment: '+c.segLabel+'</h2>'
+        +'<div class="pv-row"><span class="pv-lbl">Buy Price</span><span class="pv-val">₹'+c.buy+'</span></div>'
+        +'<div class="pv-row"><span class="pv-lbl">Sell Price</span><span class="pv-val">₹'+c.sell+'</span></div>'
+        +'<div class="pv-row"><span class="pv-lbl">Quantity</span><span class="pv-val">'+c.qty.toLocaleString('en-IN')+'</span></div>'
+      +'</div>'
+      +'<div class="pv-section"><h2>Turnover</h2>'
+        +'<div class="pv-row"><span class="pv-lbl">Buy Turnover</span><span class="pv-val">'+bcFmt(c.buyTurnover)+'</span></div>'
+        +'<div class="pv-row"><span class="pv-lbl">Sell Turnover</span><span class="pv-val">'+bcFmt(c.sellTurnover)+'</span></div>'
+        +'<div class="pv-row pv-total"><span class="pv-lbl">Total Turnover</span><span class="pv-val">'+bcFmt(c.totalTurnover)+'</span></div>'
+      +'</div>'
+      +'<div class="pv-section"><h2>Charges Breakdown</h2>'
+        +rowsHtml
+        +'<div class="pv-row pv-total"><span class="pv-lbl">Total Charges</span><span class="pv-val">'+bcFmt(c.totalCharges)+'</span></div>'
+      +'</div>'
+      +'<div class="pv-row pv-seg-net '+(c.isProfit?'pv-profit':'pv-loss')+'"><span class="pv-lbl">Net '+(c.isProfit?'Profit':'Loss')+' — '+c.segLabel+'</span><span class="pv-val">'+bcFmt(c.netPL)+'</span></div>'
+    +'</div>';
   }).join('');
+
+  var totalsHtml;
+  if(usedSegs.length>1){
+    var totCharges=0, totNet=0, totGross=0;
+    usedSegs.forEach(function(seg){
+      var c = bcAllSegFullResults[seg];
+      totCharges += c.totalCharges; totNet += c.netPL; totGross += c.grossPL;
+    });
+    var isProfit = totNet>=0;
+    var segNames = usedSegs.map(function(seg){ return bcAllSegFullResults[seg].segLabel; }).join(', ');
+    totalsHtml = '<div class="pv-net '+(isProfit?'pv-profit':'pv-loss')+'">'
+      +'<div class="pv-lbl2" style="margin-top:0;margin-bottom:4px">Combined Total — '+usedSegs.length+' Segments ('+segNames+')</div>'
+      +'<div class="pv-amt">'+bcFmt(totNet)+'</div>'
+      +'<div class="pv-lbl2">Gross '+(totGross>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(totGross))+' − Charges '+bcFmt(totCharges)+' = Net '+(isProfit?'Profit':'Loss')+'</div>'
+    +'</div>';
+  } else if(usedSegs.length===1){
+    var c1 = bcAllSegFullResults[usedSegs[0]];
+    totalsHtml = '<div class="pv-net '+(c1.isProfit?'pv-profit':'pv-loss')+'">'
+      +'<div class="pv-amt">'+bcFmt(c1.netPL)+'</div>'
+      +'<div class="pv-lbl2">Gross '+(c1.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(c1.grossPL))+' − Charges '+bcFmt(c1.totalCharges)+' = Net '+(c1.isProfit?'Profit':'Loss')+'</div>'
+    +'</div>';
+  } else {
+    totalsHtml = '<div class="pv-footer">No trade entered in any segment yet.</div>';
+  }
 
   var html =
     '<div class="pv-hdr"><h1>D N <span class="pv-gold">INVESTMENT</span></h1><div class="pv-sub">Brokerage &amp; Charges Calculation</div></div>'
-    +'<div class="pv-meta"><span>'+(c.clientLabel ? 'Client: '+c.clientLabel : 'Client: —')+'</span><span>'+today+'</span></div>'
+    +'<div class="pv-meta"><span>'+(clientLabel ? 'Client: '+clientLabel : 'Client: —')+'</span><span>'+today+'</span></div>'
     +'<div class="pv-section"><h2>Brokerage Rate — All Segments</h2>'
       +allRatesHtml
     +'</div>'
-    +'<div class="pv-section"><h2>Segment: '+c.segLabel+'</h2>'
-      +'<div class="pv-row"><span class="pv-lbl">Buy Price</span><span class="pv-val">₹'+c.buy+'</span></div>'
-      +'<div class="pv-row"><span class="pv-lbl">Sell Price</span><span class="pv-val">₹'+c.sell+'</span></div>'
-      +'<div class="pv-row"><span class="pv-lbl">Quantity</span><span class="pv-val">'+c.qty.toLocaleString('en-IN')+'</span></div>'
-    +'</div>'
-    +'<div class="pv-section"><h2>Turnover</h2>'
-      +'<div class="pv-row"><span class="pv-lbl">Buy Turnover</span><span class="pv-val">'+bcFmt(c.buyTurnover)+'</span></div>'
-      +'<div class="pv-row"><span class="pv-lbl">Sell Turnover</span><span class="pv-val">'+bcFmt(c.sellTurnover)+'</span></div>'
-      +'<div class="pv-row pv-total"><span class="pv-lbl">Total Turnover</span><span class="pv-val">'+bcFmt(c.totalTurnover)+'</span></div>'
-    +'</div>'
-    +'<div class="pv-section"><h2>Charges Breakdown</h2>'
-      +rowsHtml
-      +'<div class="pv-row pv-total"><span class="pv-lbl">Total Charges</span><span class="pv-val">'+bcFmt(c.totalCharges)+'</span></div>'
-    +'</div>'
-    +'<div class="pv-net '+(c.isProfit?'pv-profit':'pv-loss')+'">'
-      +'<div class="pv-amt">'+bcFmt(c.netPL)+'</div>'
-      +'<div class="pv-lbl2">Gross '+(c.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(c.grossPL))+' − Charges '+bcFmt(c.totalCharges)+' = Net '+(c.isProfit?'Profit':'Loss')+'</div>'
-    +'</div>'
+    +segSectionsHtml
+    +totalsHtml
     +'<div class="pv-footer">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates. Please verify against your latest contract note.</div>';
 
   document.getElementById('bcPrintView').innerHTML = html;
@@ -3277,6 +3321,7 @@ function bcPrintSummary(){
 var bcAllSegOpen = true;
 var BC_ALL_SEGS = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
 var bcAllSegResults = {};   // { seg: {qty, totalCharges, netPL, grossPL} } — populated as each row is calculated
+var bcAllSegFullResults = {};   // { seg: full bcLastCalc-shaped detail } — used to print a full breakdown per segment
 
 function bcCalcAllSegGrandTotal(){
   var wrap = document.getElementById('bcAllSegGrandTotal');
@@ -3558,6 +3603,7 @@ function bcCalcAllSegRow(seg){
     document.getElementById('bcBrokRateDigit').value = document.getElementById('bcAllRateDigit_'+seg).value;
   }
   bcCalc();
+  bcAllSegFullResults[seg] = Object.assign({}, bcLastCalc, { rows: bcLastCalc.rows.slice() });
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
