@@ -3255,14 +3255,14 @@ function bcPrintSummary(){
   // One row per used segment — every individual charge shown separately (Brokerage, STT, Txn, Stamp, SEBI, GST) — landscape page fits it all.
   var segRowsHtml = usedSegs.map(function(seg){
     var c = bcAllSegFullResults[seg];
-    return '<tr><td>'+c.segLabel+'</td><td>₹'+c.buy+'</td><td>₹'+c.sell+'</td><td>'+c.qty.toLocaleString('en-IN')+'</td>'
+    return '<tr><td>'+c.segLabel+'</td><td>'+(c.shareName||'—')+'</td><td>₹'+c.buy+'</td><td>₹'+c.sell+'</td><td>'+c.qty.toLocaleString('en-IN')+'</td>'
       +'<td>'+bcFmt(c.totalTurnover)+'</td><td>'+bcFmt(c.rows[0][1])+'</td><td>'+bcFmt(c.rows[1][1])+'</td>'
       +'<td>'+bcFmt(c.rows[2][1])+'</td><td>'+bcFmt(c.rows[3][1])+'</td><td>'+bcFmt(c.rows[4][1])+'</td><td>'+bcFmt(c.rows[5][1])+'</td>'
       +'<td>'+bcFmt(c.totalCharges)+'</td><td class="pv-net-cell '+(c.isProfit?'pv-profit':'pv-loss')+'">'+bcFmt(c.netPL)+'</td></tr>';
   }).join('');
   var segTableHtml = usedSegs.length
     ? '<div class="pv-section"><h2>Trade Summary</h2><table class="pv-seg-table"><thead><tr>'
-      +'<th>Segment</th><th>Buy</th><th>Sell</th><th>Qty</th><th>Turnover</th><th>Brokerage</th><th>STT/CTT</th><th>Txn Chg.</th><th>Stamp Duty</th><th>SEBI Fees</th><th>GST</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
+      +'<th>Segment</th><th>Share Name</th><th>Buy</th><th>Sell</th><th>Qty</th><th>Turnover</th><th>Brokerage</th><th>STT/CTT</th><th>Txn Chg.</th><th>Stamp Duty</th><th>SEBI Fees</th><th>GST</th><th>Total Chg.</th><th>Net Recv/Pay</th>'
       +'</tr></thead><tbody>'+segRowsHtml+'</tbody></table></div>'
     : '';
 
@@ -3351,7 +3351,7 @@ function bcRenderAllSegTable(){
   if(!wrap) return;
   var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
 
-  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brok. Rate</div><div>Qty</div><div>Buy</div><div>Sell</div><div>Charges</div><div>Net Recv/Pay</div><div></div></div>';
+  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brok. Rate</div><div>Share Name</div><div>Qty</div><div>Buy</div><div>Sell</div><div>Charges</div><div>Net Recv/Pay</div><div></div></div>';
 
   BC_ALL_SEGS.forEach(function(seg){
     var shape = BC_SEG_BROK_TYPE[seg];
@@ -3393,6 +3393,7 @@ function bcRenderAllSegTable(){
     html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
       + '<div class="bc-allseg-seg" onclick="bcCalcAllSegRow(\''+seg+'\')" style="cursor:pointer" title="Click to select this segment">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
       + '<div class="bc-allseg-brok">'+brokCell+'</div>'
+      + '<div><input type="text" class="bc-allseg-trade bc-allseg-share" id="bcAllShare_'+seg+'" placeholder="Share Name"></div>'
       + '<div class="bc-allseg-qtywrap">'+qtyCell+'</div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
@@ -3492,7 +3493,7 @@ function bcRefreshAllSegBrokerageInputs(clearTrade){
       if(document.getElementById('bcAllRate_'+seg)) bcSetLockedRateForSeg('bcAllRate_'+seg,'bcAllRatePfx_'+seg,'bcAllRateDigit_'+seg, d.brokPct, seg, false);
     }
     if(clearTrade){
-      ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
+      ['bcAllBuy_','bcAllSell_','bcAllQty_','bcAllShare_'].forEach(function(pfx){
         var el = document.getElementById(pfx+seg); if(el) el.value = '';
       });
       var lotEl = document.getElementById('bcAllLots_'+seg);
@@ -3505,7 +3506,7 @@ function bcRefreshAllSegBrokerageInputs(clearTrade){
 // Clears just ONE segment's trade fields (Buy/Sell/Qty) — leaves its Brokerage Rate and every other
 // segment untouched — then recalculates that row and the combined grand total.
 function bcClearAllSegRow(seg){
-  ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
+  ['bcAllBuy_','bcAllSell_','bcAllQty_','bcAllShare_'].forEach(function(pfx){
     var el = document.getElementById(pfx+seg); if(el) el.value = '';
   });
   var lotEl = document.getElementById('bcAllLots_'+seg);
@@ -3594,7 +3595,7 @@ function bcCalcAllSegRow(seg){
     document.getElementById('bcBrokRateDigit').value = document.getElementById('bcAllRateDigit_'+seg).value;
   }
   bcCalc();
-  bcAllSegFullResults[seg] = Object.assign({}, bcLastCalc, { rows: bcLastCalc.rows.slice() });
+  bcAllSegFullResults[seg] = Object.assign({}, bcLastCalc, { rows: bcLastCalc.rows.slice(), shareName: (document.getElementById('bcAllShare_'+seg).value||'').trim() });
 }
 
 // Initialize on script load — all fields exist in the DOM even while the page is hidden
