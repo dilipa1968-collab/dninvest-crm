@@ -3343,10 +3343,19 @@ function bcRenderAllSegTable(){
                + '<input type="hidden" id="bcAllRate_'+seg+'" value="'+pctOnly+'">'
                + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>';
     }
+    var qtyCell;
+    if(shape==='flat'){
+      qtyCell = '<div class="bc-allseg-qty-item"><span class="bc-allseg-brok-lbl">Qty</span>'
+              + '<input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+              + '<div class="bc-allseg-qty-item"><span class="bc-allseg-brok-lbl">Lot</span>'
+              + '<input type="number" class="bc-allseg-trade bc-allseg-lot" id="bcAllLots_'+seg+'" placeholder="Lot" min="1" value="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>';
+    } else {
+      qtyCell = '<input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')">';
+    }
     html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
       + '<div class="bc-allseg-seg" onclick="bcCalcAllSegRow(\''+seg+'\')" style="cursor:pointer" title="Click to select this segment">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
       + '<div class="bc-allseg-brok">'+brokCell+'</div>'
-      + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
+      + '<div class="bc-allseg-qtywrap">'+qtyCell+'</div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div class="bc-allseg-charges" id="bcAllCharges_'+seg+'">₹0.00</div>'
@@ -3448,6 +3457,8 @@ function bcRefreshAllSegBrokerageInputs(clearTrade){
       ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
         var el = document.getElementById(pfx+seg); if(el) el.value = '';
       });
+      var lotEl = document.getElementById('bcAllLots_'+seg);
+      if(lotEl) lotEl.value = 1;
     }
     if(document.getElementById('bcAllBuy_'+seg)) bcCalcAllSegRow(seg);
   });
@@ -3459,6 +3470,8 @@ function bcClearAllSegRow(seg){
   ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
     var el = document.getElementById(pfx+seg); if(el) el.value = '';
   });
+  var lotEl = document.getElementById('bcAllLots_'+seg);
+  if(lotEl) lotEl.value = 1;
   bcCalcAllSegRow(seg);
 }
 
@@ -3473,7 +3486,9 @@ function bcCalcAllSegRow(seg){
   var brokerage;
   if(shape==='flat'){
     var flatRate = parseFloat(document.getElementById('bcAllBrokFlat_'+seg).value)||0;
-    brokerage = flatRate * qty * 2;   // Quantity treated as lot count for flat-brokerage segments
+    var lotEl = document.getElementById('bcAllLots_'+seg);
+    var lotsForBrok = lotEl ? (parseFloat(lotEl.value)||0) : qty;
+    brokerage = flatRate * lotsForBrok * 2;   // brokerage is charged per LOT, not per share/unit quantity
   } else if(shape==='pct_min'){
     var pct = parseFloat(document.getElementById('bcAllRate_'+seg).value)||0;
     var min = parseFloat(document.getElementById('bcAllMin_'+seg).value)||0;
@@ -3512,11 +3527,19 @@ function bcCalcAllSegRow(seg){
   document.getElementById('bcBuyPrice').value = buy;
   document.getElementById('bcSellPrice').value = sell;
   document.getElementById('bcQtyPlain').value = qty;
-  document.getElementById('bcLotSize').value = qty;
-  // For flat-brokerage segments, bcCalc()'s brokerage formula uses "lots" directly (brokFlat * lots * 2),
-  // so it must mirror the row's actual qty (treated as lot count) — not a hardcoded 1 — otherwise a row
-  // with no quantity entered still showed a flat brokerage charge (e.g. ₹60 with 0 qty).
-  document.getElementById('bcLots').value = (shape==='flat') ? qty : 1;
+  // For flat-brokerage segments (Options etc.), turnover is on the real Qty while brokerage is charged
+  // per LOT — these are independent now, so mirror them separately into bcCalc()'s lotSize/lots pair:
+  // lotSize × lots must still equal the real qty (so Turnover stays correct), while "lots" itself must
+  // equal the actual lot count entered (so the per-lot Brokerage figure stays correct too).
+  if(shape==='flat'){
+    var lotEl2 = document.getElementById('bcAllLots_'+seg);
+    var lotsVal = lotEl2 ? (parseFloat(lotEl2.value)||0) : 0;
+    document.getElementById('bcLots').value = lotsVal;
+    document.getElementById('bcLotSize').value = lotsVal>0 ? (qty/lotsVal) : qty;
+  } else {
+    document.getElementById('bcLotSize').value = qty;
+    document.getElementById('bcLots').value = 1;
+  }
   if(shape==='flat'){
     document.getElementById('bcBrokFlat').value = document.getElementById('bcAllBrokFlat_'+seg).value;
   } else if(shape==='pct_min'){
