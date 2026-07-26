@@ -3269,7 +3269,7 @@ function bcPrintSummary(){
 // Every segment gets its own row: its own Brokerage Rate on the left, its own Trade Qty & Price on the right —
 // no tab-switching needed. Uses the selected client's saved rate per segment where available, else the default.
 // ══════════════════════════════════════════
-var bcAllSegOpen = false;
+var bcAllSegOpen = true;
 var BC_ALL_SEGS = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
 
 function bcToggleAllSegView(){
@@ -3357,3 +3357,4 @@ bcSetSeg('equity_intraday');
 bcSubscribeClients();
 bcAddMultiRow();
 bcAddMultiRow();
+bcRenderAllSegTable();
