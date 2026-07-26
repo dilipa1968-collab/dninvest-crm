@@ -1,5 +1,29 @@
 
 // ══════════════════════════════════════════
+// GLOBAL AUTO-UPPERCASE
+// Whatever anyone types into any text field or textarea across the whole CRM
+// is automatically converted to CAPITAL LETTERS as they type — so it's saved
+// in uppercase everywhere too, since the underlying value itself is uppercase.
+// Excluded: password/email/url/number/date/time/color/file fields (uppercasing
+// those would break login, email validity, numeric parsing, etc.), and any
+// field explicitly marked data-no-uppercase="1" for a deliberate exception.
+// ══════════════════════════════════════════
+(function(){
+  var EXCLUDED_TYPES = ['password','email','url','number','date','datetime-local','month','week','time','color','file','range','hidden','checkbox','radio'];
+  document.addEventListener('input', function(e){
+    var el = e.target;
+    if(!el || (el.tagName!=='INPUT' && el.tagName!=='TEXTAREA')) return;
+    if(el.tagName==='INPUT' && EXCLUDED_TYPES.indexOf((el.type||'text').toLowerCase())!==-1) return;
+    if(el.dataset && el.dataset.noUppercase==='1') return;
+    var start = el.selectionStart, end = el.selectionEnd;
+    var upper = el.value.toUpperCase();
+    if(upper === el.value) return;   // nothing to change — avoid disturbing cursor unnecessarily
+    el.value = upper;
+    try{ el.setSelectionRange(start, end); }catch(err){}
+  }, true);
+})();
+
+// ══════════════════════════════════════════
 // DATA STORE (localStorage + memory)
 // ══════════════════════════════════════════
 // Previously we used per-document Firestore collections (eq_clients_v2,
