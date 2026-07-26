@@ -3132,10 +3132,11 @@ function bcRenderSummaryTable(){
     + '<th>Split</th><th>Link</th></tr></thead><tbody>';
   codes.forEach(function(code){
     var entry = bcClients[code];
-    html += '<tr><td>'+entry.label+' ('+code+')</td>'
+    var safeCode = code.replace(/'/g,"\\'");
+    html += '<tr><td style="cursor:pointer;text-decoration:underline" title="Click to load this client above" onclick="bcSelectClientFromSummary(\''+safeCode+'\')">'+entry.label+' ('+code+')</td>'
       + segs.map(function(s){ return bcFmtSegCell(s, entry); }).join('')
       + '<td>'+(entry.multiTrade && entry.multiTrade.length ? entry.multiTrade.length+' lines' : '<span class="bc-summary-empty">—</span>')+'</td>'
-      + '<td><button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy);white-space:nowrap" onclick="bcShareClientLink(\''+code.replace(/'/g,"\\'")+'\')">🔗 Share Link</button></td></tr>';
+      + '<td><button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy);white-space:nowrap" onclick="bcShareClientLink(\''+safeCode+'\')">🔗 Share Link</button></td></tr>';
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
@@ -3143,6 +3144,19 @@ function bcRenderSummaryTable(){
 
 // Builds a locked client link (same encoding the standalone DN_Client_Calculator.html page reads) from this
 // client's already-saved rates, and copies it to the clipboard.
+// Clicking a client's name in the Summary table loads their saved rate into the calculator above,
+// for whichever segment tab is currently active — so you can immediately enter a trade and check it.
+function bcSelectClientFromSummary(code){
+  bcCurrentClientKey = code;
+  var entry = bcClients[code];
+  if(!entry) return;
+  var searchBox = document.getElementById('bcClientSearch');
+  searchBox.value = (code.indexOf('custom_')===0) ? entry.label : (entry.label + ' (' + code + ')');
+  bcApplyClientOverride();
+  bcLoadMultiTradeForClient();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
 function bcShareClientLink(code){
   var entry = bcClients[code];
   if(!entry){ alert('No saved rates found for this client.'); return; }
