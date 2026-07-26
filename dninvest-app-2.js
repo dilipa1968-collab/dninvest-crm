@@ -3274,6 +3274,33 @@ function bcPrintSummary(){
 // ══════════════════════════════════════════
 var bcAllSegOpen = true;
 var BC_ALL_SEGS = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
+var bcAllSegResults = {};   // { seg: {qty, totalCharges, netPL, grossPL} } — populated as each row is calculated
+
+function bcCalcAllSegGrandTotal(){
+  var wrap = document.getElementById('bcAllSegGrandTotal');
+  if(!wrap) return;
+  var usedSegs = BC_ALL_SEGS.filter(function(seg){ return bcAllSegResults[seg] && bcAllSegResults[seg].qty>0; });
+  if(!usedSegs.length){
+    wrap.innerHTML = '<div class="bc-allseg-grandtotal"><div class="bc-agt-title">📊 Combined Total — All Segments</div><div class="bc-agt-empty">Enter a trade in any segment above to see the combined total here.</div></div>';
+    return;
+  }
+  var totCharges=0, totNet=0, totGross=0;
+  usedSegs.forEach(function(seg){
+    totCharges += bcAllSegResults[seg].totalCharges;
+    totNet += bcAllSegResults[seg].netPL;
+    totGross += bcAllSegResults[seg].grossPL;
+  });
+  var segNames = usedSegs.map(function(seg){ return BC_MULTI_SEG_LABELS[seg]; }).join(', ');
+  var isProfit = totNet>=0;
+  wrap.innerHTML = '<div class="bc-allseg-grandtotal">'
+    +'<div class="bc-agt-title">📊 Combined Total — '+usedSegs.length+' Segment'+(usedSegs.length>1?'s':'')+' ('+segNames+')</div>'
+    +'<div class="bc-agt-row">'
+      +'<div class="bc-agt-item"><div class="bc-agt-lbl">Gross '+(totGross>=0?'Profit':'Loss')+'</div><div class="bc-agt-val">'+bcFmt(Math.abs(totGross))+'</div></div>'
+      +'<div class="bc-agt-item"><div class="bc-agt-lbl">Total Charges</div><div class="bc-agt-val">'+bcFmt(totCharges)+'</div></div>'
+      +'<div class="bc-agt-item"><div class="bc-agt-lbl">Net '+(isProfit?'Profit':'Loss')+'</div><div class="bc-agt-net '+(isProfit?'bc-profit':'bc-loss')+'">'+bcFmt(totNet)+'</div></div>'
+    +'</div>'
+  +'</div>';
+}
 
 function bcToggleAllSegView(){
   bcAllSegOpen = !bcAllSegOpen;
@@ -3317,7 +3344,7 @@ function bcRenderAllSegTable(){
                + '<div class="bc-rate-warn-box no-upper" id="bcAllRateWarn_'+seg+'"></div>';
     }
     html += '<div class="bc-allseg-row" id="bcAllRow_'+seg+'">'
-      + '<div class="bc-allseg-seg">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
+      + '<div class="bc-allseg-seg" onclick="bcCalcAllSegRow(\''+seg+'\')" style="cursor:pointer" title="Click to select this segment">'+BC_MULTI_SEG_LABELS[seg]+'</div>'
       + '<div class="bc-allseg-brok">'+brokCell+'</div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllBuy_'+seg+'" placeholder="Buy" onfocus="bcCalcAllSegRow(\''+seg+'\')" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllSell_'+seg+'" placeholder="Sell" onfocus="bcCalcAllSegRow(\''+seg+'\')" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
@@ -3461,6 +3488,9 @@ function bcCalcAllSegRow(seg){
   netEl.textContent = bcFmt(netPL);
   netEl.className = 'bc-allseg-net ' + (netPL>=0 ? 'bc-profit' : 'bc-loss');
 
+  bcAllSegResults[seg] = { qty:qty, totalCharges:totalCharges, netPL:netPL, grossPL:(sellTurnover-buyTurnover) };
+  bcCalcAllSegGrandTotal();
+
   // Mirror this row into the (hidden) single-segment fields so the detailed Turnover/Charges/Net cards,
   // Save Rate, Print Summary, and Apply-To-All all continue to work against whichever row was just edited.
   bcCurSeg = seg;
@@ -3497,3 +3527,4 @@ bcSubscribeClients();
 bcAddMultiRow();
 bcAddMultiRow();
 bcRenderAllSegTable();
+bcCalcAllSegGrandTotal();

@@ -938,6 +938,18 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-allseg-net{font-size:.78rem;font-weight:800;padding:4px 6px;border-radius:6px;text-align:center}
 #page-brokerage-calc .bc-allseg-net.bc-profit{background:var(--green2);color:var(--green)}
 #page-brokerage-calc .bc-allseg-net.bc-loss{background:var(--red2);color:var(--red)}
+#page-brokerage-calc .bc-allseg-grandtotal{margin-top:14px;padding:16px 20px;border-radius:14px;
+  background:linear-gradient(135deg,var(--navy),var(--navy3));box-shadow:0 4px 14px rgba(16,30,60,.18)}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-title{color:var(--gold2);font-size:.78rem;font-weight:800;
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-item{flex:1;min-width:140px}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-lbl{color:#c8d2ea;font-size:.68rem;font-weight:700;text-transform:uppercase}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-val{color:#fff;font-size:1.1rem;font-weight:800;margin-top:2px}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-net{font-size:1.3rem;font-weight:900;margin-top:2px}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-net.bc-profit{color:#7ee8c0}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-net.bc-loss{color:#ff9b8a}
+#page-brokerage-calc .bc-allseg-grandtotal .bc-agt-empty{color:#c8d2ea;font-size:.8rem;text-align:center;padding:6px 0}
 #page-brokerage-calc .bc-summary-table .bc-mini-btn{padding:3px 7px;font-size:.66rem;white-space:nowrap}
 #page-brokerage-calc .bc-seg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 #page-brokerage-calc .bc-seg-tab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
@@ -1897,6 +1909,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             </div>
             <div class="no-upper" style="font-size:.72rem;color:var(--gray);margin-bottom:10px">Every segment's own Brokerage Rate on the left, its own Trade Qty &amp; Price on the right — fill in whichever segments you need, results update live.</div>
             <div id="bcAllSegTable" class="no-upper"></div>
+            <div id="bcAllSegGrandTotal" class="no-upper"></div>
           </div>
         </div>
 
