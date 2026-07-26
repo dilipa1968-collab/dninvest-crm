@@ -3313,7 +3313,7 @@ function bcRenderAllSegTable(){
   if(!wrap) return;
   var clientEntry = (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey] : null;
 
-  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Buy Price</div><div>Sell Price</div><div>Quantity</div><div>Total Charges</div><div>Net P/L</div></div>';
+  var html = '<div class="bc-allseg-row bc-allseg-head"><div>Segment</div><div>Brokerage Rate</div><div>Buy Price</div><div>Sell Price</div><div>Quantity</div><div>Total Charges</div><div>Net P/L</div><div></div></div>';
 
   BC_ALL_SEGS.forEach(function(seg){
     var shape = BC_SEG_BROK_TYPE[seg];
@@ -3351,6 +3351,7 @@ function bcRenderAllSegTable(){
       + '<div><input type="number" class="bc-allseg-trade" id="bcAllQty_'+seg+'" placeholder="Qty" min="1" oninput="bcCalcAllSegRow(\''+seg+'\')"></div>'
       + '<div class="bc-allseg-charges" id="bcAllCharges_'+seg+'">₹0.00</div>'
       + '<div class="bc-allseg-net bc-profit" id="bcAllNet_'+seg+'">₹0.00</div>'
+      + '<div><button type="button" class="bc-allseg-clear-btn" onclick="bcClearAllSegRow(\''+seg+'\')" title="Clear this segment\'s trade">✕</button></div>'
       + '</div>';
   });
   wrap.innerHTML = '<div class="bc-allseg-table">'+html+'</div>';
@@ -3450,6 +3451,15 @@ function bcRefreshAllSegBrokerageInputs(clearTrade){
     }
     if(document.getElementById('bcAllBuy_'+seg)) bcCalcAllSegRow(seg);
   });
+}
+
+// Clears just ONE segment's trade fields (Buy/Sell/Qty) — leaves its Brokerage Rate and every other
+// segment untouched — then recalculates that row and the combined grand total.
+function bcClearAllSegRow(seg){
+  ['bcAllBuy_','bcAllSell_','bcAllQty_'].forEach(function(pfx){
+    var el = document.getElementById(pfx+seg); if(el) el.value = '';
+  });
+  bcCalcAllSegRow(seg);
 }
 
 function bcCalcAllSegRow(seg){
