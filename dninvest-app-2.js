@@ -2864,8 +2864,9 @@ function bcCalc(){
 
   var brokerage, brokLbl;
   if(brokShape==='flat'){
-    brokerage = brokFlat * lots * 2;   // charged on both the buy order and the sell order
-    brokLbl = 'Brokerage (₹'+brokFlat+' × '+lots+' lot(s) × 2 legs)';
+    var legs = (buy>0?1:0) + (sell>0?1:0);   // only charge for legs that actually have a price entered
+    brokerage = brokFlat * lots * legs;
+    brokLbl = 'Brokerage (₹'+brokFlat+' × '+lots+' lot(s) × '+legs+' leg'+(legs!==1?'s':'')+')';
   } else if(brokShape==='pct_min'){
     var buyBrok = (buy>0) ? Math.max(buyTurnover*brokPct/100, qty*brokMin) : 0;
     var sellBrok = (sell>0) ? Math.max(sellTurnover*brokPct/100, qty*brokMin) : 0;
@@ -3014,7 +3015,8 @@ function bcCalcMultiTrade(){
       var lotSizeEl = document.getElementById('bcMultiLot'+id);
       var lotSize = lotSizeEl ? (parseFloat(lotSizeEl.value)||0) : 0;
       var lots = lotSize>0 ? (qty/lotSize) : qty;   // if Lot Size wasn't entered, fall back to treating Quantity itself as lots
-      brokerage = flatRate * lots * 2;
+      var legs = (buy>0?1:0) + (sell>0?1:0);   // only charge for legs that actually have a price entered
+      brokerage = flatRate * lots * legs;
       if(!(lotSize>0)) anyApproxOptions = true;
     } else if(shape==='pct_min'){
       var pct = (clientRate!=null) ? clientRate.pct : d.brokPct;
@@ -3488,7 +3490,8 @@ function bcCalcAllSegRow(seg){
     var flatRate = parseFloat(document.getElementById('bcAllBrokFlat_'+seg).value)||0;
     var lotEl = document.getElementById('bcAllLots_'+seg);
     var lotsForBrok = lotEl ? (parseFloat(lotEl.value)||0) : qty;
-    brokerage = flatRate * lotsForBrok * 2;   // brokerage is charged per LOT, not per share/unit quantity
+    var legs = (buy>0?1:0) + (sell>0?1:0);   // only charge for legs that actually have a price entered
+    brokerage = flatRate * lotsForBrok * legs;   // brokerage is charged per LOT, not per share/unit quantity
   } else if(shape==='pct_min'){
     var pct = parseFloat(document.getElementById('bcAllRate_'+seg).value)||0;
     var min = parseFloat(document.getElementById('bcAllMin_'+seg).value)||0;
