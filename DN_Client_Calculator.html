@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>D N Investment — Brokerage Calculator</title>
+<style>
+:root{
+  --navy:#0f1f3d;--navy2:#162b54;--navy3:#1e3a6e;
+  --gold:#c9942a;--gold2:#f5d98a;--gold3:#fdf6e3;
+  --green:#0f7a45;--green2:#e3f7ee;
+  --red:#c0392b;--red2:#fdf0ee;
+  --blue:#1a56db;--blue2:#eef3fc;
+  --bg:#f4f6fa;--white:#fff;
+  --border:#e3e8f0;--gray:#5d6e8a;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--navy);min-height:100vh;padding-bottom:24px}
+.hdr{background:linear-gradient(135deg,var(--navy),var(--navy3));color:#fff;padding:18px 16px 16px;position:sticky;top:0;z-index:20;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.hdr h1{font-size:1.05rem;font-weight:800}
+.hdr h1 span{color:var(--gold2)}
+.hdr .sub{font-size:.72rem;color:#c8d2ea;margin-top:2px}
+.wrap{max-width:520px;margin:0 auto;padding:14px 12px}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(16,30,60,.06)}
+.card h2{font-size:.82rem;font-weight:800;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.seg-scroll{display:flex;flex-wrap:wrap;gap:6px}
+.seg-tab{flex:0 0 auto;padding:8px 14px;border-radius:18px;border:1.5px solid var(--border);background:#fff;
+  font-size:.76rem;font-weight:700;color:var(--gray);white-space:nowrap}
+.seg-tab.active{background:var(--navy);border-color:var(--navy);color:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-size:.65rem;font-weight:700;color:var(--gray);text-transform:uppercase;
+  letter-spacing:.3px;margin-bottom:5px}
+.field input{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;
+  font-size:1rem;font-family:inherit;outline:none;-webkit-appearance:none}
+.field input:focus{border-color:var(--gold)}
+.field.trade input{border-color:var(--blue);background:var(--blue2);font-weight:700;color:var(--navy)}
+.field.brok input{border-color:var(--green);background:var(--green2);font-weight:800;color:var(--green);text-align:center;font-size:1.1rem}
+.field.brok input[readonly]{border-color:var(--border);background:var(--bg);color:var(--gray);cursor:not-allowed}
+.locked-banner{background:var(--gold3);border:1px solid var(--gold);border-radius:10px;padding:8px 12px;font-size:.72rem;
+  color:#7a5c0e;text-align:center;margin-bottom:10px;font-weight:700}
+.qty-note{font-size:.7rem;color:var(--gray);margin-top:4px}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;
+  border-bottom:1px solid #f0f2f8;font-size:.82rem}
+.result-row:last-child{border-bottom:none}
+.result-row .lbl{color:var(--gray)}
+.result-row .val{font-weight:700;font-variant-numeric:tabular-nums}
+.total-row{border-top:2px solid var(--navy);margin-top:4px;padding-top:10px;font-weight:800;font-size:.95rem}
+.total-row .lbl{color:var(--navy)}
+.net-box{margin-top:12px;padding:14px;border-radius:12px;text-align:center}
+.net-box.profit{background:var(--green2);color:var(--green)}
+.net-box.loss{background:var(--red2);color:var(--red)}
+.net-box .amt{font-size:1.4rem;font-weight:900}
+.net-box .lbl2{font-size:.68rem;font-weight:700;margin-top:3px;line-height:1.4}
+.toggle{font-size:.72rem;color:var(--gold);font-weight:700;text-align:center;padding:6px 0}
+#statRates{display:none;margin-top:8px}
+#statRates.open{display:block}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.75rem}
+.stat-item{background:var(--bg);border-radius:8px;padding:8px 10px}
+.stat-item b{display:block;color:var(--navy);font-size:.85rem;margin-top:2px}
+.footer-note{font-size:.68rem;color:var(--gray);text-align:center;margin-top:10px;line-height:1.5;padding:0 8px}
+.print-btn{width:100%;padding:12px;border:none;border-radius:10px;background:var(--gold);color:#3d2c05;
+  font-weight:800;font-size:.85rem;margin-top:4px}
+@media print{ .seg-scroll,.toggle,.print-btn{display:none} }
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>D N <span>INVESTMENT</span></h1>
+  <div class="sub">Brokerage &amp; Charges Calculator</div>
+  <div class="sub" id="clientNameShow" style="display:none;font-weight:700;color:#fff;margin-top:2px"></div>
+</div>
+
+<div class="wrap">
+  <div class="locked-banner" id="lockedBanner" style="display:none">🔒 Brokerage rate is fixed by D N Investment for your account.</div>
+  <div class="card">
+    <h2>📊 Select Segment</h2>
+    <div class="seg-scroll" id="segTabs">
+      <div class="seg-tab active" data-seg="equity_intraday">Equity Intraday</div>
+      <div class="seg-tab" data-seg="equity_delivery">Equity Delivery</div>
+      <div class="seg-tab" data-seg="futures">Futures (F&amp;O)</div>
+      <div class="seg-tab" data-seg="options">Options</div>
+      <div class="seg-tab" data-seg="commodity_futures">Commodity Futures</div>
+      <div class="seg-tab" data-seg="commodity_options">Commodity Options</div>
+      <div class="seg-tab" data-seg="currency_futures">Currency Futures</div>
+      <div class="seg-tab" data-seg="currency_options">Currency Options</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>💼 Brokerage Rate</h2>
+    <div class="grid">
+      <div class="field brok" id="pctWrap">
+        <label id="pctLabel">Rate (%)</label>
+        <input type="number" id="brokRate" value="0.03" step="0.001">
+      </div>
+      <div class="field brok" id="minWrap" style="display:none">
+        <label>Min ₹/Share</label>
+        <input type="number" id="brokMin" value="0.03" step="0.01">
+      </div>
+      <div class="field brok" id="flatWrap" style="display:none">
+        <label>Flat ₹/Lot</label>
+        <input type="number" id="brokFlat" value="30" step="1">
+      </div>
+    </div>
+    <div class="qty-note" id="brokHint"></div>
+  </div>
+
+  <div class="card">
+    <h2>📝 Trade Details</h2>
+    <div class="grid">
+      <div class="field trade"><label>Buy Price (₹)</label><input type="number" id="buyPrice" placeholder="Buy Price"></div>
+      <div class="field trade"><label>Sell Price (₹)</label><input type="number" id="sellPrice" placeholder="Sell Price"></div>
+      <div class="field trade" id="lotSizeWrap"><label>Lot Size</label><input type="number" id="lotSize" placeholder="Lot Size" min="1"></div>
+      <div class="field trade" id="lotsWrap"><label>No. Of Lots</label><input type="number" id="lots" placeholder="Lots" min="1"></div>
+      <div class="field trade" id="qtyPlainWrap" style="display:none"><label>Quantity</label><input type="number" id="qtyPlain" placeholder="Quantity" min="1"></div>
+    </div>
+    <div class="qty-note">Total Quantity: <b id="totalQtyShow" style="color:var(--navy)">0</b></div>
+    <div class="toggle" id="advToggle" onclick="toggleAdv()">⚙️ View Statutory Rates (Fixed — Not Editable)</div>
+    <div id="statRates">
+      <div class="stat-grid">
+        <div class="stat-item">STT / CTT<b id="sttShow">—</b></div>
+        <div class="stat-item">Transaction Charges<b id="txnShow">—</b></div>
+        <div class="stat-item">Stamp Duty (Buy)<b id="stampShow">—</b></div>
+        <div class="stat-item">SEBI Fees<b id="sebiShow">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📈 Turnover</h2>
+    <div id="turnoverBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>💰 Charges Breakdown</h2>
+    <div id="breakdown"></div>
+    <div id="netBox" class="net-box profit">
+      <div class="amt" id="netAmt">₹0</div>
+      <div class="lbl2" id="netLbl">Net Profit</div>
+    </div>
+  </div>
+
+  <div class="card" id="rmToolsCard">
+    <h2>🔗 Share With Client (RM Only)</h2>
+    <div class="qty-note" style="margin-bottom:8px">Set each segment's rate above as needed, add the client's name (optional), then generate a link. The client can enter their own trade but can't change the rate.</div>
+    <div class="field trade" style="margin-bottom:8px"><label>Client Name (Optional)</label><input type="text" id="rmClientName" placeholder="e.g. Rekha Agarwal"></div>
+    <button class="print-btn" style="background:var(--navy);color:#fff" onclick="generateClientLink()">🔗 Generate Client Link</button>
+    <div id="linkResult" style="display:none;margin-top:10px">
+      <div class="qty-note" style="margin-bottom:6px">Share this link — it opens with your rates locked in:</div>
+      <textarea id="linkOutput" readonly style="width:100%;padding:8px;border:1.5px solid var(--gold);border-radius:8px;font-size:.72rem;height:60px;font-family:monospace;background:var(--gold3)"></textarea>
+      <button class="print-btn" style="margin-top:6px" onclick="copyClientLink()">📋 Copy Link</button>
+    </div>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+
+  <div class="footer-note">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates — the same for every client. Please verify against your latest contract note.</div>
+</div>
+
+<script>
+var SEG_BROK_TYPE = { futures:'percent', equity_delivery:'pct_min', equity_intraday:'pct_min', options:'flat',
+                       commodity_futures:'percent', commodity_options:'flat', currency_futures:'percent', currency_options:'flat' };
+var USES_LOTS = { futures:true, options:true, commodity_futures:true, commodity_options:true, currency_futures:true, currency_options:true };
+var SEG_LABELS = { equity_intraday:'Equity Intraday', equity_delivery:'Equity Delivery', futures:'Futures (F&O)', options:'Options',
+                    commodity_futures:'Commodity Futures', commodity_options:'Commodity Options',
+                    currency_futures:'Currency Futures', currency_options:'Currency Options' };
+
+var SEGMENT_DEFAULTS = {
+  futures:          { stt:0.05,  txn:0.0019, stamp:0.002, sebi:0.0001, sttSide:'sell', brokPct:0.03 },
+  options:          { stt:0.15,  txn:0.0355, stamp:0.003, sebi:0.0001, sttSide:'sell', brokFlat:30 },
+  equity_delivery:  { stt:0.10,  txn:0.00297,stamp:0.015, sebi:0.0001, sttSide:'both', brokPct:0.3,  brokMin:0.03 },
+  equity_intraday:  { stt:0.025, txn:0.00297,stamp:0.003, sebi:0.0001, sttSide:'sell', brokPct:0.03, brokMin:0.03 },
+  commodity_futures:{ stt:0.05,  txn:0.0021, stamp:0.002, sebi:0.0001, sttSide:'sell', brokPct:0.03 },
+  commodity_options:{ stt:0.05,  txn:0.00418,stamp:0.003, sebi:0.0001, sttSide:'sell', brokFlat:30 },
+  currency_futures: { stt:0,     txn:0.00005,stamp:0.0001,sebi:0.0001, sttSide:'sell', brokPct:0.03 },
+  currency_options: { stt:0,     txn:0.002,  stamp:0.0001,sebi:0.0001, sttSide:'sell', brokFlat:30 }
+};
+
+var curSeg = 'equity_intraday';
+var isLocked = false;
+
+function syncCurrentFieldsToDefaults(){
+  var shape = SEG_BROK_TYPE[curSeg];
+  var d = SEGMENT_DEFAULTS[curSeg];
+  if(shape==='flat') d.brokFlat = parseFloat(document.getElementById('brokFlat').value)||0;
+  else if(shape==='pct_min'){
+    d.brokPct = parseFloat(document.getElementById('brokRate').value)||0;
+    d.brokMin = parseFloat(document.getElementById('brokMin').value)||0;
+  } else d.brokPct = parseFloat(document.getElementById('brokRate').value)||0;
+}
+
+function pctStr(v){ return v + '%'; }
+
+function setSeg(seg){
+  curSeg = seg;
+  document.querySelectorAll('.seg-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.seg===seg); });
+  var d = SEGMENT_DEFAULTS[seg];
+  document.getElementById('sttShow').textContent = (d.stt===0) ? 'Not applicable' : pctStr(d.stt) + (d.sttSide==='both'?' (buy+sell)':' (sell)');
+  document.getElementById('txnShow').textContent = pctStr(d.txn);
+  document.getElementById('stampShow').textContent = pctStr(d.stamp) + ' (buy)';
+  document.getElementById('sebiShow').textContent = pctStr(d.sebi);
+
+  var shape = SEG_BROK_TYPE[seg];
+  document.getElementById('pctWrap').style.display = (shape==='percent'||shape==='pct_min') ? '' : 'none';
+  document.getElementById('minWrap').style.display = (shape==='pct_min') ? '' : 'none';
+  document.getElementById('flatWrap').style.display = (shape==='flat') ? '' : 'none';
+  document.getElementById('pctLabel').textContent = (shape==='pct_min') ? 'Rate (%)' : 'Rate (%)';
+  document.getElementById('brokHint').textContent = (shape==='pct_min')
+    ? 'Whichever is higher applies — the % amount or the Min ₹/Share (per leg).' : '';
+
+  if(shape==='flat') document.getElementById('brokFlat').value = d.brokFlat;
+  else if(shape==='pct_min'){ document.getElementById('brokRate').value = d.brokPct; document.getElementById('brokMin').value = d.brokMin; }
+  else document.getElementById('brokRate').value = d.brokPct;
+
+  ['brokRate','brokMin','brokFlat'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(isLocked) el.setAttribute('readonly','readonly'); else el.removeAttribute('readonly');
+  });
+
+  var usesLots = !!USES_LOTS[seg];
+  document.getElementById('lotSizeWrap').style.display = usesLots ? '' : 'none';
+  document.getElementById('lotsWrap').style.display = usesLots ? '' : 'none';
+  document.getElementById('qtyPlainWrap').style.display = usesLots ? 'none' : '';
+
+  calc();
+}
+
+function toggleAdv(){ document.getElementById('statRates').classList.toggle('open'); }
+
+function fmt(n){
+  var neg = n<0; n=Math.abs(n);
+  return (neg?'-':'') + '₹' + n.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function calc(){
+  var buy = parseFloat(document.getElementById('buyPrice').value)||0;
+  var sell = parseFloat(document.getElementById('sellPrice').value)||0;
+  var usesLots = !!USES_LOTS[curSeg];
+  var qty;
+  if(usesLots){
+    var lotSize = parseFloat(document.getElementById('lotSize').value)||0;
+    var lots = parseFloat(document.getElementById('lots').value)||0;
+    qty = lotSize*lots;
+  } else {
+    qty = parseFloat(document.getElementById('qtyPlain').value)||0;
+  }
+  document.getElementById('totalQtyShow').textContent = qty.toLocaleString('en-IN');
+
+  var brokPct = parseFloat(document.getElementById('brokRate').value)||0;
+  var brokMin = parseFloat(document.getElementById('brokMin').value)||0;
+  var brokFlat = parseFloat(document.getElementById('brokFlat').value)||0;
+  var d = SEGMENT_DEFAULTS[curSeg];
+  var shape = SEG_BROK_TYPE[curSeg];
+
+  var buyTurnover = buy*qty, sellTurnover = sell*qty, totalTurnover = buyTurnover+sellTurnover;
+
+  var brokerage, brokLbl;
+  var lotsForFlat = usesLots ? (parseFloat(document.getElementById('lots').value)||0) : 0;
+  if(shape==='flat'){
+    brokerage = brokFlat * lotsForFlat * 2;
+    brokLbl = 'Brokerage (₹'+brokFlat+' × '+lotsForFlat+' lot(s) × 2 legs)';
+  } else if(shape==='pct_min'){
+    var buyBrok = (buy>0) ? Math.max(buyTurnover*brokPct/100, qty*brokMin) : 0;
+    var sellBrok = (sell>0) ? Math.max(sellTurnover*brokPct/100, qty*brokMin) : 0;
+    brokerage = buyBrok + sellBrok;
+    brokLbl = 'Brokerage ('+brokPct+'% or ₹'+brokMin+'/share, whichever higher)';
+  } else {
+    brokerage = totalTurnover * brokPct/100;
+    brokLbl = 'Brokerage ('+brokPct+'% of turnover)';
+  }
+
+  var txn = totalTurnover * d.txn/100;
+  var sebi = totalTurnover * d.sebi/100;
+  var stamp = buyTurnover * d.stamp/100;
+  var stt = (d.sttSide==='both') ? totalTurnover*d.stt/100 : sellTurnover*d.stt/100;
+  var gst = (brokerage+txn+sebi) * 0.18;
+  var totalCharges = brokerage+stt+txn+stamp+sebi+gst;
+  var grossPL = sellTurnover - buyTurnover;
+  var netPL = grossPL - totalCharges;
+
+  document.getElementById('turnoverBox').innerHTML =
+    '<div class="result-row"><span class="lbl">Buy Turnover</span><span class="val">'+fmt(buyTurnover)+'</span></div>'
+    +'<div class="result-row"><span class="lbl">Sell Turnover</span><span class="val">'+fmt(sellTurnover)+'</span></div>'
+    +'<div class="result-row total-row"><span class="lbl">Total Turnover</span><span class="val">'+fmt(totalTurnover)+'</span></div>';
+
+  var rows = [
+    [brokLbl, brokerage],
+    ['STT / CTT'+(d.stt===0?' (N/A)':''), stt],
+    ['Transaction Charges', txn],
+    ['Stamp Duty', stamp],
+    ['SEBI Fees', sebi],
+    ['GST (18%)', gst]
+  ];
+  var html = rows.map(function(r){ return '<div class="result-row"><span class="lbl">'+r[0]+'</span><span class="val">'+fmt(r[1])+'</span></div>'; }).join('');
+  html += '<div class="result-row total-row"><span class="lbl">Total Charges</span><span class="val">'+fmt(totalCharges)+'</span></div>';
+  document.getElementById('breakdown').innerHTML = html;
+
+  var isProfit = netPL>=0;
+  document.getElementById('netBox').className = 'net-box ' + (isProfit?'profit':'loss');
+  document.getElementById('netAmt').textContent = fmt(netPL);
+  document.getElementById('netLbl').textContent = 'Gross '+(grossPL>=0?'Profit':'Loss')+' '+fmt(Math.abs(grossPL))+' − Charges '+fmt(totalCharges)+' = Net '+(isProfit?'Profit':'Loss');
+}
+
+document.querySelectorAll('.seg-tab').forEach(function(t){ t.addEventListener('click', function(){ setSeg(t.dataset.seg); }); });
+document.querySelectorAll('input').forEach(function(el){
+  el.addEventListener('input', function(){
+    if(el.id==='brokRate' || el.id==='brokMin' || el.id==='brokFlat') syncCurrentFieldsToDefaults();
+    calc();
+  });
+});
+
+// ── Locked client-link mode: read rates for every segment out of the URL, and lock the Brokerage fields ──
+function loadFromUrlIfLocked(){
+  var params = new URLSearchParams(window.location.search);
+  var r = params.get('r');
+  if(!r) return false;
+  try{
+    var decoded = JSON.parse(decodeURIComponent(escape(atob(r.replace(/-/g,'+').replace(/_/g,'/')))));
+    Object.keys(decoded).forEach(function(seg){
+      if(!SEGMENT_DEFAULTS[seg]) return;
+      var v = decoded[seg];
+      if(typeof v === 'object'){ SEGMENT_DEFAULTS[seg].brokPct = v.pct; SEGMENT_DEFAULTS[seg].brokMin = v.min; }
+      else if(SEG_BROK_TYPE[seg]==='flat') SEGMENT_DEFAULTS[seg].brokFlat = v;
+      else SEGMENT_DEFAULTS[seg].brokPct = v;
+    });
+    isLocked = true;
+    document.getElementById('rmToolsCard').style.display = 'none';
+    document.getElementById('lockedBanner').style.display = '';
+    var name = params.get('n');
+    if(name){
+      var nameEl = document.getElementById('clientNameShow');
+      nameEl.textContent = 'Prepared for: ' + name;
+      nameEl.style.display = '';
+    }
+    return true;
+  }catch(e){ return false; }
+}
+
+// ── RM mode: build a shareable link encoding every segment's currently-set rate ──
+function generateClientLink(){
+  syncCurrentFieldsToDefaults();
+  var rates = {};
+  Object.keys(SEGMENT_DEFAULTS).forEach(function(seg){
+    var d = SEGMENT_DEFAULTS[seg], shape = SEG_BROK_TYPE[seg];
+    if(shape==='flat') rates[seg] = d.brokFlat;
+    else if(shape==='pct_min') rates[seg] = { pct:d.brokPct, min:d.brokMin };
+    else rates[seg] = d.brokPct;
+  });
+  var encoded = btoa(unescape(encodeURIComponent(JSON.stringify(rates)))).replace(/\+/g,'-').replace(/\//g,'_');
+  var name = (document.getElementById('rmClientName').value||'').trim();
+  var url = window.location.origin + window.location.pathname + '?r=' + encoded + (name ? '&n=' + encodeURIComponent(name) : '');
+  document.getElementById('linkOutput').value = url;
+  document.getElementById('linkResult').style.display = '';
+}
+
+function copyClientLink(){
+  var box = document.getElementById('linkOutput');
+  box.select(); box.setSelectionRange(0, 99999);
+  try{ document.execCommand('copy'); }catch(e){}
+  if(navigator.clipboard) navigator.clipboard.writeText(box.value).catch(function(){});
+}
+
+loadFromUrlIfLocked();
+setSeg('equity_intraday');
+</script>
+
+</body>
+</html>
