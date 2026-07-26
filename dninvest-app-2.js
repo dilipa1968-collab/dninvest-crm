@@ -2755,7 +2755,8 @@ function bcApplyDigitToAllSegments(){
   });
 
   bcAllSegmentsApplied = true;
-  bcSetSeg(bcCurSeg);   // refresh the currently-shown segment with its (possibly just-updated) default
+  bcApplyDefaultBrokerage(bcCurSeg);   // refresh the currently-shown segment's fields — without re-loading any client override
+  bcCalc();
   document.getElementById('bcClientHint').textContent = 'Applied digit "'+rateDigit+'" as the new default across all 6 segments for this session.';
 }
 
@@ -3167,6 +3168,22 @@ function bcSelectClientFromSummary(code){
   bcApplyClientOverride();
   bcLoadMultiTradeForClient();
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// A general-purpose link — not tied to any client, Brokerage Rate stays editable for whoever opens it.
+function bcGenerateOpenLink(){
+  var name = (document.getElementById('bcClientSearch').value||'').trim();
+  if(name==='New Client') name = '';
+  var url = window.location.origin + '/DN_Client_Calculator.html?mode=open' + (name ? '&n=' + encodeURIComponent(name) : '');
+  var copied = false;
+  try{
+    var ta = document.createElement('textarea');
+    ta.value = url; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,99999);
+    copied = document.execCommand('copy');
+    document.body.removeChild(ta);
+  }catch(e){}
+  prompt(copied ? 'Link copied! Share this open link (rate stays editable):' : 'Copy this open link (rate stays editable):', url);
 }
 
 function bcShareClientLink(code){
