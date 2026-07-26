@@ -2425,7 +2425,7 @@ var BC_SEGMENT_DEFAULTS = {
   equity_intraday:  { stt:0.025, txn:0.00297,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03, brokMin:0.03 },
   commodity_futures:{ stt:0.05,  txn:0.0021, stamp:0.002, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },
   commodity_options:{ stt:0.05,  txn:0.00418,stamp:0.003, sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 },
-  currency_futures: { stt:0,     txn:0.00005,stamp:0.0001,sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },   // STT doesn't apply to currency derivatives
+  currency_futures: { stt:0,     txn:0.0004, stamp:0.0001,sebi:0.0001, sttSide:'sell', stampSide:'buy', brokPct:0.03 },   // STT doesn't apply to currency derivatives; txn = 0.00035% Txn Charges + 0.00005% IPFT (verified against real bill)
   currency_options: { stt:0,     txn:0.002,  stamp:0.0001,sebi:0.0001, sttSide:'sell', stampSide:'buy', brokFlat:30 }     // STT doesn't apply to currency derivatives
 };
 // True original defaults (the "3" series) — never mutated. "Apply To All Segments" changes BC_SEGMENT_DEFAULTS
@@ -2934,7 +2934,7 @@ function bcCalc(){
     +'Options: STT 0.15% (sell side, on premium), Transaction Charges 0.0355%, Stamp Duty 0.003% (buy side). '
     +'Equity Delivery and Intraday follow standard NSE/SEBI slabs. Commodity Futures: CTT 0.05% (sell side, on par with equity futures), MCX Transaction Charges 0.0021%, Stamp Duty 0.002%. '
     +'Commodity Options: CTT 0.05% (sell side, on premium), MCX Transaction Charges 0.00418%, Stamp Duty 0.003%. '
-    +'Currency Futures/Options: STT does not apply (currency derivatives are exempt) — Transaction Charges 0.00005% (Futures) / 0.002% (Options, on premium), Stamp Duty 0.0001%. '
+    +'Currency Futures/Options: STT does not apply (currency derivatives are exempt) — Transaction Charges 0.0004% (Futures — includes IPFT) / 0.002% (Options, on premium), Stamp Duty 0.0001%. '
     +'GST is charged at 18% on the sum of Brokerage, Transaction Charges, and SEBI Fees. Rates reflect the April 2026 Budget revision — please verify against the latest exchange circular periodically.';
 }
 
