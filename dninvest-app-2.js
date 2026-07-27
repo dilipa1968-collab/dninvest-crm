@@ -2467,6 +2467,14 @@ function bcApplyRoleAccess(){
   if(footer) footer.textContent = isAdmin
     ? 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) can be edited by Admin only — for example, after an exchange rate revision. RMs see these as fixed, auto-applied values.'
     : 'Statutory rates (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed by exchange and government rules, and are applied automatically for each segment. Only the Brokerage Rate needs to be entered.';
+
+  // Sharing a client/open link is Admin-only — RM sees the button disabled.
+  var openLinkBtn = document.getElementById('bcOpenLinkBtn');
+  if(openLinkBtn){
+    if(isAdmin){ openLinkBtn.disabled=false; openLinkBtn.style.opacity=''; openLinkBtn.style.cursor=''; openLinkBtn.title='A general link where the brokerage rate stays editable — not tied to any client'; }
+    else{ openLinkBtn.disabled=true; openLinkBtn.style.opacity='0.5'; openLinkBtn.style.cursor='not-allowed'; openLinkBtn.title='Only Admin can generate/share links'; }
+  }
+  if(bcSummaryOpen) bcRenderSummaryTable();
 }
 
 // "Locked prefix" rate control — RM can only change the decimal digits after "0." (e.g. 03, 3, or 35),
@@ -3143,6 +3151,7 @@ function bcRenderSummaryTable(){
     return;
   }
 
+  var isAdmin = (typeof CU!=='undefined' && CU && CU.role==='admin');
   var segs = ['equity_intraday','equity_delivery','futures','options','commodity_futures','commodity_options','currency_futures','currency_options'];
   var shortLabels = { equity_intraday:'Eq Intraday', equity_delivery:'Eq Delivery', futures:'Futures',
                        options:'Options', commodity_futures:'Com Fut', commodity_options:'Com Opt',
@@ -3153,10 +3162,13 @@ function bcRenderSummaryTable(){
   codes.forEach(function(code){
     var entry = bcClients[code];
     var safeCode = code.replace(/'/g,"\\'");
+    var linkCell = isAdmin
+      ? '<button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy);white-space:nowrap" onclick="bcShareClientLink(\''+safeCode+'\')">🔗 Share Link</button>'
+      : '<span class="bc-summary-empty" title="Only Admin can generate/share links">🔒 Admin only</span>';
     html += '<tr><td style="cursor:pointer;text-decoration:underline" title="Click to load this client above" onclick="bcSelectClientFromSummary(\''+safeCode+'\')">'+entry.label+' ('+code+')</td>'
       + segs.map(function(s){ return bcFmtSegCell(s, entry); }).join('')
       + '<td>'+(entry.multiTrade && entry.multiTrade.length ? entry.multiTrade.length+' lines' : '<span class="bc-summary-empty">—</span>')+'</td>'
-      + '<td><button type="button" class="bc-mini-btn" style="border-color:var(--navy);color:var(--navy);white-space:nowrap" onclick="bcShareClientLink(\''+safeCode+'\')">🔗 Share Link</button></td></tr>';
+      + '<td>'+linkCell+'</td></tr>';
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
@@ -3180,6 +3192,7 @@ function bcSelectClientFromSummary(code){
 
 // A general-purpose link — not tied to any client, Brokerage Rate stays editable for whoever opens it.
 function bcGenerateOpenLink(){
+  if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ alert('Only Admin can generate/share links.'); return; }
   var name = (document.getElementById('bcClientSearch').value||'').trim();
   if(name==='New Client') name = '';
   var url = window.location.origin + '/DN_Client_Calculator.html?mode=open' + (name ? '&n=' + encodeURIComponent(name) : '');
@@ -3195,6 +3208,7 @@ function bcGenerateOpenLink(){
 }
 
 function bcShareClientLink(code){
+  if(!(typeof CU!=='undefined' && CU && CU.role==='admin')){ alert('Only Admin can generate/share links.'); return; }
   var entry = bcClients[code];
   if(!entry){ alert('No saved rates found for this client.'); return; }
   var rates = {};
