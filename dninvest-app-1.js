@@ -2248,6 +2248,7 @@ function renderMfAumTrend(){
   if(!el) return;
   const mf = getMyMfClients();
   window.__mfAumRows = mf;
+  const totalAUM = mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
   const changed = mf.filter(c=>c.invested_change_amt);
   const increased = changed.filter(c=>c.invested_change_amt>0);
   const decreased = changed.filter(c=>c.invested_change_amt<0);
@@ -2261,13 +2262,18 @@ function renderMfAumTrend(){
     : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
   el.innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="flex:1;min-width:100px;background:#eef3fc;border-radius:8px;padding:3px 7px">
+        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔵 CURRENT AUM</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--blue);line-height:1.15">₹${fmtNum(totalAUM)}</div>
+        <span style="font-size:.62rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
+      </div>
       <div style="flex:1;min-width:100px;background:#f0fdf4;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🟢 INVESTED AMOUNT INCREASED</div>
+        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🟢 ADDITIONS</div>
         <div style="font-size:1rem;font-weight:800;color:var(--green);line-height:1.15">${increased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
       </div>
       <div style="flex:1;min-width:100px;background:#fef2f2;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔴 INVESTED AMOUNT DECREASED</div>
+        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔴 REDEMPTIONS</div>
         <div style="font-size:1rem;font-weight:800;color:var(--red);line-height:1.15">${decreased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
       </div>
@@ -2306,7 +2312,7 @@ function showMfAumRmSplit(){
     return [rmCell, v.inc, '₹'+fmtNum(v.incAmt), v.dec, '₹'+fmtNum(v.decAmt)];
   }).sort((a,b)=>(b[1]+b[3])-(a[1]+a[3]));
   if(!table.length){ toast('Abhi koi Invested Amount change record nahi hai','info'); return; }
-  showReport('📈 MF Invested Amount Changes — RM-wise', ['RM','Increased','Increase Amt','Decreased','Decrease Amt'], table);
+  showReport('📈 MF Invested Amount Changes — RM-wise', ['RM','Additions','Addition Amt','Redemptions','Redemption Amt'], table);
 }
 
 function refreshDash(){
