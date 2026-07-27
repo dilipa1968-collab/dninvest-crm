@@ -2248,7 +2248,7 @@ function renderMfAumTrend(){
   if(!el) return;
   const mf = getMyMfClients();
   window.__mfAumRows = mf;
-  const totalAUM = mf.reduce((s,c)=>s+(parseFloat(c.aum)||0),0);
+  const totalInvested = mf.reduce((s,c)=>s+(parseFloat(c.aum_detail && c.aum_detail.inv)||0),0);
   const changed = mf.filter(c=>c.invested_change_amt);
   const increased = changed.filter(c=>c.invested_change_amt>0);
   const decreased = changed.filter(c=>c.invested_change_amt<0);
@@ -2263,8 +2263,8 @@ function renderMfAumTrend(){
   el.innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
       <div style="flex:1;min-width:100px;background:#eef3fc;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔵 CURRENT AUM</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--blue);line-height:1.15">₹${fmtNum(totalAUM)}</div>
+        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔵 TOTAL INVESTED AMOUNT</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--blue);line-height:1.15">₹${fmtNum(totalInvested)}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
       </div>
       <div style="flex:1;min-width:100px;background:#f0fdf4;border-radius:8px;padding:3px 7px">
