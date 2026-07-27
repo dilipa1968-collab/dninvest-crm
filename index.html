@@ -1255,6 +1255,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             </div>
             <div id="eqActivityTrend"></div>
           </div>
+          <div class="dash-card" style="grid-column:1 / -1;padding:10px 14px" id="mfAumCard">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+              <h3 style="margin-bottom:0">📈 MF Invested Amount — Increased vs Decreased</h3>
+            </div>
+            <div id="mfAumTrend"></div>
+          </div>
           <div class="dash-card collapsible" id="rmEqCard">
             <h3 onclick="toggleDashCard('rmEqCard')">Equity RM — Client Count <span class="dc-count" id="rmEqCount"></span><span class="dc-chevron">▶</span></h3>
             <div class="dc-body"><div id="rmEqChart"></div></div>
@@ -1459,6 +1465,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div class="page-hdr">
           <div class="page-title">MF Investors <span id="mf-total-label"></span></div>
           <div class="hdr-actions">
+            <button class="btn btn-outline" style="border-color:#0d9488;color:#0d9488" onclick="showMfAumList()">📈 Invested Amt Changes</button>
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
             <button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="openMfDupMerge()">🔀 Merge Duplicates</button>

@@ -2239,6 +2239,76 @@ function birthdayCardImage(idx){
   }, 'image/png');
 }
 
+// MF Invested Amount — Increased vs Decreased dashboard card. Uses the prev_invested/invested_change_amt
+// fields stamped whenever an AUM By Client import changes a client's AUM value
+// (see the mf import merge logic). Simpler than the Equity Trade Activity card —
+// no day-over-day snapshot history, just live counts + amounts from the last import.
+function renderMfAumTrend(){
+  const el = document.getElementById('mfAumTrend');
+  if(!el) return;
+  const mf = getMyMfClients();
+  window.__mfAumRows = mf;
+  const changed = mf.filter(c=>c.invested_change_amt);
+  const increased = changed.filter(c=>c.invested_change_amt>0);
+  const decreased = changed.filter(c=>c.invested_change_amt<0);
+  const sumInc = increased.reduce((s,c)=>s+c.invested_change_amt,0);
+  const sumDec = decreased.reduce((s,c)=>s+Math.abs(c.invested_change_amt),0);
+  const isAdmin = CU.role==='admin';
+  const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
+  const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
+  const footerNote = isAdmin
+    ? `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
+    : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="flex:1;min-width:100px;background:#f0fdf4;border-radius:8px;padding:6px 10px">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:700">🟢 INVESTED AMOUNT INCREASED</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--green);line-height:1.3">${increased.length}</div>
+        <span style="font-size:.64rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
+      </div>
+      <div style="flex:1;min-width:100px;background:#fef2f2;border-radius:8px;padding:6px 10px">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:700">🔴 INVESTED AMOUNT DECREASED</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--red);line-height:1.3">${decreased.length}</div>
+        <span style="font-size:.64rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
+      </div>
+    </div>
+    <p style="color:var(--gray);font-size:.64rem;margin-top:5px;text-align:center">${footerNote}</p>`;
+}
+
+// Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
+function showMfAumList(){
+  const rows = window.__mfAumRows || [];
+  const changed = rows.filter(c=>c.invested_change_amt).sort((a,b)=>Math.abs(b.invested_change_amt)-Math.abs(a.invested_change_amt));
+  if(!changed.length){ toast('Abhi koi Invested Amount change record nahi hai — AUM By Client import ke baad yahan dikhega','info'); return; }
+  const table = changed.map(c=>{
+    const up = c.invested_change_amt>0;
+    const newInv = (c.aum_detail && c.aum_detail.inv) || 0;
+    return [c.name, c.rm||'—', '₹'+fmtNum(c.prev_invested||0), '₹'+fmtNum(newInv),
+      `<span style="color:${up?'var(--green)':'var(--red)'};font-weight:700">${up?'▲ +':'▼ -'}₹${fmtNum(Math.abs(c.invested_change_amt))}</span>`,
+      c.invested_change_date?fmtDate(c.invested_change_date):'—'];
+  });
+  showReport('📈 MF Invested Amount — Changes (Since Last Import)', ['Name','RM','Previous Invested','Current Invested','Change','Date'], table);
+}
+
+// Admin-only: RM-wise split of AUM increases/decreases.
+function showMfAumRmSplit(){
+  const rows = window.__mfAumRows || [];
+  const changed = rows.filter(c=>c.invested_change_amt);
+  const rmMap = {};
+  changed.forEach(c=>{
+    const rm = c.rm || '— (no RM)';
+    if(!rmMap[rm]) rmMap[rm] = {inc:0, dec:0, incAmt:0, decAmt:0};
+    if(c.invested_change_amt>0){ rmMap[rm].inc++; rmMap[rm].incAmt+=c.invested_change_amt; }
+    else { rmMap[rm].dec++; rmMap[rm].decAmt+=Math.abs(c.invested_change_amt); }
+  });
+  const table = Object.entries(rmMap).map(([rm,v])=>{
+    const rmCell = rm==='— (no RM)' ? rm : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="closeModal('reportModal');showMfAumList()">${escapeHtml(rm)}</span>`;
+    return [rmCell, v.inc, '₹'+fmtNum(v.incAmt), v.dec, '₹'+fmtNum(v.decAmt)];
+  }).sort((a,b)=>(b[1]+b[3])-(a[1]+a[3]));
+  if(!table.length){ toast('Abhi koi Invested Amount change record nahi hai','info'); return; }
+  showReport('📈 MF Invested Amount Changes — RM-wise', ['RM','Increased','Increase Amt','Decreased','Decrease Amt'], table);
+}
+
 function refreshDash(){
   const eq = getMyEqClients();
   const activeEq = getActiveEqClients();
@@ -2321,6 +2391,7 @@ function refreshDash(){
 
   // Active/Inactive daily trend (1-saal se trade nahi kiya = Inactive)
   if(hasEq) renderEqActivityTrend(activeEq);
+  if(hasMf) renderMfAumTrend();
 
   // No-call alerts (Equity)
   const noCallEq = activeEq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
@@ -10540,6 +10611,15 @@ async function doImport(){
         ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
         if(row.mobile && !ex.mobile) ex.mobile = mob10(row.mobile); // mobile mile aur khaali ho to bhar do
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
+        {
+          const oldInv = parseFloat(ex.aum_detail && ex.aum_detail.inv)||0;
+          const newInv = parseFloat(row.inv_amt)||0;
+          if(oldInv !== newInv && ex.aum_detail){   // don't log the very first Invested Amount a client ever gets
+            ex.prev_invested = oldInv;
+            ex.invested_change_amt = newInv - oldInv;
+            ex.invested_change_date = today();
+          }
+        }
         ex.aum_detail = _aumDetail(row);
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
         if(sipInfo.sip_count) ex.sip_count = sipInfo.sip_count;
