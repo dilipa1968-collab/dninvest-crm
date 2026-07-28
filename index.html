@@ -1078,6 +1078,129 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   #bcPrintView .pv-seg-table td.pv-net-cell.pv-loss{ color:var(--red); font-weight:800; }
 }
 </style>
+<style id="mobile-polish-v3">
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE POLISH v3 — extra breathing room + consistent sizing on phones.
+   Layered on top of mobile-boost; only refines spacing/scale, no logic.
+   Breakpoints: 800 (tablet/phone), 640 (large phone), 480 (phone), 380 (small phone)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@media(max-width:800px){
+  /* Login screen — comfortable full-width card, less wasted margin */
+  .login-box{width:100%;max-width:380px;padding:36px 26px 28px;border-radius:18px;}
+  .login-logo-img{width:88px;height:88px;}
+  .login-logo .brand{font-size:1.7rem;}
+
+  /* Page header — stack title + actions cleanly */
+  .page-hdr{gap:10px;margin-bottom:12px;}
+  .page-title{font-size:1.02rem;}
+  .page-title span{display:block;margin-left:0;margin-top:2px;font-size:.76rem;}
+  .hdr-actions .btn{font-size:.74rem;padding:8px 10px;}
+
+  /* Stat / dashboard grids — evenly sized tiles, no cramped overflow */
+  .stats-row{grid-template-columns:repeat(auto-fit,minmax(46%,1fr));}
+  .stat-card{padding:12px 13px;border-radius:12px;}
+  .stat-l{font-size:.63rem;}
+  .dash-grid{grid-template-columns:1fr 1fr;gap:8px;}
+  .report-grid{grid-template-columns:repeat(auto-fill,minmax(46%,1fr));gap:10px;}
+  .report-card{padding:14px;}
+  .report-card .r-icon{font-size:1.4rem;margin-bottom:6px;}
+
+  /* Cards / panels — tighter, consistent padding everywhere */
+  .dash-card{padding:10px 12px;border-radius:12px;}
+  .ann-card{padding:14px;border-radius:12px;margin-bottom:14px;}
+  .user-card{padding:14px 16px;border-radius:12px;flex-wrap:wrap;gap:10px;}
+  .call-log-item{padding:10px 12px;}
+
+  /* Forms — single column, larger tap-friendly fields already ~42px via mobile-boost */
+  .form-field{margin-bottom:2px;}
+  .form-field label{font-size:.68rem;}
+  .modal-hdr{padding:12px 16px;border-radius:0;}
+  .modal-hdr h3{font-size:.92rem;}
+  .modal-body{padding:12px 16px;}
+  .modal-footer{padding:10px 16px;flex-wrap:wrap;}
+  .modal-footer .btn{flex:1;justify-content:center;min-width:120px;}
+
+  /* Tabs — scrollable row instead of squeezing/wrapping oddly */
+  .tab-bar{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tab-bar::-webkit-scrollbar{display:none;}
+  .tab-item{padding:9px 13px;font-size:.78rem;flex-shrink:0;}
+  .op-tab-btn{padding:7px 12px;font-size:.75rem;}
+
+  /* Pagination — comfy wrap, no tiny targets */
+  .pagination{gap:6px;padding:10px 4px;}
+  .pg-btn{padding:7px 11px;min-width:34px;}
+
+  /* Messaging bubbles — a touch wider on narrow screens for readability */
+  .msg-bubble{max-width:90%;font-size:.82rem;}
+
+  /* Report / user avatar sizing consistent with tighter card padding */
+  .user-avatar{width:36px;height:36px;font-size:.9rem;margin-right:10px;}
+}
+
+@media(max-width:640px){
+  .content{padding:10px 10px calc(72px + env(safe-area-inset-bottom));}
+  .page-title{font-size:.96rem;}
+  .stats-row{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .stat-card{padding:11px 12px;}
+  .dash-grid{grid-template-columns:1fr;}
+  .report-grid{grid-template-columns:1fr 1fr;}
+  .ma-board{gap:12px;}
+  .ann-imgwrap img{max-width:100%;height:auto;}
+  .filters{border-radius:12px;}
+  .tbl-wrap{border-radius:12px;}
+  .stat-card{border-radius:12px;}
+  #announcementPopup .modal{width:100%;}
+  .rm-tab-bar{gap:2px;}
+  .rm-tab-btn{padding:6px 10px;font-size:.76rem;}
+}
+
+@media(max-width:480px){
+  /* Phone-sized screens — one clean column everywhere, roomy touch spacing */
+  .login-box{padding:30px 20px 24px;}
+  .stats-row{grid-template-columns:1fr 1fr;gap:7px;}
+  .stat-card{padding:10px 11px;border-radius:11px;}
+  .stat-l{font-size:.6rem;}
+  .report-grid{grid-template-columns:1fr;}
+  .page-hdr{margin-bottom:10px;}
+  .hdr-actions{gap:6px;}
+  .hdr-actions .btn{font-size:.72rem;padding:8px 8px;}
+  .filters{gap:6px;padding:9px;}
+  .filters input[type=text]{min-width:0;}
+  .modal{border-radius:0;}
+  .modal-hdr h3{font-size:.88rem;}
+  table{font-size:.68rem;}
+  thead th{font-size:.6rem;padding:7px 5px;}
+  tbody td{padding:6px 5px;}
+  .ma-item-text{font-size:.8rem;}
+  .user-card{padding:12px 14px;}
+  .call-log-item{padding:9px 11px;font-size:.9rem;}
+  .badge{padding:2px 7px;font-size:.62rem;}
+  .mnav-item{font-size:.56rem;padding:6px 2px 5px;}
+  .mnav-item .mi{font-size:1.05rem;}
+}
+
+@media(max-width:380px){
+  /* Very small phones — squeeze without breaking layout or truncating amounts */
+  .stats-row{grid-template-columns:1fr 1fr;gap:6px;}
+  .stat-card{padding:9px 10px;}
+  .stat-n{font-size:clamp(1rem,5.6vw,1.3rem);}
+  .topbar-brand{font-size:.82rem;}
+  .content{padding:8px 8px calc(70px + env(safe-area-inset-bottom));}
+  .hdr-actions .btn{padding:7px 7px;font-size:.68rem;}
+  .modal-body{padding:10px 12px;}
+  .form-field input,.form-field select,.form-field textarea{padding:5px 8px;}
+  .op-tab-btn{padding:6px 10px;font-size:.72rem;}
+}
+
+/* Landscape phones — reclaim vertical space from the bottom nav + tables */
+@media(max-width:900px) and (orientation:landscape){
+  .mnav-item{padding:4px 2px 4px;font-size:.55rem;}
+  .mnav-item .mi{font-size:.95rem;}
+  .content{padding-bottom:52px;}
+  .tbl-scroll{max-height:calc(100vh - 150px);}
+}
+</style>
 </head>
 <body>
 
