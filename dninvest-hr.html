@@ -2095,6 +2095,28 @@ async function doLogout(){
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
     if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp();return;}
   }catch{}
+
+  // Auto-login: CRM passes ?autologin=<token> when opening HR from the HR button.
+  // Token is stored in localStorage by CRM before opening HR, valid for 30 seconds.
+  try{
+    const params=new URLSearchParams(window.location.search);
+    const token=params.get('autologin');
+    if(token){
+      const stored=JSON.parse(localStorage.getItem('dnihr_autologin_token')||'null');
+      if(stored && stored.token===token && Date.now()-stored.at < 30000){
+        // Valid token from CRM — find this user in EMPLOYEES list and log them in directly.
+        const empName = stored.name || '';
+        const empIsAdmin = stored.isAdmin || false;
+        localStorage.removeItem('dnihr_autologin_token'); // use once
+        if(empName){
+          currentUser=empName; isAdmin=empIsAdmin;
+          startApp(); return;
+        }
+      }
+      localStorage.removeItem('dnihr_autologin_token');
+    }
+  }catch{}
+
   // Pre-fill username if opened from CRM with ?u=username
   try{
     const params=new URLSearchParams(window.location.search);

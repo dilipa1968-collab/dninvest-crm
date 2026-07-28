@@ -1004,7 +1004,24 @@ async function recordHrAttendanceOnCrmLogin(user){
 // we can't auto-login across tabs, but this saves the username step).
 function openHrPortal(){
   if(!CU || !CU.username){ alert('Please login first'); return; }
-  window.open('dninvest-hr.html?u='+encodeURIComponent(CU.username), '_blank');
+  // Generate a one-time token valid for 30 seconds — HR reads it and auto-logs-in
+  // without asking for a password again (since the user already authenticated in CRM).
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const hrName = (()=>{
+    const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+    const raw = String(CU.name||CU.username||'').trim();
+    return HR_NAMES.find(n=>
+      n.toLowerCase()===raw.toLowerCase() ||
+      n.toLowerCase()===raw.split(' ')[0].toLowerCase() ||
+      n.toLowerCase()===String(CU.username||'').toLowerCase()
+    ) || raw;
+  })();
+  try{
+    localStorage.setItem('dnihr_autologin_token', JSON.stringify({
+      token, name:hrName, isAdmin:(CU.role==='admin'), at:Date.now()
+    }));
+  }catch(e){}
+  window.open('dninvest-hr.html?autologin='+token+'&u='+encodeURIComponent(CU.username), '_blank');
 }
 
 function doLogout(){
