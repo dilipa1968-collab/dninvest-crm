@@ -1,4 +1,3 @@
-
 // ══════════════════════════════════════════
 // GLOBAL AUTO-UPPERCASE
 // Whatever anyone types into any text field or textarea across the whole CRM
@@ -12119,4 +12118,3 @@ window.checkFollowups = function(){
     });
   });
 })();
-
