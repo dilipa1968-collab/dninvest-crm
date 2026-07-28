@@ -236,7 +236,7 @@ const DB = {
   // bharta hai jo isi browser/device se save hue hon — agar RM kal kisi doosre
   // device se login kiya tha ya cache clear ho gaya, toh yahan "kal" ka data
   // dikhega hi nahi chahe Firestore me maujood ho. Ye ek-baar-per-session
-  // Firestore se poora shared doc khींch kar local cache ko top-up karta hai
+  // Firestore se poora shared doc fetchch kar local cache ko top-up karta hai
   // taaki "vs yesterday" kisi bhi device pe sahi dikhe.
   async fetchEqActivitySnapshots(){
     if(typeof fdb==='undefined') return null;
@@ -2548,7 +2548,7 @@ function refreshDash(){
           ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All Pending (${_bdayQueue.length}) — opens one by one</button>`
           : '';
         const doneBar = (bdays.length && _nSent===bdays.length)
-          ? `<div style="background:#dcfce7;color:#166534;font-size:.78rem;font-weight:800;padding:7px;border-radius:9px;margin-bottom:10px;text-align:center">✅ Aaj ke sabhi ${bdays.length} birthday wish ho gaye</div>`
+          ? `<div style="background:#dcfce7;color:#166534;font-size:.78rem;font-weight:800;padding:7px;border-radius:9px;margin-bottom:10px;text-align:center">✅ All ${bdays.length} birthday wishes for today have been sent</div>`
           : '';
         return doneBar + wishAll + rowsHtml;
       })()

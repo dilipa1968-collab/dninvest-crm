@@ -1289,16 +1289,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="dash-card"><h3>🎂 Today's Birthdays <span id="bdayHeadCount" style="background:#e11d8f;color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayBirthday"></div></div>
         </div>
 
-        <div class="dash-section-hdr" style="background:linear-gradient(90deg,#7a1f1f,#a83232)">⚠️ ALERTS</div>
-        <div class="dash-grid">
-          <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
-          <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
-          <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
-          <div class="dash-card collapsible admin-only" id="mfAuditCard" style="display:none">
-            <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
-            <div class="dc-body"><div id="mfAuditTable"></div></div>
-          </div>
-        </div>
+        <!-- Hidden containers kept for JS compatibility — alerts still rendered but not shown on dashboard -->
+        <div style="display:none"><div id="noTradeAlert"></div><div id="noCallEqAlert"></div><div id="noCallMfAlert"></div><div id="mfAuditTable"></div></div>
 
 
 
@@ -1449,7 +1441,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="sqExport()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-sq" id="sq-clrbtn" style="display:none" onclick="sqClear()">🗑️ Clear</button>
-            <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" title="Har office ki file alag-alag upload kar sakte hain — data merge hoga, mitega nahi" onclick="document.getElementById('sq-file').click()">⬆️ Upload File (Merge)</button>
+            <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" title="Each branch's file can be uploaded separately — data will be merged, not overwritten" onclick="document.getElementById('sq-file').click()">⬆️ Upload File (Merge)</button>
             <input type="file" id="sq-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sqUpload(this)">
           </div>
         </div>
@@ -1849,8 +1841,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
 
         <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.82rem">
-          ⚠️ <b>Delete permanent hai.</b> Pehle <b>Users &amp; Settings → Download Full Backup</b> le lijiye.
-          Har group me kam se kam <b>1 record</b> rehna zaruri hai — sabko ek saath delete nahi kar sakte.
+          ⚠️ <b>Deletion is permanent.</b> Please take a <b>Users &amp; Settings → Download Full Backup</b> first.
+          At least <b>1 record</b> must remain in each group — you cannot delete all of them at once.
         </div>
 
         <div class="tab-bar">
@@ -2143,7 +2135,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
         <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
           <h3 style="margin:0 0 6px">🔒 Call Date Lock (for RMs)</h3>
-          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">RM ke Follow-up form me <b>Last Call</b> aur <b>Next Call</b> date ki limit set karo. Isse pehle ya iske baad ki date RM daal nahi payega. Blank chhodo = us taraf koi limit nahi. (Admin par koi limit nahi lagti.)</p>
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Set date limits for <b>Last Call</b> and <b>Next Call</b> in the RM's follow-up form. Dates before or after these limits RM daal nahi payega. Blank chhodo = us taraf koi limit nahi. (Admin par koi limit nahi lagti.)</p>
 
           <div style="display:flex;gap:8px;margin:0 0 14px;background:#f1f5f9;padding:4px;border-radius:10px;width:fit-content">
             <button type="button" id="cl-tab-rolling" class="btn" style="border:0;padding:7px 14px;border-radius:8px;font-size:.82rem" onclick="setCallLimitMode('rolling')">🔄 Rolling (auto)</button>
@@ -2153,8 +2145,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <!-- ROLLING MODE -->
           <div id="cl-pane-rolling" style="display:none;flex-direction:column;gap:14px">
             <p style="margin:0;font-size:.8rem;color:var(--gray);background:#ecfdf5;border-left:3px solid #10b981;padding:8px 10px;border-radius:6px">
-              ✅ <b>Rolling mode:</b> limit har roz <b>khud aage khisak jati hai</b> — daily click karne ki zarurat nahi. Neeche <b>aaj se kitne din</b> ka gap allow karna hai wo daalo. Blank = us taraf koi limit nahi.
-              <br>Example: <b>-7</b> = 7 din pehle tak · <b>0</b> = aaj · <b>90</b> = aaj se 90 din baad tak.
+              ✅ <b>Rolling mode:</b> the limit <b>automatically shifts forward every day</b> — no need to click daily. Enter below how many days' gap to allow from today. Blank = no limit in that direction.
+              <br>Example: <b>-7</b> = up to 7 days ago · <b>0</b> = today · <b>90</b> = up to 90 days from today.
             </p>
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
@@ -2162,14 +2154,14 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
                 <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se kam se kam (din)
                   <input type="number" id="cl-r-lc-min" placeholder="blank = no limit" style="padding:6px;width:150px"></label>
                 <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se zyada se zyada (din)
-                  <input type="number" id="cl-r-lc-max" placeholder="0 = aaj tak" style="padding:6px;width:150px"></label>
+                  <input type="number" id="cl-r-lc-max" placeholder="0 = today" style="padding:6px;width:150px"></label>
               </div>
             </div>
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
                 <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se kam se kam (din)
-                  <input type="number" id="cl-r-nc-min" placeholder="0 = aaj se" style="padding:6px;width:150px"></label>
+                  <input type="number" id="cl-r-nc-min" placeholder="0 = from today" style="padding:6px;width:150px"></label>
                 <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se zyada se zyada (din)
                   <input type="number" id="cl-r-nc-max" placeholder="90 = +3 mahine" style="padding:6px;width:150px"></label>
               </div>
@@ -2182,29 +2174,29 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse pehle nahi (earliest)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not before (earliest)
                   <input type="date" id="cl-lc-min" style="padding:6px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse baad nahi (latest)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not after (latest)
                   <input type="date" id="cl-lc-max" style="padding:6px"></label>
               </div>
             </div>
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse pehle nahi (earliest)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not before (earliest)
                   <input type="date" id="cl-nc-min" style="padding:6px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Isse baad nahi (latest)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not after (latest)
                   <input type="date" id="cl-nc-max" style="padding:6px"></label>
               </div>
             </div>
             <p style="margin:0;font-size:.8rem;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:6px">
-              ⚠️ <b>Fixed mode:</b> ye dates <b>freeze</b> rehti hain — apne aap aage nahi badhti. Rolling limit chahiye to upar "Rolling (auto)" chuno.
+              ⚠️ <b>Fixed mode:</b> these dates <b>stay fixed</b> — they don't advance automatically. For auto-shifting limits, choose "Rolling (auto)" above.
             </p>
           </div>
 
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
             <button class="btn btn-primary" onclick="saveCallLimits()">💾 Save Limits</button>
-            <button class="btn btn-outline" onclick="resetCallLimits()" title="Rolling default wapas: Last Call aaj tak, Next Call aaj se +3 mahine">↩️ Reset to Default</button>
+            <button class="btn btn-outline" onclick="resetCallLimits()" title="Reset to rolling default: Last Call up to today, Next Call up to +3 months from today">↩️ Reset to Default</button>
             <button class="btn btn-outline" onclick="clearCallLimits()">✖ Clear All (no limit)</button>
           </div>
         </div>
@@ -2818,7 +2810,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   </div>
 </div>
 
-<!-- Followup Alert Popup (login ke baad RM ko dikhta hai) -->
+<!-- Follow-up Alert Popup (shown to RM after login) -->
 <div class="modal-overlay" id="followupAlertPopup">
   <div class="modal" style="max-width:480px">
     <div class="modal-hdr">
@@ -2979,7 +2971,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Ek hi Excel upload kijiye. <b>Client Code</b> zaroori hai; uske saath <b>RM</b>, <b>PAN</b>, <b>DOB</b> me se jo bhi column milega <b>sirf wahi update</b> hoga — baaki kuch (Asset Value, Status, Mobile, Remarks) touch nahi hoga. <b>Naye client add nahi honge.</b>
+        Upload a single Excel file. <b>Client Code</b> is required; only the columns present alongside it (<b>RM</b>, <b>PAN</b>, <b>DOB</b>) will be updated — nothing else (Asset Value, Status, Mobile, Remarks) touch nahi hoga. <b>Naye client add nahi honge.</b>
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
         Header names flexible hain (auto-detect): <b>Client Code</b> + koi bhi ek ya zyada me se — <b>New RM / RM / Dealer</b>, <b>PAN</b>, <b>DOB / Date of Birth</b>. Baaki saare columns ignore.<br>

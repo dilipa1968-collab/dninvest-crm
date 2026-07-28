@@ -616,8 +616,8 @@ const DUP = {
     const rec = (DB.get(key)||[]).find(c=>c.id===id);
     if(!rec) return;
     const bad = this._wouldEmpty(seg, new Set([id]));
-    if(bad.length){ toast('Ye group ka aakhri record hai — delete nahi kar sakte','error'); return; }
-    if(!confirm(`Delete "${rec.name}"?\n\n${seg==='eq'?'Code':'PAN'}: ${seg==='eq'?rec.code:rec.pan}\nRM: ${rec.rm||'—'}\n\nYe permanent hai.`)) return;
+    if(bad.length){ toast('This is the last record in the group — cannot delete it','error'); return; }
+    if(!confirm(`Delete "${rec.name}"?\n\n${seg==='eq'?'Code':'PAN'}: ${seg==='eq'?rec.code:rec.pan}\nRM: ${rec.rm||'—'}\n\nThis is permanent.`)) return;
     await DB.deleteClient(key, id);
     DB.addActivityLog({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf', client_id:id,
       client_name:rec.name, rm:rec.rm, by:CU.name, date:new Date().toISOString(),
@@ -632,12 +632,12 @@ const DUP = {
     if(!ids.size) return;
     const bad = this._wouldEmpty(seg, ids);
     if(bad.length){
-      toast(`${bad.length} group me saare records selected hain — har group me 1 rakhna zaruri hai`,'error');
+      toast(`${bad.length} group(s) have all records selected — at least 1 must be kept per group`,'error');
       return;
     }
     const list = DB.get(key)||[];
     const recs = list.filter(c=>ids.has(c.id));
-    if(!confirm(`${recs.length} records DELETE karein?\n\nYe permanent hai aur wapas nahi aayega.\nBackup liya hai na?`)) return;
+    if(!confirm(`${recs.length} records will be DELETED?\n\nThis is permanent and cannot be undone.\nHave you taken a backup?`)) return;
     await DB.deleteClientsBulk(key, [...ids]);
     DB.addActivityLog(recs.map(r=>({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf',
       client_id:r.id, client_name:r.name, rm:r.rm, by:CU.name, date:new Date().toISOString(),
@@ -650,7 +650,7 @@ const DUP = {
   },
 
   export(){
-    if(typeof XLSX==='undefined'){ toast('Excel library load nahi hui','error'); return; }
+    if(typeof XLSX==='undefined'){ toast('Excel library could not be loaded','error'); return; }
     const wb = XLSX.utils.book_new();
     let any = false;
     [['eq','Client Code','EQ dup CODE'],['mf','PAN','MF dup PAN']].forEach(([seg,label,sheet])=>{
@@ -663,7 +663,7 @@ const DUP = {
       });
       if(rows.length){ XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet); any = true; }
     });
-    if(!any){ toast('Koi duplicate nahi — export ke liye kuch nahi','error'); return; }
+    if(!any){ toast('No duplicates found — nothing to export','error'); return; }
     XLSX.writeFile(wb, 'duplicates_'+today()+'.xlsx');
     toast('Excel download ho gayi','success');
   }
@@ -1370,7 +1370,7 @@ const BULK = {
     if(!newRm){ toast('Choose an RM first','error'); return; }
     const recs=this._selRecords(seg);
     const change=recs.filter(c=>(c.rm||'').trim().toLowerCase()!==newRm.toLowerCase());
-    if(!change.length){ toast('In sabhi ka RM already '+newRm+' hai','error'); return; }
+    if(!change.length){ toast('All of these already have RM '+newRm+'','error'); return; }
     this.confirm('Bulk RM Change',
       `<b>${change.length}</b> ${this.LBL[seg]} client(s) will get RM <b>${this._esc(newRm)}</b>.`
       + (recs.length-change.length?`<br><span style="color:var(--gray)">${recs.length-change.length} already ${this._esc(newRm)} — skip.</span>`:''),
@@ -1688,7 +1688,7 @@ const MFTBULK = {
     const newRm=normRm((document.getElementById('mft-bb-rm')||{value:''}).value.trim());
     if(!newRm){ toast('Choose an RM first','error'); return; }
     const change=recs.filter(e=>(e.rm||'').trim().toLowerCase()!==newRm.toLowerCase());
-    if(!change.length){ toast('In sabka RM already '+newRm+' hai','error'); return; }
+    if(!change.length){ toast('In sabka RM already '+newRm+'','error'); return; }
     BULK.confirm('Bulk RM Re-attribute',
       `<b>${change.length}</b> transaction(s) will get RM <b>${this._esc(newRm)}</b>.`
       + `<br><span style="color:var(--gray)">Only the attribution of these transactions will change — the client&#39;s actual RM stays the same.</span>`
