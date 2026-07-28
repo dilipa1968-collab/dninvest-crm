@@ -1144,7 +1144,7 @@ async function tryAutoLogin(){
           }
         }
         CU = user;
-        CU._loginAt = loginAt || Date.now();
+        CU._loginAt = Number(at)||Date.now();
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').style.display='block';
         initApp();
