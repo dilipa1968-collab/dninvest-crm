@@ -2294,24 +2294,24 @@ function renderMfAumTrend(){
     ? `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
     : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
   el.innerHTML = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="flex:1;min-width:100px;background:#eef3fc;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔵 TOTAL INVESTED AMOUNT</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--blue);line-height:1.15">₹${fmtNum(totalInvested)}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="flex:1;min-width:110px;background:#eef3fc;border-radius:12px;padding:8px 12px;box-shadow:0 1px 4px rgba(10,20,50,.06)">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔵 TOTAL INVESTED AMOUNT</div>
+        <div style="font-size:1.2rem;font-weight:900;color:var(--blue);line-height:1.2">₹${fmtNum(totalInvested)}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
       </div>
-      <div style="flex:1;min-width:100px;background:#f0fdf4;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🟢 ADDITIONS</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--green);line-height:1.15">${increased.length}</div>
+      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:12px;padding:8px 12px;box-shadow:0 1px 4px rgba(10,20,50,.06)">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 ADDITIONS</div>
+        <div style="font-size:1.2rem;font-weight:900;color:var(--green);line-height:1.2">${increased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
       </div>
-      <div style="flex:1;min-width:100px;background:#fef2f2;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔴 REDEMPTIONS</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--red);line-height:1.15">${decreased.length}</div>
+      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:12px;padding:8px 12px;box-shadow:0 1px 4px rgba(10,20,50,.06)">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 REDEMPTIONS</div>
+        <div style="font-size:1.2rem;font-weight:900;color:var(--red);line-height:1.2">${decreased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
       </div>
     </div>
-    <p style="color:var(--gray);font-size:.6rem;margin-top:3px;text-align:center">${footerNote}</p>`;
+    <p style="color:var(--gray);font-size:.62rem;margin-top:5px;text-align:center">${footerNote}</p>`;
 }
 
 // Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
@@ -2710,19 +2710,19 @@ function renderEqActivityTrend(activeEq){
     : `📅 ${fmtDate(td)} · click card for full date-wise history`;
 
   el.innerHTML = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="flex:1;min-width:100px;background:#f0fdf4;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🟢 ACTIVE (traded within 1yr)</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--green);line-height:1.15">${nActive}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:12px;padding:8px 12px;box-shadow:0 1px 4px rgba(10,20,50,.06)">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 ACTIVE (traded within 1yr)</div>
+        <div style="font-size:1.3rem;font-weight:900;color:var(--green);line-height:1.2">${nActive}</div>
         ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
       </div>
-      <div style="flex:1;min-width:100px;background:#fef2f2;border-radius:8px;padding:3px 7px">
-        <div style="font-size:.6rem;color:var(--gray);font-weight:700">🔴 INACTIVE (1yr+ / never traded)</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--red);line-height:1.15">${nInactive}</div>
+      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:12px;padding:8px 12px;box-shadow:0 1px 4px rgba(10,20,50,.06)">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 INACTIVE (1yr+ / never traded)</div>
+        <div style="font-size:1.3rem;font-weight:900;color:var(--red);line-height:1.2">${nInactive}</div>
         ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
       </div>
     </div>
-    <p style="color:var(--gray);font-size:.6rem;margin-top:3px;text-align:center">${footerNote}</p>`;
+    <p style="color:var(--gray);font-size:.62rem;margin-top:5px;text-align:center">${footerNote}</p>`;
 
   // Save today's TRUE (unfiltered) snapshot (fire-and-forget — don't block
   // the dashboard render, and don't let an admin's RM filter overwrite it).
