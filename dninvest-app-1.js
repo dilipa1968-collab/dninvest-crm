@@ -2315,6 +2315,18 @@ function showMfAumRmSplit(){
   showReport('📈 MF Invested Amount Changes — RM-wise', ['RM','Additions','Addition Amt','Redemptions','Redemption Amt'], table);
 }
 
+// Generic Show More / Show Less toggle — reusable by any dashboard list card.
+// extraId = the hidden container holding the extra rows, btnWrapId = the wrapper holding the toggle button.
+function dashShowMoreToggle(extraId, btnWrapId, extraCount){
+  const extra = document.getElementById(extraId);
+  const wrap = document.getElementById(btnWrapId);
+  if(!extra || !wrap) return;
+  const btn = wrap.querySelector('button');
+  const isHidden = extra.style.display==='none';
+  extra.style.display = isHidden ? '' : 'none';
+  if(btn) btn.textContent = isHidden ? '▲ Show Less' : `▼ Show ${extraCount} More`;
+}
+
 function refreshDash(){
   const eq = getMyEqClients();
   const activeEq = getActiveEqClients();
@@ -2438,16 +2450,22 @@ function refreshDash(){
   const segCls = s=>s==='EQ'?'b-eq':s==='MF'?'b-mf':s==='Lead'?'b-lead':'b-op';
   const fuHeadEl=document.getElementById('fuHeadCount');
   if(fuHeadEl){fuHeadEl.textContent=fuAll.length>0?fuAll.length:'';fuHeadEl.style.display=fuAll.length>0?'':'none';}
+  const FU_LIMIT = 8;
+  const fuRowsHtml = fuAll.map(c=>{
+    const isOverdue = c.next_call < tdStr;
+    return `<div class="bar-row" style="border-left:3px solid ${isOverdue?'var(--red)':'transparent'};padding-left:9px;">
+      <span class="bar-name">${escapeHtml(c.name||'—')}</span>
+      <span class="badge ${segCls(c.seg)}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
+      <span style="font-size:.72rem;color:${isOverdue?'var(--red)':'var(--gray)'};margin-right:4px;font-weight:${isOverdue?'700':'400'}">${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
+      <span style="font-size:.72rem;color:var(--gray);margin-left:auto">${escapeHtml(c.rm||'')}</span>
+    </div>`;
+  });
   document.getElementById('todayFollowup').innerHTML = fuAll.length
-    ? fuAll.map(c=>{
-        const isOverdue = c.next_call < tdStr;
-        return `<div class="bar-row" style="border-left:3px solid ${isOverdue?'var(--red)':'transparent'};padding-left:9px;">
-          <span class="bar-name">${escapeHtml(c.name||'—')}</span>
-          <span class="badge ${segCls(c.seg)}" style="margin:0 6px;flex-shrink:0">${c.seg}</span>
-          <span style="font-size:.72rem;color:${isOverdue?'var(--red)':'var(--gray)'};margin-right:4px;font-weight:${isOverdue?'700':'400'}">${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
-          <span style="font-size:.72rem;color:var(--gray);margin-left:auto">${escapeHtml(c.rm||'')}</span>
-        </div>`;
-      }).join('')
+    ? fuRowsHtml.slice(0,FU_LIMIT).join('')
+      + (fuAll.length>FU_LIMIT ? `<div id="fuExtra" style="display:none">${fuRowsHtml.slice(FU_LIMIT).join('')}</div>
+         <div id="fuMoreWrap" style="text-align:center;margin-top:6px">
+           <button onclick="dashShowMoreToggle('fuExtra','fuMoreWrap',${fuAll.length-FU_LIMIT})" style="background:none;border:1.5px solid var(--border);border-radius:20px;padding:4px 16px;font-size:.72rem;font-weight:700;color:var(--navy);cursor:pointer">▼ Show ${fuAll.length-FU_LIMIT} More</button>
+         </div>` : '')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No pending follow-ups</p>';
 
   // ── 🎂 Today's Birthdays (match dob month+day with today) ──
