@@ -1269,6 +1269,7 @@ function getAtt(){ return DB.get('attendance', {}) || {}; }
 async function saveAttRecord(name, record){ await DB.setAttendanceRecord(name, record); }
 function getHolidays(){ return DB.get('holidays', []) || []; }
 async function saveHolidays(d){ await DB.set('holidays', d); }
+function weekdayShort(dateStr){ const names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; return names[new Date(dateStr+'T00:00:00').getDay()]; }
 function isSunday(dateStr){ return new Date(dateStr+'T00:00:00').getDay()===0; }
 function isSaturday(dateStr){ return new Date(dateStr+'T00:00:00').getDay()===6; }
 function isWeekend(dateStr){ const d=new Date(dateStr+'T00:00:00').getDay(); return d===0||d===6; }
@@ -1752,17 +1753,6 @@ function daysBetween(f,t){
 }
 
 // ─── LOGIN ──────────────────────────────────────────────────────────────────
-// Set ADMIN_AUTOLOGIN=false to turn this off again — everything else keeps
-// working as before. Must match the CRM's admin username/password.
-const ADMIN_AUTOLOGIN = true;
-const ADMIN_AUTOLOGIN_USERNAME = 'admin';
-const ADMIN_AUTOLOGIN_PASSWORD = 'Admin@123';
-function prefillAdminLoginFields(){
-  if(!ADMIN_AUTOLOGIN) return;
-  const ln=document.getElementById('login-name'), lp=document.getElementById('login-pass');
-  if(ln) ln.value = ADMIN_AUTOLOGIN_USERNAME;
-  if(lp) lp.value = ADMIN_AUTOLOGIN_PASSWORD;
-}
 document.getElementById('login-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('login-name').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
 document.getElementById('login-name').addEventListener('blur', ()=>{ if(typeof updateOfficeStatusBanner==='function') updateOfficeStatusBanner(); });
@@ -2101,10 +2091,7 @@ async function doLogout(){
 }
 
 // Check persisted session
-(async function(){
-  // Fill Admin's credentials into the login boxes right away (visible even
-  // if none of the auto-login paths below end up firing).
-  prefillAdminLoginFields();
+(function(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
     if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp();return;}
@@ -2140,17 +2127,6 @@ async function doLogout(){
       if(nameField){ nameField.value=u; document.getElementById('login-pass').focus(); }
     }
   }catch{}
-
-  // No saved session and no valid CRM autologin token → auto-login straight
-  // in as Admin instead of waiting on the login screen. Only do this if the
-  // username box still says Admin's username (an RM's expired ?u= token
-  // above may have overwritten it — in that case leave it for manual login).
-  if(ADMIN_AUTOLOGIN){
-    const ln=document.getElementById('login-name');
-    if(ln && ln.value===ADMIN_AUTOLOGIN_USERNAME){
-      try{ await doLogin(); }catch(e){}
-    }
-  }
 })();
 
 // Show office-hours status banner on the login screen (RM-only restriction).
@@ -3340,14 +3316,14 @@ function renderLeavePage(){
     if(upcoming.length){
       html+='<tr><td colspan="3" style="padding:8px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Upcoming exchange holidays</td></tr>';
       upcoming.forEach(h=>{
-        html+=`<tr><td style="padding:4px 0">${h.date}</td><td style="padding:4px 0">${h.name}</td>`;
+        html+=`<tr><td style="padding:4px 0;white-space:nowrap">${h.date} <span style="color:var(--text3)">(${weekdayShort(h.date)})</span></td><td style="padding:4px 0">${h.name}</td>`;
         html+= isAdmin ? `<td style="text-align:right"><button class="btn btn-sm btn-danger" onclick="removeHoliday('${h.date}')">Remove</button></td></tr>` : `<td></td></tr>`;
       });
     }
     if(past.length){
       html+='<tr><td colspan="3" style="padding:8px 0 4px;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase">Past holidays</td></tr>';
       past.slice(-5).reverse().forEach(h=>{
-        html+=`<tr><td style="padding:4px 0;color:var(--text3)">${h.date}</td><td style="padding:4px 0;color:var(--text3)">${h.name}</td><td></td></tr>`;
+        html+=`<tr><td style="padding:4px 0;color:var(--text3);white-space:nowrap">${h.date} <span>(${weekdayShort(h.date)})</span></td><td style="padding:4px 0;color:var(--text3)">${h.name}</td><td></td></tr>`;
       });
     }
     html+='</table>';
