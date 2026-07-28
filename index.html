@@ -176,13 +176,13 @@ window.dnXlsx = function(filename, title, columns, rows, totalRow){
 
 :root{
   --navy:#0f1f3d;--navy2:#162b54;--navy3:#1e3a6e;
-  --gold:#c9942a;--gold2:#f5d98a;--gold3:#fdf8ec;
-  --green:#0f7a45;--green2:#eefaf3;
-  --blue:#1a56db;--blue2:#f2f6fd;
-  --red:#c0392b;--red2:#fdf3f1;
-  --teal:#0891b2;--teal2:#e9fafc;
-  --purple:#6d28d9;--purple2:#f2eefd;
-  --orange:#c2600a;--orange2:#fff7ec;
+  --gold:#c9942a;--gold2:#f5d98a;--gold3:#fdf6e3;
+  --green:#0f7a45;--green2:#e3f7ee;
+  --blue:#1a56db;--blue2:#eef3fc;
+  --red:#c0392b;--red2:#fdf0ee;
+  --teal:#0891b2;--teal2:#e0f7fc;
+  --purple:#6d28d9;--purple2:#ede9fe;
+  --orange:#c2600a;--orange2:#fff4e5;
   --bg:#f4f6fa;--white:#fff;
   --border:#e3e8f0;--gray:#5d6e8a;
   --shadow:0 1px 3px rgba(16,30,60,.06);
@@ -532,8 +532,8 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .dash-two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-top:8px;}
 .dash-col{display:flex;flex-direction:column;gap:7px;}
 @media(max-width:820px){.dash-two-col{grid-template-columns:1fr;}}
-.dash-section-hdr{font-weight:800;font-size:.76rem;letter-spacing:.6px;text-transform:uppercase;
-  padding:7px 14px;border-radius:10px;margin:12px 0 7px;box-shadow:0 1px 4px rgba(10,20,50,.06);border:1px solid rgba(10,20,50,.05);}
+.dash-section-hdr{color:#fff;font-weight:800;font-size:.76rem;letter-spacing:.6px;text-transform:uppercase;
+  padding:7px 14px;border-radius:10px;margin:12px 0 7px;box-shadow:0 2px 8px rgba(10,20,50,.12);}
 .dash-card{background:#fff;border-radius:14px;padding:8px 12px;box-shadow:0 2px 12px rgba(10,20,50,.07);border:1px solid rgba(10,20,50,.04);}
 .dash-card h3{font-size:.72rem;color:var(--gray);font-weight:800;text-transform:uppercase;
   letter-spacing:.6px;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
@@ -1253,7 +1253,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
         <div class="dash-two-col">
           <div class="dash-col">
-            <div class="dash-section-hdr" style="background:linear-gradient(90deg,#eef3fc,#f7fafe);color:var(--navy)">📊 EQUITY</div>
+            <div class="dash-section-hdr" style="background:linear-gradient(90deg,var(--navy),var(--navy3))">📊 EQUITY</div>
             <div class="dash-card" style="padding:5px 10px" id="eqActivityCard">
               <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:2px">
                 <h3 style="margin-bottom:0;font-size:.8rem">📊 Trade Activity — Active vs Inactive (1yr no-trade)</h3>
@@ -1270,7 +1270,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
 
           <div class="dash-col">
-            <div class="dash-section-hdr" style="background:linear-gradient(90deg,#e9fafc,#f5fefe);color:#0d5c56">💰 MUTUAL FUND</div>
+            <div class="dash-section-hdr" style="background:linear-gradient(90deg,#0d5c56,#0f7a71)">💰 MUTUAL FUND</div>
             <div class="dash-card" style="padding:5px 10px" id="mfAumCard">
               <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:2px">
                 <h3 style="margin-bottom:0;font-size:.8rem">📈 MF Invested Amount — Increased vs Decreased</h3>
@@ -1289,7 +1289,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="dash-card"><h3>🎂 Today's Birthdays <span id="bdayHeadCount" style="background:#e11d8f;color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayBirthday"></div></div>
         </div>
 
-        <div class="dash-section-hdr" style="background:linear-gradient(90deg,#fdf0ee,#fef7f6);color:#a83232">⚠️ ALERTS</div>
+        <div class="dash-section-hdr" style="background:linear-gradient(90deg,#7a1f1f,#a83232)">⚠️ ALERTS</div>
         <div class="dash-grid">
           <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
           <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
