@@ -10513,14 +10513,22 @@ async function doContactImport(){
   const data = importData.contact;
   if(!data || !data.length) return;
   const existing = DB.get('mf_clients')||[];
-  const byName = {};
-  // Duplicate naam wale investors ko AMBIGUOUS mark karo. Ek hi naam ke kai
-  // alag folios/investors ho sakte hain — unme se kisi ek pe dusre ka mobile/
-  // PAN/DOB chipak jaana galat hai. Aise naamo ko chhod dete hain.
+  const byPanGroup = {};
+  const byNameGroup = {};
+  // PAN is usually unique, but a minor's folio is often registered under their
+  // guardian's PAN — so the SAME PAN can legitimately belong to several client
+  // records (the guardian + each child). Always group by PAN (never assume 1:1),
+  // and use the name to pick the right one within a shared-PAN group.
   existing.forEach(c=>{
+    if(c.pan){
+      const pk = c.pan.trim().toUpperCase();
+      if(!byPanGroup[pk]) byPanGroup[pk] = [];
+      byPanGroup[pk].push(c);
+    }
     if(c.name){
       const nk = c.name.trim().toUpperCase();
-      byName[nk] = (byName[nk] === undefined) ? c : 'AMBIGUOUS';
+      if(!byNameGroup[nk]) byNameGroup[nk] = [];
+      byNameGroup[nk].push(c);
     }
   });
 
@@ -10531,8 +10539,38 @@ async function doContactImport(){
   const ambigNames = new Set();
   data.forEach(row=>{
     const key = row.name.trim().toUpperCase();
-    const ex = byName[key];
-    if(ex === 'AMBIGUOUS'){ ambiguous++; ambigNames.add(row.name.trim()); return; }
+    const rowPan = (row.pan||'').trim().toUpperCase();
+    let ex = null;
+
+    // 1) PAN match — narrow by name too when the PAN is shared (guardian + minors case),
+    // since a child's name still differs from their guardian's/siblings' names.
+    if(rowPan && byPanGroup[rowPan]){
+      const panGroup = byPanGroup[rowPan];
+      if(panGroup.length===1){
+        ex = panGroup[0];
+      } else {
+        const narrowedByName = panGroup.filter(c=>c.name && c.name.trim().toUpperCase()===key);
+        if(narrowedByName.length===1) ex = narrowedByName[0];
+      }
+    }
+
+    // 2) Fall back to name matching if PAN alone didn't resolve it.
+    if(!ex){
+      const group = byNameGroup[key] || [];
+      if(group.length===1){
+        ex = group[0];
+      } else if(group.length>1){
+        // CRM has multiple investors with this exact name — only proceed if this
+        // row's PAN narrows it down to exactly one of them; otherwise stay skipped,
+        // same as before, rather than risk updating the wrong person.
+        if(rowPan){
+          const narrowed = group.filter(c=>c.pan && c.pan.trim().toUpperCase()===rowPan);
+          if(narrowed.length===1) ex = narrowed[0];
+        }
+        if(!ex){ ambiguous++; ambigNames.add(row.name.trim()); return; }
+      }
+    }
+
     if(ex){
       let changed=false;
       if(row.mobile && ex.mobile!==row.mobile){ ex.mobile=row.mobile; changed=true; }
@@ -10553,16 +10591,16 @@ async function doContactImport(){
   closeModal('importModal');
   let cmsg = `✅ Contact info updated! ${updated} updated`;
   if(notFound) cmsg += `, ${notFound} not matched`;
-  if(ambiguous) cmsg += `, ${ambiguous} skip (duplicate naam)`;
+  if(ambiguous) cmsg += `, ${ambiguous} skip (duplicate naam, PAN se bhi nahi mila)`;
   toast(cmsg, 'success');
   renderMfTable(); refreshDash(); updateBadges();
 
-  // Duplicate naam wale rows skip hue — inhe manually update karna padega
+  // Duplicate naam wale rows skip hue (PAN se bhi resolve nahi hue) — inhe manually update karna padega
   if(ambigNames.size){
     setTimeout(()=>{
       showReport(`Duplicate Naam — Skip Kiye (${ambigNames.size} naam / ${ambiguous} rows)`,
         ['#','Naam','Wajah'],
-        [...ambigNames].map((n,i)=>[i+1, n, 'CRM me isi naam ke 1+ investor hain — manually update karein']));
+        [...ambigNames].map((n,i)=>[i+1, n, 'CRM me isi naam ke 1+ investor hain, aur PAN se bhi match confirm nahi hua — manually update karein']));
     }, 600);
   }
 }
