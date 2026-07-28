@@ -2808,10 +2808,30 @@ function showStatusChangeDrilldown(dateStr, rmName){
 // an untracked path). Shortlists Inactive clients whose last trade date is
 // right around the 365-day cutoff — the client that silently crossed over
 // is almost always in this narrow list, so admin/RM can eyeball and confirm.
-function showLikelyStatusFlipCandidates(rmName){
-  const eq = (DB.get('eq_clients')||[]).filter(c=>c.status==='Inactive');
+function showLikelyStatusFlipCandidates(dateStr, dActive, rmName){
   const effectiveRm = rmName || (CU && CU.role!=='admin' ? CU.name : null);
-  const scoped = effectiveRm ? eq.filter(c=>(c.rm||'').trim().toUpperCase()===effectiveRm.trim().toUpperCase()) : eq;
+  const allEq = DB.get('eq_clients')||[];
+  const scopeFilter = c => !effectiveRm || (c.rm||'').trim().toUpperCase()===effectiveRm.trim().toUpperCase();
+
+  // Active count went UP that day — the only way a client flips Inactive→Active on a specific
+  // date is by actually trading that day, so look for an exact last_trade_date match instead of
+  // the "near 365-day threshold" guess (which is for the opposite, became-inactive, direction).
+  if(dActive>0 && dateStr){
+    const rows = allEq.filter(c=>scopeFilter(c) && String(c.last_trade_date||'').slice(0,10)===dateStr)
+      .map(c=>[c.rm||'—', c.code||'', c.name, fmtDate(c.last_trade_date)||'—', c.status||'—']);
+    if(!rows.length){
+      toast('Is date ko trade karne wala koi client record nahi mila — status kisi aur wajah se badla hoga','info');
+      return;
+    }
+    showReport(`🔍 Likely Clients — traded on ${fmtDate(dateStr)} (best guess)`, ['RM','Code','Name','Trade Date','Status'], rows);
+    return;
+  }
+
+  // Active count went DOWN (or unknown direction) — shortlist Inactive clients whose last trade
+  // date is right around the 365-day cutoff, since that's almost always the client who quietly
+  // crossed over.
+  const eq = allEq.filter(c=>c.status==='Inactive');
+  const scoped = eq.filter(scopeFilter);
   const rows = scoped.map(c=>({...c, days:daysDiff(c.last_trade_date)}))
     .filter(c=>c.days!=null && c.days>=EQ_INACTIVE_DAYS+1 && c.days<=EQ_INACTIVE_DAYS+10)
     .sort((a,b)=>a.days-b.days)
@@ -2854,7 +2874,8 @@ function showEqActivityHistory(rmName){
     if(changed.length){
       changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showStatusChangeDrilldown('${r.date}',${rmArg})" title="Click to see client names">${changed.length} client${changed.length>1?'s':''} ▶</span>`;
     } else {
-      changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--orange,#D97706)" onclick="showLikelyStatusFlipCandidates(${rmArg})" title="No log entry for this date — best-guess shortlist of clients near the 1-year no-trade mark">🔍 find</span>`;
+      const dActiveArg = dA==null ? 0 : dA;
+      changedCell = `<span style="text-decoration:underline;cursor:pointer;color:var(--orange,#D97706)" onclick="showLikelyStatusFlipCandidates('${r.date}',${dActiveArg},${rmArg})" title="No log entry for this date — best-guess shortlist of clients">🔍 find</span>`;
     }
     return [fmtDate(r.date), r.active, fmtDiff(dA), r.inactive, fmtDiff(dI), r.total, changedCell];
   });
