@@ -678,6 +678,27 @@ function v(x){ return (x!=null&&x!=='')?x:'—'; }
 document.getElementById('lpwd').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('lusr').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('lpwd').focus(); });
 
+// ── ADMIN AUTO-FILL / AUTO-LOGIN ─────────────────────────────────────────────
+// Set ADMIN_AUTOLOGIN=false below to turn this off again (e.g. before sharing
+// the link with anyone other than Admin) — everything else keeps working as before.
+const ADMIN_AUTOLOGIN = true;
+const ADMIN_AUTOLOGIN_USERNAME = 'admin'; // must match a role:'admin' user's username
+
+// Fills the username/password boxes on the login screen with Admin's own
+// saved password (looked up from Firestore/DB if already synced, else the
+// hardcoded DEFAULT_USERS fallback so the fields are never blank).
+function prefillAdminLoginFields(){
+  if(!ADMIN_AUTOLOGIN) return;
+  try{
+    const users = (typeof DB!=='undefined' && DB.get('users')) || DEFAULT_USERS;
+    const adm = users.find(x=>x.username===ADMIN_AUTOLOGIN_USERNAME && x.role==='admin') || DEFAULT_USERS.find(x=>x.username===ADMIN_AUTOLOGIN_USERNAME);
+    if(!adm) return;
+    const lu=document.getElementById('lusr'), lp=document.getElementById('lpwd');
+    if(lu) lu.value = adm.username;
+    if(lp) lp.value = adm.password;
+  }catch(e){}
+}
+
 // Detects if the current device is a mobile/handheld device using a
 // combination of User-Agent sniffing AND screen width. Both signals are
 // checked together so that e.g. a desktop browser window resized small
@@ -1108,6 +1129,9 @@ async function tryAutoLogin(){
   // Client "player mode" (?play in URL): skip CRM login entirely — the quiz
   // player overlay handles everything. Guard so RM/admin auto-login never runs.
   if(typeof QUIZ!=='undefined' && ((QUIZ.isPlayMode && QUIZ.isPlayMode()) || (QUIZ.isScreenMode && QUIZ.isScreenMode()))) return;
+  // Fill the login boxes with Admin's credentials right away, so they're
+  // never blank while the async work below (Firebase wait, session check) runs.
+  prefillAdminLoginFields();
   // Wait for Firebase to be ready before doing anything — on a slow mobile
   // connection the SDK scripts may not have loaded yet when this fires. Without
   // this, auto-login used to run with fdb undefined → no client sync + skipped
@@ -1174,6 +1198,16 @@ async function tryAutoLogin(){
       }
     }catch(e){}
     localStorage.removeItem('dninvest_session');
+  }
+  // No valid saved session (first visit on this device/browser, or session was
+  // cleared) → auto-login straight in as Admin instead of waiting on the login
+  // screen. Fields are already filled by prefillAdminLoginFields() above, so
+  // this just re-runs the normal doLogin() flow with those same values.
+  if(ADMIN_AUTOLOGIN){
+    const lu=document.getElementById('lusr'), lp=document.getElementById('lpwd');
+    if(lu && lp && lu.value && lp.value){
+      await doLogin();
+    }
   }
 }
 window.addEventListener('DOMContentLoaded', tryAutoLogin);
