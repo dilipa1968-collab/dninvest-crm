@@ -2450,7 +2450,7 @@ function refreshDash(){
   const segCls = s=>s==='EQ'?'b-eq':s==='MF'?'b-mf':s==='Lead'?'b-lead':'b-op';
   const fuHeadEl=document.getElementById('fuHeadCount');
   if(fuHeadEl){fuHeadEl.textContent=fuAll.length>0?fuAll.length:'';fuHeadEl.style.display=fuAll.length>0?'':'none';}
-  const FU_LIMIT = 8;
+  const FU_LIMIT = 5;
   const fuRowsHtml = fuAll.map(c=>{
     const isOverdue = c.next_call < tdStr;
     return `<div class="bar-row" style="border-left:3px solid ${isOverdue?'var(--red)':'transparent'};padding-left:9px;">
@@ -2521,14 +2521,20 @@ function refreshDash(){
             </div>
             <div class="bday-acts">${waBtn}${cardBtn}</div>
           </div>`;
-        }).join('');
+        }); // rows stays an array so we can slice for Show More
+        const BD_LIMIT = 5;
+        const rowsHtml = rows.slice(0,BD_LIMIT).join('')
+          + (rows.length>BD_LIMIT ? `<div id="bdExtra" style="display:none">${rows.slice(BD_LIMIT).join('')}</div>
+             <div id="bdMoreWrap" style="text-align:center;margin-top:6px">
+               <button onclick="dashShowMoreToggle('bdExtra','bdMoreWrap',${rows.length-BD_LIMIT})" style="background:none;border:1.5px solid var(--border);border-radius:20px;padding:4px 16px;font-size:.72rem;font-weight:700;color:var(--navy);cursor:pointer">▼ Show ${rows.length-BD_LIMIT} More</button>
+             </div>` : '');
         const wishAll = _bdayQueue.length>=2
           ? `<button id="wishAllBtn" onclick="wishAllBirthdays()" style="width:100%;margin-bottom:10px;background:#25D366;color:#fff;border:none;font-size:.8rem;font-weight:800;padding:8px;border-radius:9px;cursor:pointer">💬 Wish All Pending (${_bdayQueue.length}) — opens one by one</button>`
           : '';
         const doneBar = (bdays.length && _nSent===bdays.length)
           ? `<div style="background:#dcfce7;color:#166534;font-size:.78rem;font-weight:800;padding:7px;border-radius:9px;margin-bottom:10px;text-align:center">✅ Aaj ke sabhi ${bdays.length} birthday wish ho gaye</div>`
           : '';
-        return doneBar + wishAll + rows;
+        return doneBar + wishAll + rowsHtml;
       })()
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">🎂 No birthdays today</p>';
   }
