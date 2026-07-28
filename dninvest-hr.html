@@ -1752,6 +1752,17 @@ function daysBetween(f,t){
 }
 
 // ─── LOGIN ──────────────────────────────────────────────────────────────────
+// Set ADMIN_AUTOLOGIN=false to turn this off again — everything else keeps
+// working as before. Must match the CRM's admin username/password.
+const ADMIN_AUTOLOGIN = true;
+const ADMIN_AUTOLOGIN_USERNAME = 'admin';
+const ADMIN_AUTOLOGIN_PASSWORD = 'Admin@123';
+function prefillAdminLoginFields(){
+  if(!ADMIN_AUTOLOGIN) return;
+  const ln=document.getElementById('login-name'), lp=document.getElementById('login-pass');
+  if(ln) ln.value = ADMIN_AUTOLOGIN_USERNAME;
+  if(lp) lp.value = ADMIN_AUTOLOGIN_PASSWORD;
+}
 document.getElementById('login-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('login-name').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
 document.getElementById('login-name').addEventListener('blur', ()=>{ if(typeof updateOfficeStatusBanner==='function') updateOfficeStatusBanner(); });
@@ -2090,7 +2101,10 @@ async function doLogout(){
 }
 
 // Check persisted session
-(function(){
+(async function(){
+  // Fill Admin's credentials into the login boxes right away (visible even
+  // if none of the auto-login paths below end up firing).
+  prefillAdminLoginFields();
   try{
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
     if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp();return;}
@@ -2126,6 +2140,17 @@ async function doLogout(){
       if(nameField){ nameField.value=u; document.getElementById('login-pass').focus(); }
     }
   }catch{}
+
+  // No saved session and no valid CRM autologin token → auto-login straight
+  // in as Admin instead of waiting on the login screen. Only do this if the
+  // username box still says Admin's username (an RM's expired ?u= token
+  // above may have overwritten it — in that case leave it for manual login).
+  if(ADMIN_AUTOLOGIN){
+    const ln=document.getElementById('login-name');
+    if(ln && ln.value===ADMIN_AUTOLOGIN_USERNAME){
+      try{ await doLogin(); }catch(e){}
+    }
+  }
 })();
 
 // Show office-hours status banner on the login screen (RM-only restriction).
