@@ -762,6 +762,7 @@ async function doLogin(){
       }
     }
     CU = user;
+    CU._loginAt = Date.now();
     localStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p, at:Date.now()}));
     document.getElementById('lerr').style.display='none';
     document.getElementById('loginScreen').style.display='none';
@@ -1143,6 +1144,7 @@ async function tryAutoLogin(){
           }
         }
         CU = user;
+        CU._loginAt = loginAt || Date.now();
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').style.display='block';
         initApp();
@@ -1392,6 +1394,20 @@ function initApp(){
           const d=doc.data().data;
           CALL_LIMITS = { configured:true, lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'' };
           try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
+        }
+      });
+
+      // Real-time: Admin can force-logout any user (e.g. gone on leave with browser still
+      // open). Only reacts if the flag's timestamp is AFTER this session's own login time —
+      // otherwise a freshly-logged-in user would see a stale flag from a previous session
+      // and get bounced right away.
+      fdb.collection('crm_data').doc('force_logout').onSnapshot(doc=>{
+        if(!doc.exists || !doc.data() || !doc.data().data || !CU) return;
+        const flags = doc.data().data;
+        const myFlagAt = flags[CU.username];
+        if(myFlagAt && myFlagAt > (CU._loginAt||0)){
+          alert('⚠️ Aapko Admin ne CRM se logout kar diya hai.');
+          doLogout();
         }
       });
 
@@ -8366,6 +8382,51 @@ function exportCSV(seg){
 // ══════════════════════════════════════════
 // ADMIN
 // ══════════════════════════════════════════
+// Admin: force a user out of the CRM right now (e.g. they left on leave with the
+// browser still open) — their next real-time sync tick logs them out automatically,
+// and their HR attendance "out" time gets stamped at THIS moment, not whenever
+// they'd otherwise have manually logged out.
+async function forceLogoutUser(userId){
+  const users = DB.get('users')||[];
+  const u = users.find(x=>x.id===userId);
+  if(!u) return;
+  if(!confirm(`${u.name} ko abhi CRM se logout kar du?\n\nUnka HR "Out Time" bhi abhi ke time se save ho jayega.`)) return;
+
+  try{
+    const docRef = fdb.collection('crm_data').doc('force_logout');
+    const snap = await docRef.get();
+    const flags = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
+    flags[u.username] = Date.now();
+    await docRef.set({ data:flags, updated:new Date().toISOString() });
+  }catch(e){ toast('Force logout flag save nahi hui: '+e.message, 'error'); return; }
+
+  // Stamp HR out-time right now, same name-matching rule as check-in.
+  try{
+    const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+    const rawName = String(u.name || u.username || '').trim();
+    const match = HR_NAMES.find(n =>
+      n.toLowerCase() === rawName.toLowerCase() ||
+      n.toLowerCase() === rawName.split(' ')[0].toLowerCase() ||
+      n.toLowerCase() === String(u.username||'').toLowerCase());
+    const hrName = match || rawName;
+    const td = today();
+    const outDate = new Date();
+    const outTime = String(outDate.getHours()).padStart(2,'0')+':'+String(outDate.getMinutes()).padStart(2,'0');
+    const attRef = fdb.collection('hr_data').doc('attendance');
+    await fdb.runTransaction(async (tx)=>{
+      const doc = await tx.get(attRef);
+      let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+      if(!latest[hrName]) latest[hrName]=[];
+      const idx = latest[hrName].findIndex(r=>r.date===td);
+      if(idx>=0) latest[hrName][idx].out = outTime;
+      else latest[hrName].push({date:td, in:'', out:outTime, status:'Present'});
+      tx.set(attRef, {data:latest, updated:new Date().toISOString()});
+    });
+  }catch(e){ console.log('[FORCE LOGOUT] HR out-time save error:', e.message); }
+
+  toast(`✅ ${u.name} ko logout kar diya gaya, out-time save ho gaya`, 'success');
+}
+
 function renderAdmin(){
   const users=DB.get('users')||[];
   let h=users.map(u=>`
@@ -8382,6 +8443,7 @@ function renderAdmin(){
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="editUser('${u.id}')">Edit</button>
+        ${u.role!=='admin'?`<button class="btn" onclick="forceLogoutUser('${u.id}')" style="background:#d97706;color:#fff;border:none" title="Force logout now — also stamps HR out-time">🚪 Force Logout</button>`:''}
         ${u.role!=='admin'?`<button class="btn" onclick="openTempAccessModal('${u.id}')" style="background:var(--teal);color:#fff;border:none" title="Temp Access">🔄 Temp</button>`:''}
         <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
         <button class="btn btn-danger" onclick="deleteUser('${u.id}')">Delete</button>
