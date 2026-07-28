@@ -1267,8 +1267,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <h3 onclick="toggleDashCard('rmEqCard')">Equity RM — Client Count <span class="dc-count" id="rmEqCount"></span><span class="dc-chevron">▶</span></h3>
               <div class="dc-body"><div id="rmEqChart"></div></div>
             </div>
-            <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
-            <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
           </div>
 
           <div class="dash-col">
@@ -1283,18 +1281,23 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <h3 onclick="toggleDashCard('rmMfCard')">MF RM — AUM Summary <span class="dc-count" id="rmMfCount"></span><span class="dc-chevron">▶</span></h3>
               <div class="dc-body"><div id="rmMfChart"></div></div>
             </div>
-            <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
-
-            <div class="dash-card collapsible admin-only" id="mfAuditCard" style="display:none">
-              <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
-              <div class="dc-body"><div id="mfAuditTable"></div></div>
-            </div>
           </div>
         </div>
 
         <div class="dash-grid">
           <div class="dash-card"><h3 onclick="showPage('eq-followup')" style="cursor:pointer" title="View all follow-ups">📞 Follow-ups — Today &amp; Overdue <span id="fuHeadCount" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayFollowup"></div></div>
           <div class="dash-card"><h3>🎂 Today's Birthdays <span id="bdayHeadCount" style="background:#e11d8f;color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayBirthday"></div></div>
+        </div>
+
+        <div class="dash-section-hdr" style="background:linear-gradient(90deg,#7a1f1f,#a83232)">⚠️ ALERTS</div>
+        <div class="dash-grid">
+          <div class="dash-card"><h3>⚠️ No-Trade Alerts</h3><div id="noTradeAlert"></div></div>
+          <div class="dash-card"><h3>📵 No-Call Alerts (Equity, 60+ days)</h3><div id="noCallEqAlert"></div></div>
+          <div class="dash-card"><h3>📵 No-Call Alerts (MF, 60+ days)</h3><div id="noCallMfAlert"></div></div>
+          <div class="dash-card collapsible admin-only" id="mfAuditCard" style="display:none">
+            <h3 onclick="toggleDashCard('mfAuditCard')">📋 Redemption / SIP Stop — Last Entry by RM <span class="dc-chevron">▶</span></h3>
+            <div class="dc-body"><div id="mfAuditTable"></div></div>
+          </div>
         </div>
 
 
