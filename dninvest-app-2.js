@@ -366,10 +366,14 @@ function renderActivityLog(){
     return;
   }
 
+  const AL_PAGE = 100;   // rows shown initially — keeps first render fast
+  let alShown = Math.min(AL_PAGE, all.length);
+
+  function buildRows(entries){
   // ── COMPACT VIEW ──
   if(alViewMode==='compact'){
     let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>Seg</th><th>RM</th><th>By</th><th>Summary</th></tr></thead><tbody>';
-    all.forEach(l=>{
+    entries.forEach(l=>{
       const dt = alWhen(l,false);
       const typeBadge=`<span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:1px 6px;border-radius:8px;font-size:.72rem;font-weight:700">${typeLabel[l.type]||l.type}</span>`;
       let summary='';
@@ -391,13 +395,12 @@ function renderActivityLog(){
       </tr>`;
     });
     rows+='</tbody>';
-    tbl.innerHTML=rows;
-    return;
+    return rows;
   }
 
   // ── DETAILED VIEW (default) ──
   let rows='<thead><tr><th>Date & Time</th><th>Type</th><th>Client</th><th>Segment</th><th>RM</th><th>By</th><th>Changes / Details</th></tr></thead><tbody>';
-  all.forEach(l=>{
+  entries.forEach(l=>{
     const dt = alWhen(l,true);
     let detail='';
     if(l.type==='call'){
@@ -423,7 +426,53 @@ function renderActivityLog(){
     </tr>`;
   });
   rows+='</tbody>';
-  tbl.innerHTML=rows;
+  return rows;
+  } // end buildRows
+
+  // Render first batch instantly
+  tbl.innerHTML = buildRows(all.slice(0, alShown));
+
+  // Load More button — appends next batch without re-rendering the whole table
+  const wrap = tbl.closest('table')?.parentElement || tbl.parentElement;
+  const oldBtn = document.getElementById('al-load-more');
+  if(oldBtn) oldBtn.remove();
+  if(all.length > alShown){
+    const btn = document.createElement('div');
+    btn.id = 'al-load-more';
+    btn.style.cssText = 'text-align:center;padding:12px';
+    btn.innerHTML = `<button onclick="alLoadMore()" style="background:none;border:1.5px solid var(--border);border-radius:20px;padding:6px 20px;font-size:.78rem;font-weight:700;color:var(--navy);cursor:pointer">▼ Load ${Math.min(AL_PAGE, all.length-alShown)} More (${all.length-alShown} remaining)</button>`;
+    wrap.after(btn);
+  }
+  window.__alAll = all; window.__alShown = alShown; window.__alViewMode = alViewMode;
+}
+
+function alLoadMore(){
+  const all = window.__alAll||[]; const prev = window.__alShown||100; const mode = window.__alViewMode;
+  const next = Math.min(prev+100, all.length);
+  const typeLabel={add:'✅ New Client',edit:'✏️ Edited',call:'📞 Call Log',call_update:'📞 Follow-up Updated',bulk_update:'⇅ Bulk Update',bulk_rm_update:'⇅ Bulk RM Update'};
+  const typeBg={add:'#d1fae5',edit:'#fef3c7',call:'#e0f2fe',call_update:'#f0e6ff'};
+  const typeColor={add:'#065f46',edit:'#92400e',call:'#0369a1',call_update:'#6d28d9'};
+  const tbl = document.getElementById('al-table');
+  if(!tbl) return;
+  const tbody = tbl.querySelector('tbody');
+  const newRows = all.slice(prev, next).map(l=>{
+    if(mode==='compact'){
+      const dt=alWhen(l,false);
+      const typeBadge=`<span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:1px 6px;border-radius:8px;font-size:.72rem;font-weight:700">${typeLabel[l.type]||l.type}</span>`;
+      let summary=l.type==='call'?`${l.call_status||''}${l.next_call?' → '+fmtDate(l.next_call):''}${l.remarks?' | '+l.remarks:''}`:(l.type==='add'?'Added a new client':(l.changes||[]).map(ch=>ch.field+': '+ch.old+'→'+ch.new).join(' | ')||'—');
+      return `<tr style="font-size:.8rem"><td style="white-space:nowrap;color:var(--gray)">${dt}</td><td>${typeBadge}</td><td style="font-weight:600">${l.client_name||'—'}</td><td>${alSegBadge(l.seg)}</td><td>${l.rm||'—'}</td><td>${l.by||'—'}</td><td style="color:var(--gray);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${summary}">${summary}</td></tr>`;
+    }
+    const dt=alWhen(l,true);
+    let detail=l.type==='call'?`<span style="color:var(--gray);font-size:.8rem">Status: <b>${l.call_status||'—'}</b>${l.next_call?' | Next Call: <b>'+fmtDate(l.next_call)+'</b>':''} ${l.remarks?'| <i>'+l.remarks+'</i>':''}</span>`:l.type==='add'?`<span style="color:var(--gray);font-size:.8rem">Added a new client</span>`:(l.changes||[]).length?l.changes.map(ch=>`<div style="font-size:.78rem;margin-bottom:2px"><b>${ch.field}:</b> <span style="color:#ef4444;text-decoration:line-through">${ch.old}</span> → <span style="color:#16a34a">${ch.new}</span></div>`).join(''):'<span style="color:var(--gray);font-size:.8rem">—</span>';
+    return `<tr><td style="font-size:.8rem;white-space:nowrap">${dt}</td><td><span style="background:${typeBg[l.type]||'#f1f5f9'};color:${typeColor[l.type]||'#475569'};padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:700">${typeLabel[l.type]||l.type}</span></td><td style="font-weight:600">${l.client_name||'—'}</td><td>${alSegBadge(l.seg)}</td><td style="font-size:.8rem">${l.rm||'—'}</td><td style="font-size:.8rem">${l.by||'—'}</td><td>${detail}</td></tr>`;
+  }).join('');
+  if(tbody) tbody.insertAdjacentHTML('beforeend', newRows);
+  window.__alShown = next;
+  const btn = document.getElementById('al-load-more');
+  if(btn){
+    if(next>=all.length) btn.remove();
+    else btn.innerHTML=`<button onclick="alLoadMore()" style="background:none;border:1.5px solid var(--border);border-radius:20px;padding:6px 20px;font-size:.78rem;font-weight:700;color:var(--navy);cursor:pointer">▼ Load ${Math.min(100,all.length-next)} More (${all.length-next} remaining)</button>`;
+  }
 }
 
 function exportActivityLog(){
