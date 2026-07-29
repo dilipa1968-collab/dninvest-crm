@@ -2752,7 +2752,7 @@ function renderEqActivityTrend(activeEq){
   // "Today's Wins" — Equity newly Active today + MF clients with new investment today
   const eqWins = yesterdayEntry ? Math.max(0, nActive - yesterdayEntry.active) : 0;
   const mfAll = (typeof getMyMfClients === 'function') ? getMyMfClients() : [];
-  const mfWins = mfAll.filter(c => c.invested_change_amt > 0).length;
+  const mfWins = mfAll.filter(c => c.invested_change_amt > 0 && !(parseFloat(c.prev_invested)||0)).length;
   const totalWins = eqWins + mfWins;
   const winsBox = totalWins > 0 ? `
       <div style="flex:1;min-width:110px;background:linear-gradient(135deg,#fef9c3,#fef3c7);border-radius:12px;padding:8px 12px;border:1.5px solid #f59e0b">
