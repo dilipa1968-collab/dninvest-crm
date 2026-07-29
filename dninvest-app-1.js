@@ -9449,11 +9449,16 @@ async function saveSpecialOffer(){
     if(pubBtn){ pubBtn.disabled=true; pubBtn.innerHTML='⏳ Uploading image…'; }
     try{
       const path='special_offers/'+(editingOfferId||('OF'+Date.now()))+'_'+Date.now()+'.jpg';
-      const snap=await window.fst.ref().child(path).put(_offerImageBlob);
+      const uploadTask = window.fst.ref().child(path).put(_offerImageBlob);
+      const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 20000));
+      const snap = await Promise.race([uploadTask, timeout]);
       imageUrl=await snap.ref.getDownloadURL();
     }catch(e){
       console.log('Offer image upload error:', e);
-      toast('Image upload failed — offer not saved. Please try again.','error');
+      const timedOut = e && e.message==='timeout';
+      toast(timedOut
+        ? 'Image upload timed out (20s) — check Firebase Storage is enabled with write access. Offer not saved.'
+        : 'Image upload failed — offer not saved. Please try again.', 'error');
       if(pubBtn){ pubBtn.disabled=false; pubBtn.innerHTML=prevBtnLabel; }
       return;
     }
