@@ -1425,19 +1425,18 @@ function initApp(){
         }
       });
 
-      // Real-time: Admin can force-logout any user (e.g. gone on leave with browser still
-      // open). Only reacts if the flag's timestamp is AFTER this session's own login time —
-      // otherwise a freshly-logged-in user would see a stale flag from a previous session
-      // and get bounced right away.
-      fdb.collection('crm_data').doc('force_logout').onSnapshot(doc=>{
-        if(!doc.exists || !doc.data() || !doc.data().data || !CU) return;
-        const flags = doc.data().data;
-        const myFlagAt = flags[CU.username];
-        if(myFlagAt && myFlagAt > (CU._loginAt||0)){
-          alert('⚠️ Aapko Admin ne CRM se logout kar diya hai.');
-          doLogout();
-        }
-      });
+      // Real-time: force-logout — only needed for non-admin users.
+      if(CU && CU.role !== 'admin'){
+        fdb.collection('crm_data').doc('force_logout').onSnapshot(doc=>{
+          if(!doc.exists || !doc.data() || !doc.data().data || !CU) return;
+          const flags = doc.data().data;
+          const myFlagAt = flags[CU.username];
+          if(myFlagAt && myFlagAt > (CU._loginAt||0)){
+            alert('⚠️ Admin has logged you out of the CRM.');
+            doLogout();
+          }
+        });
+      }
 
       // Real-time listener for announcements (single object, not array)
       fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
@@ -1454,32 +1453,35 @@ function initApp(){
         }
       });
 
-      // Real-time listener for special offers / contests — RM's open screen
-      // pops instantly when Admin publishes; admin list refreshes live too.
-      fdb.collection('crm_data').doc('special_offers').onSnapshot(doc=>{
-        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
-          const newData = doc.data().data;
-          const existing = DB.get('special_offers');
-          if(JSON.stringify(newData) !== JSON.stringify(existing)){
-            DB.setLocal('special_offers', newData);
-            console.log('Real-time update: special_offers');
-            if(CU && CU.role==='admin'){ if(getCurrentPageId()==='announcements') renderOffersAdmin(); }
-            else { try{ showOfferPopupIfAny(true); }catch(e){} }
+      // special_offers and comm_history rarely change — poll every 5 minutes
+      // instead of keeping a real-time listener open (saves ~2 continuous read charges per user).
+      async function pollRarelyChanging(){
+        try{
+          const soSnap = await fdb.collection('crm_data').doc('special_offers').get();
+          if(soSnap.exists && soSnap.data() && Object.prototype.hasOwnProperty.call(soSnap.data(),'data')){
+            const newData = soSnap.data().data;
+            const existing = DB.get('special_offers');
+            if(JSON.stringify(newData) !== JSON.stringify(existing)){
+              DB.setLocal('special_offers', newData);
+              if(CU && CU.role==='admin'){ if(getCurrentPageId()==='announcements') renderOffersAdmin(); }
+              else { try{ showOfferPopupIfAny(true); }catch(e){} }
+            }
           }
-        }
-      });
-
-      // Real-time listener for comm_history (📜 announcement/offer history)
-      fdb.collection('crm_data').doc('comm_history').onSnapshot(doc=>{
-        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
-          const newData = doc.data().data;
-          const existing = DB.get('comm_history');
-          if(JSON.stringify(newData) !== JSON.stringify(existing)){
-            DB.setLocal('comm_history', newData);
-            if(CU && CU.role==='admin' && getCurrentPageId()==='announcements'){ try{ renderCommHistory(); }catch(e){} }
+        }catch(e){}
+        try{
+          const chSnap = await fdb.collection('crm_data').doc('comm_history').get();
+          if(chSnap.exists && chSnap.data() && Object.prototype.hasOwnProperty.call(chSnap.data(),'data')){
+            const newData = chSnap.data().data;
+            const existing = DB.get('comm_history');
+            if(JSON.stringify(newData) !== JSON.stringify(existing)){
+              DB.setLocal('comm_history', newData);
+              if(CU && CU.role==='admin' && getCurrentPageId()==='announcements'){ try{ renderCommHistory(); }catch(e){} }
+            }
           }
-        }
-      });
+        }catch(e){}
+      }
+      pollRarelyChanging();
+      setInterval(pollRarelyChanging, 5 * 60 * 1000);   // poll every 5 minutes
 
       // Real-time listener for rm_messages (two-way messaging)
       fdb.collection('crm_data').doc('rm_messages').onSnapshot(doc=>{
@@ -1610,9 +1612,19 @@ function initApp(){
               // has reported in at least once.
               if(DB._shardSeen[key].size < n) return;
               const merged   = DB._mergeShards(key);
-              const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
-              if(JSON.stringify(merged) === JSON.stringify(existing)) return;
+              // Fast change check: compare count first, then spot-check a few items.
+              // Full JSON.stringify of 3000 clients is expensive — avoid it.
+              const existingRaw = localStorage.getItem('dninvest_'+key)||'[]';
+              const existingLen = (existingRaw.match(/\{/g)||[]).length;
+              if(existingLen === merged.length){
+                // Same count — spot-check first and last item ids
+                try{
+                  const ex = JSON.parse(existingRaw);
+                  if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
+                }catch(e){}
+              }
               localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+              if(DB._mem) DB._mem[key] = merged;
               _afterRealtime(key);
             });
           }
