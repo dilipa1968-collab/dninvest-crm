@@ -1453,13 +1453,24 @@ function initApp(){
         }
       });
 
-      // special_offers and comm_history rarely change — poll every 5 minutes
-      // instead of keeping a real-time listener open (saves ~2 continuous read charges per user).
-      async function pollRarelyChanging(){
+      // comm_history — instant onSnapshot (Admin sends announcement → RM sees it immediately)
+      fdb.collection('crm_data').doc('comm_history').onSnapshot(doc=>{
+        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+          const newData = doc.data().data;
+          const existing = DB.get('comm_history');
+          if(JSON.stringify(newData) !== JSON.stringify(existing)){
+            DB.setLocal('comm_history', newData);
+            if(CU && CU.role==='admin' && getCurrentPageId()==='announcements'){ try{ renderCommHistory(); }catch(e){} }
+          }
+        }
+      });
+
+      // special_offers — fetch on login + every 3 hours (not realtime, saves billing)
+      async function fetchSpecialOffers(){
         try{
-          const soSnap = await fdb.collection('crm_data').doc('special_offers').get();
-          if(soSnap.exists && soSnap.data() && Object.prototype.hasOwnProperty.call(soSnap.data(),'data')){
-            const newData = soSnap.data().data;
+          const snap = await fdb.collection('crm_data').doc('special_offers').get();
+          if(snap.exists && snap.data() && Object.prototype.hasOwnProperty.call(snap.data(),'data')){
+            const newData = snap.data().data;
             const existing = DB.get('special_offers');
             if(JSON.stringify(newData) !== JSON.stringify(existing)){
               DB.setLocal('special_offers', newData);
@@ -1468,20 +1479,9 @@ function initApp(){
             }
           }
         }catch(e){}
-        try{
-          const chSnap = await fdb.collection('crm_data').doc('comm_history').get();
-          if(chSnap.exists && chSnap.data() && Object.prototype.hasOwnProperty.call(chSnap.data(),'data')){
-            const newData = chSnap.data().data;
-            const existing = DB.get('comm_history');
-            if(JSON.stringify(newData) !== JSON.stringify(existing)){
-              DB.setLocal('comm_history', newData);
-              if(CU && CU.role==='admin' && getCurrentPageId()==='announcements'){ try{ renderCommHistory(); }catch(e){} }
-            }
-          }
-        }catch(e){}
       }
-      pollRarelyChanging();
-      setInterval(pollRarelyChanging, 5 * 60 * 1000);   // poll every 5 minutes
+      fetchSpecialOffers();
+      setInterval(fetchSpecialOffers, 3 * 60 * 60 * 1000);   // every 3 hours
 
       // Real-time listener for rm_messages (two-way messaging)
       fdb.collection('crm_data').doc('rm_messages').onSnapshot(doc=>{
@@ -9629,60 +9629,13 @@ function openAnnAlerts(){
 
 // ── Followup Alert Popup ────────────────────────────────────────────────────
 function checkFollowupAlert(){
-  // Only for non-admin RMs
-  if(!CU || CU.role==='admin') return;
-
-  const tdStr = today();
-  const eq    = getActiveEqClients();
-  const mf    = getMyMfClients();
-  const leads = getMyLeads();
-  const op    = getMyOpEntries();
-
-  // Collect today + overdue entries
-  const items = [
-    ...eq.filter(c=>c.next_call && c.next_call<=tdStr)
-        .map(c=>({name:c.name, next_call:c.next_call, seg:'EQ'})),
-    ...mf.filter(c=>c.next_call && c.next_call<=tdStr)
-        .map(c=>({name:c.name, next_call:c.next_call, seg:'MF'})),
-    ...leads.filter(c=>c.next_call && c.next_call<=tdStr)
-        .map(c=>({name:c.name, next_call:c.next_call, seg:'Lead'})),
-    ...op.filter(c=>c.next_call && c.next_call<=tdStr)
-        .map(c=>({name:c.client_name||c.name, next_call:c.next_call, seg:c.product_type||'Other'}))
-  ].sort((a,b)=>a.next_call.localeCompare(b.next_call));
-
-  if(!items.length) return;
-
-  // Build popup rows
-  const rows = items.map(c=>{
-    const isOverdue = c.next_call < tdStr;
-    const segColor = c.seg==='EQ'?'#b45309': c.seg==='MF'?'#0e7490': c.seg==='Lead'?'#5b21b6':'#166534';
-    const segBg    = c.seg==='EQ'?'#fef3c7': c.seg==='MF'?'#e0f2fe': c.seg==='Lead'?'#ede9fe':'#dcfce7';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;
-        padding:9px 14px;border-bottom:1px solid #f1f5f9">
-      <span style="font-size:.87rem;font-weight:500">${escapeHtml(c.name)}</span>
-      <span style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:.72rem;background:${segBg};color:${segColor};
-            border-radius:4px;padding:1px 7px;font-weight:600">${escapeHtml(c.seg)}</span>
-        <span style="font-size:.72rem;color:${isOverdue?'#dc2626':'#374151'}">
-          ${isOverdue?'⚠️ '+fmtDate(c.next_call):'Today'}</span>
-      </span>
-    </div>`;
-  }).join('');
-
-  const todayCnt   = items.filter(c=>c.next_call===tdStr).length;
-  const overdueCnt = items.filter(c=>c.next_call<tdStr).length;
-  let summary='';
-  if(overdueCnt) summary+=`<span style="color:#dc2626;font-weight:600">${overdueCnt} overdue</span>`;
-  if(overdueCnt && todayCnt) summary+=' &nbsp;·&nbsp; ';
-  if(todayCnt) summary+=`<span style="color:#059669;font-weight:600">${todayCnt} today</span>`;
-
-  document.getElementById('followupAlertBody').innerHTML = rows;
-  document.getElementById('followupAlertCount').innerHTML = summary;
-  document.getElementById('followupAlertPopup').classList.add('open');
+  // Follow-up popup disabled — the dashboard Follow-ups card shows today's pending list.
+  return;
 }
 
+
 function closeFollowupAlert(){
-  document.getElementById('followupAlertPopup').classList.remove('open');
+  // popup removed
 }
 // ───────────────────────────────────────────────────────────────────────────
 
