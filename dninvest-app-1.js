@@ -2316,6 +2316,7 @@ function renderMfAumTrend(){
   const footerNote = isAdmin
     ? `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
     : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
+  const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
       <div style="flex:1;min-width:110px;background:#eef3fc;border-radius:12px;padding:8px 12px">
@@ -2333,8 +2334,24 @@ function renderMfAumTrend(){
         <div style="font-size:1.2rem;font-weight:900;color:var(--red);line-height:1.2">${decreased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
       </div>
+      <div style="flex:1;min-width:110px;background:#f5f3ff;border-radius:12px;padding:8px 12px;cursor:pointer" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
+        <div style="font-size:.62rem;color:#6d28d9;font-weight:800;letter-spacing:.3px">⚪ ZERO BALANCE</div>
+        <div style="font-size:1.2rem;font-weight:900;color:#6d28d9;line-height:1.2">${zeroBalance.length}</div>
+        <span style="font-size:.62rem;font-weight:700;color:#6d28d9">AUM = 0 / blank</span>
+      </div>
     </div>
     <p style="color:var(--gray);font-size:.62rem;margin-top:5px;text-align:center">${footerNote}</p>`;
+}
+
+// Zero balance MF investors — AUM = 0 or blank (never invested / fully redeemed)
+function showMfZeroBalance(){
+  const rows = window.__mfAumRows || [];
+  const zero = rows.filter(c=>!(parseFloat(c.aum)||0))
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!zero.length){ toast('No zero-balance investors found','info'); return; }
+  showReport(`⚪ Zero Balance MF Investors (${zero.length})`,
+    ['Name','RM','Mobile','PAN','Status'],
+    zero.map(c=>[c.name||'—', c.rm||'—', c.mobile||'—', c.pan||'—', c.status||'—']));
 }
 
 // Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
