@@ -2435,9 +2435,9 @@ function refreshDash(){
     statsHtml+=sc(pendEq+pendMf,'Follow-ups Due','red','');
   }
   if(hasMf){
+    statsHtml+=sc(mf.length,'MF Investors','teal','mf');
     statsHtml+=sc('₹'+fmtNum(totalAUM),'Total AUM','gold','mf');
     statsHtml+=sc('₹'+fmtNum(totalSIP),'Monthly SIP','purple','mf');
-    statsHtml+=sc(mf.length,'MF Investors','teal','mf');
   }
   document.getElementById('dashStats').innerHTML=statsHtml;
 
