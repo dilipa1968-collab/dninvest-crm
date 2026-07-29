@@ -9426,16 +9426,22 @@ function saveSpecialOffer(){
   }
   const from=document.getElementById('offer-from').value||today();
   const to=document.getElementById('offer-to').value||'';
-  if(!title){ toast('Please enter the offer title','error'); return; }
-  if(!msg){ toast('Please enter the offer details / message','error'); return; }
+
+  // If a poster image is attached (new upload, or an existing one kept during
+  // edit), the image itself can carry the offer — title/message become optional.
+  const existingOffer = editingOfferId ? getSpecialOffers().find(x=>x.id===editingOfferId) : null;
+  const willHaveImage = !!_offerImageData || (_offerImageData===undefined && existingOffer && !!existingOffer.image);
+  if(!title && !willHaveImage){ toast('Please enter the offer title, or add a poster image','error'); return; }
+  if(!msg && !willHaveImage){ toast('Please enter the offer details / message, or add a poster image','error'); return; }
   if(to && to<from){ toast('Valid To cannot be earlier than Valid From','error'); return; }
+  const finalTitle = title || 'Special Offer 🎁';
 
   // _offerImageData: undefined = leave unchanged (edit only), '' = removed, dataURL = new image
   const list=getSpecialOffers();
   if(editingOfferId){
     const o=list.find(x=>x.id===editingOfferId);
     if(o){
-      Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name});
+      Object.assign(o,{title:finalTitle,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name});
       if(_offerImageData!==undefined) o.image=_offerImageData;
     }
     saveSpecialOffersList(list);
@@ -9451,14 +9457,14 @@ function saveSpecialOffer(){
     toast('💾 Offer updated! RMs will see the new version');
     return;
   }
-  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:_offerImageData||''};
+  const newOffer={id:'OF'+Date.now(), title:finalTitle, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:_offerImageData||''};
   list.push(newOffer);
   saveSpecialOffersList(list);
   // Permanent history record
   addCommHistory({
     id:'H'+Date.now()+Math.random().toString(36).slice(2,6),
     kind:'offer', refId:newOffer.id,
-    title, text:msg, theme, from, to,
+    title:finalTitle, text:msg, theme, from, to,
     target:offerTargetLabel(newOffer), by:CU.name, date:newOffer.created, hasImage:!!newOffer.image
   });
   document.getElementById('offer-title').value='';
@@ -9734,9 +9740,11 @@ function showOfferPopupIfAny(force){
   const cards=live.map(o=>{
     const t=OFFER_THEMES[o.theme]||OFFER_THEMES.festival;
     const posterHtml = o.image ? `<img src="${esc(o.image)}" style="width:100%;max-height:320px;object-fit:cover;border-radius:10px;margin-top:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.25)">` : '';
+    const titleHtml = o.title ? `<div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:.3px">${t.emoji} ${esc(o.title)}</div>` : '';
+    const msgHtml = o.msg ? `<div style="font-size:13.5px;color:rgba(255,255,255,.95);margin-top:6px;line-height:1.5;white-space:pre-wrap">${esc(o.msg)}</div>` : '';
     return `<div style="background:rgba(255,255,255,.14);backdrop-filter:blur(3px);border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:14px 16px;margin-top:12px;text-align:left">
-      <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:.3px">${t.emoji} ${esc(o.title)}</div>
-      <div style="font-size:13.5px;color:rgba(255,255,255,.95);margin-top:6px;line-height:1.5;white-space:pre-wrap">${esc(o.msg)}</div>
+      ${titleHtml}
+      ${msgHtml}
       ${posterHtml}
       <div style="font-size:11px;color:${th.ribbon};margin-top:8px;font-weight:600">⏳ Valid: ${o.from||'today'}${o.to?' to '+o.to:' — until further notice'}</div>
     </div>`;
