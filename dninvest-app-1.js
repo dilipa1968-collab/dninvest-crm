@@ -2317,37 +2317,30 @@ function renderMfAumTrend(){
     ? `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
     : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
-  const mfBoxes = `
-    <div style="background:#eef3fc;border-radius:12px;padding:8px 12px;border:1.5px solid #bfdbfe;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="font-size:.6rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔵 MF INVESTED</div>
-      <div style="font-size:1.2rem;font-weight:900;color:var(--blue);line-height:1.2">₹${fmtNum(totalInvested)}</div>
-      <span style="font-size:.6rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;cursor:pointer" onclick="${cardClick}" title="${cardClick}">
+      <div style="background:#eef3fc;border-radius:12px;padding:8px 12px;border:1.5px solid #bfdbfe">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔵 TOTAL INVESTED AMOUNT</div>
+        <div style="font-size:1.2rem;font-weight:900;color:var(--blue);line-height:1.2">₹${fmtNum(totalInvested)}</div>
+        <span style="font-size:.62rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
+      </div>
+      <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 ADDITIONS</div>
+        <div style="font-size:1.2rem;font-weight:900;color:var(--green);line-height:1.2">${increased.length}</div>
+        <span style="font-size:.62rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
+      </div>
+      <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 REDEMPTIONS</div>
+        <div style="font-size:1.2rem;font-weight:900;color:var(--red);line-height:1.2">${decreased.length}</div>
+        <span style="font-size:.62rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
+      </div>
+      <div style="background:#f5f3ff;border-radius:12px;padding:8px 12px;border:1.5px solid #ddd6fe;cursor:pointer" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
+        <div style="font-size:.62rem;color:#6d28d9;font-weight:800;letter-spacing:.3px">⚪ ZERO BALANCE</div>
+        <div style="font-size:1.2rem;font-weight:900;color:#6d28d9;line-height:1.2">${zeroBalance.length}</div>
+        <span style="font-size:.62rem;font-weight:700;color:#6d28d9">AUM = 0 / blank</span>
+      </div>
     </div>
-    <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="font-size:.6rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 MF ADDITIONS</div>
-      <div style="font-size:1.2rem;font-weight:900;color:var(--green);line-height:1.2">${increased.length}</div>
-      <span style="font-size:.6rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
-    </div>
-    <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="font-size:.6rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 REDEMPTIONS</div>
-      <div style="font-size:1.2rem;font-weight:900;color:var(--red);line-height:1.2">${decreased.length}</div>
-      <span style="font-size:.6rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
-    </div>
-    <div style="background:#f5f3ff;border-radius:12px;padding:8px 12px;border:1.5px solid #ddd6fe;cursor:pointer" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
-      <div style="font-size:.6rem;color:#6d28d9;font-weight:800;letter-spacing:.3px">⚪ ZERO BALANCE</div>
-      <div style="font-size:1.2rem;font-weight:900;color:#6d28d9;line-height:1.2">${zeroBalance.length}</div>
-      <span style="font-size:.6rem;font-weight:700;color:#6d28d9">AUM = 0 / blank</span>
-    </div>`;
-
-  const combo = document.getElementById('combinedActivityBoxes');
-  if(combo){
-    window.__mfBoxesHtml = mfBoxes;
-    combo.innerHTML = (window.__eqBoxesHtml||'') + (window.__mfBoxesHtml||'');
-  }
-  const mfFooter = document.getElementById('mfAumFooter');
-  if(mfFooter) mfFooter.innerHTML = footerNote;
-
-  el.innerHTML = '';
+    <p style="color:var(--gray);font-size:.62rem;margin-top:5px;text-align:center">${footerNote}</p>`;
 }
 
 // Zero balance MF investors — AUM = 0 or blank (never invested / fully redeemed)
@@ -2798,33 +2791,35 @@ function renderEqActivityTrend(activeEq){
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
       </div>`;
 
-  const eqBoxes = `
-    <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="font-size:.6rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 EQ ACTIVE</div>
-      <div style="font-size:1.2rem;font-weight:900;color:var(--green);line-height:1.2">${nActive}</div>
-      ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 ACTIVE (traded within 1yr)</div>
+        <div style="font-size:1.3rem;font-weight:900;color:var(--green);line-height:1.2">${nActive}</div>
+        ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
+      </div>
+      <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca">
+        <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 INACTIVE (1yr+ / never traded)</div>
+        <div style="font-size:1.3rem;font-weight:900;color:var(--red);line-height:1.2">${nInactive}</div>
+        ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
+      </div>
+      ${winsBox}
     </div>
-    <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="font-size:.6rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 EQ INACTIVE</div>
-      <div style="font-size:1.2rem;font-weight:900;color:var(--red);line-height:1.2">${nInactive}</div>
-      ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
-    </div>
-    ${winsBox}`;
-
-  const combo = document.getElementById('combinedActivityBoxes');
-  if(combo){
-    // Store EQ boxes, then merge with MF boxes if they exist
-    window.__eqBoxesHtml = eqBoxes;
-    combo.innerHTML = (window.__eqBoxesHtml||'') + (window.__mfBoxesHtml||'');
-  }
-  const eqFooter = document.getElementById('eqActivityFooter');
-  if(eqFooter) eqFooter.innerHTML = footerNote;
-
-  el.innerHTML = '';
+    <p style="color:var(--gray);font-size:.62rem;margin-top:5px;text-align:center">${footerNote}</p>`;
 
   // Save today's TRUE (unfiltered) snapshot (fire-and-forget — don't block
   // the dashboard render, and don't let an admin's RM filter overwrite it).
   DB.addEqActivitySnapshot(entry).catch(e=>console.log('activity snapshot save failed',e));
+  // Sync heights of both activity cards after render so they align perfectly
+  requestAnimationFrame(()=>{
+    const eq = document.getElementById('eqActivityCard');
+    const mf = document.getElementById('mfAumCard');
+    if(eq && mf){
+      eq.style.minHeight=''; mf.style.minHeight='';
+      const h = Math.max(eq.offsetHeight, mf.offsetHeight);
+      eq.style.minHeight = h+'px'; mf.style.minHeight = h+'px';
+    }
+  });
 
   // One-time-per-session top-up from Firestore: local cache only has
   // snapshots this exact browser has ever written, so a device Puja hasn't
