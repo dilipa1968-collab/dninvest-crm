@@ -2319,22 +2319,22 @@ function renderMfAumTrend(){
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="flex:1;min-width:110px;background:#eef3fc;border-radius:12px;padding:8px 12px">
+      <div style="flex:1;min-width:110px;background:#eef3fc;border-radius:12px;padding:8px 12px;border:1.5px solid #bfdbfe">
         <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔵 TOTAL INVESTED AMOUNT</div>
         <div style="font-size:1.2rem;font-weight:900;color:var(--blue);line-height:1.2">₹${fmtNum(totalInvested)}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
       </div>
-      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:12px;padding:8px 12px">
+      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0">
         <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 ADDITIONS</div>
         <div style="font-size:1.2rem;font-weight:900;color:var(--green);line-height:1.2">${increased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
       </div>
-      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:12px;padding:8px 12px">
+      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca">
         <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 REDEMPTIONS</div>
         <div style="font-size:1.2rem;font-weight:900;color:var(--red);line-height:1.2">${decreased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
       </div>
-      <div style="flex:1;min-width:110px;background:#f5f3ff;border-radius:12px;padding:8px 12px;cursor:pointer" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
+      <div style="flex:1;min-width:110px;background:#f5f3ff;border-radius:12px;padding:8px 12px;border:1.5px solid #ddd6fe;cursor:pointer" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
         <div style="font-size:.62rem;color:#6d28d9;font-weight:800;letter-spacing:.3px">⚪ ZERO BALANCE</div>
         <div style="font-size:1.2rem;font-weight:900;color:#6d28d9;line-height:1.2">${zeroBalance.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:#6d28d9">AUM = 0 / blank</span>
