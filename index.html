@@ -1275,7 +1275,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="dash-col">
             <div class="dash-section-hdr" style="background:linear-gradient(90deg,var(--navy),var(--navy3))">📊 EQUITY</div>
             <div class="dash-card" style="padding:5px 10px" id="eqActivityCard">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:2px">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:2px;min-height:26px">
                 <h3 style="margin-bottom:0;font-size:.8rem">📊 Trade Activity — Active vs Inactive (1yr no-trade)</h3>
                 <select id="eqActivityRmFilter" onclick="event.stopPropagation()" onchange="onEqActivityRmFilterChange()" style="display:none;padding:4px 9px;font-size:.74rem;font-weight:600;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--navy2);max-width:180px">
                   <option value="">👥 All RMs</option>
@@ -1292,7 +1292,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="dash-col">
             <div class="dash-section-hdr" style="background:linear-gradient(90deg,#0d5c56,#0f7a71)">💰 MUTUAL FUND</div>
             <div class="dash-card" style="padding:5px 10px" id="mfAumCard">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:2px">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:2px;min-height:26px">
                 <h3 style="margin-bottom:0;font-size:.8rem">📈 MF Invested Amount — Increased vs Decreased</h3>
               </div>
               <div id="mfAumTrend"></div>
