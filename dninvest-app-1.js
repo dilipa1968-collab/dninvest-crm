@@ -2785,20 +2785,20 @@ function renderEqActivityTrend(activeEq){
     : `<span style="color:var(--gray)">—</span>`;
 
   const winsBox = `
-      <div style="flex:1;min-width:110px;background:${boxBg};border-radius:12px;padding:8px 12px;border:1.5px solid ${boxBorder};cursor:pointer" onclick="event.stopPropagation();showTodaysWinLossList()" title="Click to see which clients changed today">
+      <div style="background:${boxBg};border-radius:12px;padding:8px 12px;border:1.5px solid ${boxBorder};cursor:pointer" onclick="event.stopPropagation();showTodaysWinLossList()" title="Click to see which clients changed today">
         <div style="font-size:.62rem;color:#92400e;font-weight:800;letter-spacing:.3px">${icon} TODAY'S WIN/LOSS</div>
         <div style="font-size:1.3rem;font-weight:900;line-height:1.2">${mainNum}</div>
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
       </div>`;
 
   el.innerHTML = `
-    <div style="display:flex;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="flex:1;min-width:110px;background:#f0fdf4;border-radius:12px;padding:8px 12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
+      <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0">
         <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🟢 ACTIVE (traded within 1yr)</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--green);line-height:1.2">${nActive}</div>
         ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
       </div>
-      <div style="flex:1;min-width:110px;background:#fef2f2;border-radius:12px;padding:8px 12px">
+      <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca">
         <div style="font-size:.62rem;color:var(--gray);font-weight:800;letter-spacing:.3px">🔴 INACTIVE (1yr+ / never traded)</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--red);line-height:1.2">${nInactive}</div>
         ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
