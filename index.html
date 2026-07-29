@@ -46,7 +46,6 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
@@ -56,7 +55,7 @@ const firebaseConfig = {
   messagingSenderId: "331999342266",
   appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
 };
-try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); window.fst=firebase.storage(); }catch(e){}
+try{ firebase.initializeApp(firebaseConfig); window.fdb=firebase.firestore(); }catch(e){}
 
 // If the Firebase SDK scripts loaded slowly (mobile/5G blip), window.fdb may
 // still be undefined when auto-login fires. This waits up to ~8s for fdb to
@@ -73,7 +72,6 @@ window.waitForFdb = function(maxMs){
       if(typeof firebase !== 'undefined' && firebase.firestore){
         try{ firebase.initializeApp(firebaseConfig); }catch(e){}
         try{ window.fdb = firebase.firestore(); }catch(e){}
-        try{ if(!window.fst && firebase.storage) window.fst = firebase.storage(); }catch(e){}
         if(window.fdb){ clearInterval(t); resolve(true); return; }
       }
       waited += step;
@@ -2317,6 +2315,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div class="form-field" style="margin-top:10px">
               <label>Poster Image (optional)</label>
               <input type="file" id="offer-img-input" accept="image/*" onchange="handleOfferImage(event)">
+              <p style="font-size:.7rem;color:var(--text3);margin:4px 0 0">Image is auto-compressed and stored with the offer. Keep it light — a few active offers with images share the same storage record.</p>
               <div id="offer-img-preview"></div>
             </div>
             <div style="display:flex;gap:10px;margin-top:14px">

@@ -9130,13 +9130,10 @@ function removeAnnouncementImage(){
 }
 
 // ══════════════════════════════════════════
-// SPECIAL OFFER — poster image (Firebase Storage)
-// Unlike the announcement image (small, stored as base64 in Firestore),
-// offer posters can be full-size — so they're uploaded as a file to
-// Firebase Storage and only the download URL is stored in Firestore.
+// SPECIAL OFFER — poster image (stored as base64 in Firestore,
+// same pattern as the announcement image — no external storage needed)
 // ══════════════════════════════════════════
-let _offerImageBlob;        // undefined = unchanged, null = removed, Blob = new image pending upload
-let _offerImagePreviewUrl;  // current preview src (existing URL, or local preview of a pending image)
+let _offerImageData; // undefined = unchanged, '' = removed, dataURL = new image
 
 function handleOfferImage(event){
   const file = event.target.files[0];
@@ -9146,7 +9143,7 @@ function handleOfferImage(event){
   reader.onload = function(e){
     const img = new Image();
     img.onload = function(){
-      const MAX = 1080; // poster-quality — larger than the announcement thumbnail
+      const MAX = 800; // keep the Firestore doc small — several offers share one document
       let w = img.width, h = img.height;
       if(w > MAX || h > MAX){
         if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
@@ -9156,12 +9153,9 @@ function handleOfferImage(event){
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(function(blob){
-        _offerImageBlob = blob;
-        _offerImagePreviewUrl = canvas.toDataURL('image/jpeg', 0.85);
-        document.getElementById('offer-img-preview').innerHTML =
-          `<div class="ann-imgwrap"><img src="${_offerImagePreviewUrl}"><button class="ann-rm" type="button" onclick="removeOfferImage()" title="Remove image">×</button></div>`;
-      }, 'image/jpeg', 0.85);
+      _offerImageData = canvas.toDataURL('image/jpeg', 0.65);
+      document.getElementById('offer-img-preview').innerHTML =
+        `<div class="ann-imgwrap"><img src="${_offerImageData}"><button class="ann-rm" type="button" onclick="removeOfferImage()" title="Remove image">×</button></div>`;
     };
     img.src = e.target.result;
   };
@@ -9169,17 +9163,15 @@ function handleOfferImage(event){
 }
 
 function removeOfferImage(){
-  _offerImageBlob = null; // explicit removal (distinct from "unchanged")
-  _offerImagePreviewUrl = '';
+  _offerImageData = '';
   document.getElementById('offer-img-preview').innerHTML='';
   document.getElementById('offer-img-input').value='';
 }
 
-// Resets the poster-image field. Pass an existing URL (edit mode) to show
-// it as the current image, or call with no args to clear the field.
+// Resets the poster-image field. Pass an existing dataURL (edit mode) to
+// show it as the current image, or call with no args to clear the field.
 function resetOfferImageState(existingUrl){
-  _offerImageBlob = undefined;
-  _offerImagePreviewUrl = existingUrl || '';
+  _offerImageData = undefined;
   const inp = document.getElementById('offer-img-input'); if(inp) inp.value='';
   const prev = document.getElementById('offer-img-preview');
   if(prev){
@@ -9418,7 +9410,7 @@ function onOfferTargetChange(){
   document.getElementById('offer-users-wrap').style.display = (v==='users')?'':'none';
 }
 
-async function saveSpecialOffer(){
+function saveSpecialOffer(){
   if(!CU || CU.role!=='admin'){ toast('Only admin can publish offers','error'); return; }
   const title=(document.getElementById('offer-title').value||'').trim();
   const msg=(document.getElementById('offer-msg').value||'').trim();
@@ -9438,41 +9430,13 @@ async function saveSpecialOffer(){
   if(!msg){ toast('Please enter the offer details / message','error'); return; }
   if(to && to<from){ toast('Valid To cannot be earlier than Valid From','error'); return; }
 
-  // Upload the poster image to Firebase Storage first (if a new one was chosen).
-  // imageUrl stays undefined when nothing changed, so an edit doesn't touch
-  // the existing image unless the admin picked a new one or removed it.
-  let imageUrl;
-  const pubBtn=document.getElementById('offer-publish-btn');
-  const prevBtnLabel = editingOfferId ? '💾 Update Offer' : '🎉 Publish Offer';
-  if(_offerImageBlob){
-    if(!window.fst){ toast('Image upload unavailable right now — Firebase Storage did not load. Try refreshing.','error'); return; }
-    if(pubBtn){ pubBtn.disabled=true; pubBtn.innerHTML='⏳ Uploading image…'; }
-    try{
-      const path='special_offers/'+(editingOfferId||('OF'+Date.now()))+'_'+Date.now()+'.jpg';
-      const uploadTask = window.fst.ref().child(path).put(_offerImageBlob);
-      const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 20000));
-      const snap = await Promise.race([uploadTask, timeout]);
-      imageUrl=await snap.ref.getDownloadURL();
-    }catch(e){
-      console.log('Offer image upload error:', e);
-      const timedOut = e && e.message==='timeout';
-      toast(timedOut
-        ? 'Image upload timed out (20s) — check Firebase Storage is enabled with write access. Offer not saved.'
-        : 'Image upload failed — offer not saved. Please try again.', 'error');
-      if(pubBtn){ pubBtn.disabled=false; pubBtn.innerHTML=prevBtnLabel; }
-      return;
-    }
-  } else if(_offerImageBlob===null){
-    imageUrl=''; // admin explicitly removed the image
-  }
-  if(pubBtn){ pubBtn.disabled=false; pubBtn.innerHTML=prevBtnLabel; }
-
+  // _offerImageData: undefined = leave unchanged (edit only), '' = removed, dataURL = new image
   const list=getSpecialOffers();
   if(editingOfferId){
     const o=list.find(x=>x.id===editingOfferId);
     if(o){
       Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name});
-      if(imageUrl!==undefined) o.image=imageUrl;
+      if(_offerImageData!==undefined) o.image=_offerImageData;
     }
     saveSpecialOffersList(list);
     // Keep the history record in sync with the edited offer
@@ -9487,7 +9451,7 @@ async function saveSpecialOffer(){
     toast('💾 Offer updated! RMs will see the new version');
     return;
   }
-  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:imageUrl||''};
+  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:_offerImageData||''};
   list.push(newOffer);
   saveSpecialOffersList(list);
   // Permanent history record
