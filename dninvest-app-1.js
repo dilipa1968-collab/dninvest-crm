@@ -2318,24 +2318,24 @@ function renderMfAumTrend(){
     : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;cursor:pointer" onclick="${cardClick}" title="${cardClick}">
-      <div style="background:#eef3fc;border-radius:12px;padding:8px 12px;border:1.5px solid #bfdbfe;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center">
-        <div style="font-size:.58rem;color:var(--gray);font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔵 TOTAL INVESTED</div>
+    <div class="dash-stat-grid dash-stat-grid-4" onclick="${cardClick}" title="${cardClick}">
+      <div class="dash-stat-box" style="background:#eef3fc;border:1.5px solid #bfdbfe">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:var(--gray)">🔵 TOTAL INVESTED</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--blue);line-height:1.2">₹${fmtNum(totalInvested)}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--gray)">${mf.length} investors</span>
       </div>
-      <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center">
-        <div style="font-size:.58rem;color:var(--gray);font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ADDITIONS</div>
+      <div class="dash-stat-box" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:var(--gray)">🟢 ADDITIONS</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--green);line-height:1.2">${increased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--green)">+₹${fmtNum(sumInc)}</span>
       </div>
-      <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center">
-        <div style="font-size:.58rem;color:var(--gray);font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔴 REDEMPTIONS</div>
+      <div class="dash-stat-box" style="background:#fef2f2;border:1.5px solid #fecaca">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:var(--gray)">🔴 REDEMPTIONS</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--red);line-height:1.2">${decreased.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:var(--red)">-₹${fmtNum(sumDec)}</span>
       </div>
-      <div style="background:#f5f3ff;border-radius:12px;padding:8px 12px;border:1.5px solid #ddd6fe;cursor:pointer;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
-        <div style="font-size:.58rem;color:#6d28d9;font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚪ ZERO BALANCE</div>
+      <div class="dash-stat-box" style="background:#f5f3ff;border:1.5px solid #ddd6fe;cursor:pointer" onclick="event.stopPropagation();showMfZeroBalance()" title="Click to see full list">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:#6d28d9">⚪ ZERO BALANCE</div>
         <div style="font-size:1.3rem;font-weight:900;color:#6d28d9;line-height:1.2">${zeroBalance.length}</div>
         <span style="font-size:.62rem;font-weight:700;color:#6d28d9">AUM = 0 / blank</span>
       </div>
@@ -2785,21 +2785,21 @@ function renderEqActivityTrend(activeEq){
     : `<span style="color:var(--gray)">—</span>`;
 
   const winsBox = `
-      <div style="background:${boxBg};border-radius:12px;padding:8px 12px;border:1.5px solid ${boxBorder};cursor:pointer;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center" onclick="event.stopPropagation();showTodaysWinLossList()" title="Click to see which clients changed today">
-        <div style="font-size:.58rem;color:#92400e;font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${icon} TODAY'S WIN/LOSS</div>
+      <div class="dash-stat-box" style="background:${boxBg};border:1.5px solid ${boxBorder};cursor:pointer" onclick="event.stopPropagation();showTodaysWinLossList()" title="Click to see which clients changed today">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:#92400e">${icon} TODAY'S WIN/LOSS</div>
         <div style="font-size:1.3rem;font-weight:900;line-height:1.2">${mainNum}</div>
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
       </div>`;
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;cursor:pointer" onclick="${cardClick}" title="${cardTitle}">
-      <div style="background:#f0fdf4;border-radius:12px;padding:8px 12px;border:1.5px solid #bbf7d0;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center">
-        <div style="font-size:.58rem;color:var(--gray);font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ACTIVE (within 1yr)</div>
+    <div class="dash-stat-grid dash-stat-grid-3" onclick="${cardClick}" title="${cardTitle}">
+      <div class="dash-stat-box" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:var(--gray)">🟢 ACTIVE (within 1yr)</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--green);line-height:1.2">${nActive}</div>
         ${diffLabel(nActive, yesterdayEntry?yesterdayEntry.active:null)}
       </div>
-      <div style="background:#fef2f2;border-radius:12px;padding:8px 12px;border:1.5px solid #fecaca;min-height:74px;min-width:0;display:flex;flex-direction:column;justify-content:center">
-        <div style="font-size:.58rem;color:var(--gray);font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="1yr+ no trade / never traded">🔴 INACTIVE (1yr+)</div>
+      <div class="dash-stat-box" style="background:#fef2f2;border:1.5px solid #fecaca">
+        <div class="dash-stat-lbl" style="font-size:.58rem;color:var(--gray)" title="1yr+ no trade / never traded">🔴 INACTIVE (1yr+)</div>
         <div style="font-size:1.3rem;font-weight:900;color:var(--red);line-height:1.2">${nInactive}</div>
         ${diffLabel(nInactive, yesterdayEntry?yesterdayEntry.inactive:null)}
       </div>
