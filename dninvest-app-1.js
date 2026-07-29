@@ -2785,7 +2785,7 @@ function renderEqActivityTrend(activeEq){
     : `<span style="color:var(--gray)">—</span>`;
 
   const winsBox = `
-      <div style="flex:1;min-width:110px;background:${boxBg};border-radius:12px;padding:8px 12px;border:1.5px solid ${boxBorder}">
+      <div style="flex:1;min-width:110px;background:${boxBg};border-radius:12px;padding:8px 12px;border:1.5px solid ${boxBorder};cursor:pointer" onclick="event.stopPropagation();showTodaysWinLossList()" title="Click to see which clients changed today">
         <div style="font-size:.62rem;color:#92400e;font-weight:800;letter-spacing:.3px">${icon} TODAY'S WIN/LOSS</div>
         <div style="font-size:1.3rem;font-weight:900;line-height:1.2">${mainNum}</div>
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
@@ -2858,7 +2858,7 @@ function showEqActivityRmSplit(){
     // RM name is clickable (where it's a real RM, not the "no RM" bucket) —
     // jumps back to the dashboard card filtered to just that RM.
     const rmCell = rm==='— (no RM)' ? rm
-      : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="closeModal('reportModal');filterEqActivityByRm('${escapeHtml(rm).replace(/'/g,"\\'")}')" title="Filter dashboard card to ${escapeHtml(rm)}">${escapeHtml(rm)}</span>`;
+      : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showEqActivityRmClients('${escapeHtml(rm).replace(/'/g,"\\'")}')" title="See ${escapeHtml(rm)}'s clients">${escapeHtml(rm)}</span>`;
     return [rmCell, v.active, v.inactive, total, pct];
   }).sort((a,b)=>b[3]-a[3]);
   if(!table.length){ toast('Abhi data load nahi hua — dashboard refresh kar ke dubara try karein','info'); return; }
@@ -2867,6 +2867,79 @@ function showEqActivityRmSplit(){
 
 // Called from the RM-wise split table — sets the dashboard card's RM filter
 // to the clicked RM and scrolls back to it.
+// Shows which clients changed Active/Inactive status today — called from Win/Loss box click
+function showTodaysWinLossList(){
+  const td = today();
+  const logs = DB.get('activity_logs')||[];
+  // Find status changes logged today
+  const todayChanges = logs.filter(l=>
+    l.seg==='equity' && l.type==='edit' &&
+    String(l.date||'').slice(0,10)===td &&
+    Array.isArray(l.changes) && l.changes.some(ch=>ch.field==='status')
+  );
+
+  // Also check clients whose last_trade_date = today (became active by trading, not by edit)
+  const allEq = window.__eqActivityAllRows || [];
+  const tradedToday = allEq.filter(c=>c.status==='Active' && c.last_trade_date===td);
+
+  const editRows = todayChanges.map(l=>{
+    const ch = l.changes.find(c=>c.field==='status');
+    const isWin = ch.new==='Active';
+    return [
+      escapeHtml(l.client_name||'—'),
+      l.rm||'—',
+      `<span style="color:${isWin?'var(--green)':'var(--red)'};font-weight:700">${isWin?'▲ → Active':'▼ → Inactive'}</span>`,
+      'Status edit'
+    ];
+  });
+
+  const tradeRows = tradedToday
+    .filter(c=>!todayChanges.find(l=>l.client_name===c.name)) // avoid duplicate
+    .map(c=>[
+      escapeHtml(c.name||'—'),
+      c.rm||'—',
+      `<span style="color:var(--green);font-weight:700">▲ Traded today</span>`,
+      'Trade'
+    ]);
+
+  const rows = [...editRows, ...tradeRows];
+  if(!rows.length){
+    toast('No status changes found today — check Activity Log for details','info');
+    return;
+  }
+  showReport(`⚡ Today's Win/Loss — ${fmtDate(td)}`, ['Client','RM','Change','Reason'], rows);
+}
+
+// Show all Active + Inactive clients for a specific RM when clicked in the RM-wise split table
+function showEqActivityRmClients(rmName){
+  const allClients = window.__eqActivityAllRows || [];
+  const filtered = allClients.filter(c=>(c.rm||'').trim().toUpperCase()===rmName.trim().toUpperCase());
+  if(!filtered.length){ toast('No clients found for '+rmName,'info'); return; }
+  const active   = filtered.filter(c=>c.status==='Active');
+  const inactive = filtered.filter(c=>c.status==='Inactive'||(!c.last_trade_date&&c.status!=='Active'));
+  const rows = [
+    ...active.sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>[
+      escapeHtml(c.name||'—'),
+      c.code||'—',
+      c.mobile||'—',
+      `<span style="color:var(--green);font-weight:700">Active</span>`,
+      c.last_trade_date ? fmtDate(c.last_trade_date) : '—'
+    ]),
+    ...inactive.sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>[
+      escapeHtml(c.name||'—'),
+      c.code||'—',
+      c.mobile||'—',
+      `<span style="color:var(--red);font-weight:700">Inactive</span>`,
+      c.last_trade_date ? fmtDate(c.last_trade_date) : 'Never'
+    ])
+  ];
+  showReport(
+    `📋 ${rmName} — Clients (${active.length} Active, ${inactive.length} Inactive)`,
+    ['Name','Code','Mobile','Status','Last Trade'],
+    rows
+  );
+}
+
 function filterEqActivityByRm(rmName){
   const sel = document.getElementById('eqActivityRmFilter');
   if(sel){ sel.value = rmName; onEqActivityRmFilterChange(); }
