@@ -6035,14 +6035,34 @@ async function saveCallLog(){
   closeModal('callModal');
   toast('Call logged!','success');
   const pg = getCurrentPageId();
-  // Re-render ONLY the view that's on screen right now, so the updated/removed
-  // row disappears instantly. Previously the full clients table (3k+ rows) and
-  // the dashboard were rendered synchronously even while sitting on the
-  // Follow-ups page — that off-screen work caused the 4-5s freeze.
-  if(pg==='eq-followup') renderFollowup('eqf');
-  else if(pg==='mf-followup') renderFollowup('mff');
-  else if(pg==='eq-clients') renderEqTable();
+
+  // Fast path: if we're on a follow-up page, just remove/refresh the single row
+  // instead of re-rendering the whole table (which can be 200+ rows).
+  if((pg==='eq-followup' || pg==='mf-followup') && idx>=0){
+    const group = pg==='eq-followup' ? 'eqf' : 'mff';
+    const rowEl = document.querySelector(`tr[data-client-id="${id}"]`);
+    const tab = group==='eqf' ? activeEqfTab : activeMffTab;
+    // On Today/Overdue tabs — this client is "done", remove the row instantly
+    if(rowEl && (tab==='today' || tab==='overdue')){
+      rowEl.style.transition='opacity .2s';
+      rowEl.style.opacity='0';
+      setTimeout(()=>{ rowEl.remove(); }, 200);
+    } else {
+      // On "All Pending" or "Upcoming" — full re-render needed since data changed
+      renderFollowup(group);
+    }
+    // Update count badge
+    const countEl = document.getElementById(group+'-count');
+    if(countEl && rowEl && (tab==='today'||tab==='overdue')){
+      const n = parseInt(countEl.textContent)||0;
+      if(n>1) countEl.textContent=(n-1)+' client'+(n-1===1?'':'s');
+      else countEl.textContent='0 clients';
+    }
+  } else if(pg==='eq-clients') renderEqTable();
   else if(pg==='mf-clients') renderMfTable();
+  else if(pg==='eq-followup') renderFollowup('eqf');
+  else if(pg==='mf-followup') renderFollowup('mff');
+
   // Everything else is off-screen — defer past the current paint so it never blocks.
   setTimeout(()=>{
     try{
@@ -7417,7 +7437,7 @@ function renderFollowup(group){
 
   data.forEach(c=>{
     const isOver=c.next_call&&c.next_call<t;
-    h+=`<tr class="${isOver?'row-alert':''}">
+    h+=`<tr class="${isOver?'row-alert':''}" data-client-id="${c.id}">
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
