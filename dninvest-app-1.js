@@ -9129,6 +9129,66 @@ function removeAnnouncementImage(){
   document.getElementById('ann-img-input').value='';
 }
 
+// ══════════════════════════════════════════
+// SPECIAL OFFER — poster image (Firebase Storage)
+// Unlike the announcement image (small, stored as base64 in Firestore),
+// offer posters can be full-size — so they're uploaded as a file to
+// Firebase Storage and only the download URL is stored in Firestore.
+// ══════════════════════════════════════════
+let _offerImageBlob;        // undefined = unchanged, null = removed, Blob = new image pending upload
+let _offerImagePreviewUrl;  // current preview src (existing URL, or local preview of a pending image)
+
+function handleOfferImage(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ toast('Please select an image file','error'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      const MAX = 1080; // poster-quality — larger than the announcement thumbnail
+      let w = img.width, h = img.height;
+      if(w > MAX || h > MAX){
+        if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob){
+        _offerImageBlob = blob;
+        _offerImagePreviewUrl = canvas.toDataURL('image/jpeg', 0.85);
+        document.getElementById('offer-img-preview').innerHTML =
+          `<div class="ann-imgwrap"><img src="${_offerImagePreviewUrl}"><button class="ann-rm" type="button" onclick="removeOfferImage()" title="Remove image">×</button></div>`;
+      }, 'image/jpeg', 0.85);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeOfferImage(){
+  _offerImageBlob = null; // explicit removal (distinct from "unchanged")
+  _offerImagePreviewUrl = '';
+  document.getElementById('offer-img-preview').innerHTML='';
+  document.getElementById('offer-img-input').value='';
+}
+
+// Resets the poster-image field. Pass an existing URL (edit mode) to show
+// it as the current image, or call with no args to clear the field.
+function resetOfferImageState(existingUrl){
+  _offerImageBlob = undefined;
+  _offerImagePreviewUrl = existingUrl || '';
+  const inp = document.getElementById('offer-img-input'); if(inp) inp.value='';
+  const prev = document.getElementById('offer-img-preview');
+  if(prev){
+    prev.innerHTML = existingUrl
+      ? `<div class="ann-imgwrap"><img src="${existingUrl}"><button class="ann-rm" type="button" onclick="removeOfferImage()" title="Remove image">×</button></div>`
+      : '';
+  }
+}
+
 // ── Browser Notification Helpers ──
 function requestNotifPermission(){
   if(!('Notification' in window)) return;
@@ -9358,7 +9418,7 @@ function onOfferTargetChange(){
   document.getElementById('offer-users-wrap').style.display = (v==='users')?'':'none';
 }
 
-function saveSpecialOffer(){
+async function saveSpecialOffer(){
   if(!CU || CU.role!=='admin'){ toast('Only admin can publish offers','error'); return; }
   const title=(document.getElementById('offer-title').value||'').trim();
   const msg=(document.getElementById('offer-msg').value||'').trim();
@@ -9377,24 +9437,52 @@ function saveSpecialOffer(){
   if(!title){ toast('Please enter the offer title','error'); return; }
   if(!msg){ toast('Please enter the offer details / message','error'); return; }
   if(to && to<from){ toast('Valid To cannot be earlier than Valid From','error'); return; }
+
+  // Upload the poster image to Firebase Storage first (if a new one was chosen).
+  // imageUrl stays undefined when nothing changed, so an edit doesn't touch
+  // the existing image unless the admin picked a new one or removed it.
+  let imageUrl;
+  const pubBtn=document.getElementById('offer-publish-btn');
+  const prevBtnLabel = editingOfferId ? '💾 Update Offer' : '🎉 Publish Offer';
+  if(_offerImageBlob){
+    if(!window.fst){ toast('Image upload unavailable right now — Firebase Storage did not load. Try refreshing.','error'); return; }
+    if(pubBtn){ pubBtn.disabled=true; pubBtn.innerHTML='⏳ Uploading image…'; }
+    try{
+      const path='special_offers/'+(editingOfferId||('OF'+Date.now()))+'_'+Date.now()+'.jpg';
+      const snap=await window.fst.ref().child(path).put(_offerImageBlob);
+      imageUrl=await snap.ref.getDownloadURL();
+    }catch(e){
+      console.log('Offer image upload error:', e);
+      toast('Image upload failed — offer not saved. Please try again.','error');
+      if(pubBtn){ pubBtn.disabled=false; pubBtn.innerHTML=prevBtnLabel; }
+      return;
+    }
+  } else if(_offerImageBlob===null){
+    imageUrl=''; // admin explicitly removed the image
+  }
+  if(pubBtn){ pubBtn.disabled=false; pubBtn.innerHTML=prevBtnLabel; }
+
   const list=getSpecialOffers();
   if(editingOfferId){
     const o=list.find(x=>x.id===editingOfferId);
-    if(o){ Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name}); }
+    if(o){
+      Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name});
+      if(imageUrl!==undefined) o.image=imageUrl;
+    }
     saveSpecialOffersList(list);
     // Keep the history record in sync with the edited offer
     if(o){
       const hl=getCommHistory();
       const h=hl.find(x=>x.kind==='offer' && x.refId===o.id);
-      if(h){ Object.assign(h,{title:o.title,text:o.msg,theme:o.theme,from:o.from,to:o.to,target:offerTargetLabel(o),edited:new Date().toISOString()}); saveCommHistory(hl); }
-      else addCommHistory({id:'H'+Date.now()+Math.random().toString(36).slice(2,6),kind:'offer',refId:o.id,title:o.title,text:o.msg,theme:o.theme,from:o.from,to:o.to,target:offerTargetLabel(o),by:CU.name,date:o.created||new Date().toISOString(),edited:new Date().toISOString()});
+      if(h){ Object.assign(h,{title:o.title,text:o.msg,theme:o.theme,from:o.from,to:o.to,target:offerTargetLabel(o),edited:new Date().toISOString(),hasImage:!!o.image}); saveCommHistory(hl); }
+      else addCommHistory({id:'H'+Date.now()+Math.random().toString(36).slice(2,6),kind:'offer',refId:o.id,title:o.title,text:o.msg,theme:o.theme,from:o.from,to:o.to,target:offerTargetLabel(o),by:CU.name,date:o.created||new Date().toISOString(),edited:new Date().toISOString(),hasImage:!!o.image});
     }
     cancelOfferEdit();
     renderOffersAdmin();
     toast('💾 Offer updated! RMs will see the new version');
     return;
   }
-  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name};
+  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:imageUrl||''};
   list.push(newOffer);
   saveSpecialOffersList(list);
   // Permanent history record
@@ -9402,10 +9490,11 @@ function saveSpecialOffer(){
     id:'H'+Date.now()+Math.random().toString(36).slice(2,6),
     kind:'offer', refId:newOffer.id,
     title, text:msg, theme, from, to,
-    target:offerTargetLabel(newOffer), by:CU.name, date:newOffer.created
+    target:offerTargetLabel(newOffer), by:CU.name, date:newOffer.created, hasImage:!!newOffer.image
   });
   document.getElementById('offer-title').value='';
   document.getElementById('offer-msg').value='';
+  resetOfferImageState();
   renderOffersAdmin();
   toast('🎉 Offer published! All targeted RMs will see the popup');
 }
@@ -9434,6 +9523,7 @@ function editOffer(id){
     document.querySelectorAll('.offer-user-chk').forEach(c=>{ c.checked=usernames.includes(c.value); });
   }
   onOfferTargetChange();
+  resetOfferImageState(o.image||'');
   const pb=document.getElementById('offer-publish-btn'); if(pb) pb.innerHTML='💾 Update Offer';
   const cb=document.getElementById('offer-cancel-btn'); if(cb) cb.style.display='';
   const card=document.getElementById('offer-admin-card'); if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
@@ -9447,6 +9537,7 @@ function cancelOfferEdit(){
   document.getElementById('offer-to').value='';
   document.getElementById('offer-target').value='ALL';
   onOfferTargetChange();
+  resetOfferImageState();
   const pb=document.getElementById('offer-publish-btn'); if(pb) pb.innerHTML='🎉 Publish Offer';
   const cb=document.getElementById('offer-cancel-btn'); if(cb) cb.style.display='none';
 }
@@ -9520,7 +9611,9 @@ function renderOffersAdmin(){
       else if(!o.active) badge='<span style="font-size:.62rem;color:var(--text3);background:var(--border,#ddd);border-radius:10px;padding:1px 8px;margin-left:4px">PAUSED</span>';
       else if(o.from && d<o.from) badge='<span style="font-size:.62rem;color:#9C6500;background:#FFEB9C;border-radius:10px;padding:1px 8px;margin-left:4px">⏳ STARTS '+o.from+' — no popup yet</span>';
       else badge='<span style="font-size:.62rem;color:#9C0006;background:#FFC7CE;border-radius:10px;padding:1px 8px;margin-left:4px">EXPIRED</span>';
+      const thumb = o.image ? `<img src="${o.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border,#e3e8ef);flex-shrink:0">` : '';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border,#e3e8ef);border-radius:10px;margin-bottom:6px">
+        ${thumb}
         <span style="font-size:20px">${th.emoji}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:.85rem;font-weight:600">${o.title} ${badge}</div>
@@ -9671,9 +9764,11 @@ function showOfferPopupIfAny(force){
   const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const cards=live.map(o=>{
     const t=OFFER_THEMES[o.theme]||OFFER_THEMES.festival;
+    const posterHtml = o.image ? `<img src="${esc(o.image)}" style="width:100%;max-height:320px;object-fit:cover;border-radius:10px;margin-top:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.25)">` : '';
     return `<div style="background:rgba(255,255,255,.14);backdrop-filter:blur(3px);border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:14px 16px;margin-top:12px;text-align:left">
       <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:.3px">${t.emoji} ${esc(o.title)}</div>
       <div style="font-size:13.5px;color:rgba(255,255,255,.95);margin-top:6px;line-height:1.5;white-space:pre-wrap">${esc(o.msg)}</div>
+      ${posterHtml}
       <div style="font-size:11px;color:${th.ribbon};margin-top:8px;font-weight:600">⏳ Valid: ${o.from||'today'}${o.to?' to '+o.to:' — until further notice'}</div>
     </div>`;
   }).join('');
