@@ -9434,14 +9434,13 @@ function saveSpecialOffer(){
   if(!title && !willHaveImage){ toast('Please enter the offer title, or add a poster image','error'); return; }
   if(!msg && !willHaveImage){ toast('Please enter the offer details / message, or add a poster image','error'); return; }
   if(to && to<from){ toast('Valid To cannot be earlier than Valid From','error'); return; }
-  const finalTitle = title || 'Special Offer 🎁';
 
   // _offerImageData: undefined = leave unchanged (edit only), '' = removed, dataURL = new image
   const list=getSpecialOffers();
   if(editingOfferId){
     const o=list.find(x=>x.id===editingOfferId);
     if(o){
-      Object.assign(o,{title:finalTitle,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name});
+      Object.assign(o,{title,msg,theme,target,from,to,updated:new Date().toISOString(),updatedBy:CU.name});
       if(_offerImageData!==undefined) o.image=_offerImageData;
     }
     saveSpecialOffersList(list);
@@ -9457,14 +9456,14 @@ function saveSpecialOffer(){
     toast('💾 Offer updated! RMs will see the new version');
     return;
   }
-  const newOffer={id:'OF'+Date.now(), title:finalTitle, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:_offerImageData||''};
+  const newOffer={id:'OF'+Date.now(), title, msg, theme, target, from, to, active:true, created:new Date().toISOString(), by:CU.name, image:_offerImageData||''};
   list.push(newOffer);
   saveSpecialOffersList(list);
   // Permanent history record
   addCommHistory({
     id:'H'+Date.now()+Math.random().toString(36).slice(2,6),
     kind:'offer', refId:newOffer.id,
-    title:finalTitle, text:msg, theme, from, to,
+    title, text:msg, theme, from, to,
     target:offerTargetLabel(newOffer), by:CU.name, date:newOffer.created, hasImage:!!newOffer.image
   });
   document.getElementById('offer-title').value='';
@@ -9591,8 +9590,8 @@ function renderOffersAdmin(){
         ${thumb}
         <span style="font-size:20px">${th.emoji}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:.85rem;font-weight:600">${o.title} ${badge}</div>
-          <div style="font-size:.74rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.msg}</div>
+          <div style="font-size:.85rem;font-weight:600">${o.title||'🖼️ Poster Offer'} ${badge}</div>
+          <div style="font-size:.74rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.msg||(o.image?'(poster image only — no text)':'')}</div>
           <div style="font-size:.68rem;color:var(--text3)">🎯 ${offerTargetLabel(o)} · 📅 ${o.from||'—'} → ${o.to||'no end'}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
@@ -9734,14 +9733,32 @@ function showOfferPopupIfAny(force){
   if(!force && offerPopupShownIds===ids) return;
   offerPopupShownIds=ids;
   const old=document.getElementById('offer-popup-overlay'); if(old) old.remove();
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const el=document.createElement('div');
+  el.id='offer-popup-overlay';
+
+  // Pure poster mode: every live offer has an image and no title/message —
+  // show just the poster(s), full size, no themed card/confetti behind it.
+  const posterOnly = live.every(o=>o.image && !(o.title||'').trim() && !(o.msg||'').trim());
+  if(posterOnly){
+    const imgs=live.map(o=>`<img src="${esc(o.image)}" style="width:100%;max-height:80vh;object-fit:contain;border-radius:14px;display:block;box-shadow:0 12px 40px rgba(0,0,0,.5);margin-bottom:14px">`).join('');
+    el.innerHTML=`
+      <div class="offer-poster-only">
+        ${imgs}
+        <button onclick="document.getElementById('offer-popup-overlay').remove()" class="offer-close-btn">Got it! 🎉</button>
+      </div>`;
+    document.body.appendChild(el);
+    return;
+  }
+
   const th=OFFER_THEMES[live[0].theme]||OFFER_THEMES.festival;
   const floats=th.float.concat(th.float).map((e,i)=>`<span class="offer-float" style="left:${(i*13+5)%95}%;animation-delay:${(i*0.7).toFixed(1)}s;animation-duration:${(5+(i%4)).toFixed(1)}s">${e}</span>`).join('');
-  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const cards=live.map(o=>{
     const t=OFFER_THEMES[o.theme]||OFFER_THEMES.festival;
-    const posterHtml = o.image ? `<img src="${esc(o.image)}" style="width:100%;max-height:320px;object-fit:cover;border-radius:10px;margin-top:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.25)">` : '';
-    const titleHtml = o.title ? `<div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:.3px">${t.emoji} ${esc(o.title)}</div>` : '';
-    const msgHtml = o.msg ? `<div style="font-size:13.5px;color:rgba(255,255,255,.95);margin-top:6px;line-height:1.5;white-space:pre-wrap">${esc(o.msg)}</div>` : '';
+    const posterHtml = o.image ? `<img src="${esc(o.image)}" style="width:100%;max-height:60vh;object-fit:contain;border-radius:10px;margin-top:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.25)">` : '';
+    const titleHtml = (o.title||'').trim() ? `<div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:.3px">${t.emoji} ${esc(o.title)}</div>` : '';
+    const msgHtml = (o.msg||'').trim() ? `<div style="font-size:13.5px;color:rgba(255,255,255,.95);margin-top:6px;line-height:1.5;white-space:pre-wrap">${esc(o.msg)}</div>` : '';
     return `<div style="background:rgba(255,255,255,.14);backdrop-filter:blur(3px);border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:14px 16px;margin-top:12px;text-align:left">
       ${titleHtml}
       ${msgHtml}
@@ -9749,8 +9766,6 @@ function showOfferPopupIfAny(force){
       <div style="font-size:11px;color:${th.ribbon};margin-top:8px;font-weight:600">⏳ Valid: ${o.from||'today'}${o.to?' to '+o.to:' — until further notice'}</div>
     </div>`;
   }).join('');
-  const el=document.createElement('div');
-  el.id='offer-popup-overlay';
   el.innerHTML=`
     <div class="offer-popup-card" style="background:${th.grad}">
       <div class="offer-float-layer">${floats}</div>
@@ -9769,6 +9784,7 @@ function showOfferPopupIfAny(force){
   css.textContent=`
   #offer-popup-overlay{position:fixed;inset:0;background:rgba(10,14,25,.62);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;animation:offerFade .25s ease}
   .offer-popup-card{position:relative;overflow:hidden;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;border-radius:22px;padding:26px 22px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.5);animation:offerPop .45s cubic-bezier(.2,1.4,.4,1)}
+  .offer-poster-only{position:relative;width:100%;max-width:460px;max-height:92vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;animation:offerPop .45s cubic-bezier(.2,1.4,.4,1)}
   .offer-big-emoji{font-size:52px;line-height:1;animation:offerBounce 1.6s ease-in-out infinite}
   .offer-float-layer{position:absolute;inset:0;z-index:1;pointer-events:none}
   .offer-float{position:absolute;top:105%;font-size:20px;opacity:.85;animation-name:offerFloatUp;animation-iteration-count:infinite;animation-timing-function:linear}
