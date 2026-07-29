@@ -2431,13 +2431,13 @@ function refreshDash(){
     statsHtml+=sc(eq.length,'Total EQ Clients','','equity');
     statsHtml+=sc('₹'+fmtNum(totalRisk),'Asset','gold','equity');
   }
-  if(hasMf){
-    statsHtml+=sc(mf.length,'MF Investors','teal','mf');
-    statsHtml+=sc('₹'+fmtNum(totalAUM),'Total AUM','gold','mf');
-    statsHtml+=sc('₹'+fmtNum(totalSIP),'Monthly SIP','purple','mf');
-  }
   if(hasEq||hasMf){
     statsHtml+=sc(pendEq+pendMf,'Follow-ups Due','red','');
+  }
+  if(hasMf){
+    statsHtml+=sc('₹'+fmtNum(totalAUM),'Total AUM','gold','mf');
+    statsHtml+=sc('₹'+fmtNum(totalSIP),'Monthly SIP','purple','mf');
+    statsHtml+=sc(mf.length,'MF Investors','teal','mf');
   }
   document.getElementById('dashStats').innerHTML=statsHtml;
 
