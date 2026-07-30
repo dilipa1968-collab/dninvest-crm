@@ -3422,7 +3422,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','followup-filter','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
+  ['search','status','rm','comeback','followup-filter','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -3537,6 +3537,7 @@ function renderEqTable(){
   const q=(document.getElementById('eq-search')||{value:''}).value.toLowerCase();
   const st=(document.getElementById('eq-status')||{value:''}).value;
   const rm=(document.getElementById('eq-rm')||{value:''}).value;
+  const comebackFilter=(document.getElementById('eq-comeback')||{value:''}).value;
   const fu=(document.getElementById('eq-followup-filter')||{value:''}).value;
   const lcFrom=(document.getElementById('eq-last-call-from')||{value:''}).value;
   const lcTo=(document.getElementById('eq-last-call-to')||{value:''}).value;
@@ -3551,6 +3552,7 @@ function renderEqTable(){
   else data=data.filter(c=>!c.do_not_call); // default: DNC hide
   if(rm==='__NONE__') data=data.filter(c=>!(c.rm||'').trim());
   else if(rm) data=data.filter(c=>rmMatches(c.rm, rm));
+  if(comebackFilter) data=data.filter(c=>c.comeback_tag===comebackFilter && c.comeback_date===c.last_trade_date);
   if(fu==='pending') data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()==='PENDING'||c.next_call);
   if(fu==='today') data=data.filter(c=>c.next_call===today());
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());

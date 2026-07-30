@@ -1395,6 +1395,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #ECEDF9;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterEq()" id="eq-rm" style="background:#FDF8FA;border:1px solid #F7E4EA;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
+          <select onchange="filterEq()" id="eq-comeback" title="Clients whose Name is highlighted today for a comeback trade" style="background:#FAFAF8;border:1px solid #EEEEE0;border-radius:8px;color:#1F2937;font-weight:500"><option value="">🎨 All Comeback Colors</option>
+            <option value="blue">🔵 Blue (~1 month+)</option><option value="green">🟢 Green (~3 months+)</option><option value="yellow">🟡 Yellow (~6 months+)</option></select>
           <select onchange="filterEq()" id="eq-followup-filter" style="background:#F8FCFE;border:1px solid #E7F2F6;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Follow-ups</option>
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
