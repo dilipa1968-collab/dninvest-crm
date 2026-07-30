@@ -771,6 +771,12 @@ function fmtDate(d){ if(!d) return ''; try{ if(/^\d{4}-\d{2}-\d{2}/.test(d)){ co
 // Time from a call log's ISO timestamp (e.g. "3:45 PM"). Purane logs me ts na ho to khali.
 function fmtTime(ts){ if(!ts) return ''; try{const dt=new Date(ts); if(isNaN(dt)) return ''; return dt.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true});}catch(e){return '';} }
 function daysDiff(d){ if(!d) return null; let dt; if(/^\d{4}-\d{2}-\d{2}/.test(d)){ const p=d.split('T')[0].split('-'); dt=new Date(+p[0],+p[1]-1,+p[2]); } else { dt=new Date(d); } if(isNaN(dt)) return null; const now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return Math.floor((today-dt)/(1000*60*60*24)); }
+function daysBetween(d1,d2){
+  const parse=d=>{ if(!d) return null; let dt; if(/^\d{4}-\d{2}-\d{2}/.test(d)){ const p=d.split('T')[0].split('-'); dt=new Date(+p[0],+p[1]-1,+p[2]); } else { dt=new Date(d); } return isNaN(dt)?null:dt; };
+  const a=parse(d1), b=parse(d2);
+  if(!a||!b) return null;
+  return Math.floor((b-a)/(1000*60*60*24));
+}
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
 let _uidCounter=0;
 function uid(){ _uidCounter=(_uidCounter+1)%1000; return Date.now().toString(36)+'_'+_uidCounter.toString(36)+Math.random().toString(36).substr(2,6); }
@@ -3646,7 +3652,12 @@ function renderEqTable(){
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${(()=>{
+        const tag = (c.comeback_tag && c.comeback_date===c.last_trade_date) ? c.comeback_tag : '';
+        const col = tag==='yellow'?'#b7950b':tag==='green'?'var(--green)':tag==='blue'?'var(--blue)':'';
+        const title = tag ? ` title="Comeback trade — ${tag==='blue'?'~1':tag==='green'?'~3':'~6'}+ month gap"` : '';
+        return col ? `<span style="color:${col}"${title}>${c.name}</span>` : c.name;
+      })()}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
@@ -12009,7 +12020,17 @@ async function doEqImport(){
         ex.status = row.status;                // Active / Inactive / Closed file se
       }
       if(row.asset_value!==null) ex.asset_value = row.asset_value;
-      if(row.last_trade_date) ex.last_trade_date = row.last_trade_date;
+      if(row.last_trade_date && row.last_trade_date!==ex.last_trade_date){
+        // Comeback-trade highlight: colour the Name for the day this trade
+        // shows up, based on how long the client had gone without trading.
+        const gapDays = ex.last_trade_date ? daysBetween(ex.last_trade_date, row.last_trade_date) : null;
+        if(gapDays!==null && gapDays>=180) ex.comeback_tag='yellow';
+        else if(gapDays!==null && gapDays>=90) ex.comeback_tag='green';
+        else if(gapDays!==null && gapDays>=30) ex.comeback_tag='blue';
+        else ex.comeback_tag='';
+        ex.comeback_date = row.last_trade_date;   // tag only applies while this stays the latest trade date
+        ex.last_trade_date = row.last_trade_date;
+      }
       if(row.email) ex.email = row.email;      // always overwrite email from file
       if(row.mobile) ex.mobile = row.mobile;   // update mobile (country code stripped)
       if(row.dob) ex.dob = row.dob;            // fill DOB if present in file
