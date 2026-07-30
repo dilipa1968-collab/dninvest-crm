@@ -1511,6 +1511,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
             <button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="openMfDupMerge()">🔀 Merge Duplicates</button>
+            <button class="btn btn-outline" style="display:none" onclick="openMfBulkDobModal()" id="mfBulkDobBtn">🎂 Bulk DOB Update</button>
             <button class="btn btn-teal" id="mfAddClientBtn" onclick="openAddClient('mf')">+ Add Investor</button>
           </div>
         </div>
@@ -3025,6 +3026,32 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('eqBulkModal')">Cancel</button>
       <button class="btn btn-teal" id="eqBulkBtnGo" onclick="doEqBulkUpdate()" disabled>Update</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="mfBulkDobModal" onclick="if(event.target===this)closeModal('mfBulkDobModal')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>🎂 MF — Bulk DOB Update</h3>
+      <button class="modal-close" onclick="closeModal('mfBulkDobModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
+        Upload the broker's client list file (the one where the <b>Name</b> column looks like <b>NAME [PAN] [CLIENT CODE]</b>, followed by a <b>DOB</b> column). Client Code (2nd bracket) is matched first, PAN (1st bracket) as fallback. Only <b>DOB</b> gets updated — nothing else touches. <b>Naye investor add nahi honge.</b>
+      </p>
+      <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
+        File ka header row auto-detect hota hai (<b>Name</b> + <b>DOB</b> columns dhoonde jaate hain — baaki columns jaise City/Address/Email/Mobile ignore ho jaate hain). DOB format <b>YYYY-MM-DD</b>, <b>DD/MM/YYYY</b>, ya Excel date — sab chalega. <b>0000-00-00</b> / blank rows apne aap skip.
+      </p>
+      <div class="import-zone" id="mf-bulk-dob-zone" onclick="document.getElementById('mf-bulk-dob-file').click()">
+        🎂 Drag the file here or click to browse
+        <input type="file" id="mf-bulk-dob-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleMfBulkDobFile(this)">
+      </div>
+      <div id="mf-bulk-dob-preview" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('mfBulkDobModal')">Cancel</button>
+      <button class="btn btn-teal" id="mfBulkDobBtnGo" onclick="doMfBulkDobUpdate()" disabled>Update</button>
     </div>
   </div>
 </div>

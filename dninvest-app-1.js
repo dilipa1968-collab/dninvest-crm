@@ -1846,6 +1846,8 @@ function initApp(){
   }
   const eqBulkBtn=document.getElementById('eqBulkBtn');
   if(eqBulkBtn) eqBulkBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const mfBulkDobBtn=document.getElementById('mfBulkDobBtn');
+  if(mfBulkDobBtn) mfBulkDobBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixMobileBtn=document.getElementById('eqFixMobileBtn');
   if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixStatusBtn=document.getElementById('eqFixStatusBtn');
@@ -12280,6 +12282,155 @@ async function doEqBulkUpdate(){
     setTimeout(()=>{
       showReport(`Client Code Not Found — ${notFoundRows.length} rows (skip kiye)`,
         ['Client Code','RM','PAN','DOB'], notFoundRows);
+    }, 600);
+  }
+}
+
+// ══ MF BULK DOB UPDATE (Admin only) ══
+// Broker client-list exports have Name as "NAME [PAN] [CLIENT CODE]" (same
+// bracket format as the Running SIP Report), followed by a DOB column. This
+// parses that format directly — no need to split it into separate columns.
+let mfBulkDobData = null;
+let mfBulkDobBad = [];
+
+function openMfBulkDobModal(){
+  if(CU.role!=='admin') return;
+  mfBulkDobData = null; mfBulkDobBad = [];
+  document.getElementById('mf-bulk-dob-preview').innerHTML='';
+  document.getElementById('mfBulkDobBtnGo').disabled=true;
+  document.getElementById('mf-bulk-dob-file').value='';
+  document.getElementById('mfBulkDobModal').classList.add('open');
+}
+
+function parseMfDobFile(rows){
+  const wanted = {
+    name: ['name','clientname','investorname'],
+    dob:  ['dob','dateofbirth','birthdate','birthday']
+  };
+  let hdrIdx=-1, colMap={};
+  for(let i=0; i<Math.min(rows.length,15); i++){
+    const map={};
+    (rows[i]||[]).forEach((cell,ci)=>{
+      const h=normHdr(cell);
+      for(const [f,vars] of Object.entries(wanted)){
+        if(vars.includes(h) && map[f]===undefined) map[f]=ci;
+      }
+    });
+    if(map.name!==undefined && map.dob!==undefined){ hdrIdx=i; colMap=map; break; }
+  }
+  if(hdrIdx===-1) return null;   // caller aborts — never guess positions
+
+  const data=[], bad=[];
+  rows.slice(hdrIdx+1).forEach(r=>{
+    if(!r || !r.some(c=>c!=='' && c!=null)) return;
+    const nameRaw = String(r[colMap.name]||'');
+    if(!nameRaw.trim()) return;
+    // Same bracket parsing as the Running SIP Report: "NAME [PAN] [CLIENT CODE]"
+    const name = nameRaw.replace(/\[.*?\]/g,'').replace(/\s+/g,' ').trim();
+    const panMatch = nameRaw.match(/\[([A-Z]{5}\d{4}[A-Z])\]/);
+    const pan = panMatch ? panMatch[1] : '';
+    const cidMatch = nameRaw.match(/\[(\d{4,})\]/);
+    const clientId = cidMatch ? cidMatch[1] : '';
+    if(!pan && !clientId){ bad.push([name||'—', '—', 'No PAN/Client Code in name — cannot match']); return; }
+
+    const rawDob = String(r[colMap.dob]==null?'':r[colMap.dob]).trim();
+    if(!rawDob || rawDob==='0000-00-00'){ bad.push([name, clientId||pan, rawDob||'(blank)']); return; }
+    const dob = normDob(rawDob);
+    if(!dob || dob.slice(0,4)==='0000'){ bad.push([name, clientId||pan, rawDob]); return; }
+
+    data.push({name, pan, client_id:clientId, dob});
+  });
+  return {data, bad};
+}
+
+function handleMfBulkDobFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  readExcel(file, function(err, rows){
+    if(err){ toast('File read error: '+err.message,'error'); return; }
+    const parsed = parseMfDobFile(rows);
+    if(!parsed || !parsed.data.length){
+      toast('File me "Name" aur "DOB" column nahi mil paye, ya koi valid row nahi mila','error');
+      document.getElementById('mfBulkDobBtnGo').disabled=true;
+      return;
+    }
+    // De-dup by client_id (or PAN if no client_id) — last row wins, same as Eq bulk
+    const byKey = {};
+    let dupSkipped = 0;
+    parsed.data.forEach(row=>{
+      const key = row.client_id || row.pan;
+      if(byKey[key]) dupSkipped++;
+      byKey[key] = row;
+    });
+    mfBulkDobData = Object.values(byKey);
+    mfBulkDobBad = parsed.bad;
+
+    let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
+       ✅ ${mfBulkDobData.length} row(s) — DOB update honge</div>`;
+    if(dupSkipped){
+      html += `<div style="background:#eef6ff;color:#1d4ed8;padding:8px 10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
+       ℹ️ ${dupSkipped} duplicate row(s) — aakhri wali li gayi hai.</div>`;
+    }
+    if(mfBulkDobBad.length){
+      html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
+       ⚠️ ${mfBulkDobBad.length} row(s) skip ho gaye (invalid DOB ya PAN/Client Code missing).
+       <a href="#" onclick="showMfBulkDobBadReport();return false;" style="color:var(--teal);text-decoration:underline;margin-left:6px">Dekho</a></div>`;
+    }
+    document.getElementById('mf-bulk-dob-preview').innerHTML = html;
+    document.getElementById('mfBulkDobBtnGo').disabled = false;
+  });
+}
+
+function showMfBulkDobBadReport(){
+  if(!mfBulkDobBad.length) return;
+  showReport(`Skipped rows (${mfBulkDobBad.length})`, ['Name','PAN / Client Code','Wajah'], mfBulkDobBad);
+}
+
+async function doMfBulkDobUpdate(){
+  if(CU.role!=='admin') return;
+  if(!mfBulkDobData || !mfBulkDobData.length) return;
+  const existing = DB.get('mf_clients')||[];
+  const byClientId = {}, byPan = {};
+  existing.forEach(c=>{
+    if(c.client_id) byClientId[String(c.client_id).trim()] = c;
+    const p = String(c.pan||'').trim().toUpperCase();
+    if(p && !c.is_minor) byPan[p] = c;   // minors can carry a guardian's PAN — never match on it
+  });
+
+  let updated=0, unchanged=0;
+  const touched=[], newLogs=[], notFoundRows=[];
+
+  mfBulkDobData.forEach(row=>{
+    const ex = (row.client_id && byClientId[row.client_id]) || (row.pan && byPan[row.pan]) || null;
+    if(!ex){ notFoundRows.push([row.name, row.client_id||row.pan||'—', fmtDate(row.dob)]); return; }
+    const oldDob = (ex.dob||'').trim();
+    if(oldDob===row.dob){ unchanged++; return; }
+    ex.dob = row.dob;
+    ex.updated = today();
+    updated++;
+    touched.push(ex);
+    newLogs.push({
+      id: uid(), type:'bulk_update', seg:'mf',
+      client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
+      by: CU.name, date: new Date().toISOString(),
+      changes: [{field:'dob', old:oldDob||'—', new:row.dob}]
+    });
+  });
+
+  if(touched.length) await DB.setClientsBulk('mf_clients', touched);
+  if(newLogs.length) await DB.addActivityLog(newLogs);
+
+  closeModal('mfBulkDobModal');
+  let msg = `✅ Bulk DOB Update done! ${updated} investor(s) updated`;
+  if(unchanged) msg += `, ${unchanged} already same`;
+  if(notFoundRows.length) msg += `, ${notFoundRows.length} not found`;
+  toast(msg, updated>0?'success':'error');
+  renderMfTable(); refreshDash(); updateBadges();
+
+  if(notFoundRows.length){
+    setTimeout(()=>{
+      showReport(`PAN / Client Code Not Found — ${notFoundRows.length} rows (skip kiye)`,
+        ['Name','PAN / Client Code','DOB'], notFoundRows);
     }, 600);
   }
 }
