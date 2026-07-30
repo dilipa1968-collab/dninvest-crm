@@ -7162,7 +7162,7 @@ function saveMfTxnEntry(){
 let mfTxnSort = { key:'date', dir:'desc' };
 function setMfTxnSort(key){
   if(mfTxnSort.key===key){ mfTxnSort.dir = mfTxnSort.dir==='asc' ? 'desc' : 'asc'; }
-  else { mfTxnSort.key=key; mfTxnSort.dir = (key==='date'||key==='amount') ? 'desc' : 'asc'; }
+  else { mfTxnSort.key=key; mfTxnSort.dir = (key==='date'||key==='start_date'||key==='amount') ? 'desc' : 'asc'; }
   renderMfTxnTable();
 }
 function mfTxnSortValue(e, key){
@@ -7173,6 +7173,7 @@ function mfTxnSortValue(e, key){
     case 'fund':   return (e.fund_name||'').toLowerCase();
     case 'amount': return Number(e.amount)||0;
     case 'status': return (e.status||'Pending').toLowerCase();
+    case 'start_date': return (e.start_date||'');
     case 'date':
     default:       return (e.date||'');
   }
