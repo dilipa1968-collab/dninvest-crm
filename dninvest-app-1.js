@@ -6510,7 +6510,7 @@ function bizStatusBadge(status){
   const map = {
     Approved: {bg:'#1D9E7522', col:'#1D9E75', label:'✅ Approved'},
     Declined: {bg:'#C0392B22', col:'#C0392B', label:'❌ Declined'},
-    Pending:  {bg:'#D3940022', col:'#B7950B', label:'⏳ Pending'}
+    Pending:  {bg:'#D3940022', col:'#B7950B', label:'⏳ Pend'}
   };
   const m = map[s] || map.Pending;
   return `<span class="badge" style="background:${m.bg};color:${m.col};font-weight:600">${m.label}</span>`;
@@ -7236,7 +7236,7 @@ function renderMfTxnTable(){
   const sThNoFilter=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
   wrap.innerHTML=`<table>
-    <thead><tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}<th></th></tr></thead>
+    <thead><tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('start_date','SIP Start')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
@@ -7244,10 +7244,11 @@ function renderMfTxnTable(){
         const canRemark = canAddCrossRemark(e);
         const remarkCell = e.cross_remark
           ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
-          : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
+          : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Rmk</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
         return `<tr>
           ${MFTBULK.td(e.id)}
           <td style="width:68px;font-size:.67rem;white-space:nowrap">${e.date||'—'}</td>
+          <td style="width:68px;font-size:.67rem;white-space:nowrap">${e.start_date?fmtDate(e.start_date):'—'}</td>
           <td onclick="viewMfTxnDetail('${e.id}')" style="width:105px;max-width:110px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;cursor:pointer;color:var(--teal,#0d9488);text-decoration:underline" title="Click to view full transaction detail">${escapeHtml(e.client_name||'—')}</td>
           <td style="width:40px;font-size:.67rem;white-space:nowrap">${escapeHtml(e.rm||'—')}</td>
           <td style="width:62px;white-space:nowrap"><span class="badge" style="background:${color}22;color:${color};font-size:.61rem;padding:1px 5px">${escapeHtml(e.type||'—')}</span></td>
@@ -7266,7 +7267,7 @@ function renderMfTxnTable(){
       }).join('')}
     </tbody>
     <tfoot><tr style="font-weight:700;background:var(--bg,#f6f7fb);border-top:2px solid var(--border,#ddd)">
-      <td colspan="${CU.role==='admin'?6:5}" style="text-align:right">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</td>
+      <td colspan="${CU.role==='admin'?7:6}" style="text-align:right">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</td>
       <td style="text-align:right">₹${brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))}</td>
       <td style="text-align:right">${INC.fmt(INC.total('mf',entries))}</td>
       <td colspan="3"></td>
@@ -8594,7 +8595,7 @@ function renderBizReportTable(){
     const canRemark = canAddCrossRemark(e);
     const remarkCell = e.cross_remark
       ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
-      : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Add remark</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
+      : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Rmk</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
     const canEdit = CU.role==='admin' || e.created_by===CU.name;
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
     h+=`<td style="min-width:140px">${remarkCell}</td>`;
