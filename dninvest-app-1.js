@@ -2305,7 +2305,8 @@ function renderMfAumTrend(){
   const mf = getMyMfClients();
   window.__mfAumRows = mf;
   const totalInvested = mf.reduce((s,c)=>s+(parseFloat(c.aum_detail && c.aum_detail.inv)||0),0);
-  const changed = mf.filter(c=>c.invested_change_amt);
+  const td = today();
+  const changed = mf.filter(c=>c.invested_change_amt && c.invested_change_date===td);
   const increased = changed.filter(c=>c.invested_change_amt>0);
   const decreased = changed.filter(c=>c.invested_change_amt<0);
   const sumInc = increased.reduce((s,c)=>s+c.invested_change_amt,0);
@@ -2314,8 +2315,8 @@ function renderMfAumTrend(){
   const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
   const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
   const footerNote = isAdmin
-    ? `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
-    : `📅 ${fmtDate(today())} · based on last AUM By Client import · click card for full list`;
+    ? `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
+    : `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for full list`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
     <div class="dash-stat-grid dash-stat-grid-4" onclick="${cardClick}" title="${cardClick}">
@@ -2357,8 +2358,9 @@ function showMfZeroBalance(){
 // Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
 function showMfAumList(){
   const rows = window.__mfAumRows || [];
-  const changed = rows.filter(c=>c.invested_change_amt).sort((a,b)=>Math.abs(b.invested_change_amt)-Math.abs(a.invested_change_amt));
-  if(!changed.length){ toast('Abhi koi Invested Amount change record nahi hai — AUM By Client import ke baad yahan dikhega','info'); return; }
+  const td = today();
+  const changed = rows.filter(c=>c.invested_change_amt && c.invested_change_date===td).sort((a,b)=>Math.abs(b.invested_change_amt)-Math.abs(a.invested_change_amt));
+  if(!changed.length){ toast('Aaj koi Invested Amount change record nahi hai — AUM By Client import ke baad yahan dikhega','info'); return; }
   const table = changed.map(c=>{
     const up = c.invested_change_amt>0;
     const newInv = (c.aum_detail && c.aum_detail.inv) || 0;
@@ -2366,13 +2368,14 @@ function showMfAumList(){
       `<span style="color:${up?'var(--green)':'var(--red)'};font-weight:700">${up?'▲ +':'▼ -'}₹${fmtNum(Math.abs(c.invested_change_amt))}</span>`,
       c.invested_change_date?fmtDate(c.invested_change_date):'—'];
   });
-  showReport('📈 MF Invested Amount — Changes (Since Last Import)', ['Name','RM','Previous Invested','Current Invested','Change','Date'], table);
+  showReport('📈 MF Invested Amount — Changes (Today)', ['Name','RM','Previous Invested','Current Invested','Change','Date'], table);
 }
 
 // Admin-only: RM-wise split of AUM increases/decreases.
 function showMfAumRmSplit(){
   const rows = window.__mfAumRows || [];
-  const changed = rows.filter(c=>c.invested_change_amt);
+  const td = today();
+  const changed = rows.filter(c=>c.invested_change_amt && c.invested_change_date===td);
   const rmMap = {};
   changed.forEach(c=>{
     const rm = c.rm || '— (no RM)';
@@ -2384,8 +2387,8 @@ function showMfAumRmSplit(){
     const rmCell = rm==='— (no RM)' ? rm : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="closeModal('reportModal');showMfAumList()">${escapeHtml(rm)}</span>`;
     return [rmCell, v.inc, '₹'+fmtNum(v.incAmt), v.dec, '₹'+fmtNum(v.decAmt)];
   }).sort((a,b)=>(b[1]+b[3])-(a[1]+a[3]));
-  if(!table.length){ toast('Abhi koi Invested Amount change record nahi hai','info'); return; }
-  showReport('📈 MF Invested Amount Changes — RM-wise', ['RM','Additions','Addition Amt','Redemptions','Redemption Amt'], table);
+  if(!table.length){ toast('Aaj koi Invested Amount change record nahi hai','info'); return; }
+  showReport('📈 MF Invested Amount Changes (Today) — RM-wise', ['RM','Additions','Addition Amt','Redemptions','Redemption Amt'], table);
 }
 
 // Generic Show More / Show Less toggle — reusable by any dashboard list card.
@@ -2753,7 +2756,7 @@ function renderEqActivityTrend(activeEq){
   const eqWins = yesterdayEntry ? Math.max(0, nActive - yesterdayEntry.active) : 0;
   const eqLoss = yesterdayEntry ? Math.max(0, yesterdayEntry.active - nActive) : 0;
   const mfAll = (typeof getMyMfClients === 'function') ? getMyMfClients() : [];
-  const mfWins = mfAll.filter(c => c.invested_change_amt > 0 && !(parseFloat(c.prev_invested)||0)).length;
+  const mfWins = mfAll.filter(c => c.invested_change_amt > 0 && c.invested_change_date===td && !(parseFloat(c.prev_invested)||0)).length;
   const totalWins = eqWins + mfWins;
   const totalLoss = eqLoss;
 
