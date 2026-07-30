@@ -3651,15 +3651,13 @@ function renderEqTable(){
   rows.forEach(c=>{
     const days=daysDiff(c.last_trade_date);
     const rowCls=days>=90?'row-alert':c.status==='Inactive'?'row-inactive':'';
+    const comebackTag = (c.comeback_tag && c.comeback_date===c.last_trade_date) ? c.comeback_tag : '';
+    const comebackBg = comebackTag==='yellow'?'#fef9e7':comebackTag==='green'?'#eafaf0':comebackTag==='blue'?'#eaf2ff':'';
+    const rowStyle = comebackBg ? ` style="background:${comebackBg}"` : '';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
-    h+=`<tr class="${rowCls}">${BULK.td('eq',c.id)}
+    h+=`<tr class="${rowCls}"${rowStyle}${comebackTag?` title="Comeback trade — ${comebackTag==='blue'?'~1':comebackTag==='green'?'~3':'~6'}+ month gap"`:''}>${BULK.td('eq',c.id)}
       <td>${c.code||'—'}</td>
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${(()=>{
-        const tag = (c.comeback_tag && c.comeback_date===c.last_trade_date) ? c.comeback_tag : '';
-        const col = tag==='yellow'?'#b7950b':tag==='green'?'var(--green)':tag==='blue'?'var(--blue)':'';
-        const title = tag ? ` title="Comeback trade — ${tag==='blue'?'~1':tag==='green'?'~3':'~6'}+ month gap"` : '';
-        return col ? `<span style="color:${col}"${title}>${c.name}</span>` : c.name;
-      })()}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
