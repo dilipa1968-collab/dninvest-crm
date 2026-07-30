@@ -5845,6 +5845,12 @@ async function saveClient(){
   if(!name){ toast('Client name is required','error'); return; }
   if(!rm){ toast('Please select RM','error'); return; }
 
+  // Reminder (non-blocking) — nudge to fill DOB while editing a client that doesn't have one yet.
+  if(currentEditId){
+    const dobVal = (document.getElementById('f_dob')||{value:''}).value.trim();
+    if(!dobVal) toast('⚠️ Is client ki Date of Birth abhi bhi khali hai — agar pata ho toh bhar dijiye');
+  }
+
   // RM call-date lock (Admin-configured). Admin is unrestricted.
   if(CU && CU.role!=='admin'){
     const _cl=effectiveCallLimits();
@@ -6763,10 +6769,6 @@ function renderMfTxnPage(){
 }
 
 // Month dropdown me wahi mahine bhare jo data me actually hain (RM ke apne, Admin ke saare).
-// Pehli baar page open hone par current month auto-select ho jata hai (agar us mahine ka
-// data maujood hai); user jab chahe "All Months" ya koi aur mahina manually chun sakta hai,
-// aur wo choice tab tak preserve rehti hai jab tak page dobara fresh (F5) na ho.
-let mfTxnMonthAutoApplied=false;
 function populateMfTxnMonths(){
   const sel=document.getElementById('mftxn-month-filter');
   if(!sel) return;
@@ -6779,13 +6781,7 @@ function populateMfTxnMonths(){
   const MNF=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const label=m=>{const [y,mo]=m.split('-');return MNF[+mo]+' '+y;};
   sel.innerHTML='<option value="">All Months</option>'+months.map(m=>`<option value="${m}">${label(m)}</option>`).join('');
-  if(months.includes(cur)){
-    sel.value=cur;
-  } else if(!mfTxnMonthAutoApplied){
-    const curMonth=today().slice(0,7);
-    if(months.includes(curMonth)) sel.value=curMonth;
-    mfTxnMonthAutoApplied=true;
-  }
+  if(months.includes(cur)) sel.value=cur;
 }
 
 // Month chunne pe From/To date clear kar do taaki conflict na ho.
