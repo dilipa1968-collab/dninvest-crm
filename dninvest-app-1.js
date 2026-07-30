@@ -264,10 +264,103 @@ const DB = {
       return merged;
     }catch(e){ console.log('Eq activity snapshot fetch error:',e); return null; }
   },
-  // Append one entry to the shared append-only call_logs array WITHOUT clobbering
-  // other RMs' concurrent entries. Uses a Firestore transaction (re-fetch latest,
-  // merge this entry in by id, write back) — the same proven pattern as setClientsBulk.
-  _clWriting:0,
+  // ── MF Invested Amount daily snapshot (for the dashboard trend card + date-wise history) ──
+  // Same pattern as addEqActivitySnapshot — merge-by-(date+scope), never touches past dates.
+  _masWriting:0,
+  async addMfAumSnapshot(entry){   // entry = {date, scope, additions, additionsAmt, redemptions, redemptionsAmt, totalInvested}
+    const rowId = entry.date+'__'+entry.scope;
+    let local=[];
+    try{ local=JSON.parse(localStorage.getItem('dninvest_mf_aum_snapshots')||'[]'); }catch(e){ local=[]; }
+    const byId={}; local.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
+    byId[rowId]=entry;
+    const capSort = arr => arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
+    const merged = capSort(Object.values(byId));
+    try{ localStorage.setItem('dninvest_mf_aum_snapshots', JSON.stringify(merged)); }catch(e){}
+    if(typeof fdb==='undefined') return merged;
+    this._masWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_aum_snapshots');
+      let finalData=null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        const byId2={}; latest.forEach(x=>{ if(x&&x.date&&x.scope) byId2[x.date+'__'+x.scope]=x; });
+        byId2[rowId]=entry;
+        finalData = capSort(Object.values(byId2));
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){ try{ localStorage.setItem('dninvest_mf_aum_snapshots',JSON.stringify(finalData)); }catch(e){} }
+      return finalData;
+    }catch(e){
+      console.log('MF AUM snapshot sync error:',e);
+      return merged;
+    }finally{
+      this._masWriting=Math.max(0,this._masWriting-1);
+    }
+  },
+  async fetchMfAumSnapshots(){
+    if(typeof fdb==='undefined') return null;
+    try{
+      const doc = await fdb.collection('crm_data').doc('mf_aum_snapshots').get();
+      if(!doc.exists || !doc.data() || !Array.isArray(doc.data().data)) return null;
+      const remote = doc.data().data;
+      let local=[];
+      try{ local=JSON.parse(localStorage.getItem('dninvest_mf_aum_snapshots')||'[]'); }catch(e){ local=[]; }
+      const byId={}; local.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
+      remote.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
+      const merged = Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
+      try{ localStorage.setItem('dninvest_mf_aum_snapshots', JSON.stringify(merged)); }catch(e){}
+      return merged;
+    }catch(e){ console.log('MF AUM snapshot fetch error:',e); return null; }
+  },
+  // ── MF Invested Amount change log — append-only, one entry per client per
+  // date whose Invested Amount changed during an AUM By Client import. Unlike
+  // the live invested_change_amt field on the client (which a later import can
+  // overwrite), this log keeps every past day's changes so "date-wise history"
+  // can show the exact named client list for any past date — no guessing
+  // needed (id = clientId+date, so re-importing the same day just updates it).
+  _mclWriting:0,
+  async addMfChangeLog(entry){   // entry = {id, date, clientId, name, rm, prevInvested, newInvested, delta}
+    let local=[];
+    try{ local=JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ local=[]; }
+    const byId={}; local.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+    byId[entry.id]=entry;
+    try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(Object.values(byId))); }catch(e){}
+    if(typeof fdb==='undefined') return;
+    this._mclWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_change_log');
+      let finalData=null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        const byId2={}; latest.forEach(x=>{ if(x&&x.id) byId2[x.id]=x; });
+        byId2[entry.id]=entry;
+        finalData = DB._pruneCallLogs(Object.values(byId2), 850000); // same date-priority pruning as call_logs
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
+    }catch(e){
+      console.log('MF change log sync error:',e);
+    }finally{
+      this._mclWriting=Math.max(0,this._mclWriting-1);
+    }
+  },
+  async fetchMfChangeLog(){
+    if(typeof fdb==='undefined') return null;
+    try{
+      const doc = await fdb.collection('crm_data').doc('mf_change_log').get();
+      if(!doc.exists || !doc.data() || !Array.isArray(doc.data().data)) return null;
+      const remote = doc.data().data;
+      let local=[];
+      try{ local=JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ local=[]; }
+      const byId={}; local.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+      remote.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+      const merged = Object.values(byId);
+      try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(merged)); }catch(e){}
+      return merged;
+    }catch(e){ console.log('MF change log fetch error:',e); return null; }
+  },
   // Keep the shared call_logs document safely under Firestore's 1 MiB limit.
   // Newest entries are kept; oldest are dropped once the JSON size crosses the cap.
   _pruneCallLogs(arr, maxBytes){
@@ -2315,8 +2408,8 @@ function renderMfAumTrend(){
   const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
   const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
   const footerNote = isAdmin
-    ? `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span>`
-    : `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for full list`;
+    ? `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
+    : `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
     <div class="dash-stat-grid dash-stat-grid-4" onclick="${cardClick}" title="${cardClick}">
@@ -2342,6 +2435,20 @@ function renderMfAumTrend(){
       </div>
     </div>
     <p style="color:var(--gray);font-size:.62rem;margin-top:5px;text-align:center">${footerNote}</p>`;
+
+  // Save today's TRUE (unfiltered — every RM sees only their own scope anyway
+  // via getMyMfClients) snapshot for the date-wise history table.
+  const scope = isAdmin ? 'ALL' : (CU.id || CU.name);
+  DB.addMfAumSnapshot({date:td, scope, additions:increased.length, additionsAmt:sumInc, redemptions:decreased.length, redemptionsAmt:sumDec, totalInvested})
+    .catch(e=>console.log('MF AUM snapshot save failed',e));
+
+  // One-time-per-session top-up from Firestore, same reasoning as the Eq card —
+  // a device that's never saved a snapshot locally still needs "vs yesterday".
+  if(!window.__masSynced){
+    window.__masSynced = true;
+    DB.fetchMfAumSnapshots().then(()=>{});
+    DB.fetchMfChangeLog().then(()=>{});
+  }
 }
 
 // Zero balance MF investors — AUM = 0 or blank (never invested / fully redeemed)
@@ -2389,6 +2496,61 @@ function showMfAumRmSplit(){
   }).sort((a,b)=>(b[1]+b[3])-(a[1]+a[3]));
   if(!table.length){ toast('Aaj koi Invested Amount change record nahi hai','info'); return; }
   showReport('📈 MF Invested Amount Changes (Today) — RM-wise', ['RM','Additions','Addition Amt','Redemptions','Redemption Amt'], table);
+}
+
+// Date-wise history of MF Invested Amount changes — mirrors the Equity
+// Active/Inactive date-wise history card. Unlike Equity (which has to
+// guess likely clients for undated deltas), every MF change is logged
+// exactly (see DB.addMfChangeLog in the AUM import merge), so "Changed
+// Clients" always shows the real named list — no guessing needed.
+function showMfAumHistory(rmName){
+  let scope;
+  if(rmName){
+    scope = rmScopeIdByName(rmName);
+    if(!scope){ toast(`${rmName} ka koi history record nahi mila`,'info'); return; }
+  } else {
+    scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
+  }
+  let hist=[];
+  try{ hist = JSON.parse(localStorage.getItem('dninvest_mf_aum_snapshots')||'[]'); }catch(e){ hist=[]; }
+  const rows = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  if(!rows.length){ toast(rmName?`${rmName} ke liye abhi tak history nahi bani — unka dashboard kal khulne par ban jayegi`:'Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
+  const table = rows.map(r=>{
+    const changed = mfChangesByDate(r.date, rmName);
+    const rmArg = rmName ? `'${escapeHtml(rmName).replace(/'/g,"\\'")}'` : '';
+    const changedCell = changed.length
+      ? `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showMfChangeDrilldown('${r.date}',${rmArg})" title="Click to see client names">${changed.length} client${changed.length>1?'s':''} ▶</span>`
+      : '<span style="color:var(--gray);font-size:.78rem">—</span>';
+    const addCell = r.additions ? `<span style="color:var(--green);font-weight:700">${r.additions} (+₹${fmtNum(r.additionsAmt)})</span>` : '0';
+    const redCell = r.redemptions ? `<span style="color:var(--red);font-weight:700">${r.redemptions} (-₹${fmtNum(r.redemptionsAmt)})</span>` : '0';
+    return [fmtDate(r.date), addCell, redCell, '₹'+fmtNum(r.totalInvested||0), changedCell];
+  });
+  const label = rmName ? ` (${rmName})` : (scope==='ALL'?' (All)':'');
+  showReport('📈 MF Invested Amount — Date-wise History'+label,
+    ['Date','Additions','Redemptions','Total Invested','Changed Clients'], table);
+}
+
+// Exact named list of MF clients whose Invested Amount changed on a given
+// date, from the persistent change log (not the live client field, which a
+// later import can overwrite) — optionally filtered to one RM.
+function mfChangesByDate(dateStr, rmName){
+  let log=[];
+  try{ log = JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ log=[]; }
+  let rows = log.filter(x=>x&&x.date===dateStr);
+  if(rmName) rows = rows.filter(x=>(x.rm||'').trim().toUpperCase()===rmName.trim().toUpperCase());
+  return rows;
+}
+
+function showMfChangeDrilldown(dateStr, rmName){
+  const rows = mfChangesByDate(dateStr, rmName).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+  if(!rows.length){ toast('Is date ke liye koi named record nahi mila','info'); return; }
+  const table = rows.map(c=>{
+    const up = c.delta>0;
+    return [escapeHtml(c.name||'—'), c.rm||'—', '₹'+fmtNum(c.prevInvested||0), '₹'+fmtNum(c.newInvested||0),
+      `<span style="color:${up?'var(--green)':'var(--red)'};font-weight:700">${up?'▲ +':'▼ -'}₹${fmtNum(Math.abs(c.delta))}</span>`];
+  });
+  const label = rmName ? ` — ${rmName}` : '';
+  showReport(`📋 MF Changes on ${fmtDate(dateStr)}${label}`, ['Name','RM','Previous Invested','Current Invested','Change'], table);
 }
 
 // Generic Show More / Show Less toggle — reusable by any dashboard list card.
@@ -11016,6 +11178,8 @@ async function doImport(){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
+            const _td=today();
+            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv});
           }
         }
         ex.aum_detail = _aumDetail(row);
