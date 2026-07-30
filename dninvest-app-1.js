@@ -5845,10 +5845,15 @@ async function saveClient(){
   if(!name){ toast('Client name is required','error'); return; }
   if(!rm){ toast('Please select RM','error'); return; }
 
-  // Reminder (non-blocking) — nudge to fill DOB while editing a client that doesn't have one yet.
+  // DOB mandatory when editing an existing client — hard block, not just a warning.
   if(currentEditId){
     const dobVal = (document.getElementById('f_dob')||{value:''}).value.trim();
-    if(!dobVal) toast('⚠️ Is client ki Date of Birth abhi bhi khali hai — agar pata ho toh bhar dijiye');
+    if(!dobVal){
+      toast('⚠️ Date of Birth is required — cannot save without DOB', 'error');
+      const el = document.getElementById('f_dob');
+      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',3000); }
+      return;
+    }
   }
 
   // RM call-date lock (Admin-configured). Admin is unrestricted.
