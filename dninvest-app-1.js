@@ -6508,7 +6508,7 @@ function saveBusinessEntry(){
 function bizStatusBadge(status){
   const s = status || 'Pending';
   const map = {
-    Approved: {bg:'#1D9E7522', col:'#1D9E75', label:'✅ Approved'},
+    Approved: {bg:'#1D9E7522', col:'#1D9E75', label:'✅ Aprv'},
     Declined: {bg:'#C0392B22', col:'#C0392B', label:'❌ Declined'},
     Pending:  {bg:'#D3940022', col:'#B7950B', label:'⏳ Pend'}
   };

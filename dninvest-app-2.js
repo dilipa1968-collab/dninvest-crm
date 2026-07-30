@@ -772,7 +772,7 @@ const INC = {
       ? ` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="INC.openOverride('${kind}','${e.id}')" title="Set incentive override">✏️</span>` : '';
     if(!approved){
       // Commission calculates only AFTER approval — show as not-yet-counted
-      return `<td style="text-align:right;white-space:nowrap;color:var(--gray)" title="Counts only after Approve">${this.fmt(r.amt)} <span style="font-size:.62rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">pending</span>${edit}</td>`;
+      return `<td style="text-align:right;white-space:nowrap;color:var(--gray)" title="Counts only after Approve">${this.fmt(r.amt)} <span style="font-size:.62rem;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:0 5px">Pend</span>${edit}</td>`;
     }
     const tag = r.over
       ? `<span style="font-size:.62rem;background:#fde68a;color:#92400e;border-radius:6px;padding:0 5px;margin-left:4px" title="Manual override">${r.label}</span>`
