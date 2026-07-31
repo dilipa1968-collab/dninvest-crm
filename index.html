@@ -699,14 +699,28 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .page-title{font-size:1.1rem;}
   .modal{width:100%;max-width:100%;border-radius:0;max-height:100vh;height:100vh;}
   .modal.wide{width:100%;}
-  .filters{padding:10px;gap:6px;}
+  .filters{padding:12px;gap:10px;border-radius:16px;}
   .filters input, .filters select{flex:1 1 100%;min-width:0;}
   .filter-sep{display:none;}
+  /* Fix: date-range groups (Last Call / Next Call / Last Trade / Last Business) were
+     overflowing off-screen on mobile — force them to wrap onto their own full-width row */
+  .filters label{flex:1 1 100% !important;flex-wrap:wrap;row-gap:8px;box-sizing:border-box;}
+  .filters label input[type=date]{flex:1 1 40%;min-width:0;width:auto;}
+  .filters label span{flex:0 0 auto;}
   .stats-row{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;}
-  .hdr-actions{width:100%;}
-  .hdr-actions .btn{flex:1;justify-content:center;}
+  .hdr-actions{width:100%;gap:10px;}
+  .hdr-actions .btn{flex:1 1 calc(50% - 10px);justify-content:center;min-height:58px;
+    border-radius:14px;box-shadow:0 2px 10px rgba(16,30,60,.08);font-size:.76rem;}
+  .hdr-actions .btn:active{transform:scale(.96);}
   table{font-size:.65rem;}
   thead th, tbody td{padding:4px 4px;}
+
+  /* Premium mobile touches */
+  .topbar{padding-top:env(safe-area-inset-top);}
+  .page-hdr{gap:10px;}
+  .page-title{font-weight:800;}
+  .mnav-item{transition:color .15s;}
+  .mnav-item:active{opacity:.7;}
 }
 
 </style>
