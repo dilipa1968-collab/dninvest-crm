@@ -1402,13 +1402,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
-          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:100px">
+          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:100px;background:#FBF9FE;border:1px solid #EEE6F8;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
           </select>
-          <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:5px 10px;font-size:.75rem;white-space:nowrap">✕ Reset</button>
+          <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #FDE2E2;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="eq-count"></span>
           <div style="flex-basis:100%;height:0"></div>
           <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #E2EAF5;border-radius:8px;padding:4px 8px;font-weight:500">Last Call:
@@ -1540,13 +1540,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterMf()" id="mf-last-biz-to" title="To date" style="padding:6px;font-size:.78rem"></label>
           <div class="filter-sep"></div>
-          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize">
+          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="background:#FEFCF7;border:1px solid #F7E9D2;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
           </select>
-          <button class="btn btn-outline" onclick="resetFilters('mf')">✕ Reset</button>
+          <button class="btn btn-outline" onclick="resetFilters('mf')" style="background:#FFF5F5;border:1px solid #FDE2E2;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="mf-count"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mf-table"></div></div>
