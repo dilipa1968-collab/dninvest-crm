@@ -450,7 +450,7 @@ const DB = {
       // Firebase SDK never connected this session — the record only exists in
       // THIS browser's local cache. Must be flagged, else the caller shows a
       // false "saved" message and the record silently vanishes on next sync.
-      return {ok:false, error:'Offline — Firebase se connect nahi ho paya'};
+      return {ok:false, error:'Offline — could not connect to Firebase'};
     }
 
     this._writing[key] = (this._writing[key]||0) + 1;
@@ -958,7 +958,7 @@ async function crmLiveOutTime(hhmm){
       const idx=arr.findIndex(r=>r.date===td); if(idx<0) return;
       const rec=arr[idx];
       if(!(rec.status==='Present'||rec.status==='Late'||rec.status==='Half day')) return;
-      if(rec.out && !(hhmm>rec.out)) return; // same/earlier — koi write nahi
+      if(rec.out && !(hhmm>rec.out)) return; // same/earlier — no write needed
       arr[idx]={...rec, out:hhmm};
       latest[_crmHbName]=arr;
       tx.set(docRef, {data:latest, updated:new Date().toISOString()});
@@ -970,7 +970,7 @@ function startCrmHeartbeat(user){
   _crmHbName=hrNameForCrmUser(user);
   const n=new Date(), cutoff=_crmHbCutoffH();
   _crmHbBlocked = (cutoff!==null && (n.getHours()+n.getMinutes()/60)>=cutoff);
-  sendCrmHeartbeat(); // immediate first ping (blocked session me khud skip hoga)
+  sendCrmHeartbeat(); // immediate first ping (skips itself automatically in a blocked session)
   _crmHbTimer=setInterval(sendCrmHeartbeat, 5*60000); // every 5 min
   bindCrmHbEdgePings();
 }
@@ -1352,11 +1352,11 @@ function setCallLimitMode(m){
 function renderCallLimitPreview(){
   const el=document.getElementById('cl-preview'); if(!el) return;
   const gn=id=>{const v=(document.getElementById(id)||{value:''}).value; return v===''?'':Number(v);};
-  const fd=s=>{ if(!s) return '<i>koi limit nahi</i>'; const p=s.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
-  el.innerHTML = '<b>Aaj (' + fd(today()) + ') ka asar:</b><br>'
+  const fd=s=>{ if(!s) return '<i>no limit</i>'; const p=s.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+  el.innerHTML = '<b>Effect for today (' + fd(today()) + '):</b><br>'
     + '📞 Last Call: ' + fd(_off(gn('cl-r-lc-min'))) + ' &nbsp;se&nbsp; ' + fd(_off(gn('cl-r-lc-max'))) + '<br>'
     + '🔜 Next Call: ' + fd(_off(gn('cl-r-nc-min'))) + ' &nbsp;se&nbsp; ' + fd(_off(gn('cl-r-nc-max')))
-    + '<br><span style="color:var(--gray)">Kal ye window apne aap 1 din aage khisak jayegi.</span>';
+    + '<br><span style="color:var(--gray)">Tomorrow this window will automatically shift forward by 1 day.</span>';
 }
 function clearCallLimits(){
   ['cl-lc-min','cl-lc-max','cl-nc-min','cl-nc-max','cl-r-lc-min','cl-r-lc-max','cl-r-nc-min','cl-r-nc-max']
@@ -1420,10 +1420,10 @@ document.addEventListener('change', function(e){
   if(fixed && fixed!==v){
     const was = _offDayLabel(v);
     el.value = fixed;
-    try{ toast(was+' pe call date nahi lag sakti — '+fmtDate(fixed)+' kar diya','warn'); }
-    catch(err){ alert(was+' pe call date nahi lag sakti. '+fixed+' set kar diya.'); }
+    try{ toast('Call date cannot fall on '+was+' — changed to '+fmtDate(fixed),'warn'); }
+    catch(err){ alert('Call date cannot fall on '+was+'. Set to '+fixed+' instead.'); }
   } else {
-    try{ toast('Is window me koi working day nahi mil raha — date check karein','warn'); }catch(err){}
+    try{ toast('No working day found in this window — please check the dates','warn'); }catch(err){}
   }
 });
 // -----------------------------------------------------------------------
@@ -1455,7 +1455,7 @@ async function resetCallLimits(){
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').delete();
     populateCallLimitInputs();
-    toast('Default rolling limits wapas ✓ (Last Call: aaj tak · Next Call: aaj se +90 din) — daily click ki zarurat nahi','success');
+    toast('Default rolling limits restored ✓ (Last Call: up to today · Next Call: today +90 days) — no need to click daily','success');
   }catch(e){ toast('Reset failed: '+(e&&e.message||e),'error'); }
 }
 async function saveCallLimits(){
@@ -1466,20 +1466,20 @@ async function saveCallLimits(){
   let d;
   if(mode==='fixed'){
     d={ mode, lcMin:gv('cl-lc-min'), lcMax:gv('cl-lc-max'), ncMin:gv('cl-nc-min'), ncMax:gv('cl-nc-max'), rLcMin:'', rLcMax:'', rNcMin:'', rNcMax:'' };
-    if(d.lcMin && d.lcMax && d.lcMin>d.lcMax){ toast('Last Call: "earliest" date "latest" se baad me hai','error'); return; }
-    if(d.ncMin && d.ncMax && d.ncMin>d.ncMax){ toast('Next Call: "earliest" date "latest" se baad me hai','error'); return; }
+    if(d.lcMin && d.lcMax && d.lcMin>d.lcMax){ toast('Last Call: "earliest" date is after the "latest" date','error'); return; }
+    if(d.ncMin && d.ncMax && d.ncMin>d.ncMax){ toast('Next Call: "earliest" date is after the "latest" date','error'); return; }
   } else {
     d={ mode, lcMin:'', lcMax:'', ncMin:'', ncMax:'', rLcMin:gn('cl-r-lc-min'), rLcMax:gn('cl-r-lc-max'), rNcMin:gn('cl-r-nc-min'), rNcMax:gn('cl-r-nc-max') };
-    if(d.rLcMin!=='' && d.rLcMax!=='' && d.rLcMin>d.rLcMax){ toast('Last Call: "kam se kam" din "zyada se zyada" se bada hai','error'); return; }
-    if(d.rNcMin!=='' && d.rNcMax!=='' && d.rNcMin>d.rNcMax){ toast('Next Call: "kam se kam" din "zyada se zyada" se bada hai','error'); return; }
+    if(d.rLcMin!=='' && d.rLcMax!=='' && d.rLcMin>d.rLcMax){ toast('Last Call: "minimum" days is greater than "maximum" days','error'); return; }
+    if(d.rNcMin!=='' && d.rNcMax!=='' && d.rNcMin>d.rNcMax){ toast('Next Call: "minimum" days is greater than "maximum" days','error'); return; }
   }
   CALL_LIMITS = { configured:true, ...d };
   const allBlank = mode==='fixed' ? !(d.lcMin||d.lcMax||d.ncMin||d.ncMax)
                                   : (d.rLcMin===''&&d.rLcMax===''&&d.rNcMin===''&&d.rNcMax==='');
-  if(allBlank && !confirm('Saari fields blank hain — iska matlab RMs par KOI LIMIT NAHI lagegi.\n\nPakka save karna hai?')) return;
+  if(allBlank && !confirm('All fields are blank — this means NO LIMIT will apply to RMs.\n\nAre you sure you want to save?')) return;
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').set({data:d, updated:new Date().toISOString()});
-    toast(mode==='rolling' ? 'Rolling limits saved ✓ — har roz apne aap aage khisakegi' : 'Fixed call date limits saved ✓ — RMs par lag gaya','success');
+    toast(mode==='rolling' ? 'Rolling limits saved ✓ — will shift forward automatically every day' : 'Fixed call date limits saved ✓ — now applied to RMs','success');
     renderCallLimitPreview();
   }catch(e){ toast('Save failed: '+(e&&e.message||e),'error'); }
 }
@@ -2352,9 +2352,9 @@ function birthdayCardImage(idx){
       '</div>'+
       '<div id="_bcHint" style="color:#e5e7eb;font-size:12.5px;text-align:center;max-width:440px;line-height:1.5">'+
         (num?(isMobileDevice()&&canShare
-              ?('“Send to '+first+'” dabao → share sheet khulega, usme <b>WhatsApp</b> chunkar '+first+' ko bhej do. 🎉')
-              :('“Send to '+first+'” dabao → image copy hogi aur '+first+' ka WhatsApp chat khul jayega. Wahan <b>Ctrl+V</b> se paste karke bhej do. 🎉'))
-            :'Is client ka number nahi hai — image Download karke WhatsApp par bhej do.')+
+              ?('Tap “Send to '+first+'” → the share sheet will open, pick <b>WhatsApp</b> and send it to '+first+'. 🎉')
+              :('Tap “Send to '+first+'” → the image will be copied and '+first+"'s WhatsApp chat will open. Paste it there with <b>Ctrl+V</b> and send. 🎉"))
+            :'This client has no number on file — download the image and send it on WhatsApp instead.')+
       '</div>';
     document.body.appendChild(ov);
     const hint=ov.querySelector('#_bcHint');
@@ -2382,14 +2382,14 @@ function birthdayCardImage(idx){
       try{ writeP=navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); }catch(e){ writeP=Promise.reject(e); }
       const win=window.open('https://wa.me/'+num,'_blank','noopener');
       markBdayWished(idx,'card');
-      hint.innerHTML='⏳ Image copy ho rahi hai...';
+      hint.innerHTML='⏳ Copying image...';
       writeP.then(function(){
         hint.innerHTML = win
-          ? ('✅ Image copy ho gayi aur '+first+' ka chat khul gaya — WhatsApp me <b>Ctrl+V</b> dabao aur bhej do. 🎉')
-          : ('✅ Image copy ho gayi. Popup block hua — <a href="https://wa.me/'+num+'" target="_blank" style="color:#25D366;font-weight:800">yahan click karke</a> chat kholo, phir <b>Ctrl+V</b>. 🎉');
+          ? ('✅ Image copied and '+first+"'s chat has opened — press <b>Ctrl+V</b> in WhatsApp and send. 🎉")
+          : ('✅ Image copied. The popup was blocked — <a href="https://wa.me/'+num+'" target="_blank" style="color:#25D366;font-weight:800">click here</a> to open the chat, then press <b>Ctrl+V</b>. 🎉');
       }).catch(function(){
         try{ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); }catch(e){}
-        hint.innerHTML='📥 Copy nahi ho payi, image download kar di — '+first+' ke chat me <b>attach</b> karke bhej do.';
+        hint.innerHTML='📥 Copy failed — the image has been downloaded instead. <b>Attach</b> it in '+first+"'s chat and send.";
       });
     };
     ov.addEventListener('click', function(ev){ if(ev.target===ov) close(); });
@@ -2416,8 +2416,8 @@ function renderMfAumTrend(){
   const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
   const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
   const footerNote = isAdmin
-    ? `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
-    : `📅 ${fmtDate(today())} · aaj ke AUM By Client import ke changes · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
+    ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
+    : `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
     <div class="dash-stat-grid dash-stat-grid-4" onclick="${cardClick}" title="${cardClick}">
@@ -2475,7 +2475,7 @@ function showMfAumList(){
   const rows = window.__mfAumRows || [];
   const td = today();
   const changed = rows.filter(c=>c.invested_change_amt && c.invested_change_date===td).sort((a,b)=>Math.abs(b.invested_change_amt)-Math.abs(a.invested_change_amt));
-  if(!changed.length){ toast('Aaj koi Invested Amount change record nahi hai — AUM By Client import ke baad yahan dikhega','info'); return; }
+  if(!changed.length){ toast('No Invested Amount change record for today — this will appear here after an AUM By Client import','info'); return; }
   const table = changed.map(c=>{
     const up = c.invested_change_amt>0;
     const newInv = (c.aum_detail && c.aum_detail.inv) || 0;
@@ -2502,7 +2502,7 @@ function showMfAumRmSplit(){
     const rmCell = rm==='— (no RM)' ? rm : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="closeModal('reportModal');showMfAumList()">${escapeHtml(rm)}</span>`;
     return [rmCell, v.inc, '₹'+fmtNum(v.incAmt), v.dec, '₹'+fmtNum(v.decAmt)];
   }).sort((a,b)=>(b[1]+b[3])-(a[1]+a[3]));
-  if(!table.length){ toast('Aaj koi Invested Amount change record nahi hai','info'); return; }
+  if(!table.length){ toast('No Invested Amount change record for today','info'); return; }
   showReport('📈 MF Invested Amount Changes (Today) — RM-wise', ['RM','Additions','Addition Amt','Redemptions','Redemption Amt'], table);
 }
 
@@ -2515,14 +2515,14 @@ function showMfAumHistory(rmName){
   let scope;
   if(rmName){
     scope = rmScopeIdByName(rmName);
-    if(!scope){ toast(`${rmName} ka koi history record nahi mila`,'info'); return; }
+    if(!scope){ toast(`No history record found for ${rmName}`,'info'); return; }
   } else {
     scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
   }
   let hist=[];
   try{ hist = JSON.parse(localStorage.getItem('dninvest_mf_aum_snapshots')||'[]'); }catch(e){ hist=[]; }
   const rows = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  if(!rows.length){ toast(rmName?`${rmName} ke liye abhi tak history nahi bani — unka dashboard kal khulne par ban jayegi`:'Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
+  if(!rows.length){ toast(rmName?`No history built yet for ${rmName} — it will be created once their dashboard is opened tomorrow`:'No history built yet — please check again after opening the dashboard tomorrow','info'); return; }
   const table = rows.map(r=>{
     const changed = mfChangesByDate(r.date, rmName);
     const rmArg = rmName ? `'${escapeHtml(rmName).replace(/'/g,"\\'")}'` : '';
@@ -2551,7 +2551,7 @@ function mfChangesByDate(dateStr, rmName){
 
 function showMfChangeDrilldown(dateStr, rmName){
   const rows = mfChangesByDate(dateStr, rmName).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
-  if(!rows.length){ toast('Is date ke liye koi named record nahi mila','info'); return; }
+  if(!rows.length){ toast('No named record found for this date','info'); return; }
   const table = rows.map(c=>{
     const up = c.delta>0;
     return [escapeHtml(c.name||'—'), c.rm||'—', '₹'+fmtNum(c.prevInvested||0), '₹'+fmtNum(c.newInvested||0),
@@ -2742,9 +2742,9 @@ function refreshDash(){
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
           const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
           const sent = c.bw && c.bw.y===curYear ? c.bw : null;
-          if(d.length>=12 && !sent) _bdayQueue.push({name:nm, url, idx});   // Wish-All: sirf pending wale
+          if(d.length>=12 && !sent) _bdayQueue.push({name:nm, url, idx});   // Wish-All: only the pending ones
           _bdayCards[idx]={name:nm, num:(d.length>=12?d:'')};   // name + wa number for card
-          _bdayMeta[idx]={id:c.id, key:c.key, name:nm};         // sent-stamp ke liye
+          _bdayMeta[idx]={id:c.id, key:c.key, name:nm};         // for the sent-stamp
           // ✅ Sent stamp — Admin ko dikhta hai ki kisne aur kab bheja
           let sentTag='';
           if(sent){
@@ -3044,7 +3044,7 @@ function showEqActivityRmSplit(){
       : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="showEqActivityRmClients('${escapeHtml(rm).replace(/'/g,"\\'")}')" title="See ${escapeHtml(rm)}'s clients">${escapeHtml(rm)}</span>`;
     return [rmCell, v.active, v.inactive, total, pct];
   }).sort((a,b)=>b[3]-a[3]);
-  if(!table.length){ toast('Abhi data load nahi hua — dashboard refresh kar ke dubara try karein','info'); return; }
+  if(!table.length){ toast('Data has not loaded yet — refresh the dashboard and try again','info'); return; }
   showReport('📊 Trade Activity — RM-wise (Active vs Inactive)', ['RM','Active','Inactive','Total','% Active'], table);
 }
 
@@ -3192,7 +3192,7 @@ function showLikelyStatusFlipCandidates(dateStr, dActive, rmName){
     const rows = allEq.filter(c=>scopeFilter(c) && String(c.last_trade_date||'').slice(0,10)===dateStr)
       .map(c=>[c.rm||'—', c.code||'', c.name, fmtDate(c.last_trade_date)||'—', c.status||'—']);
     if(!rows.length){
-      toast('Is date ko trade karne wala koi client record nahi mila — status kisi aur wajah se badla hoga','info');
+      toast('No client record found trading on this date — the status must have changed for another reason','info');
       return;
     }
     showReport(`🔍 Likely Clients — traded on ${fmtDate(dateStr)} (best guess)`, ['RM','Code','Name','Trade Date','Status'], rows);
@@ -3209,7 +3209,7 @@ function showLikelyStatusFlipCandidates(dateStr, dActive, rmName){
     .sort((a,b)=>a.days-b.days)
     .map(c=>[c.rm||'—', c.code||'', c.name, fmtDate(c.last_trade_date)||'—', c.days+'d ago']);
   if(!rows.length){
-    toast('Koi exact match nahi mila is threshold ke aas-paas — is client ka status kisi aur wajah se badla hoga','info');
+    toast("No exact match found around this threshold — this client's status must have changed for another reason",'info');
     return;
   }
   showReport('🔍 Likely Client — crossed 1-year no-trade mark recently (best guess)', ['RM','Code','Name','Last Trade','Days Ago'], rows);
@@ -3219,14 +3219,14 @@ function showEqActivityHistory(rmName){
   let scope;
   if(rmName){
     scope = rmScopeIdByName(rmName);
-    if(!scope){ toast(`${rmName} ka koi history record nahi mila`,'info'); return; }
+    if(!scope){ toast(`No history record found for ${rmName}`,'info'); return; }
   } else {
     scope = CU.role==='admin' ? 'ALL' : (CU.id || CU.name);
   }
   let hist=[];
   try{ hist = JSON.parse(localStorage.getItem('dninvest_eq_activity_snapshots')||'[]'); }catch(e){ hist=[]; }
   const rows = hist.filter(x=>x&&x.scope===scope).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  if(!rows.length){ toast(rmName?`${rmName} ke liye abhi tak history nahi bani — unka dashboard kal khulne par ban jayegi`:'Abhi tak history nahi bani — dashboard kal bhi khol kar dekhiye','info'); return; }
+  if(!rows.length){ toast(rmName?`No history built yet for ${rmName} — it will be created once their dashboard is opened tomorrow`:'No history built yet — please check again after opening the dashboard tomorrow','info'); return; }
   const table = rows.map((r,i)=>{
     const prev = rows[i+1]; // next row is the earlier date (desc-sorted)
     // A snapshot with total===0 is a placeholder/incomplete day (e.g. this
@@ -4069,10 +4069,10 @@ async function saveLead(){
     const _lc=(document.getElementById('l_last_call')||{value:''}).value;
     const _nc=(document.getElementById('l_next_call')||{value:''}).value;
     const _fd=s=>{ const p=String(s).split('-'); return p.length===3? p[2]+'-'+p[1]+'-'+p[0] : s; };
-    if(_lc){ if(_cl.lcMin && _lc<_cl.lcMin){ toast('Last Call date '+_fd(_cl.lcMin)+' se pehle nahi ho sakti','error'); return; }
-             if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date '+_fd(_cl.lcMax)+' ke baad nahi ho sakti','error'); return; } }
-    if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date '+_fd(_cl.ncMin)+' se pehle nahi ho sakti','error'); return; }
-             if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date '+_fd(_cl.ncMax)+' ke baad nahi ho sakti','error'); return; } }
+    if(_lc){ if(_cl.lcMin && _lc<_cl.lcMin){ toast('Last Call date cannot be before '+_fd(_cl.lcMin),'error'); return; }
+             if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date cannot be after '+_fd(_cl.lcMax),'error'); return; } }
+    if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date cannot be before '+_fd(_cl.ncMin),'error'); return; }
+             if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date cannot be after '+_fd(_cl.ncMax),'error'); return; } }
   }
 
   const gv2=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
@@ -4117,8 +4117,8 @@ async function saveLead(){
   }
   const _saveRes = await DB.setClient('leads',rec);
   if(_saveRes && _saveRes.ok===false){
-    toast('⚠️ Lead server tak save NAHI hui ('+(_saveRes.error||'connection issue')+'). Internet check karke dobara "Save" dabayein — form band nahi kiya.','error');
-    return;   // modal khula rehta hai, data khota nahi
+    toast('⚠️ The lead was NOT saved to the server ('+(_saveRes.error||'connection issue')+'). Check your internet and press "Save" again — the form has been kept open.','error');
+    return;   // modal stays open, no data is lost
   }
   maybeLogMergedCall('lead', newId, name, rm);
   closeModal('leadModal');
@@ -4132,7 +4132,7 @@ async function confirmDeleteLead(id,name){
   const lead = leads.find(x=>x.id===id);
   // Admin can delete any lead. RM can delete ONLY their own (lead.rm === apna naam).
   const isOwnLead = lead && CU.role==='rm' && lead.rm===CU.name;
-  if(CU.role!=='admin' && !isOwnLead){ toast('Aap sirf apni leads delete kar sakte hain','error'); return; }
+  if(CU.role!=='admin' && !isOwnLead){ toast('You can only delete your own leads','error'); return; }
   if(!confirm(`Delete lead "${name}"? This cannot be undone.`)) return;
   await DB.deleteClient('leads',id);
   toast('Lead deleted','success');
@@ -5702,12 +5702,12 @@ function clientForm(seg, c){
     </div>
     <div class="form-section">Trading Info</div>
     <div class="form-row three">
-      <div class="form-field"><label>Trading Status ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><select id="f_status" ${(CU&&CU.role==='admin')?'':'disabled title="Sirf Admin status change kar sakta hai"'}><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option><option ${c?.status==='Closed'?'selected':''}>Closed</option></select></div>
+      <div class="form-field"><label>Trading Status ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><select id="f_status" ${(CU&&CU.role==='admin')?'':'disabled title="Only Admin can change the status"'}><option ${!c||c.status==='Active'?'selected':''}>Active</option><option ${c?.status==='Inactive'?'selected':''}>Inactive</option><option ${c?.status==='Closed'?'selected':''}>Closed</option></select></div>
       <div class="form-field"><label>Asset Value (₹)</label><input id="f_asset" type="number" value="${c?.asset_value||''}" placeholder="e.g. 500000"></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     <div class="form-row three">
-      <div class="form-field"><label>Last Trade Date ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}" ${(CU&&CU.role==='admin')?'':'disabled title="Sirf Admin Last Trade Date change kar sakta hai"'}></div>
+      <div class="form-field"><label>Last Trade Date ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}" ${(CU&&CU.role==='admin')?'':'disabled title="Only Admin can change the Last Trade Date"'}></div>
       <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
       <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"${_lcAttr()}></div>
     </div>
@@ -5754,7 +5754,7 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Email</label><input id="f_email" type="email" value="${c?.email||''}" placeholder="email@example.com"></div>
       ${rmFieldHtml('mf', c, 'MF RM *')}
-      <div class="form-field"><label>Investor Status ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><select id="f_status" ${(CU&&CU.role==='admin')?'':'disabled title="Sirf Admin status change kar sakta hai"'}><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
+      <div class="form-field"><label>Investor Status ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><select id="f_status" ${(CU&&CU.role==='admin')?'':'disabled title="Only Admin can change the status"'}><option ${!c||c.status==='Investor'?'selected':''}>Investor</option><option ${c?.status==='Prospect'?'selected':''}>Prospect</option></select></div>
     </div>
     <div class="form-row three">
       <div class="form-field"><label>🎂 Date of Birth</label><input id="f_dob" type="date" value="${c?.dob||''}" max="${today()}"></div>
@@ -5862,10 +5862,10 @@ async function saveClient(){
     const _lc=(document.getElementById('f_last_call')||{value:''}).value;
     const _nc=(document.getElementById('f_next_call')||{value:''}).value;
     const _fd=s=>{ const p=String(s).split('-'); return p.length===3? p[2]+'-'+p[1]+'-'+p[0] : s; };
-    if(_lc){ if(_cl.lcMin && _lc<_cl.lcMin){ toast('Last Call date '+_fd(_cl.lcMin)+' se pehle nahi ho sakti','error'); return; }
-             if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date '+_fd(_cl.lcMax)+' ke baad nahi ho sakti','error'); return; } }
-    if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date '+_fd(_cl.ncMin)+' se pehle nahi ho sakti','error'); return; }
-             if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date '+_fd(_cl.ncMax)+' ke baad nahi ho sakti','error'); return; } }
+    if(_lc){ if(_cl.lcMin && _lc<_cl.lcMin){ toast('Last Call date cannot be before '+_fd(_cl.lcMin),'error'); return; }
+             if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date cannot be after '+_fd(_cl.lcMax),'error'); return; } }
+    if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date cannot be before '+_fd(_cl.ncMin),'error'); return; }
+             if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date cannot be after '+_fd(_cl.ncMax),'error'); return; } }
   }
 
   // Mandatory field validation
@@ -8292,15 +8292,15 @@ function sqUpload(input){
       // purani dates jama na hon.
       const keyOf = r => String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
       const merged = new Map();
-      (DB.get('squareoff')||[]).forEach(r=>merged.set(keyOf(r), r));   // pehle purana
-      out.forEach(r=>merged.set(keyOf(r), r));                          // naya upar
+      (DB.get('squareoff')||[]).forEach(r=>merged.set(keyOf(r), r));   // old rows first
+      out.forEach(r=>merged.set(keyOf(r), r));                          // new rows on top
       const todayISO = today();
       const finalRows = [...merged.values()].filter(r=>!r.sqDate || r.sqDate >= todayISO);
       const dropped = merged.size - finalRows.length;
       DB.set('squareoff', finalRows);
       const uploadedDates = [...new Set(out.map(r=>r.sqDate).filter(Boolean))];
       let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), total '+finalRows.length+' clients';
-      if(dropped) msg += ', '+dropped+' purani date wali hataayi';
+      if(dropped) msg += ', '+dropped+' with an old date removed';
       toast(msg,'success');
       renderSquareoff(); updateBadges(); sqUpdateBell();
     }catch(err){ console.error(err); toast('Upload failed: '+err.message,'error'); }
@@ -8420,7 +8420,7 @@ function renderSquareoff(){
     const isToday=dk===todayStr;
     stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:${dateColor[dk]}">
       <span class="n" style="color:${dateColor[dk]}">₹${Math.round(dTotal).toLocaleString('en-IN')}</span>
-      <span class="l">${sqFmtD(dk)}${isToday?' · AAJ':''} — ${dCount} clients</span></div>`;
+      <span class="l">${sqFmtD(dk)}${isToday?' · TODAY':''} — ${dCount} clients</span></div>`;
   });
   const stripEl=document.getElementById('sq-stat-strip');
   if(stripEl) stripEl.innerHTML=stripHtml;
@@ -8434,7 +8434,7 @@ function renderSquareoff(){
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
     html+=`<th style="min-width:160px;padding-top:8px;padding-bottom:8px;text-align:center;
         box-shadow:inset 0 3px 0 ${dateColor[dk]}">
-      <div class="sq-date-pill" style="justify-content:center;color:#fff"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · AAJ':''}</div>
+      <div class="sq-date-pill" style="justify-content:center;color:#fff"><span class="sq-date-dot" style="background:${dateColor[dk]}"></span>${sqFmtD(dk)}${isToday?' · TODAY':''}</div>
       <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:2px;letter-spacing:.2px;text-align:center">₹${Math.round(dTotal).toLocaleString('en-IN')}</div>
       <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:1px;text-align:center">${dCount} clients</div>
     </th>`;
@@ -8789,7 +8789,7 @@ async function forceLogoutUser(userId){
   const users = DB.get('users')||[];
   const u = users.find(x=>x.id===userId);
   if(!u) return;
-  if(!confirm(`${u.name} ko abhi CRM se logout kar du?\n\nUnka HR "Out Time" bhi abhi ke time se save ho jayega.`)) return;
+  if(!confirm(`Log ${u.name} out of the CRM now?\n\nTheir HR "Out Time" will also be saved with the current time.`)) return;
 
   try{
     const docRef = fdb.collection('crm_data').doc('force_logout');
@@ -8797,7 +8797,7 @@ async function forceLogoutUser(userId){
     const flags = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
     flags[u.username] = Date.now();
     await docRef.set({ data:flags, updated:new Date().toISOString() });
-  }catch(e){ toast('Force logout flag save nahi hui: '+e.message, 'error'); return; }
+  }catch(e){ toast('Force-logout flag could not be saved: '+e.message, 'error'); return; }
 
   // Stamp HR out-time right now, same name-matching rule as check-in.
   try{
@@ -8823,7 +8823,7 @@ async function forceLogoutUser(userId){
     });
   }catch(e){ console.log('[FORCE LOGOUT] HR out-time save error:', e.message); }
 
-  toast(`✅ ${u.name} ko logout kar diya gaya, out-time save ho gaya`, 'success');
+  toast(`✅ ${u.name} has been logged out, out-time saved`, 'success');
 }
 
 function renderAdmin(){
@@ -10615,7 +10615,7 @@ function showSipDetails(id){
   const c = list.find(x=>x.id===id);
   if(!c) return;
   const d = Array.isArray(c.sip_details)?c.sip_details:[];
-  if(!d.length){ toast('SIP details available nahi — Running SIP Report import kijiye','error'); return; }
+  if(!d.length){ toast('SIP details are not available — please import the Running SIP Report','error'); return; }
   const total = d.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
   document.getElementById('sipDetailTitle').innerHTML = `SIP Details — ${c.name} <span style="font-weight:500;opacity:.7">(${d.length} SIP${d.length>1?'s':''})</span>`;
   let h = `<div style="overflow:auto"><table class="tbl" style="width:100%;font-size:.85rem">
@@ -10866,11 +10866,11 @@ function handleAumFile(input){
       importData.aum = null;
       document.getElementById('aum-preview').innerHTML =
         `<div style="background:var(--red2,#fee);color:var(--red,#c00);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-         ❌ Header row nahi mila (Client Name + AUM columns chahiye). File ka format check karein — import roka gaya.</div>`;
+         ❌ Header row not found (Client Name + AUM columns are required). Please check the file format — import stopped.</div>`;
       checkImportReady(); return;
     }
     importData.aum = parsed;
-    const warn = parsed._badPan ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ ${parsed._badPan} rows me valid PAN nahi — un clients ka PAN chheda nahi jayega</div>` : '';
+    const warn = parsed._badPan ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ ${parsed._badPan} rows have no valid PAN — those clients' PAN will be left untouched</div>` : '';
     document.getElementById('aum-preview').innerHTML = 
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
        ✅ ${parsed.length} clients found in AUM file</div>${warn}`;
@@ -10888,12 +10888,12 @@ function handleSipFile(input){
       importData.sip = null;
       document.getElementById('sip-preview').innerHTML =
         `<div style="background:var(--red2,#fee);color:var(--red,#c00);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-         ❌ Header row nahi mila (Name + SIP Monthly Amount columns chahiye). File ka format check karein — import roka gaya.</div>`;
+         ❌ Header row not found (Name + SIP Monthly Amount columns are required). Please check the file format — import stopped.</div>`;
       checkImportReady(); return;
     }
     importData.sip = parsedS;
     const cnt = Object.keys(parsedS).length;
-    const rw = parsedS._usedRegAmt ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ "SIP Monthly Amount" column nahi mila — "SIP Registered Amount" use kiya</div>` : '';
+    const rw = parsedS._usedRegAmt ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ "SIP Monthly Amount" column not found — used "SIP Registered Amount" instead</div>` : '';
     document.getElementById('sip-preview').innerHTML = 
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
        ✅ ${cnt} SIP clients found</div>${rw}`;
@@ -10912,18 +10912,18 @@ function handleBothFile(type, input){
       if(!parsedB || !parsedB.length){
         importData.aum = null;
         document.getElementById('both-preview').innerHTML +=
-          `<div style="color:var(--red,#c00);font-size:.82rem;font-weight:600">❌ AUM: header row nahi mila — format check karein</div>`;
+          `<div style="color:var(--red,#c00);font-size:.82rem;font-weight:600">❌ AUM: header row not found — please check the format</div>`;
         checkImportReady(); return;
       }
       importData.aum = parsedB;
       document.getElementById('both-preview').innerHTML += 
-        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${parsedB.length} clients${parsedB._badPan?' (⚠️ '+parsedB._badPan+' bina valid PAN)':''}</div>`;
+        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${parsedB.length} clients${parsedB._badPan?' (⚠️ '+parsedB._badPan+' without a valid PAN)':''}</div>`;
     } else {
       const parsedSB = parseSipExcel(rows);
       if(!parsedSB || !Object.keys(parsedSB).length){
         importData.sip = null;
         document.getElementById('both-preview').innerHTML +=
-          `<div style="color:var(--red,#c00);font-size:.82rem;font-weight:600">❌ SIP: header row nahi mila — format check karein</div>`;
+          `<div style="color:var(--red,#c00);font-size:.82rem;font-weight:600">❌ SIP: header row not found — please check the format</div>`;
         checkImportReady(); return;
       }
       importData.sip = parsedSB;
@@ -11093,16 +11093,16 @@ async function doContactImport(){
   closeModal('importModal');
   let cmsg = `✅ Contact info updated! ${updated} updated`;
   if(notFound) cmsg += `, ${notFound} not matched`;
-  if(ambiguous) cmsg += `, ${ambiguous} skip (duplicate naam, PAN se bhi nahi mila)`;
+  if(ambiguous) cmsg += `, ${ambiguous} skipped (duplicate name, no match via PAN either)`;
   toast(cmsg, 'success');
   renderMfTable(); refreshDash(); updateBadges();
 
   // Duplicate naam wale rows skip hue (PAN se bhi resolve nahi hue) — inhe manually update karna padega
   if(ambigNames.size){
     setTimeout(()=>{
-      showReport(`Duplicate Naam — Skip Kiye (${ambigNames.size} naam / ${ambiguous} rows)`,
+      showReport(`Duplicate Names — Skipped (${ambigNames.size} names / ${ambiguous} rows)`,
         ['#','Naam','Wajah'],
-        [...ambigNames].map((n,i)=>[i+1, n, 'CRM me isi naam ke 1+ investor hain, aur PAN se bhi match confirm nahi hua — manually update karein']));
+        [...ambigNames].map((n,i)=>[i+1, n, 'The CRM has 1+ investors with this same name, and a PAN match could not confirm which one — please update manually']));
     }, 600);
   }
 }
@@ -11359,24 +11359,24 @@ async function doImport(){
   let _imsg = `✅ Import done! ${updated} updated + ${added} new clients`;
   if(importData.sip){
     const _b = [];
-    if(sipAdded)   _b.push(`${sipAdded} naye`);
+    if(sipAdded)   _b.push(`${sipAdded} new`);
     if(sipUpdated) _b.push(`${sipUpdated} update`);
     if(sipClosed)  _b.push(`${sipClosed} closed`);
-    _imsg += ` · SIP: ` + (_b.length ? _b.join(' · ') : 'koi change nahi')
+    _imsg += ` · SIP: ` + (_b.length ? _b.join(' · ') : 'no change')
            + (sipClientsCleared ? ` (${sipClientsCleared} client fully closed)` : '');
   }
-  if(ambigRows.length) _imsg += ` — ${ambigRows.length} rows skip (same naam, 1+ log)`;
+  if(ambigRows.length) _imsg += ` — ${ambigRows.length} rows skipped (same name, 1+ match)`;
   toast(_imsg, 'success');
   renderMfTable(); refreshDash(); updateBadges();
   // Anything we refused to guess at, hand back to the user with the Client ID
   // and PAN so it can be fixed by hand.
   if(ambigRows.length){
     setTimeout(()=>{
-      showReport(`Same Naam — Skip Kiye (${ambigRows.length} rows)`,
+      showReport(`Same Name — Skipped (${ambigRows.length} rows)`,
         ['#','Naam','Client ID','PAN','AUM','Wajah'],
         ambigRows.map((r,i)=>[i+1, r.name, r.client_id||'—', r.pan||'—',
           (r.aum||0).toLocaleString('en-IN'),
-          'Is naam ke 1+ investor hain — manually update karein']));
+          'There is more than 1 investor with this name — please update manually']));
     }, 600);
   }
 }
@@ -11412,7 +11412,7 @@ function _mfPrimary(recs){
   return recs.slice().sort((a,b)=> score(b)-score(a) || String(a.created||'').localeCompare(String(b.created||'')) )[0];
 }
 function openMfDupMerge(){
-  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('Ye tool sirf admin ke liye hai','error'); return; }
+  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('This tool is for admin only','error'); return; }
   const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const groups = findMfDupGroups();
   const ov=document.createElement('div');
@@ -11420,7 +11420,7 @@ function openMfDupMerge(){
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
   let body;
   if(!groups.length){
-    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Koi Duplicate Nahi Mila</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">Same PAN / mobile / naam wale ek se zyada MF investor nahi hain.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'mfDupOverlay\').remove()">Band Karein</button></div></div>';
+    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">No Duplicates Found</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">There are no MF investors sharing the same PAN / mobile / name.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'mfDupOverlay\').remove()">Band Karein</button></div></div>';
   } else {
     let rows='';
     groups.forEach((g,gi)=>{
@@ -11441,7 +11441,7 @@ function openMfDupMerge(){
       });
       rows+='<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">'
         +'<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">'
-        +'<input type="checkbox" class="mfdup-chk" data-key="'+esc(g.key)+'" checked> Group '+(gi+1)+' — '+g.recs.length+' records ('+kind+' same) — merge karein</label>'
+        +'<input type="checkbox" class="mfdup-chk" data-key="'+esc(g.key)+'" checked> Group '+(gi+1)+' — '+g.recs.length+' records (same '+kind+') — merge</label>'
         +'<table style="width:100%;border-collapse:collapse;font-size:.8rem">'
         +'<tr style="background:#f1f5f9;font-size:.72rem;color:#475569"><td style="padding:5px 8px">STATUS</td><td style="padding:5px 8px">NAAM</td><td style="padding:5px 8px">PAN</td><td style="padding:5px 8px">MOBILE</td><td style="padding:5px 8px;text-align:right">AUM</td><td style="padding:5px 8px">RM</td></tr>'
         +cards+'</table></div>';
@@ -11449,7 +11449,7 @@ function openMfDupMerge(){
     body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
       +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate MF Investors — Review & Merge</div>'
       +'<button onclick="document.getElementById(\'mfDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
-      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ "Rakhenge" = jis record me sabse zyada info hai. AUM group ka <b>sabse bada</b> value rakha jayega (double nahi hoga). Baaki records delete honge, unke khaali fields (PAN/mobile/RM/remarks) survivor me bhar diye jayenge. Jise merge nahi karna, uska tick hata do.</div>'
+      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ The record kept is the one with the most information. For AUM groups, the <b>largest</b> value is kept (it won\'t be doubled). The other records will be deleted, and their blank fields (PAN/mobile/RM/remarks) will be filled in on the survivor. Uncheck any group you don\'t want merged.</div>'
       +'<div style="padding:16px 18px">'+rows
       +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
       +'<button class="btn btn-outline" onclick="document.getElementById(\'mfDupOverlay\').remove()">Cancel</button>'
@@ -11461,9 +11461,9 @@ function openMfDupMerge(){
 }
 async function mergeMfDupsSelected(){
   const keys=[...document.querySelectorAll('.mfdup-chk')].filter(x=>x.checked).map(x=>x.getAttribute('data-key'));
-  if(!keys.length){ toast('Koi group select nahi hua','error'); return; }
+  if(!keys.length){ toast('No group selected','error'); return; }
   const groups=findMfDupGroups().filter(g=>keys.includes(g.key));
-  if(!groups.length){ toast('Kuch nahi mila','error'); return; }
+  if(!groups.length){ toast('Nothing found','error'); return; }
   const val=v=>String(v||'').trim();
   const survivors=[], delIds=[]; let totalDel=0;
   groups.forEach(g=>{
@@ -11486,12 +11486,12 @@ async function mergeMfDupsSelected(){
     survivor.updated=today();
     survivors.push(survivor);
   });
-  if(!confirm('Confirm: '+groups.length+' group(s) merge honge, '+totalDel+' duplicate record delete honge (survivor me info jud jayegi). Aage badhein?')) return;
+  if(!confirm('Confirm: '+groups.length+' group(s) will be merged, '+totalDel+' duplicate record(s) will be deleted (their info will be added to the survivor). Proceed?')) return;
   try{
     await DB.setClientsBulk('mf_clients', survivors);
     await DB.deleteClientsBulk('mf_clients', delIds);
     const ovx=document.getElementById('mfDupOverlay'); if(ovx) ovx.remove();
-    toast('✅ '+groups.length+' group merge hue, '+totalDel+' duplicate hataye','success');
+    toast('✅ '+groups.length+' group(s) merged, '+totalDel+' duplicate(s) removed','success');
     renderMfTable(); refreshDash(); updateBadges();
   }catch(e){ toast('Merge failed: '+(e&&e.message||e),'error'); }
 }
@@ -11730,7 +11730,7 @@ function openMfAum(id){
     <div style="color:var(--gray);font-size:.78rem;margin-bottom:10px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div>`;
   if(!d){
     body.innerHTML = hdr + `${row('AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—')}
-      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">Baaki detail (Invested, Gain/Loss, XIRR) ke liye MF → Import Excel se AUM By Client report upload karein.</div>`;
+      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
   } else {
     body.innerHTML = hdr +
       row('Invested', d.inv?'₹'+fmtNum(d.inv):'—') +
@@ -11793,8 +11793,8 @@ async function fixAllMobiles(){
     });
     preview[k]=n; total+=n;
   });
-  if(total===0){ toast('✅ Sab mobile already clean hain — koi 91 country code nahi mila','success'); return; }
-  if(!confirm(`${total} clients ke mobile mein country code (91) mila hai.\n\nEquity: ${preview.eq_clients||0}\nMF: ${preview.mf_clients||0}\n\nSabse 91 hata ke last 10 digit rakh du? (Alternate number bhi)`)) return;
+  if(total===0){ toast('✅ All mobile numbers are already clean — no 91 country code found','success'); return; }
+  if(!confirm(`${total} clients have a country code (91) in their mobile number.\n\nEquity: ${preview.eq_clients||0}\nMF: ${preview.mf_clients||0}\n\nRemove the 91 from all of them and keep the last 10 digits? (Alternate number too)`)) return;
   let fixed=0;
   for(const k of keys){
     const list=DB.get(k)||[];
@@ -11809,7 +11809,7 @@ async function fixAllMobiles(){
     });
     if(touched.length) await DB.setClientsBulk(k, touched);
   }
-  toast(`✅ ${fixed} clients ke mobile fix ho gaye (91 hataya)`,'success');
+  toast(`✅ ${fixed} clients' mobile numbers fixed (91 removed)`,'success');
   renderEqTable(); if(typeof renderMfTable==='function') renderMfTable(); refreshDash(); updateBadges();
 }
 
@@ -11825,7 +11825,7 @@ async function fixStatusByLastTrade(){
   const toFix = [];
   let nBlankSkippedClosed=0, nBadDate=0;
   list.forEach(c=>{
-    if(c.status==='Closed') return;              // Closed chhedna nahi
+    if(c.status==='Closed') return;              // don't touch Closed
     if(!c.last_trade_date){
       // Kabhi trade nahi kiya (ya date missing) — inhe bhi Inactive maano, jab tak Closed na ho.
       if(c.status!=='Inactive') toFix.push({c, from:c.status||'—', to:'Inactive'});
@@ -11835,23 +11835,23 @@ async function fixStatusByLastTrade(){
     // daysDiff() wahi function hai jo table me "6299D AGO" dikhata hai — isse
     // har format (YYYY-MM-DD / 17-Apr-2009 / Date object) sahi parse hota hai.
     const days = daysDiff(c.last_trade_date);
-    if(days===null){ nBadDate++; return; }       // date samajh nahi aayi
+    if(days===null){ nBadDate++; return; }       // date could not be parsed
     const want = days > EQ_INACTIVE_DAYS ? 'Inactive' : 'Active';
     if(want!==c.status) toFix.push({c, from:c.status||'—', to:want});
   });
   if(nBadDate) console.log('Fix Status: date parse fail ->', nBadDate, 'clients');
   if(!toFix.length){
-    toast(`✅ Sab clients ka status already sahi hai${nBadDate?` (${nBadDate} ki date samajh nahi aayi)`:''}`,'success');
+    toast(`✅ All clients' status is already correct${nBadDate?` (${nBadDate} had a date that couldn't be parsed)`:''}`,'success');
     return;
   }
   const nInact = toFix.filter(x=>x.to==='Inactive').length;
   const nAct   = toFix.filter(x=>x.to==='Active').length;
   const nBlankInact = toFix.filter(x=>x.to==='Inactive' && !x.c.last_trade_date).length;
-  if(!confirm(`${toFix.length} clients ka status update hoga:\n\n`+
-              `🟡 ${nInact} ko Inactive karna hai (${nBlankInact} jinka last trade blank hai, baaki 1 saal se trade nahi)\n`+
-              `🟢 ${nAct} ko Active karna hai (1 saal ke andar trade hua)\n\n`+
-              `Chhue nahi jayenge: Closed clients`+
-              `${nBadDate?`, ${nBadDate} jinki date parse nahi hui`:''}.\n\nUpdate karu?`)) return;
+  if(!confirm(`${toFix.length} clients' status will be updated:\n\n`+
+              `🟡 ${nInact} will be marked Inactive (${nBlankInact} have a blank last trade, the rest haven't traded in 1 year)\n`+
+              `🟢 ${nAct} will be marked Active (traded within the last 1 year)\n\n`+
+              `Left untouched: Closed clients`+
+              `${nBadDate?`, ${nBadDate} whose date couldn't be parsed`:''}.\n\nProceed with the update?`)) return;
   const touched=[];
   toFix.forEach(x=>{ x.c.status = x.to; touched.push(x.c); });
   await DB.setClientsBulk('eq_clients', touched);
@@ -11859,7 +11859,7 @@ async function fixStatusByLastTrade(){
     client_id:x.c.id, client_name:x.c.name, rm:x.c.rm, by:CU.name,
     date:new Date().toISOString(),
     changes:[{field:'status', old:x.from, new:x.to}] })));
-  toast(`✅ ${toFix.length} clients ka status update ho gaya (${nInact} Inactive, ${nAct} Active)`,'success');
+  toast(`✅ ${toFix.length} clients' status updated (${nInact} Inactive, ${nAct} Active)`,'success');
   renderEqTable(); refreshDash(); updateBadges();
 }
 
@@ -11975,12 +11975,12 @@ function handleEqFile(input){
        ✅ ${data.length} rows found (matched by Code/Mobile)</div>` +
       (colMap.last_trade_date!==undefined
         ? `<div style="background:#FEF6E7;color:#92400E;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
-           📅 Status <b>Last Trade Date</b> se banega (1 saal se purana = Inactive):<br>
+           📅 Status will be based on <b>Last Trade Date</b> (older than 1 year = Inactive):<br>
            🟢 ${nAct} Active &nbsp;·&nbsp; 🟡 ${nInact} Inactive &nbsp;·&nbsp; 🔴 ${nClosed} Closed${nUnk?` &nbsp;·&nbsp; ⚪ ${nUnk} last trade blank (status waisa hi rahega)`:''}
-           ${nFlip?`<br>⚠️ Inme se <b>${nFlip}</b> ko file "Active" bol rahi hai par 1 saal se trade nahi — Inactive rakhe gaye.`:''}
-           <br>Naye Closed accounts add nahi honge; purane clients Closed mark ho jayenge.</div>`
+           ${nFlip?`<br>⚠️ Of these, the file says <b>${nFlip}</b> are "Active" but haven't traded in 1 year — they were kept Inactive.`:''}
+           <br>New Closed accounts will not be added; existing clients will be marked Closed.</div>`
         : `<div style="background:#FEE2E2;color:#991B1B;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
-           ⚠️ Last Trade Date column nahi mila — status update nahi hoga.</div>`);
+           ⚠️ Last Trade Date column not found — status will not be updated.</div>`);
     document.getElementById('eqImportBtnGo').disabled = data.length===0;
   });
 }
@@ -12081,7 +12081,7 @@ async function doEqImport(){
   closeModal('eqImportModal');
   let msg = `✅ Import done! ${updated} updated, ${added} new added`;
   if(statusFixes.length) msg += `, ${statusFixes.length} status corrected`;
-  if(closedSkipped) msg += `, ${closedSkipped} Closed skip (add nahi kiye)`;
+  if(closedSkipped) msg += `, ${closedSkipped} Closed skipped (not added)`;
   if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
@@ -12103,7 +12103,7 @@ async function doEqImport(){
   if(statusFixes.length){
     setTimeout(()=>{
       showReport(`Status Corrections — ${statusFixes.length} clients (${closedMarked} Closed mark)`,
-        ['RM','Code','Name','CRM me tha','Last Trade se'], statusFixes);
+        ['RM','Code','Name','Was in CRM as','From Last Trade'], statusFixes);
     }, 600);
   }
 }
@@ -12128,7 +12128,7 @@ function downloadEqBulkTemplate(){
     ['Client Code','Client Name (reference only)','New RM','PAN','DOB'],
     ['EQ12345','Example: Ramesh Kumar','Komal','ABCDE1234F','19561009'],
     ['EQ67890','Example: Sunita Devi','Bharat','',''],
-    ['EQ11111','Example: sirf DOB update','','','09/10/1956']
+    ['EQ11111','Example: DOB update only','','','09/10/1956']
   ];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   ws['!cols'] = [{wch:18},{wch:32},{wch:16},{wch:16},{wch:14}];
@@ -12163,7 +12163,7 @@ function handleEqBulkFile(input){
       }
     }
     if(hdrIdx===-1){
-      toast('Header row nahi mila. Excel me Client Code ke saath RM / PAN / DOB me se koi ek column hona chahiye.','error');
+      toast('Header row not found. The Excel file must have a Client Code column plus at least one of RM / PAN / DOB.','error');
       return;
     }
 
@@ -12205,9 +12205,9 @@ function handleEqBulkFile(input){
         const rawStr = String(rawDob==null?'':rawDob).trim().toLowerCase();
         if(!_blank.includes(rawStr)){
           const dob = normDob(rawDob);
-          if(!dob) badDates.push([code, String(rawDob), 'Date parse nahi hui']);
+          if(!dob) badDates.push([code, String(rawDob), 'Date could not be parsed']);
           else if(dob > todayStr) badDates.push([code, String(rawDob), 'Future date']);
-          else if(dob < '1900-01-01') badDates.push([code, String(rawDob), '1900 se pehle']);
+          else if(dob < '1900-01-01') badDates.push([code, String(rawDob), 'Before 1900']);
           else { row.dob = dob; counts.dob++; }
         }
       }
@@ -12216,7 +12216,7 @@ function handleEqBulkFile(input){
     });
 
     if(!data.length){
-      toast('Koi valid row nahi mili (Client Code ke saath RM / PAN / DOB me se kuch chahiye).','error');
+      toast('No valid rows found (Client Code plus at least one of RM / PAN / DOB is required).','error');
       return;
     }
 
@@ -12224,22 +12224,22 @@ function handleEqBulkFile(input){
     const labels = {rm:'RM', pan:'PAN', dob:'DOB'};
     const found = eqBulkFields.map(f=>`<b>${labels[f]}</b> (${counts[f]})`).join(', ');
     let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${data.length} rows — update honge: ${found}</div>`;
+       ✅ ${data.length} rows — will be updated: ${found}</div>`;
     if(dupSkipped){
       html += `<div style="background:#eef6ff;color:#1d4ed8;padding:8px 10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
-       ℹ️ ${dupSkipped} duplicate Client Code row(s) — pehli row li gayi hai.</div>`;
+       ℹ️ ${dupSkipped} duplicate Client Code row(s) — the first row was used.</div>`;
     }
     if(badRm){
       html += `<div style="background:#fdecea;color:var(--red);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
-       ⚠️ ${badRm} row(s) ka RM naam CRM ki list se match nahi karta — wo RM skip ho jayega (baaki fields fir bhi update honge). Naam exact hona chahiye (jaise Komal, Bharat).</div>`;
+       ⚠️ ${badRm} row(s) have an RM name that doesn't match the CRM's list — that RM will be skipped (other fields will still update). The name must be exact (e.g. Komal, Bharat).</div>`;
     }
     if(badPanFmt){
       html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px">
-       ⚠️ ${badPanFmt} PAN standard format (ABCDE1234F) jaisa nahi lag raha — as-is upload hoga, ek baar check kar lijiye.</div>`;
+       ⚠️ ${badPanFmt} PAN doesn't look like the standard format (ABCDE1234F) — it will be uploaded as-is, please double-check.</div>`;
     }
     if(badDates.length){
       html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
-       ⚠️ ${badDates.length} row(s) ki DOB invalid hai — wo DOB skip ho jayegi.
+       ⚠️ ${badDates.length} row(s) have an invalid DOB — that DOB will be skipped.
        <a href="#" onclick="showEqBulkBadDobReport();return false;" style="color:var(--teal);text-decoration:underline;margin-left:6px">Dekho</a></div>`;
       window._eqBulkBadDob = badDates;
     } else {
@@ -12318,7 +12318,7 @@ async function doEqBulkUpdate(){
 
   if(notFoundRows.length){
     setTimeout(()=>{
-      showReport(`Client Code Not Found — ${notFoundRows.length} rows (skip kiye)`,
+      showReport(`Client Code Not Found — ${notFoundRows.length} rows (skipped)`,
         ['Client Code','RM','PAN','DOB'], notFoundRows);
     }, 600);
   }
@@ -12388,7 +12388,7 @@ function handleMfBulkDobFile(input){
     if(err){ toast('File read error: '+err.message,'error'); return; }
     const parsed = parseMfDobFile(rows);
     if(!parsed || !parsed.data.length){
-      toast('File me "Name" aur "DOB" column nahi mil paye, ya koi valid row nahi mila','error');
+      toast('The "Name" and "DOB" columns could not be found in the file, or no valid rows were found','error');
       document.getElementById('mfBulkDobBtnGo').disabled=true;
       return;
     }
@@ -12404,14 +12404,14 @@ function handleMfBulkDobFile(input){
     mfBulkDobBad = parsed.bad;
 
     let html = `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${mfBulkDobData.length} row(s) — DOB update honge</div>`;
+       ✅ ${mfBulkDobData.length} row(s) — DOB will be updated</div>`;
     if(dupSkipped){
       html += `<div style="background:#eef6ff;color:#1d4ed8;padding:8px 10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
-       ℹ️ ${dupSkipped} duplicate row(s) — aakhri wali li gayi hai.</div>`;
+       ℹ️ ${dupSkipped} duplicate row(s) — the last one was used.</div>`;
     }
     if(mfBulkDobBad.length){
       html += `<div style="background:#fff7e6;color:var(--orange);padding:10px;border-radius:8px;font-size:.8rem;margin-top:8px;font-weight:600">
-       ⚠️ ${mfBulkDobBad.length} row(s) skip ho gaye (invalid DOB ya PAN/Client Code missing).
+       ⚠️ ${mfBulkDobBad.length} row(s) skipped (invalid DOB or PAN/Client Code missing).
        <a href="#" onclick="showMfBulkDobBadReport();return false;" style="color:var(--teal);text-decoration:underline;margin-left:6px">Dekho</a></div>`;
     }
     document.getElementById('mf-bulk-dob-preview').innerHTML = html;
@@ -12467,7 +12467,7 @@ async function doMfBulkDobUpdate(){
 
   if(notFoundRows.length){
     setTimeout(()=>{
-      showReport(`PAN / Client Code Not Found — ${notFoundRows.length} rows (skip kiye)`,
+      showReport(`PAN / Client Code Not Found — ${notFoundRows.length} rows (skipped)`,
         ['Name','PAN / Client Code','DOB'], notFoundRows);
     }, 600);
   }

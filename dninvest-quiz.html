@@ -102,12 +102,12 @@ input,select,textarea,button{font-family:inherit}
               <div id="quiz-player-names" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
               <div style="margin-top:10px"><button class="btn btn-teal" style="padding:8px 14px;font-size:.85rem" onclick="QUIZ.openScreen()">🖥️ Open Big Screen (LCD)</button></div>
               <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-                <label style="font-size:.82rem;font-weight:700;display:block;margin-bottom:5px">🖥️ Big Screen Ka Title (Upar Wala Naam)</label>
+                <label style="font-size:.82rem;font-weight:700;display:block;margin-bottom:5px">🖥️ Big Screen Title (name shown at the top)</label>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                   <input type="text" id="quiz-screen-title" placeholder="D N INVESTMENT" maxlength="60" style="flex:1;min-width:180px;padding:7px 9px;font-size:.85rem;border:1px solid var(--border);border-radius:6px">
                   <button class="btn btn-teal" style="padding:7px 14px;font-size:.82rem" onclick="QUIZ.saveScreenTitle()">💾 Save</button>
                 </div>
-                <div style="font-size:.72rem;color:var(--gray);margin-top:5px">Ye naam big screen ke upar dikhega. "· QUIZ TIME ✨" apne-aap juda rahega. Sabhi devices par sync ho jayega.</div>
+                <div style="font-size:.72rem;color:var(--gray);margin-top:5px">This name will show at the top of the big screen. "· QUIZ TIME ✨" is added automatically. It syncs across all devices.</div>
               </div>
             </div>
           </div>
@@ -129,8 +129,8 @@ input,select,textarea,button{font-family:inherit}
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
-                <span style="font-size:.72rem;color:var(--gray);font-weight:700">📤 Naya Question Bank Upload Karo (Excel):</span>
-                <input type="text" id="quiz-bank-name" placeholder="Naam (jaise Cricket, Filmi)" style="padding:5px 8px;font-size:.76rem;border:1px solid var(--border);border-radius:6px;width:170px">
+                <span style="font-size:.72rem;color:var(--gray);font-weight:700">📤 Upload A New Question Bank (Excel):</span>
+                <input type="text" id="quiz-bank-name" placeholder="Name (e.g. Cricket, Movies)" style="padding:5px 8px;font-size:.76rem;border:1px solid var(--border);border-radius:6px;width:170px">
                 <input type="file" id="quiz-bank-file" accept=".xlsx,.xls" style="font-size:.72rem;max-width:190px">
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.uploadBankExcel()">⬆️ Upload</button>
                 <span style="font-size:.68rem;color:#94a3b8">Columns: Question | Correct Answer | Wrong 1 | Wrong 2 | Wrong 3</span>
@@ -402,10 +402,10 @@ window.QUIZ = (function(){
     wrap.style.display = (host.hiddenBanks && host.hiddenBanks.filmi) ? 'none' : 'inline-flex';
   }
   async function deleteFilmiButton(){
-    if(!confirm('"Filmi" Bank Ko List Se Hataayein? Button Gayab Ho Jayega (Sabhi Device Se). Wapas Chahiye To Mujhe Bata Dena, Dobara Jod Denge.')) return;
+    if(!confirm('Remove The "Filmi" Bank From The List? The Button Will Disappear (On All Devices). Let Us Know If You Want It Back — We Can Re-Add It.')) return;
     try{
       await CUSTOMBANKDOC().set({ hidden:{ filmi:true }, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
-    }catch(e){ alert('Delete Fail Ho Gaya: '+(e && e.message ? e.message : e)); return; }
+    }catch(e){ alert('Delete Failed: '+(e && e.message ? e.message : e)); return; }
     host.hiddenBanks = Object.assign({}, host.hiddenBanks||{}, {filmi:true});
     renderFilmiVisibility();
   }
@@ -424,14 +424,14 @@ window.QUIZ = (function(){
     box.innerHTML=html;
   }
   async function deleteCustomBank(key){
-    if(!confirm('"'+key+'" Bank Hamesha Ke Liye Delete Karein? Ye Sabhi Device Se Hat Jayega — Wapas Nahi Aayega (Dobara Upload Karna Padega).')) return;
+    if(!confirm('Delete The "'+key+'" Bank Permanently? It Will Be Removed From All Devices — This Cannot Be Undone (You Would Have To Upload It Again).')) return;
     try{
       await CUSTOMBANKDOC().update({ ['banks.'+key]: firebase.firestore.FieldValue.delete() });
     }catch(e){
       // doc/field may not exist in the shape update() expects — fall back to full rewrite
       var current=Object.assign({}, host.customBanks||{});
       delete current[key];
-      try{ await CUSTOMBANKDOC().set({ banks:current, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e2){ alert('Delete Fail Ho Gaya: '+(e2&&e2.message?e2.message:e2)); return; }
+      try{ await CUSTOMBANKDOC().set({ banks:current, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e2){ alert('Delete Failed: '+(e2&&e2.message?e2.message:e2)); return; }
     }
     var current2=Object.assign({}, host.customBanks||{});
     delete current2[key];
@@ -439,8 +439,8 @@ window.QUIZ = (function(){
   }
   async function loadCustomBank(key){
     var arr=(host.customBanks && host.customBanks[key]) || [];
-    if(!arr.length){ alert('Ye Bank Abhi Khaali Hai — Pehle Excel Upload Karo.'); return; }
-    if(!confirm('5 Naye "'+key+'" Sawal Load Karein? Isse Sabhi Device Par Maujooda 5 Sawal Badal Jayenge.')) return;
+    if(!arr.length){ alert('This Bank Is Currently Empty — Please Upload An Excel File First.'); return; }
+    if(!confirm('Load 5 New "'+key+'" Questions? This Will Replace The Current 5 Questions On All Devices.')) return;
     var arr2=_buildBankFromTopic(arr);
     host.bankCache=arr2; renderBank();
     await writeBankToFirestore(arr2);
@@ -449,17 +449,17 @@ window.QUIZ = (function(){
     var nameInput=document.getElementById('quiz-bank-name');
     var fileInput=document.getElementById('quiz-bank-file');
     var name=(nameInput && nameInput.value || '').trim();
-    if(!name){ alert('Pehle Bank Ka Naam Likho (Jaise Cricket, Sports, Filmi).'); return; }
+    if(!name){ alert('Please Enter A Bank Name First (E.g. Cricket, Sports, Movies).'); return; }
     var file=fileInput && fileInput.files && fileInput.files[0];
-    if(!file){ alert('Pehle Excel File Chuno.'); return; }
+    if(!file){ alert('Please Choose An Excel File First.'); return; }
     var key=name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
-    if(!key){ alert('Bank Ka Naam Sahi Likho.'); return; }
+    if(!key){ alert('Please Enter A Valid Bank Name.'); return; }
     try{
       var buf=await file.arrayBuffer();
       var wb=XLSX.read(buf,{type:'array'});
       var ws=wb.Sheets[wb.SheetNames[0]];
       var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-      if(!rows.length){ alert('Excel Me Koi Data Nahi Mila.'); return; }
+      if(!rows.length){ alert('No Data Found In The Excel File.'); return; }
       var firstKeys=Object.keys(rows[0]);
       function findCol(cands){
         for(var i=0;i<firstKeys.length;i++){
@@ -474,7 +474,7 @@ window.QUIZ = (function(){
       var w2=findCol(['wrong 2','wrong2','option c']);
       var w3=findCol(['wrong 3','wrong3','option d']);
       if(!qCol||!cCol||!w1||!w2||!w3){
-        alert('Excel Ke Column Names Sahi Nahi Hain.\n\nZaroori Columns (Pehli Row Me): Question | Correct Answer | Wrong 1 | Wrong 2 | Wrong 3');
+        alert('The Excel Column Names Are Not Correct.\n\nRequired Columns (In The First Row): Question | Correct Answer | Wrong 1 | Wrong 2 | Wrong 3');
         return;
       }
       var arr=[];
@@ -484,15 +484,15 @@ window.QUIZ = (function(){
         var o1=String(r[w1]||'').trim(), o2=String(r[w2]||'').trim(), o3=String(r[w3]||'').trim();
         if(q && c && o1 && o2 && o3){ arr.push({q:q, a:[c,o1,o2,o3]}); }
       });
-      if(!arr.length){ alert('Koi Valid Row Nahi Mili — Har Row Me 5 Column (Question + Correct + 3 Wrong) Bhare Hone Chahiye.'); return; }
+      if(!arr.length){ alert('No Valid Rows Found — Each Row Must Have All 5 Columns Filled (Question + Correct + 3 Wrong).'); return; }
       var current=Object.assign({}, host.customBanks||{});
       current[key]=arr;
       await CUSTOMBANKDOC().set({ banks:current, updatedAt:firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
       host.customBanks=current; renderCustomBankButtons();
-      alert('✅ "'+name+'" Bank Upload Ho Gaya — '+arr.length+' Sawal. Ab "Load '+name+' Questions" Button Se Kabhi Bhi Use Kar Sakte Ho (Sabhi Device Par).');
+      alert('✅ "'+name+'" Bank Uploaded — '+arr.length+' Questions. You Can Now Use The "Load '+name+' Questions" Button Anytime (On All Devices).');
       if(fileInput) fileInput.value='';
     }catch(e){
-      alert('Upload Fail Ho Gaya: '+(e && e.message ? e.message : e));
+      alert('Upload Failed: '+(e && e.message ? e.message : e));
     }
   }
 
@@ -511,7 +511,7 @@ window.QUIZ = (function(){
   async function hostInit(){
     setConnStatus('🔌 Connecting…','#b45309');
     await window.waitForFdb(8000);
-    if(!window.fdb){ setConnStatus('🔴 Firebase Not Connected'+(window.__fbErr?(' — '+window.__fbErr):''),'#dc2626'); alert('⚠️ Firebase Connect Nahi Hua.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Internet Check Karo, Phir Page Reload Karo.')); return; }
+    if(!window.fdb){ setConnStatus('🔴 Firebase Not Connected'+(window.__fbErr?(' — '+window.__fbErr):''),'#dc2626'); alert('⚠️ Could Not Connect To Firebase.\n\n'+(window.__fbErr?('Error: '+window.__fbErr):'Check Your Internet, Then Reload The Page.')); return; }
     // join link + QR
     var li=document.getElementById('quiz-join-link'); if(li) li.value=joinLink();
     var qr=document.getElementById('quiz-qr-box');
@@ -531,7 +531,7 @@ window.QUIZ = (function(){
       setConnStatus('🟢 Connected — Ready','#16a34a');
     }catch(e){
       setConnStatus('🔴 Firestore Blocked: '+(e&&e.message||e),'#dc2626');
-      alert('⚠️ Firestore Read/Write Blocked:\n\n'+(e&&e.message||e)+'\n\n(Security Rules Ya Internet Check Karo.)');
+      alert('⚠️ Firestore Read/Write Blocked:\n\n'+(e&&e.message||e)+'\n\n(Check Security Rules Or Your Internet.)');
     }
     attachHostListeners();
     if(host.unsubReqMobile) host.unsubReqMobile();
@@ -545,10 +545,10 @@ window.QUIZ = (function(){
   }
 
   async function saveScreenTitle(){
-    await window.waitForFdb(8000); if(!window.fdb){ alert('Connect Nahi Ho Paya. Refresh Karo.'); return; }
+    await window.waitForFdb(8000); if(!window.fdb){ alert('Could Not Connect. Please Refresh.'); return; }
     var ti=document.getElementById('quiz-screen-title');
     var val = ti ? (ti.value||'').trim().slice(0,60) : '';
-    try{ await LINKS().set({ screenTitle: val }, {merge:true}); alert('✅ Title Save Ho Gaya. Big Screen Par Apne-Aap Update Ho Jayega.'); }
+    try{ await LINKS().set({ screenTitle: val }, {merge:true}); alert('✅ Title Saved. It Will Update Automatically On The Big Screen.'); }
     catch(e){ alert('Save Failed: '+(e&&e.message||e)); }
   }
 
@@ -909,7 +909,7 @@ window.QUIZ = (function(){
     if(!canShareOne){
       var hint=document.createElement('div');
       hint.style.cssText='color:#e5e7eb;font-size:12px;text-align:center;max-width:460px';
-      hint.textContent='Desktop pe direct WhatsApp attach nahi hota — poster download karke WhatsApp group me bhej do. Mobile pe 📤 Share button aata hai (ek saath sab bhi).';
+      hint.textContent='Direct WhatsApp attach isn\'t available on desktop — download the poster and send it in the WhatsApp group instead. On mobile, a 📤 Share button appears (can send all at once too).';
       ov.appendChild(hint);
     }
     items.forEach(function(o){
@@ -1111,7 +1111,7 @@ window.QUIZ = (function(){
   async function launchQuestionObj(q){
     var _cs=document.getElementById('quiz-conn');
     await window.waitForFdb(8000);
-    if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Firebase Connect Nahi Hua.'); return; }
+    if(!window.fdb){ if(_cs){_cs.textContent='🔴 No Firebase';_cs.style.color='#dc2626';} alert('⚠️ Could Not Connect To Firebase.'); return; }
     try{ await saveCurrentResults(); }catch(e){}   // never let this block the push
     // continue the SAME live session/sequence (survives reloads & multiple host tabs)
     try{ var cur=(await DOC().get()).data()||{}; if(cur.sessionId) host.sessionId=cur.sessionId; host.qIndex=(cur.qIndex||0); }catch(e){}
@@ -1143,7 +1143,7 @@ window.QUIZ = (function(){
       try{ var rs=await RESPONSES().get(); renderHostResults(rs); }catch(e){}
     }catch(e){
       if(_cs){ _cs.textContent='🔴 Push Failed: '+(e&&e.message||e); _cs.style.color='#dc2626'; }
-      alert('⚠️ Push Failed:\n\n'+(e&&e.message||e)+'\n\n(Firestore Write Block Ho Sakta Hai — Rules Check Karo.)');
+      alert('⚠️ Push Failed:\n\n'+(e&&e.message||e)+'\n\n(The Firestore Write May Be Blocked — Check The Rules.)');
     }
   }
 
@@ -1357,11 +1357,11 @@ window.QUIZ = (function(){
       '<div class="qp-glass qp-pop">'
       + '<div style="text-align:center;font-size:3rem;margin-bottom:8px" class="qp-float">🎉</div>'
       + '<div style="font-size:1.35rem;font-weight:900;text-align:center;margin-bottom:4px">Welcome!</div>'
-      + '<div style="font-size:.9rem;color:#c7d2fe;text-align:center;margin-bottom:22px">Apna naam daalein aur quiz join karein 🏆</div>'
+      + '<div style="font-size:.9rem;color:#c7d2fe;text-align:center;margin-bottom:22px">Enter your name and join the quiz 🏆</div>'
       + '<input id="qp-name" placeholder="👤 Aapka Naam" class="qp-input" style="margin-bottom:14px">'
       + mobileField
       + '<button id="qp-join-btn" class="qp-cta">Join Quiz →</button>'
-      + '<div style="text-align:center;font-size:.75rem;color:#94a3b8;margin-top:16px">🎁 Winner ko seminar me prize milega</div>'
+      + '<div style="text-align:center;font-size:.75rem;color:#94a3b8;margin-top:16px">🎁 The winner will receive a prize at the seminar</div>'
       + '</div>';
     var inp=document.getElementById('qp-name'); if(inp) inp.focus();
     document.getElementById('qp-join-btn').onclick=async function(){
@@ -1435,7 +1435,7 @@ window.QUIZ = (function(){
       C().innerHTML='<div class="qp-glass qp-pop" style="text-align:center">'
         + '<div style="font-size:3.4rem;margin-bottom:12px" class="qp-float">⏳</div>'
         + '<div style="font-size:1.3rem;font-weight:900;margin-bottom:6px">Hi '+esc(player.name)+'! 👋</div>'
-        + '<div style="font-size:1rem;color:#c7d2fe;margin-bottom:18px">Quiz shuru hone wala hai… ready ho jao! 🏆</div>'
+        + '<div style="font-size:1rem;color:#c7d2fe;margin-bottom:18px">The quiz is about to start… get ready! 🏆</div>'
         + '<div class="qp-dots"><span></span><span></span><span></span></div>'
         + '</div>';
     }

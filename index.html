@@ -2168,7 +2168,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
         <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
           <h3 style="margin:0 0 6px">🔒 Call Date Lock (for RMs)</h3>
-          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Set date limits for <b>Last Call</b> and <b>Next Call</b> in the RM's follow-up form. Dates before or after these limits RM daal nahi payega. Blank chhodo = us taraf koi limit nahi. (Admin par koi limit nahi lagti.)</p>
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Set date limits for <b>Last Call</b> and <b>Next Call</b> in the RM's follow-up form. the RM will not be able to enter a date before or after these limits. Leave blank = no limit on that side. (No limit ever applies to Admin.)</p>
 
           <div style="display:flex;gap:8px;margin:0 0 14px;background:#f1f5f9;padding:4px;border-radius:10px;width:fit-content">
             <button type="button" id="cl-tab-rolling" class="btn" style="border:0;padding:7px 14px;border-radius:8px;font-size:.82rem" onclick="setCallLimitMode('rolling')">🔄 Rolling (auto)</button>
@@ -2184,19 +2184,19 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se kam se kam (din)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At least this many days from today
                   <input type="number" id="cl-r-lc-min" placeholder="blank = no limit" style="padding:6px;width:150px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se zyada se zyada (din)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At most this many days from today
                   <input type="number" id="cl-r-lc-max" placeholder="0 = today" style="padding:6px;width:150px"></label>
               </div>
             </div>
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se kam se kam (din)
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At least this many days from today
                   <input type="number" id="cl-r-nc-min" placeholder="0 = from today" style="padding:6px;width:150px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Aaj se zyada se zyada (din)
-                  <input type="number" id="cl-r-nc-max" placeholder="90 = +3 mahine" style="padding:6px;width:150px"></label>
+                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At most this many days from today
+                  <input type="number" id="cl-r-nc-max" placeholder="90 = +3 months" style="padding:6px;width:150px"></label>
               </div>
             </div>
             <div id="cl-preview" style="font-size:.8rem;color:var(--navy);background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px"></div>
@@ -3010,11 +3010,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Upload a single Excel file. <b>Client Code</b> is required; only the columns present alongside it (<b>RM</b>, <b>PAN</b>, <b>DOB</b>) will be updated — nothing else (Asset Value, Status, Mobile, Remarks) touch nahi hoga. <b>Naye client add nahi honge.</b>
+        Upload a single Excel file. <b>Client Code</b> is required; only the columns present alongside it (<b>RM</b>, <b>PAN</b>, <b>DOB</b>) will be updated — nothing else (Asset Value, Status, Mobile, Remarks) will be touched. <b>No new clients will be added.</b>
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        Header names flexible hain (auto-detect): <b>Client Code</b> + koi bhi ek ya zyada me se — <b>New RM / RM / Dealer</b>, <b>PAN</b>, <b>DOB / Date of Birth</b>. Baaki saare columns ignore.<br>
-        DOB format: <b>19561009</b> (YYYYMMDD), <b>DD/MM/YYYY</b>, ya Excel date cell — sab chalega. <b>0</b> / <b>NULL</b> rows apne aap skip.
+        Header names are flexible (auto-detected): <b>Client Code</b> + any one or more of — <b>New RM / RM / Dealer</b>, <b>PAN</b>, <b>DOB / Date of Birth</b>. All other columns are ignored.<br>
+        DOB format: <b>19561009</b> (YYYYMMDD), <b>DD/MM/YYYY</b>, or an Excel date cell — all formats work. <b>0</b> / <b>NULL</b> rows are skipped automatically.
       </p>
       <div style="margin-bottom:12px">
         <a href="#" onclick="downloadEqBulkTemplate();return false;" style="font-size:.8rem;color:var(--teal);font-weight:600">⬇️ Download Template</a>
@@ -3040,10 +3040,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
     <div class="modal-body">
       <p style="color:var(--gray);font-size:.85rem;margin-bottom:12px">
-        Upload the broker's client list file (the one where the <b>Name</b> column looks like <b>NAME [PAN] [CLIENT CODE]</b>, followed by a <b>DOB</b> column). Client Code (2nd bracket) is matched first, PAN (1st bracket) as fallback. Only <b>DOB</b> gets updated — nothing else touches. <b>Naye investor add nahi honge.</b>
+        Upload the broker's client list file (the one where the <b>Name</b> column looks like <b>NAME [PAN] [CLIENT CODE]</b>, followed by a <b>DOB</b> column). Client Code (2nd bracket) is matched first, PAN (1st bracket) as fallback. Only <b>DOB</b> gets updated — nothing else is touched. <b>No new investors will be added.</b>
       </p>
       <p style="color:var(--gray);font-size:.78rem;margin-bottom:12px">
-        File ka header row auto-detect hota hai (<b>Name</b> + <b>DOB</b> columns dhoonde jaate hain — baaki columns jaise City/Address/Email/Mobile ignore ho jaate hain). DOB format <b>YYYY-MM-DD</b>, <b>DD/MM/YYYY</b>, ya Excel date — sab chalega. <b>0000-00-00</b> / blank rows apne aap skip.
+        The file's header row is auto-detected (<b>Name</b> + <b>DOB</b> columns are located — other columns like City/Address/Email/Mobile are ignored). DOB format <b>YYYY-MM-DD</b>, <b>DD/MM/YYYY</b>, or Excel date — all formats work. <b>0000-00-00</b> / blank rows are skipped automatically.
       </p>
       <div class="import-zone" id="mf-bulk-dob-zone" onclick="document.getElementById('mf-bulk-dob-file').click()">
         🎂 Drag the file here or click to browse
@@ -3246,7 +3246,7 @@ window.QUIZ = (function(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     var key = which==='feedback' ? 'feedbackOpen' : 'quizOpen';
     var next = which==='feedback' ? !linksState.feedbackOpen : !linksState.quizOpen;
-    if(!next && !confirm((which==='feedback'?'Feedback':'Quiz')+' link band karein? Clients ko "closed" dikhega.')) return;
+    if(!next && !confirm('Close the '+(which==='feedback'?'Feedback':'Quiz')+' link? Clients will see it as "closed".')) return;
     var upd={}; upd[key]=next;
     try{ await LINKS().set(upd,{merge:true}); }catch(e){ alert('Update failed: '+e.message); }
   }

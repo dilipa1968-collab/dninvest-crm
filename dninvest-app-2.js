@@ -575,7 +575,7 @@ const DUP = {
     const body = document.getElementById('dup-'+seg+'-body');
     if(!gs.length){
       body.innerHTML = `<div style="padding:30px;text-align:center;color:#2e7d32;font-size:1rem">
-        ✅ Koi duplicate ${label} nahi mila.</div>`;
+        ✅ No duplicate ${label} found.</div>`;
       return;
     }
 
@@ -690,7 +690,7 @@ const DUP = {
     DB.addActivityLog(recs.map(r=>({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf',
       client_id:r.id, client_name:r.name, rm:r.rm, by:CU.name, date:new Date().toISOString(),
       changes:[{field:'duplicate_cleanup', old:seg==='eq'?r.code:r.pan, new:'deleted'}] })));
-    toast(`✅ ${recs.length} duplicate records delete ho gaye`,'success');
+    toast(`✅ ${recs.length} duplicate records deleted`,'success');
     this.sel[seg].clear();
     this.scan(); refreshDash(); updateBadges();
     if(seg==='eq' && typeof renderEqTable==='function') renderEqTable();
@@ -713,7 +713,7 @@ const DUP = {
     });
     if(!any){ toast('No duplicates found — nothing to export','error'); return; }
     XLSX.writeFile(wb, 'duplicates_'+today()+'.xlsx');
-    toast('Excel download ho gayi','success');
+    toast('Excel downloaded','success');
   }
 };
 
@@ -1131,7 +1131,7 @@ const MFUP = {
         });
       }
       if(!newEntries.length){ toast('No valid rows found','error'); return; }
-      if(!confirm(newEntries.length+' MF business entries upload hongi (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skip'):'')+'.\nConfirm?')) return;
+      if(!confirm(newEntries.length+' MF business entries will be uploaded (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skipped'):'')+'.\nConfirm?')) return;
       const biz=DB.get('mf_business');
       const entries=(Array.isArray(biz)?biz:(biz?.entries||[])).concat(newEntries);
       const eqEntries=Array.isArray(biz)?[]:(biz?.eq_entries||[]);
@@ -1192,7 +1192,7 @@ const MFUP = {
         });
       }
       if(!newEntries.length){ toast('No valid rows found','error'); return; }
-      if(!confirm(newEntries.length+' Demat entries upload hongi (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skip'):'')+'.\nConfirm?')) return;
+      if(!confirm(newEntries.length+' Demat entries will be uploaded (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skipped'):'')+'.\nConfirm?')) return;
       setEqDematEntries(getEqDematEntries().concat(newEntries));
       if(typeof renderEqDematTable==='function') renderEqDematTable();
       refreshDash&&refreshDash();
@@ -1736,7 +1736,7 @@ const MFTBULK = {
     const newRm=normRm((document.getElementById('mft-bb-rm')||{value:''}).value.trim());
     if(!newRm){ toast('Choose an RM first','error'); return; }
     const change=recs.filter(e=>(e.rm||'').trim().toLowerCase()!==newRm.toLowerCase());
-    if(!change.length){ toast('In sabka RM already '+newRm+'','error'); return; }
+    if(!change.length){ toast('All of these already have RM '+newRm+'','error'); return; }
     BULK.confirm('Bulk RM Re-attribute',
       `<b>${change.length}</b> transaction(s) will get RM <b>${this._esc(newRm)}</b>.`
       + `<br><span style="color:var(--gray)">Only the attribution of these transactions will change — the client&#39;s actual RM stays the same.</span>`
