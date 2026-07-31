@@ -1391,35 +1391,35 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
         <div class="filters" id="eq-filters">
-          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search" autocomplete="off" name="eq-search-nofill" style="background:#F8FCFB;border:1px solid #E7F1EE;border-radius:8px;color:#1F2937;font-weight:500">
-          <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #ECEDF9;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
+          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search" autocomplete="off" name="eq-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
-          <select onchange="filterEq()" id="eq-rm" style="background:#FDF8FA;border:1px solid #F7E4EA;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
-          <select onchange="filterEq()" id="eq-comeback" title="Clients whose Name is highlighted today for a comeback trade" style="background:#FAFAF8;border:1px solid #EEEEE0;border-radius:8px;color:#1F2937;font-weight:500"><option value="">🎨 All Comeback Colors</option>
+          <select onchange="filterEq()" id="eq-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
+          <select onchange="filterEq()" id="eq-comeback" title="Clients whose Name is highlighted today for a comeback trade" style="background:#FAFAF8;border:1px solid #E0DCB8;border-radius:8px;color:#1F2937;font-weight:500"><option value="">🎨 All Comeback Colors</option>
             <option value="blue">🔵 Blue (~1 month+)</option><option value="green">🟢 Green (~3 months+)</option><option value="yellow">🟡 Yellow (~6 months+)</option></select>
-          <select onchange="filterEq()" id="eq-followup-filter" style="background:#F8FCFE;border:1px solid #E7F2F6;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">All Follow-ups</option>
+          <select onchange="filterEq()" id="eq-followup-filter" style="background:#F8FCFE;border:1px solid #BFE0EC;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">All Follow-ups</option>
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
-          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:100px;background:#FBF9FE;border:1px solid #EEE6F8;color:#1F2937;font-weight:500">
+          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:100px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
           </select>
-          <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #FDE2E2;color:#1F2937">✕ Reset</button>
+          <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="eq-count"></span>
           <div style="flex-basis:100%;height:0"></div>
-          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #E2EAF5;border-radius:8px;padding:4px 8px;font-weight:500">Last Call:
+          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:8px;padding:4px 8px;font-weight:500">Last Call:
             <input type="date" onchange="filterEq()" id="eq-last-call-from" title="From date" style="padding:5px;font-size:.75rem">
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterEq()" id="eq-last-call-to" title="To date" style="padding:5px;font-size:.75rem"></label>
-          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FCFA;border:1px solid #E7F2EB;border-radius:8px;padding:4px 8px;font-weight:500">Next Call:
+          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FCFA;border:1px solid #BFE0CB;border-radius:8px;padding:4px 8px;font-weight:500">Next Call:
             <input type="date" onchange="filterEq()" id="eq-next-call-from" title="From date" style="padding:5px;font-size:.75rem">
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterEq()" id="eq-next-call-to" title="To date" style="padding:5px;font-size:.75rem"></label>
-          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#FEFCF7;border:1px solid #F7E9D2;border-radius:8px;padding:4px 8px;font-weight:500">Last Trade:
+          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#FEFCF7;border:1px solid #EBCB8E;border-radius:8px;padding:4px 8px;font-weight:500">Last Trade:
             <input type="date" onchange="filterEq()" id="eq-last-trade-from" title="From date" style="padding:5px;font-size:.75rem">
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterEq()" id="eq-last-trade-to" title="To date" style="padding:5px;font-size:.75rem"></label>
@@ -1518,35 +1518,35 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
         <div class="filters">
-          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search" autocomplete="off" name="mf-search-nofill" style="background:#F8FCFB;border:1px solid #E7F1EE;border-radius:8px;color:#1F2937;font-weight:500">
-          <select onchange="filterMf()" id="mf-status" style="background:#F9FAFE;border:1px solid #ECEDF9;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search" autocomplete="off" name="mf-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <select onchange="filterMf()" id="mf-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Investor</option><option>Prospect</option><option value="DNC">🚫 DNC</option></select>
-          <select onchange="filterMf()" id="mf-rm" style="background:#FDF8FA;border:1px solid #F7E4EA;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
-          <select onchange="filterMf()" id="mf-followup-filter" style="background:#F8FCFE;border:1px solid #E7F2F6;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Follow-ups</option>
+          <select onchange="filterMf()" id="mf-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
+          <select onchange="filterMf()" id="mf-followup-filter" style="background:#F8FCFE;border:1px solid #BFE0EC;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Follow-ups</option>
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
           <div class="filter-sep"></div>
-          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #E2EAF5;border-radius:8px;padding:4px 8px;font-weight:500">Last Call:
+          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:8px;padding:4px 8px;font-weight:500">Last Call:
             <input type="date" onchange="filterMf()" id="mf-last-call-from" title="From date" style="padding:6px;font-size:.78rem">
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterMf()" id="mf-last-call-to" title="To date" style="padding:6px;font-size:.78rem"></label>
-          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FCFA;border:1px solid #E7F2EB;border-radius:8px;padding:4px 8px;font-weight:500">Next Call:
+          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FCFA;border:1px solid #BFE0CB;border-radius:8px;padding:4px 8px;font-weight:500">Next Call:
             <input type="date" onchange="filterMf()" id="mf-next-call-from" title="From date" style="padding:6px;font-size:.78rem">
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterMf()" id="mf-next-call-to" title="To date" style="padding:6px;font-size:.78rem"></label>
-          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#FBF9FE;border:1px solid #EEE6F8;border-radius:8px;padding:4px 8px;font-weight:500">Last Business:
+          <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#FBF9FE;border:1px solid #D8C2F0;border-radius:8px;padding:4px 8px;font-weight:500">Last Business:
             <input type="date" onchange="filterMf()" id="mf-last-biz-from" title="From date" style="padding:6px;font-size:.78rem">
             <span style="font-size:.72rem">to</span>
             <input type="date" onchange="filterMf()" id="mf-last-biz-to" title="To date" style="padding:6px;font-size:.78rem"></label>
           <div class="filter-sep"></div>
-          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="background:#FEFCF7;border:1px solid #F7E9D2;color:#1F2937;font-weight:500">
+          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="background:#FEFCF7;border:1px solid #EBCB8E;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
           </select>
-          <button class="btn btn-outline" onclick="resetFilters('mf')" style="background:#FFF5F5;border:1px solid #FDE2E2;color:#1F2937">✕ Reset</button>
+          <button class="btn btn-outline" onclick="resetFilters('mf')" style="background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="mf-count"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mf-table"></div></div>
