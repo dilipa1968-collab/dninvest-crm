@@ -8240,7 +8240,12 @@ function sqUpload(input){
   const reader=new FileReader();
   reader.onload=function(e){
     try{
-      const wb=XLSX.read(e.target.result,{type:'binary'});
+      // raw:true — CSV files me SheetJS khud hi date-jaisi text (jaise "03/08/2026")
+      // ko number/date bana deta hai apne heuristic se, jo ambiguous DD/MM ko
+      // MM/DD samajh leta hai (din <=12 hone par). Isse "3 Aug" chup-chaap "8 Mar"
+      // ban jaata tha. raw:true is auto-conversion ko band karta hai, taaki humara
+      // apna DD/MM/YYYY parser (sqToISO) neeche asli text par sahi se chale.
+      const wb=XLSX.read(e.target.result,{type:'binary',raw:true});
       const out=[];
       wb.SheetNames.forEach(sn=>{
         const ws=wb.Sheets[sn];
