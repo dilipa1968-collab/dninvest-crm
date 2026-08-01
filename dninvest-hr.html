@@ -4597,6 +4597,35 @@ async function getCrmCodeRmMap(){
   return map;
 }
 
+// Fetch a { normalizedClientName : code } map from the CRM's equity clients.
+// Used to backfill a Client Code that's blank in a brokerage upload (e.g. a
+// brand-new client whose code hadn't reached the broker/exchange export yet)
+// by matching on the client's name instead. Names that belong to more than
+// one client in the CRM are marked false (ambiguous) so they're never
+// auto-filled with a guess.
+function _normBrkName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
+async function getCrmNameCodeMap(){
+  const map = {};
+  try{
+    if(typeof fdb!=='undefined'){
+      const doc = await fdb.collection('crm_data').doc('eq_clients').get();
+      if(doc.exists && doc.data() && doc.data().data){
+        doc.data().data.forEach(c=>{
+          if(c && c.name && c.code){
+            const key = _normBrkName(c.name);
+            if(map.hasOwnProperty(key)){
+              if(map[key] !== c.code) map[key] = false; // ambiguous — same name, different clients
+            } else {
+              map[key] = c.code;
+            }
+          }
+        });
+      }
+    }
+  }catch(e){ console.error('name→code map fetch failed:', e); }
+  return map;
+}
+
 function parseBrokerageFile(inputEl){
   const file = inputEl.files[0];
   if(!file){ return; }
@@ -4675,6 +4704,16 @@ function parseBrokerageFile(inputEl){
         }
       }
 
+      // If some rows have a blank Client Code but a usable Client Name (e.g. a
+      // brand-new client whose code hadn't reached the broker export yet),
+      // fetch a name→code map from the CRM so those codes can be backfilled.
+      let nameCodeMap = null;
+      if(idxCode>=0 && idxName>=0){
+        const hasBlankCode = rawRows.slice(headerRowIdx+1).some(row =>
+          !String(row[idxCode]||'').trim() && String(row[idxName]||'').trim());
+        if(hasBlankCode) nameCodeMap = await getCrmNameCodeMap();
+      }
+
       // Parse data rows (skip header row)
       const minClients = parseFloat(document.getElementById('bro-client-min').value)      || 50;
       const threshold  = parseFloat(document.getElementById('bro-client-threshold').value) || 100;
@@ -4685,8 +4724,15 @@ function parseBrokerageFile(inputEl){
       for(let i = headerRowIdx + 1; i < rawRows.length; i++){
         const row = rawRows[i];
         const bro     = parseFloat(row[idxBro]) || 0;
-        const code    = idxCode>=0 ? String(row[idxCode]||'').trim() : '';
+        let   code    = idxCode>=0 ? String(row[idxCode]||'').trim() : '';
         const cliName = idxName>=0 ? String(row[idxName]||'').trim() : '';
+        // Backfill a blank code from the CRM by matching the client's name —
+        // only when that name is unique in the CRM (ambiguous names are
+        // skipped rather than guessed).
+        if(!code && cliName && nameCodeMap){
+          const hit = nameCodeMap[_normBrkName(cliName)];
+          if(hit) code = hit;
+        }
         // RM from the file's RM column, or (no RM column) looked up from the CRM by code.
         const rm = (idxRm>=0)
           ? String(row[idxRm]||'').trim().toUpperCase()
