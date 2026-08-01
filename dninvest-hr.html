@@ -874,7 +874,7 @@ input:focus, select:focus, textarea:focus{
           <div class="tbl-wrap"><div id="crm-sales-table"></div></div>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
-          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><div style="display:flex;gap:8px"><button onclick="showBroUnmatchedReport()" title="Clients that failed to match an RM in brokerage uploads" style="background:#B91C1C;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">⚠ Unmatched Clients</button><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div></div>
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="showClientBrokerageHistory(null)" title="Every client's brokerage, month by month, across all RMs" style="background:var(--navy,#1a2744);border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📅 Client History (All RMs)</button><button onclick="showBroUnmatchedReport()" title="Clients that failed to match an RM in brokerage uploads" style="background:#B91C1C;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">⚠ Unmatched Clients</button><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div></div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
@@ -4159,7 +4159,7 @@ function renderIncentivePage(){
         ${t.perfBase>0?`<tr><td style="color:var(--text2);padding:4px 0">Performance Incentive <span style="color:var(--text3);font-size:11px">(${fmt(t.perfBase)}${t.perfCut>0?' − '+fmt(t.perfCut)+' attendance cut ÷26':''})</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.perfPay)}</td></tr>`:''}
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
-        ${t.broClientRows&&t.broClientRows.length>0?'<tr><td colspan="2" style="padding:4px 0"><button onclick="showBroClientDetail(\''+currentUser+'\',\''+selMonth+'\')" style="font-size:11.5px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer">📋 Client-wise brokerage detail ('+t.broClientTotal+' clients, '+t.broClientCount+' eligible)</button></td></tr>':''}
+        ${t.broClientRows&&t.broClientRows.length>0?'<tr><td colspan="2" style="padding:4px 0"><button onclick="showBroClientDetail(\''+currentUser+'\',\''+selMonth+'\')" style="font-size:11.5px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer;margin-right:6px">📋 Client-wise brokerage detail ('+t.broClientTotal+' clients, '+t.broClientCount+' eligible)</button><button onclick="showClientBrokerageHistory(\''+currentUser+'\')" style="font-size:11.5px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer">📅 Month-wise history</button></td></tr>':''}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
@@ -5159,6 +5159,153 @@ function showBroClientDetail(empName, month){
   document.addEventListener('keydown', function escClose(e){
     if(e.key==='Escape'){
       const ov = document.getElementById('bro-result-overlay');
+      if(ov) ov.remove();
+      document.removeEventListener('keydown', escClose);
+    }
+  });
+}
+
+// Client Brokerage History — every client's brokerage broken down month by
+// month, built from each month's saved broClientRows across employees.
+// scopeEmpName = null  → admin view, all RMs (with an RM filter dropdown)
+// scopeEmpName = 'Name' → that RM's own clients only (RM filter hidden)
+function showClientBrokerageHistory(scopeEmpName){
+  const all = getMfSipByMonth();
+  const allMonths = Object.keys(all).sort(); // ascending YYYY-MM
+
+  // Build { code : {code,name,rm,byMonth:{month:amount}} } across every
+  // month/employee in scope. Last month an entry appears wins as the
+  // "current" RM shown (a client can move between RMs over time).
+  function buildClientMap(rmFilter){
+    const map = {};
+    allMonths.forEach(m=>{
+      Object.entries(all[m]||{}).forEach(([empName,data])=>{
+        if(scopeEmpName && empName!==scopeEmpName) return;
+        if(rmFilter && empName!==rmFilter) return;
+        (data.broClientRows||[]).forEach(c=>{
+          const key = c.code || ('__name:'+c.name);
+          if(!map[key]) map[key] = {code:c.code, name:c.name, rm:empName, byMonth:{}};
+          map[key].byMonth[m] = (map[key].byMonth[m]||0) + Number(c.bro||0);
+          map[key].rm = empName;
+          if(c.name) map[key].name = c.name;
+        });
+      });
+    });
+    return map;
+  }
+
+  const rmList = Array.from(new Set(
+    allMonths.flatMap(m=>Object.keys(all[m]||{}))
+  )).filter(n=>!scopeEmpName || n===scopeEmpName).sort();
+
+  let overlay = document.getElementById('bro-hist-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'bro-hist-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    document.body.appendChild(overlay);
+  }
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+
+  const mLabel = m => new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+  const inr2 = n => Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  const rmFilterHtml = scopeEmpName ? '' :
+    '<select id="bro-hist-rm" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    +'<option value="">All RMs — whole office</option>'
+    + rmList.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('')
+    +'</select>';
+
+  overlay.innerHTML = '<div style="background:var(--bg,#F7F6F3);border-radius:14px;padding:0;width:min(1000px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden" onclick="event.stopPropagation()">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 22px;flex-shrink:0;background:linear-gradient(135deg,var(--navy,#1a2744) 0%,var(--navy3,#2d4a8a) 100%)">'
+    +'<div><div style="font-weight:700;font-size:15.5px;color:#fff">📅 Client Brokerage History</div>'
+    +'<div style="font-size:12px;color:var(--gold2,#e8c97a);margin-top:1px">'+(scopeEmpName?escapeHtml(scopeEmpName)+' — my clients':'All RMs — whole office')+'</div></div>'
+    +'<button onclick="document.getElementById(\'bro-hist-overlay\').remove()" style="background:rgba(255,255,255,.12);border:none;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;color:#fff;line-height:1">✕</button>'
+    +'</div>'
+    +'<div style="padding:16px 22px 18px;overflow-y:auto">'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<input id="bro-hist-search" type="text" placeholder="Search Code or Client Name…" style="flex:1;min-width:180px;font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    +'<select id="bro-hist-month" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    +'<option value="">All months (month-by-month table)</option>'
+    + allMonths.slice().reverse().map(m=>'<option value="'+m+'">'+mLabel(m)+' only</option>').join('')
+    +'</select>'
+    + rmFilterHtml
+    +'</div>'
+    +'<div style="overflow-x:auto;overflow-y:auto;max-height:60vh;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface,#fff)">'
+    +'<table id="bro-hist-table" style="font-size:12.5px;width:100%;border-collapse:collapse"></table></div>'
+    +'<div id="bro-hist-count" style="font-size:12px;color:var(--text3);margin-top:8px"></div>'
+    +'</div></div>';
+
+  const renderTable = function(){
+    const rmFilter = scopeEmpName ? '' : (document.getElementById('bro-hist-rm').value || '');
+    const clientMap = buildClientMap(rmFilter);
+    const q = (document.getElementById('bro-hist-search').value||'').trim().toLowerCase();
+    const monthSel = document.getElementById('bro-hist-month').value || '';
+
+    let clients = Object.values(clientMap).filter(c=>{
+      if(!q) return true;
+      return String(c.code||'').toLowerCase().includes(q) || String(c.name||'').toLowerCase().includes(q);
+    });
+
+    let theadHtml, tbodyHtml;
+    if(!monthSel){
+      // Matrix: one column per month, ascending chronological
+      clients.sort((a,b)=>{
+        const ta = Object.values(a.byMonth).reduce((s,v)=>s+v,0);
+        const tb = Object.values(b.byMonth).reduce((s,v)=>s+v,0);
+        return tb-ta;
+      });
+      theadHtml = '<thead><tr style="background:var(--surface2)">'
+        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase">Code</th>'
+        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">Client Name</th>'
+        +(scopeEmpName?'':'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">RM</th>')
+        + allMonths.map(m=>'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap">'+mLabel(m)+'</th>').join('')
+        +'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap">Total</th>'
+        +'</tr></thead>';
+      tbodyHtml = '<tbody>' + clients.map(c=>{
+        const total = allMonths.reduce((s,m)=>s+(c.byMonth[m]||0),0);
+        return '<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+escapeHtml(c.code||'—')+'</td>'
+          +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
+          +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
+          + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(c.byMonth[m]?'':';color:var(--text3)')+'">'+(c.byMonth[m]?inr2(c.byMonth[m]):'—')+'</td>').join('')
+          +'<td style="padding:7px 10px;text-align:right;font-weight:700">'+inr2(total)+'</td>'
+          +'</tr>';
+      }).join('') + '</tbody>';
+      if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(3+allMonths.length+(scopeEmpName?0:1))+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found</td></tr></tbody>';
+    } else {
+      // Single month: simple list, sorted by amount desc
+      clients = clients.filter(c=>c.byMonth[monthSel]);
+      clients.sort((a,b)=>(b.byMonth[monthSel]||0)-(a.byMonth[monthSel]||0));
+      theadHtml = '<thead><tr style="background:var(--surface2)">'
+        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Code</th>'
+        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Client Name</th>'
+        +(scopeEmpName?'':'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">RM</th>')
+        +'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Brokerage (₹) — '+mLabel(monthSel)+'</th>'
+        +'</tr></thead>';
+      tbodyHtml = '<tbody>' + clients.map(c=>
+        '<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:7px 10px">'+escapeHtml(c.code||'—')+'</td>'
+        +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
+        +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
+        +'<td style="padding:7px 10px;text-align:right;font-weight:600">'+inr2(c.byMonth[monthSel])+'</td>'
+        +'</tr>'
+      ).join('') + '</tbody>';
+      if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(scopeEmpName?3:4)+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found for '+mLabel(monthSel)+'</td></tr></tbody>';
+    }
+
+    document.getElementById('bro-hist-table').innerHTML = theadHtml + tbodyHtml;
+    document.getElementById('bro-hist-count').textContent = clients.length+' client(s) shown';
+  };
+
+  document.getElementById('bro-hist-search').oninput = renderTable;
+  document.getElementById('bro-hist-month').onchange = renderTable;
+  if(!scopeEmpName) document.getElementById('bro-hist-rm').onchange = renderTable;
+  renderTable();
+
+  document.addEventListener('keydown', function escClose(e){
+    if(e.key==='Escape'){
+      const ov = document.getElementById('bro-hist-overlay');
       if(ov) ov.remove();
       document.removeEventListener('keydown', escClose);
     }
