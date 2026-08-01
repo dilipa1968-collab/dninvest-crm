@@ -1935,8 +1935,11 @@ function startApp(){
     mmFrom.value=d.toISOString().slice(0,7);
   }
   const mmTo=document.getElementById('mm-to'); if(mmTo && !mmTo.value) mmTo.value=curMonth;
-  // "My combined balance" defaults to last month → this month (2-month window).
-  const myMmFrom=document.getElementById('my-mm-from'); if(myMmFrom && !myMmFrom.value) myMmFrom.value=lastMonth;
+  // "My combined balance" defaults to last 3 months (this month + 2 back).
+  const myMmFrom=document.getElementById('my-mm-from'); if(myMmFrom && !myMmFrom.value){
+    const d=new Date(); d.setMonth(d.getMonth()-2);
+    myMmFrom.value=d.toISOString().slice(0,7);
+  }
   const myMmTo=document.getElementById('my-mm-to'); if(myMmTo && !myMmTo.value) myMmTo.value=curMonth;
   const advDateEl=document.getElementById('adv-date'); if(advDateEl && !advDateEl.value) advDateEl.value=today();
 
