@@ -2962,7 +2962,6 @@ function renderEqActivityTrend(activeEq){
         <div class="dash-stat-lbl" style="font-size:.58rem;color:#92400e">${icon} TODAY'S WIN/LOSS</div>
         <div style="font-size:1.3rem;font-weight:900;line-height:1.2">${mainNum}</div>
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
-        ${isAdmin && mfWins>0 ? `<div style="margin-top:4px"><span style="font-size:.56rem;text-decoration:underline;color:#92400e" onclick="event.stopPropagation();fixWrongMfNewTags()" title="Purane clients ka galat MF New tag hataye">🧹 Fix wrong MF New tags</span></div>` : ''}
       </div>`;
 
   el.innerHTML = `
@@ -3051,35 +3050,6 @@ function showEqActivityRmSplit(){
 
 // Called from the RM-wise split table — sets the dashboard card's RM filter
 // to the clicked RM and scrolls back to it.
-// Admin one-click fix: removes the wrong "MF New" tag from clients that were
-// already existing before today (their aum_detail simply hadn't been
-// imported before — they were NOT genuinely new investors). Only touches
-// records flagged as changed TODAY whose client record itself was not
-// created today. Triggered from the "🧹 Fix wrong MF New tags" link on the
-// Win/Loss dashboard card — no DevTools needed.
-async function fixWrongMfNewTags(){
-  if(CU.role!=='admin'){ toast('Admin only','error'); return; }
-  if(!confirm('Purane MF clients ka galat "MF New" tag hatana hai? (Genuinely naye clients touch nahi honge)')) return;
-  const td = today();
-  const mf = DB.get('mf_clients')||[];
-  let fixed = 0;
-  const updated = mf.map(c=>{
-    if(c.invested_change_date===td && !(parseFloat(c.prev_invested)||0) && c.created !== td){
-      fixed++;
-      const clean = {...c};
-      delete clean.invested_change_amt;
-      delete clean.invested_change_date;
-      delete clean.prev_invested;
-      return clean;
-    }
-    return c;
-  });
-  if(!fixed){ toast('Koi galat MF New tag nahi mila','info'); return; }
-  await DB.set('mf_clients', updated);
-  toast(`✅ ${fixed} client(s) fix ho gaye — dashboard refresh ho raha hai`,'success');
-  setTimeout(()=>location.reload(), 1200);
-}
-
 // Shows which clients changed Active/Inactive status today — called from Win/Loss box click
 function showTodaysWinLossList(){
   const td = today();
