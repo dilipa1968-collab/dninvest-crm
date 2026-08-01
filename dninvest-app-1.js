@@ -11209,14 +11209,21 @@ async function doImport(){
       
       if(ex){
         // Update existing
+        const oldAumBeforeUpdate = parseFloat(ex.aum)||0; // capture BEFORE it gets overwritten below — needed to correctly detect genuine first-ever investors
         if(row.aum || row.aum===0) ex.aum = row.aum;   // 0 is a real value, not "skip"
         ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
         if(row.mobile && !ex.mobile) ex.mobile = mob10(row.mobile); // mobile mile aur khaali ho to bhar do
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
         {
-          const oldInv = parseFloat(ex.aum_detail && ex.aum_detail.inv)||0;
+          const hadAumDetail = !!ex.aum_detail;
+          // Fall back to the client's previous total AUM when aum_detail was
+          // never populated before (older imports didn't capture the detailed
+          // breakdown) — otherwise an old, already-invested client whose
+          // aum_detail simply hadn't been imported yet gets wrongly tagged
+          // "MF New" on their next top-up.
+          const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : oldAumBeforeUpdate;
           const newInv = parseFloat(row.inv_amt)||0;
-          const isFirstEver = !ex.aum_detail; // client never had AUM detail before — first investment ever
+          const isFirstEver = !hadAumDetail && oldAumBeforeUpdate===0; // no prior AUM detail AND zero AUM before — genuinely never invested until now
           if(isFirstEver && newInv>0){
             // First-ever investment for this (pre-existing) client record — counts as
             // a new-investor "win" too, same as a brand-new client added below.
@@ -11225,7 +11232,7 @@ async function doImport(){
             ex.invested_change_date = today();
             const _td=today();
             DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
-          } else if(oldInv !== newInv && ex.aum_detail){
+          } else if(oldInv !== newInv){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
