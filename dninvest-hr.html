@@ -5223,21 +5223,21 @@ function showClientBrokerageHistory(scopeEmpName){
   // RM pill colors — light "watercolor" pastel palette: soft tinted
   // background + a matching soft-toned text color (no solid dark fills).
   const rmPastel={
-    'ROHIT':{bg:'#E6E9FC',text:'#5B5FC7'},
-    'RIYA':{bg:'#FBE3EE',text:'#C2578A'},
-    'RAJU':{bg:'#FBE4E6',text:'#B85C6B'},
-    'BHARAT':{bg:'#E1F5EC',text:'#4C9A78'},
-    'KHOKHAN':{bg:'#DFF5F2',text:'#3E9A8F'},
-    'PUJA':{bg:'#E1EFFB',text:'#4E85B5'},
-    'KOMAL':{bg:'#F1E7FB',text:'#9868C4'},
-    'MEGHA':{bg:'#FBEEDC',text:'#C4923F'},
-    'ANJALI':{bg:'#EBEEF2',text:'#7C8798'}
+    'ROHIT':{bg:'#F1F2FD',text:'#8E90D8'},
+    'RIYA':{bg:'#FCF1F6',text:'#D591AF'},
+    'RAJU':{bg:'#FCF0F1',text:'#D3949E'},
+    'BHARAT':{bg:'#F0FAF4',text:'#82BCA0'},
+    'KHOKHAN':{bg:'#EFF9F8',text:'#77BAB2'},
+    'PUJA':{bg:'#F0F6FC',text:'#84ADCE'},
+    'KOMAL':{bg:'#F8F2FC',text:'#B79BD8'},
+    'MEGHA':{bg:'#FCF6EC',text:'#D3B076'},
+    'ANJALI':{bg:'#F5F6F8',text:'#A7AFBC'}
   };
   const rmPastelFallback=[
-    {bg:'#E9ECF2',text:'#6B7A94'},{bg:'#E2F0E4',text:'#5A9067'},{bg:'#EDE6F9',text:'#8B6FC7'},
-    {bg:'#FBE6EE',text:'#C06B93'},{bg:'#DFF1F5',text:'#4E93A8'},{bg:'#FBEBDF',text:'#C08050'},
-    {bg:'#EAF3DE',text:'#7A9C4C'},{bg:'#EFE5F9',text:'#8865BD'},{bg:'#DDF0EC',text:'#3F9885'},
-    {bg:'#F5E4EF',text:'#B0619B'}
+    {bg:'#F5F6F8',text:'#9AA6B8'},{bg:'#F1F8F2',text:'#8CBB98'},{bg:'#F7F3FC',text:'#B6A0D6'},
+    {bg:'#FCF1F6',text:'#D096B7'},{bg:'#EFF8FA',text:'#82B6C4'},{bg:'#FCF3EC',text:'#D0A67C'},
+    {bg:'#F5FAEF',text:'#A8C182'},{bg:'#F7F1FC',text:'#B99DD8'},{bg:'#EFF8F6',text:'#7EBFAE'},
+    {bg:'#FBF1F6',text:'#C990B4'}
   ];
   const rmColorCache={};
   const rmColorFor = name=>{
@@ -5259,7 +5259,7 @@ function showClientBrokerageHistory(scopeEmpName){
   // Brokerage cell: amounts over ₹100 get a light watercolor-green
   // highlight so they pop out at a glance; smaller/blank amounts stay neutral.
   const GREEN_THRESHOLD = 100;
-  const GREEN_BG = '#E4F7EC', GREEN_TEXT = '#4C9A78';
+  const GREEN_BG = '#F1FAF4', GREEN_TEXT = '#6FB393';
   const amtCell = (v, extraStyle) => {
     const n = Number(v)||0;
     if(!n) return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text3)'+(extraStyle||'')+'">—</td>';
