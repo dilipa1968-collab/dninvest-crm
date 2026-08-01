@@ -5220,6 +5220,32 @@ function showClientBrokerageHistory(scopeEmpName){
   const mLabel = m => new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
   const inr2 = n => Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+  // RM pill colors — same fixed premium palette used elsewhere in the CRM,
+  // so an RM's color is consistent across screens.
+  const rmFixed={'ROHIT':'#4338CA','RIYA':'#BE185D','RAJU':'#9F1239','BHARAT':'#047857','KHOKHAN':'#0F766E','PUJA':'#0369A1','KOMAL':'#7E22CE','MEGHA':'#B45309','ANJALI':'#475569'};
+  const rmFallback=['#334155','#1E4620','#4C1D95','#831843','#155E75','#7C2D12','#365314','#5B21B6','#134E4A','#701A75'];
+  const rmColorCache={};
+  const rmColorFor = name=>{
+    const key=String(name||'—').trim().toUpperCase();
+    if(!rmColorCache[key]){
+      if(rmFixed[key]) rmColorCache[key]=rmFixed[key];
+      else{ let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0; rmColorCache[key]=rmFallback[h%rmFallback.length]; }
+    }
+    return rmColorCache[key];
+  };
+  const rmPill = name => name
+    ? '<span style="display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:'+rmColorFor(name)+'">'+escapeHtml(name)+'</span>'
+    : '';
+  // Brokerage cell: amounts over ₹100 get a green highlight so they pop
+  // out at a glance; smaller/blank amounts stay neutral.
+  const GREEN_THRESHOLD = 100;
+  const amtCell = (v, extraStyle) => {
+    const n = Number(v)||0;
+    if(!n) return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text3)'+(extraStyle||'')+'">—</td>';
+    const hot = n>GREEN_THRESHOLD;
+    return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(hot?';background:#DCFCE7;color:#15803D;font-weight:700':'')+(extraStyle||'')+'">'+inr2(n)+'</td>';
+  };
+
   const rmFilterHtml = scopeEmpName ? '' :
     '<select id="bro-hist-rm" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
     +'<option value="">All RMs — whole office</option>'
@@ -5327,12 +5353,12 @@ function showClientBrokerageHistory(scopeEmpName){
       tbodyHtml = '<tbody>' + clients.map(c=>{
         return '<tr style="border-bottom:1px solid var(--border)">'
           +(rmTotalOn
-            ? '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff);font-weight:600">'+escapeHtml(c.rm||'—')+'</td>'
-            : '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+escapeHtml(c.code||'—')+'</td>'
+            ? '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+rmPill(c.rm)+'</td>'
+            : '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff);font-weight:600">'+escapeHtml(c.code||'—')+'</td>'
               +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
-              +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>'))
-          + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(c.byMonth[m]?'':';color:var(--text3)')+'">'+(c.byMonth[m]?inr2(c.byMonth[m]):'—')+'</td>').join('')
-          +'<td style="padding:7px 10px;text-align:right;font-weight:700">'+inr2(c.__total)+'</td>'
+              +(scopeEmpName?'':'<td style="padding:7px 10px">'+rmPill(c.rm)+'</td>'))
+          + allMonths.map(m=>amtCell(c.byMonth[m])).join('')
+          + amtCell(c.__total, ';font-weight:800')
           +(rmTotalOn ? '<td style="padding:7px 10px;text-align:right;color:var(--text3)">'+c.__n+'</td>' : '')
           +'</tr>';
       }).join('') + '</tbody>';
@@ -5378,11 +5404,11 @@ function showClientBrokerageHistory(scopeEmpName){
       tbodyHtml = '<tbody>' + clients.map(c=>
         '<tr style="border-bottom:1px solid var(--border)">'
         +(rmTotalOn
-          ? '<td style="padding:7px 10px;font-weight:600">'+escapeHtml(c.rm||'—')+'</td>'
-          : '<td style="padding:7px 10px">'+escapeHtml(c.code||'—')+'</td>'
+          ? '<td style="padding:7px 10px">'+rmPill(c.rm)+'</td>'
+          : '<td style="padding:7px 10px;font-weight:600">'+escapeHtml(c.code||'—')+'</td>'
             +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
-            +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>'))
-        +'<td style="padding:7px 10px;text-align:right;font-weight:600">'+inr2(c.byMonth[monthSel])+'</td>'
+            +(scopeEmpName?'':'<td style="padding:7px 10px">'+rmPill(c.rm)+'</td>'))
+        + amtCell(c.byMonth[monthSel], ';font-weight:700')
         +(rmTotalOn ? '<td style="padding:7px 10px;text-align:right;color:var(--text3)">'+c.__n+'</td>' : '')
         +'</tr>'
       ).join('') + '</tbody>';
