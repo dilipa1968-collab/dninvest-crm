@@ -2189,45 +2189,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
           <p style="color:#b91c1c;font-size:.75rem;margin:12px 0 0">⚠️ Restore replaces the current data with the backup file data — use with caution.</p>
         </div>
-
-        <div class="card" style="margin-top:18px;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
-          <h3 style="margin:0 0 6px">🔒 Call Date Lock (for RMs)</h3>
-          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Set date limits for <b>Last Call</b> and <b>Next Call</b> in the RM's follow-up form. the RM will not be able to enter a date before or after these limits. Leave blank = no limit on that side. (No limit ever applies to Admin.)</p>
-
-          <p style="margin:0 0 14px;font-size:.8rem;color:var(--gray);background:#ecfdf5;border-left:3px solid #10b981;padding:8px 10px;border-radius:6px">
-            ✅ <b>Rolling (auto):</b> the limit <b>automatically shifts forward every day</b> — no need to click daily. Enter below how many days' gap to allow from today. Blank = no limit in that direction.
-            <br>Example: <b>-7</b> = up to 7 days ago · <b>0</b> = today · <b>90</b> = up to 90 days from today.
-          </p>
-
-          <!-- ROLLING MODE (only mode) -->
-          <div id="cl-pane-rolling" style="display:flex;flex-direction:column;gap:14px">
-            <div>
-              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
-              <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At least this many days from today
-                  <input type="number" id="cl-r-lc-min" placeholder="blank = no limit" style="padding:6px;width:150px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At most this many days from today
-                  <input type="number" id="cl-r-lc-max" placeholder="0 = today" style="padding:6px;width:150px"></label>
-              </div>
-            </div>
-            <div>
-              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
-              <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At least this many days from today
-                  <input type="number" id="cl-r-nc-min" placeholder="0 = from today" style="padding:6px;width:150px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">At most this many days from today
-                  <input type="number" id="cl-r-nc-max" placeholder="90 = +3 months" style="padding:6px;width:150px"></label>
-              </div>
-            </div>
-            <div id="cl-preview" style="font-size:.8rem;color:var(--navy);background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px"></div>
-          </div>
-
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
-            <button class="btn btn-primary" onclick="saveCallLimits()">💾 Save Limits</button>
-            <button class="btn btn-outline" onclick="resetCallLimits()" title="Reset to rolling default: Last Call up to today, Next Call up to +3 months from today">↩️ Reset to Default</button>
-            <button class="btn btn-outline" onclick="clearCallLimits()">✖ Clear All (no limit)</button>
-          </div>
-        </div>
       </div>
 
       <!-- ── ANNOUNCEMENTS PAGE ── -->
