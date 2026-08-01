@@ -5251,23 +5251,23 @@ function showClientBrokerageHistory(scopeEmpName){
   const rmPill = name => {
     if(!name) return '';
     const c = rmColorFor(name);
-    return '<span style="display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:'+c.text+';background:'+c.bg+'">'+escapeHtml(name)+'</span>';
+    return '<span style="font-weight:700;color:'+c.text+'">'+escapeHtml(name)+'</span>';
   };
-  // Excel gets the exact same pastel per RM (used in the export's RM column)
-  const rmColorForExport = name=>{ const c=rmColorFor(name); return {bg:'FF'+c.bg.replace('#',''), font:'FF'+c.text.replace('#','')}; };
+  // Excel gets the same pastel text color per RM (font only, no cell fill)
+  const rmColorForExport = name=>{ const c=rmColorFor(name); return {font:'FF'+c.text.replace('#','')}; };
 
-  // Brokerage cell: amounts over ₹100 get a light watercolor-green
-  // highlight so they pop out at a glance; smaller/blank amounts stay neutral.
+  // Brokerage cell: amounts over ₹100 get a soft green text color so they
+  // pop out at a glance; smaller/blank amounts stay neutral. No background fill.
   const GREEN_THRESHOLD = 100;
-  const GREEN_BG = '#F1FAF4', GREEN_TEXT = '#6FB393';
+  const GREEN_TEXT = '#5DA980';
   const amtCell = (v, extraStyle) => {
     const n = Number(v)||0;
     if(!n) return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text3)'+(extraStyle||'')+'">—</td>';
     const hot = n>GREEN_THRESHOLD;
-    return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(hot?';background:'+GREEN_BG+';color:'+GREEN_TEXT+';font-weight:700':'')+(extraStyle||'')+'">'+inr2(n)+'</td>';
+    return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(hot?';color:'+GREEN_TEXT+';font-weight:700':'')+(extraStyle||'')+'">'+inr2(n)+'</td>';
   };
-  // Same threshold+colors for the Excel export (money columns)
-  const posGreenPastel = v=>{ const n=Number(v)||0; return n>GREEN_THRESHOLD ? {bg:'FF'+GREEN_BG.replace('#',''), font:'FF'+GREEN_TEXT.replace('#','')} : null; };
+  // Same threshold+color for the Excel export (font only, no cell fill)
+  const posGreenPastel = v=>{ const n=Number(v)||0; return n>GREEN_THRESHOLD ? {font:'FF'+GREEN_TEXT.replace('#','')} : null; };
 
 
   const rmFilterHtml = scopeEmpName ? '' :
