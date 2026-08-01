@@ -5225,6 +5225,9 @@ function showClientBrokerageHistory(scopeEmpName){
     +'<option value="">All RMs — whole office</option>'
     + rmList.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('')
     +'</select>';
+  const rmTotalToggleHtml = scopeEmpName ? '' :
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2,#555);padding:0 4px;white-space:nowrap;cursor:pointer">'
+    +'<input type="checkbox" id="bro-hist-rmtotal" style="width:15px;height:15px;cursor:pointer"> 📊 RM-wise Total</label>';
 
   overlay.innerHTML = '<div style="background:var(--bg,#F7F6F3);border-radius:14px;padding:0;width:min(1000px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden" onclick="event.stopPropagation()">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 22px;flex-shrink:0;background:linear-gradient(135deg,var(--navy,#1a2744) 0%,var(--navy3,#2d4a8a) 100%)">'
@@ -5240,6 +5243,7 @@ function showClientBrokerageHistory(scopeEmpName){
     + allMonths.slice().reverse().map(m=>'<option value="'+m+'">'+mLabel(m)+' only</option>').join('')
     +'</select>'
     + rmFilterHtml
+    + rmTotalToggleHtml
     +'<button id="bro-hist-export" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px">📥 Excel Export</button>'
     +'</div>'
     +'<div style="overflow-x:auto;overflow-y:auto;max-height:56vh;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface,#fff)">'
@@ -5252,6 +5256,7 @@ function showClientBrokerageHistory(scopeEmpName){
 
   const renderTable = function(){
     const rmFilter = scopeEmpName ? '' : (document.getElementById('bro-hist-rm').value || '');
+    const rmTotalOn = !scopeEmpName && !rmFilter && document.getElementById('bro-hist-rmtotal').checked;
     const clientMap = buildClientMap(rmFilter);
     const q = (document.getElementById('bro-hist-search').value||'').trim().toLowerCase();
     const monthSel = document.getElementById('bro-hist-month').value || '';
@@ -5280,6 +5285,18 @@ function showClientBrokerageHistory(scopeEmpName){
       return sortDir==='asc' ? cmp : -cmp;
     });
 
+    // RM-wise Total: regroup rows so every RM's clients sit together
+    // (alphabetical by RM), keeping each group's internal order. A subtotal
+    // row is inserted after each group below. Re-applied after any further
+    // sort (e.g. the single-month branch re-sorts its own filtered list).
+    const groupByRm = list => {
+      if(!rmTotalOn) return list;
+      const byRm = {};
+      list.forEach(c=>{ const k=c.rm||'—'; (byRm[k]=byRm[k]||[]).push(c); });
+      return Object.keys(byRm).sort((a,b)=>a.localeCompare(b)).flatMap(k=>byRm[k]);
+    };
+    clients = groupByRm(clients);
+
     const arrow = col => sortCol===col ? (sortDir==='asc'?' ▲':' ▼') : '';
     const th = (col, label, align) => '<th data-sort-col="'+col+'" style="padding:8px 10px;text-align:'+align+';position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap;cursor:pointer;user-select:none">'+label+arrow(col)+'</th>';
 
@@ -5293,14 +5310,26 @@ function showClientBrokerageHistory(scopeEmpName){
         + allMonths.map(m=>th(m, mLabel(m), 'right')).join('')
         + th('total','Total','right')
         +'</tr></thead>';
-      tbodyHtml = '<tbody>' + clients.map(c=>{
-        return '<tr style="border-bottom:1px solid var(--border)">'
+      tbodyHtml = '<tbody>' + clients.map((c,i)=>{
+        const row = '<tr style="border-bottom:1px solid var(--border)">'
           +'<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+escapeHtml(c.code||'—')+'</td>'
           +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
           +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
           + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(c.byMonth[m]?'':';color:var(--text3)')+'">'+(c.byMonth[m]?inr2(c.byMonth[m]):'—')+'</td>').join('')
           +'<td style="padding:7px 10px;text-align:right;font-weight:700">'+inr2(c.__total)+'</td>'
           +'</tr>';
+        // End of an RM group (next row is a different RM, or last row) → subtotal
+        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
+          const grpItems = clients.filter(x=>x.rm===c.rm);
+          const grpMonthTot = {}; allMonths.forEach(m=>{ grpMonthTot[m]=grpItems.reduce((s,x)=>s+(x.byMonth[m]||0),0); });
+          const grpTotal = grpItems.reduce((s,x)=>s+x.__total,0);
+          return row + '<tr style="background:#eef2ff;font-weight:700;border-bottom:2px solid var(--border)">'
+            +'<td style="padding:7px 10px;position:sticky;left:0;background:#eef2ff" colspan="'+(scopeEmpName?2:3)+'">Subtotal — '+escapeHtml(c.rm||'—')+'</td>'
+            + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right">'+inr2(grpMonthTot[m])+'</td>').join('')
+            +'<td style="padding:7px 10px;text-align:right">'+inr2(grpTotal)+'</td>'
+            +'</tr>';
+        }
+        return row;
       }).join('') + '</tbody>';
       if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(3+allMonths.length+(scopeEmpName?0:1))+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found</td></tr></tbody>';
       // Month-wise TOTAL row (sum of the clients currently shown, per month)
@@ -5314,7 +5343,16 @@ function showClientBrokerageHistory(scopeEmpName){
         + allMonths.map(m=>'<td style="padding:8px 10px;text-align:right;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthTotals[m])+'</td>').join('')
         +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(grandTotal)+'</td>'
         +'</tr></tfoot>' : '';
-      lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]) );
+      lastExportRows = [];
+      clients.forEach((c,i)=>{
+        lastExportRows.push([c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]));
+        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
+          const grpItems = clients.filter(x=>x.rm===c.rm);
+          const grpMonthTot = {}; allMonths.forEach(m=>{ grpMonthTot[m]=grpItems.reduce((s,x)=>s+(x.byMonth[m]||0),0); });
+          const grpTotal = grpItems.reduce((s,x)=>s+x.__total,0);
+          lastExportRows.push(['Subtotal — '+(c.rm||'—'),''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>grpMonthTot[m])).concat([grpTotal]));
+        }
+      });
       lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal]);
       lastExportMonthSel = '';
     } else {
@@ -5326,20 +5364,30 @@ function showClientBrokerageHistory(scopeEmpName){
         let cmp = typeof va==='string' ? va.localeCompare(vb) : va-vb;
         return sortDir==='asc' ? cmp : -cmp;
       });
+      clients = groupByRm(clients);
       theadHtml = '<thead><tr style="background:var(--surface2)">'
         + th('code','Code','left')
         + th('name','Client Name','left')
         +(scopeEmpName?'':th('rm','RM','left'))
         + th('amount','Brokerage (₹) — '+mLabel(monthSel),'right')
         +'</tr></thead>';
-      tbodyHtml = '<tbody>' + clients.map(c=>
-        '<tr style="border-bottom:1px solid var(--border)">'
-        +'<td style="padding:7px 10px">'+escapeHtml(c.code||'—')+'</td>'
-        +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
-        +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
-        +'<td style="padding:7px 10px;text-align:right;font-weight:600">'+inr2(c.byMonth[monthSel])+'</td>'
-        +'</tr>'
-      ).join('') + '</tbody>';
+      tbodyHtml = '<tbody>' + clients.map((c,i)=>{
+        const row = '<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 10px">'+escapeHtml(c.code||'—')+'</td>'
+          +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
+          +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
+          +'<td style="padding:7px 10px;text-align:right;font-weight:600">'+inr2(c.byMonth[monthSel])+'</td>'
+          +'</tr>';
+        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
+          const grpItems = clients.filter(x=>x.rm===c.rm);
+          const grpTotal = grpItems.reduce((s,x)=>s+(x.byMonth[monthSel]||0),0);
+          return row + '<tr style="background:#eef2ff;font-weight:700;border-bottom:2px solid var(--border)">'
+            +'<td style="padding:7px 10px" colspan="'+(scopeEmpName?2:3)+'">Subtotal — '+escapeHtml(c.rm||'—')+'</td>'
+            +'<td style="padding:7px 10px;text-align:right">'+inr2(grpTotal)+'</td>'
+            +'</tr>';
+        }
+        return row;
+      }).join('') + '</tbody>';
       if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(scopeEmpName?3:4)+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found for '+mLabel(monthSel)+'</td></tr></tbody>';
       const monthSum = clients.reduce((s,c)=>s+(c.byMonth[monthSel]||0),0);
       tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2)">'
@@ -5348,7 +5396,14 @@ function showClientBrokerageHistory(scopeEmpName){
         +(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>')
         +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthSum)+'</td>'
         +'</tr></tfoot>' : '';
-      lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat([c.byMonth[monthSel]||0]) );
+      lastExportRows = [];
+      clients.forEach((c,i)=>{
+        lastExportRows.push([c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat([c.byMonth[monthSel]||0]));
+        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
+          const grpTotal = clients.filter(x=>x.rm===c.rm).reduce((s,x)=>s+(x.byMonth[monthSel]||0),0);
+          lastExportRows.push(['Subtotal — '+(c.rm||'—'),''].concat(scopeEmpName?[]:['']).concat([grpTotal]));
+        }
+      });
       lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat([monthSum]);
       lastExportMonthSel = monthSel;
     }
@@ -5370,6 +5425,7 @@ function showClientBrokerageHistory(scopeEmpName){
   document.getElementById('bro-hist-search').oninput = renderTable;
   document.getElementById('bro-hist-month').onchange = renderTable;
   if(!scopeEmpName) document.getElementById('bro-hist-rm').onchange = renderTable;
+  if(!scopeEmpName) document.getElementById('bro-hist-rmtotal').onchange = renderTable;
   renderTable();
 
   document.getElementById('bro-hist-export').onclick = function(){
