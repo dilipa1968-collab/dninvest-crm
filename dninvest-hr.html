@@ -5271,13 +5271,20 @@ function showClientBrokerageHistory(scopeEmpName){
     // RM-wise Total: collapse straight to one row per RM (sum across that
     // RM's clients — respecting the current search) — no client rows at
     // all, so there's nothing to scroll through, just each RM's total.
+    // Month-aware: when a specific month is selected, only that month's
+    // clients/amounts count (not a cross-month total).
     if(rmTotalOn){
       const byRm = {};
       clients.forEach(c=>{
+        if(monthSel && !c.byMonth[monthSel]) return; // this client has no brokerage in the selected month — skip
         const k = c.rm || '—';
         if(!byRm[k]) byRm[k] = {rm:k, byMonth:{}, __total:0, __n:0};
-        allMonths.forEach(m=>{ byRm[k].byMonth[m] = (byRm[k].byMonth[m]||0) + (c.byMonth[m]||0); });
-        byRm[k].__total += c.__total;
+        if(monthSel){
+          byRm[k].byMonth[monthSel] = (byRm[k].byMonth[monthSel]||0) + (c.byMonth[monthSel]||0);
+        } else {
+          allMonths.forEach(m=>{ byRm[k].byMonth[m] = (byRm[k].byMonth[m]||0) + (c.byMonth[m]||0); });
+          byRm[k].__total += c.__total;
+        }
         byRm[k].__n += 1;
       });
       clients = Object.values(byRm);
