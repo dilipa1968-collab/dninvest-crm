@@ -1922,8 +1922,12 @@ function startApp(){
 
   // Default month pickers (Salary & Incentive) to current month
   const curMonth=today().slice(0,7);
+  const lastMonth=(()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7); })();
   const incM=document.getElementById('inc-month'); if(incM && !incM.value) incM.value=curMonth;
-  const viewIncM=document.getElementById('view-inc-month'); if(viewIncM && !viewIncM.value) viewIncM.value=curMonth;
+  // "My Incentive" defaults to LAST month, not the current one — at the start
+  // of a new month this month's brokerage/incentive usually isn't uploaded
+  // yet, so showing last month's (already-computed) figures is more useful.
+  const viewIncM=document.getElementById('view-inc-month'); if(viewIncM && !viewIncM.value) viewIncM.value=lastMonth;
   const salM=document.getElementById('sal-month'); if(salM && !salM.value) salM.value=curMonth;
   const viewSalM=document.getElementById('view-sal-month'); if(viewSalM && !viewSalM.value) viewSalM.value=curMonth;
   const mmFrom=document.getElementById('mm-from'); if(mmFrom && !mmFrom.value){
@@ -1931,10 +1935,8 @@ function startApp(){
     mmFrom.value=d.toISOString().slice(0,7);
   }
   const mmTo=document.getElementById('mm-to'); if(mmTo && !mmTo.value) mmTo.value=curMonth;
-  const myMmFrom=document.getElementById('my-mm-from'); if(myMmFrom && !myMmFrom.value){
-    const d=new Date(); d.setMonth(d.getMonth()-2);
-    myMmFrom.value=d.toISOString().slice(0,7);
-  }
+  // "My combined balance" defaults to last month → this month (2-month window).
+  const myMmFrom=document.getElementById('my-mm-from'); if(myMmFrom && !myMmFrom.value) myMmFrom.value=lastMonth;
   const myMmTo=document.getElementById('my-mm-to'); if(myMmTo && !myMmTo.value) myMmTo.value=curMonth;
   const advDateEl=document.getElementById('adv-date'); if(advDateEl && !advDateEl.value) advDateEl.value=today();
 
@@ -4109,7 +4111,7 @@ function viewIncMonth(){
 function renderIncentivePage(){
   const rates=getIncRates();
   const vEl=document.getElementById('view-inc-month');
-  if(vEl && !vEl.value) vEl.value=today().slice(0,7);
+  if(vEl && !vEl.value){ const d=new Date(); d.setMonth(d.getMonth()-1); vEl.value=d.toISOString().slice(0,7); }
   const selMonth=viewIncMonth();
 
   // Update formula card with current rates
