@@ -4583,16 +4583,33 @@ let _broParseResult = null; // holds last parsed result for apply step
 // Fetch a { normalizedClientCode : RM } map from the CRM's equity clients
 // (crm_data/eq_clients). Used when a brokerage file has no RM column — the RM
 // is derived from each client's code as stored in the CRM.
+// The CRM's eq_clients data no longer lives in one Firestore document — at
+// ~3400+ clients it crossed Firestore's 1 MiB per-document limit, so the CRM
+// splits it across 8 sibling documents: crm_data/eq_clients__s0 ... __s7
+// (see dninvest-app-1.js SHARD_CFG). Read all 8 and concatenate. A legacy
+// single 'eq_clients' doc may still exist from before that split — it's
+// stale/partial (misses anything added after the split) so it's not used.
+async function getCrmEqClients(){
+  const all = [];
+  try{
+    if(typeof fdb!=='undefined'){
+      const docs = await Promise.all(
+        Array.from({length:8}, (_,i)=> fdb.collection('crm_data').doc('eq_clients__s'+i).get())
+      );
+      docs.forEach(doc=>{
+        if(doc.exists && doc.data() && Array.isArray(doc.data().data)) all.push(...doc.data().data);
+      });
+    }
+  }catch(e){ console.error('eq_clients shard fetch failed:', e); }
+  return all;
+}
+
 function _normBrkCode(s){ return String(s||'').trim().toLowerCase().replace(/[\s\-]/g,''); }
 async function getCrmCodeRmMap(){
   const map = {};
   try{
-    if(typeof fdb!=='undefined'){
-      const doc = await fdb.collection('crm_data').doc('eq_clients').get();
-      if(doc.exists && doc.data() && doc.data().data){
-        doc.data().data.forEach(c=>{ if(c && c.code) map[_normBrkCode(c.code)] = (c.rm||''); });
-      }
-    }
+    const clients = await getCrmEqClients();
+    clients.forEach(c=>{ if(c && c.code) map[_normBrkCode(c.code)] = (c.rm||''); });
   }catch(e){ console.error('code→RM map fetch failed:', e); }
   return map;
 }
@@ -4607,21 +4624,17 @@ function _normBrkName(s){ return String(s||'').trim().toUpperCase().replace(/\s+
 async function getCrmNameCodeMap(){
   const map = {};
   try{
-    if(typeof fdb!=='undefined'){
-      const doc = await fdb.collection('crm_data').doc('eq_clients').get();
-      if(doc.exists && doc.data() && doc.data().data){
-        doc.data().data.forEach(c=>{
-          if(c && c.name && c.code){
-            const key = _normBrkName(c.name);
-            if(map.hasOwnProperty(key)){
-              if(map[key] !== c.code) map[key] = false; // ambiguous — same name, different clients
-            } else {
-              map[key] = c.code;
-            }
-          }
-        });
+    const clients = await getCrmEqClients();
+    clients.forEach(c=>{
+      if(c && c.name && c.code){
+        const key = _normBrkName(c.name);
+        if(map.hasOwnProperty(key)){
+          if(map[key] !== c.code) map[key] = false; // ambiguous — same name, different clients
+        } else {
+          map[key] = c.code;
+        }
       }
-    }
+    });
   }catch(e){ console.error('name→code map fetch failed:', e); }
   return map;
 }
@@ -4844,23 +4857,32 @@ function renderBroUploadResult(results, minClients, threshold, bonus, unmatchedR
   html += `</tbody></table></div>`;
 
   if(unmatchedRows.length){
+    const empOptions = EMPLOYEES.filter(e=>e && !e.deleted).map(e=>e.name).sort()
+      .map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');
     html += `<div style="margin-top:16px;background:var(--red-bg,#FEF2F2);border:1px solid #F09595;border-radius:8px;padding:12px 14px">
       <div style="font-weight:700;font-size:13px;color:var(--red-text,#B91C1C);margin-bottom:2px">⚠ ${unmatchedRows.length} client${unmatchedRows.length>1?'s':''} could not be matched to any RM — not counted anywhere</div>
-      <div style="font-size:11.5px;color:var(--red-text,#B91C1C);opacity:.85;margin-bottom:8px">Usually a brand-new client whose code isn't in the CRM's Equity Client list yet, or the code/RM in CRM doesn't match this file. Fix in the CRM, then re-upload this file.</div>
-      <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
+      <div style="font-size:11.5px;color:var(--red-text,#B91C1C);opacity:.85;margin-bottom:8px">Usually a brand-new client whose code isn't in the CRM's Equity Client list yet, or the code/RM in CRM doesn't match this file. Fix it in the CRM for next time — or pick the RM below to include this client right now.</div>
+      <div style="overflow-x:auto;max-height:220px;overflow-y:auto">
       <table style="font-size:12px;width:100%;border-collapse:collapse">
         <thead><tr>
           <th style="padding:5px 8px;text-align:left">Code</th>
           <th style="padding:5px 8px;text-align:left">Client Name</th>
           <th style="padding:5px 8px;text-align:right">Brokerage (₹)</th>
           <th style="padding:5px 8px;text-align:left">Reason</th>
+          <th style="padding:5px 8px;text-align:left">Assign RM</th>
         </tr></thead><tbody>`;
-    unmatchedRows.forEach(u => {
+    unmatchedRows.forEach((u, idx) => {
       html += `<tr style="border-top:1px solid #F0C6C6">
         <td style="padding:5px 8px">${escapeHtml(u.code||'—')}</td>
         <td style="padding:5px 8px">${escapeHtml(u.name||'—')}</td>
         <td style="padding:5px 8px;text-align:right">${Number(u.bro||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
         <td style="padding:5px 8px">${escapeHtml(u.reason||'')}</td>
+        <td style="padding:5px 8px">
+          <select id="bro-unm-assign-${idx}" style="font-size:11.5px;padding:3px 5px;border:1px solid var(--border2,#ccc);border-radius:5px;background:#fff">
+            <option value="">— not included —</option>
+            ${empOptions}
+          </select>
+        </td>
       </tr>`;
     });
     html += `</tbody></table></div></div>`;
@@ -5057,15 +5079,44 @@ async function applyBroClientIncentive(){
   const month   = monthEl ? monthEl.value : '';
   if(!month){ alert('Please select a month first.'); return; }
 
-  const {results} = _broParseResult;
-  const matched   = results.filter(r => r.empName);
-  const unmatched = results.filter(r => !r.empName);
+  const { results, unmatchedRows, threshold, minClients, bonus } = _broParseResult;
+
+  // Pull any manual RM assignments made in the "Unmatched" warning table
+  // (one <select> per row) and fold each into that RM's totals — brokerage
+  // sum, eligible-client count (recomputed against the ₹threshold), and the
+  // client-wise row list — before saving.
+  const workingResults = results.map(r => ({...r, clients:(r.clients||[]).slice()}));
+  const stillUnassigned = [];
+  (unmatchedRows||[]).forEach((u, idx) => {
+    const sel = document.getElementById('bro-unm-assign-'+idx);
+    const empName = sel ? sel.value : '';
+    if(!empName){ stillUnassigned.push(u); return; }
+    let entry = workingResults.find(r => r.empName === empName);
+    if(!entry){
+      entry = { rm: empName.toUpperCase(), empName, totalClients:0, eligibleClients:0, totalBrokerage:0, clients:[], eligible:false, bonus:0 };
+      workingResults.push(entry);
+    }
+    const eligibleNow = Number(u.bro||0) >= threshold;
+    entry.totalClients++;
+    entry.totalBrokerage += Number(u.bro||0);
+    if(eligibleNow) entry.eligibleClients++;
+    entry.clients.push({code:u.code, name:u.name, bro:u.bro, eligible:eligibleNow});
+  });
+  // Re-check bonus eligibility for every RM (manual additions can push someone past minClients)
+  workingResults.forEach(r => {
+    r.eligible = r.eligibleClients >= minClients;
+    r.bonus    = r.eligible ? bonus : 0;
+  });
+
+  const matched   = workingResults.filter(r => r.empName);
+  const unmatched = workingResults.filter(r => !r.empName);
   if(!matched.length){ alert('No RM names could be matched to employees. Check the file.'); return; }
 
   const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-  const summary = matched.map(r => `${r.empName}: ${r.eligible ? '₹'+r.bonus+' bonus ('+r.eligibleClients+' clients)' : 'No bonus ('+r.eligibleClients+'/'+_broParseResult.minClients+' clients)'}`).join('\n');
+  const summary = matched.map(r => `${r.empName}: ${r.eligible ? '₹'+r.bonus+' bonus ('+r.eligibleClients+' clients)' : 'No bonus ('+r.eligibleClients+'/'+minClients+' clients)'}`).join('\n');
   const unmSummary = unmatched.length ? '\n\nUnmatched RMs (skipped): '+unmatched.map(r=>r.rm).join(', ') : '';
-  if(!confirm('Apply brokerage client bonus for '+mLabel+'?\n\n'+summary+unmSummary)) return;
+  const stillUnSummary = stillUnassigned.length ? '\n\n'+stillUnassigned.length+' client(s) left un-assigned — still not counted anywhere.' : '';
+  if(!confirm('Apply brokerage client bonus for '+mLabel+'?\n\n'+summary+unmSummary+stillUnSummary)) return;
 
   const all = getMfSipByMonth();
   if(!all[month]) all[month] = {};
