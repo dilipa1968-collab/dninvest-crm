@@ -1296,7 +1296,7 @@ window.addEventListener('DOMContentLoaded', tryAutoLogin);
 // restricted (input min/max + save validation). Admin itself is unrestricted.
 // mode:'rolling' → offsets are DAYS from today (recomputed on every read, so the
 // window auto-rolls daily and never needs re-clicking). mode:'fixed' → frozen dates.
-let CALL_LIMITS = { configured:false, mode:'rolling', lcMin:'', lcMax:'', ncMin:'', ncMax:'', rLcMin:'', rLcMax:'', rNcMin:'', rNcMax:'' };
+let CALL_LIMITS = { configured:false, rLcMin:'', rLcMax:'', rNcMin:'', rNcMax:'' };
 const CL_DEFAULT_ROLL = { rLcMin:'', rLcMax:0, rNcMin:0, rNcMax:90 };
 // Local-date arithmetic (no UTC/ISO — avoids IST midnight date shift)
 function _dayOffset(n){
@@ -1313,19 +1313,10 @@ async function loadCallLimits(){
     if(doc.exists && doc.data() && doc.data().data){
       const d=doc.data().data;
       const num=v=>(v===''||v===null||v===undefined)?'':Number(v);
-      CALL_LIMITS = { configured:true, mode:(d.mode==='fixed'?'fixed':'rolling'),
-        lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'',
+      // Only rolling limits are supported now — any old fixed-mode dates
+      // in the doc (from before Fixed Dates was removed) are ignored.
+      CALL_LIMITS = { configured:true,
         rLcMin:num(d.rLcMin), rLcMax:num(d.rLcMax), rNcMin:num(d.rNcMin), rNcMax:num(d.rNcMax) };
-      // Legacy doc (saved before rolling mode existed) has no `mode` field.
-      // Treat it as fixed — but ONLY if it actually carries dates. An all-blank
-      // legacy doc used to mean "no limit"; that silently disabled the lock, so
-      // we now fall back to the rolling defaults instead.
-      if(d.mode===undefined){
-        const hasDates = !!(d.lcMin||d.lcMax||d.ncMin||d.ncMax);
-        if(hasDates){ CALL_LIMITS.mode='fixed'; }
-        else { CALL_LIMITS = { configured:false, mode:'rolling', lcMin:'', lcMax:'', ncMin:'', ncMax:'', ...CL_DEFAULT_ROLL };
-               console.log('call_limits: blank legacy doc ignored — rolling defaults applied'); }
-      }
     }
   }catch(e){ console.log('call limits load failed', e); }
   try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
@@ -1333,21 +1324,8 @@ async function loadCallLimits(){
 // Effective min/max for the CURRENT user. Admin = no limits.
 function effectiveCallLimits(){
   if(CU && CU.role==='admin') return {lcMin:'',lcMax:'',ncMin:'',ncMax:''};
-  if(CALL_LIMITS.configured && CALL_LIMITS.mode==='fixed')
-    return {lcMin:CALL_LIMITS.lcMin,lcMax:CALL_LIMITS.lcMax,ncMin:CALL_LIMITS.ncMin,ncMax:CALL_LIMITS.ncMax};
   const r = CALL_LIMITS.configured ? CALL_LIMITS : CL_DEFAULT_ROLL;
   return {lcMin:_off(r.rLcMin), lcMax:_off(r.rLcMax), ncMin:_off(r.rNcMin), ncMax:_off(r.rNcMax)};
-}
-function setCallLimitMode(m){
-  CALL_LIMITS.mode = (m==='fixed'?'fixed':'rolling');
-  const on = {background:'#fff',color:'var(--navy)',fontWeight:'700',boxShadow:'0 1px 3px rgba(0,0,0,.12)'};
-  const off = {background:'transparent',color:'var(--gray)',fontWeight:'500',boxShadow:'none'};
-  const tabR=document.getElementById('cl-tab-rolling'), tabF=document.getElementById('cl-tab-fixed');
-  Object.assign(tabR.style, CALL_LIMITS.mode==='rolling'?on:off);
-  Object.assign(tabF.style, CALL_LIMITS.mode==='fixed'?on:off);
-  document.getElementById('cl-pane-rolling').style.display = CALL_LIMITS.mode==='rolling'?'flex':'none';
-  document.getElementById('cl-pane-fixed').style.display   = CALL_LIMITS.mode==='fixed'?'flex':'none';
-  renderCallLimitPreview();
 }
 function renderCallLimitPreview(){
   const el=document.getElementById('cl-preview'); if(!el) return;
@@ -1359,7 +1337,7 @@ function renderCallLimitPreview(){
     + '<br><span style="color:var(--gray)">Tomorrow this window will automatically shift forward by 1 day.</span>';
 }
 function clearCallLimits(){
-  ['cl-lc-min','cl-lc-max','cl-nc-min','cl-nc-max','cl-r-lc-min','cl-r-lc-max','cl-r-nc-min','cl-r-nc-max']
+  ['cl-r-lc-min','cl-r-lc-max','cl-r-nc-min','cl-r-nc-max']
     .forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   renderCallLimitPreview();
 }
@@ -1429,29 +1407,18 @@ document.addEventListener('change', function(e){
 // -----------------------------------------------------------------------
 function populateCallLimitInputs(){
   const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=(v===''||v===null||v===undefined)?'':v;};
-  const c = CALL_LIMITS.configured ? CALL_LIMITS : null;
-  // fixed pane — show current fixed dates, or today's rolling window as a starting point
-  const f = (c && c.mode==='fixed') ? c : effectiveCallLimits0();
-  set('cl-lc-min',f.lcMin); set('cl-lc-max',f.lcMax); set('cl-nc-min',f.ncMin); set('cl-nc-max',f.ncMax);
-  // rolling pane
-  const r = (c && c.mode==='rolling') ? c : CL_DEFAULT_ROLL;
+  const r = CALL_LIMITS.configured ? CALL_LIMITS : CL_DEFAULT_ROLL;
   set('cl-r-lc-min',r.rLcMin); set('cl-r-lc-max',r.rLcMax); set('cl-r-nc-min',r.rNcMin); set('cl-r-nc-max',r.rNcMax);
   ['cl-r-lc-min','cl-r-lc-max','cl-r-nc-min','cl-r-nc-max'].forEach(id=>{
     const el=document.getElementById(id); if(el && !el._clBound){ el._clBound=1; el.addEventListener('input',renderCallLimitPreview); }
   });
-  setCallLimitMode(c ? c.mode : 'rolling');
-}
-// Same as effectiveCallLimits but ignoring the admin bypass — used to prefill the fixed pane.
-function effectiveCallLimits0(){
-  if(CALL_LIMITS.configured && CALL_LIMITS.mode==='fixed') return CALL_LIMITS;
-  const r = CALL_LIMITS.configured ? CALL_LIMITS : CL_DEFAULT_ROLL;
-  return {lcMin:_off(r.rLcMin), lcMax:_off(r.rLcMax), ncMin:_off(r.rNcMin), ncMax:_off(r.rNcMax)};
+  renderCallLimitPreview();
 }
 // Reset to the built-in DEFAULT (rolling): Last Call up to today; Next Call
 // today .. +3 months. Removes any admin-set fixed limits.
 async function resetCallLimits(){
   if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
-  CALL_LIMITS = { configured:false, mode:'rolling', lcMin:'', lcMax:'', ncMin:'', ncMax:'', ...CL_DEFAULT_ROLL };
+  CALL_LIMITS = { configured:false, ...CL_DEFAULT_ROLL };
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').delete();
     populateCallLimitInputs();
@@ -1462,24 +1429,15 @@ async function saveCallLimits(){
   if(!CU || CU.role!=='admin'){ toast('Only Admin can change this','error'); return; }
   const gv=id=>(document.getElementById(id)||{value:''}).value||'';
   const gn=id=>{const v=gv(id); return v===''?'':Number(v);};
-  const mode = CALL_LIMITS.mode==='fixed' ? 'fixed' : 'rolling';
-  let d;
-  if(mode==='fixed'){
-    d={ mode, lcMin:gv('cl-lc-min'), lcMax:gv('cl-lc-max'), ncMin:gv('cl-nc-min'), ncMax:gv('cl-nc-max'), rLcMin:'', rLcMax:'', rNcMin:'', rNcMax:'' };
-    if(d.lcMin && d.lcMax && d.lcMin>d.lcMax){ toast('Last Call: "earliest" date is after the "latest" date','error'); return; }
-    if(d.ncMin && d.ncMax && d.ncMin>d.ncMax){ toast('Next Call: "earliest" date is after the "latest" date','error'); return; }
-  } else {
-    d={ mode, lcMin:'', lcMax:'', ncMin:'', ncMax:'', rLcMin:gn('cl-r-lc-min'), rLcMax:gn('cl-r-lc-max'), rNcMin:gn('cl-r-nc-min'), rNcMax:gn('cl-r-nc-max') };
-    if(d.rLcMin!=='' && d.rLcMax!=='' && d.rLcMin>d.rLcMax){ toast('Last Call: "minimum" days is greater than "maximum" days','error'); return; }
-    if(d.rNcMin!=='' && d.rNcMax!=='' && d.rNcMin>d.rNcMax){ toast('Next Call: "minimum" days is greater than "maximum" days','error'); return; }
-  }
+  const d={ rLcMin:gn('cl-r-lc-min'), rLcMax:gn('cl-r-lc-max'), rNcMin:gn('cl-r-nc-min'), rNcMax:gn('cl-r-nc-max') };
+  if(d.rLcMin!=='' && d.rLcMax!=='' && d.rLcMin>d.rLcMax){ toast('Last Call: "minimum" days is greater than "maximum" days','error'); return; }
+  if(d.rNcMin!=='' && d.rNcMax!=='' && d.rNcMin>d.rNcMax){ toast('Next Call: "minimum" days is greater than "maximum" days','error'); return; }
   CALL_LIMITS = { configured:true, ...d };
-  const allBlank = mode==='fixed' ? !(d.lcMin||d.lcMax||d.ncMin||d.ncMax)
-                                  : (d.rLcMin===''&&d.rLcMax===''&&d.rNcMin===''&&d.rNcMax==='');
+  const allBlank = (d.rLcMin===''&&d.rLcMax===''&&d.rNcMin===''&&d.rNcMax==='');
   if(allBlank && !confirm('All fields are blank — this means NO LIMIT will apply to RMs.\n\nAre you sure you want to save?')) return;
   try{
     if(typeof fdb!=='undefined') await fdb.collection('shared_control').doc('call_limits').set({data:d, updated:new Date().toISOString()});
-    toast(mode==='rolling' ? 'Rolling limits saved ✓ — will shift forward automatically every day' : 'Fixed call date limits saved ✓ — now applied to RMs','success');
+    toast('Rolling limits saved ✓ — will shift forward automatically every day','success');
     renderCallLimitPreview();
   }catch(e){ toast('Save failed: '+(e&&e.message||e),'error'); }
 }
@@ -1519,7 +1477,8 @@ function initApp(){
       fdb.collection('shared_control').doc('call_limits').onSnapshot(doc=>{
         if(doc.exists && doc.data() && doc.data().data){
           const d=doc.data().data;
-          CALL_LIMITS = { configured:true, lcMin:d.lcMin||'', lcMax:d.lcMax||'', ncMin:d.ncMin||'', ncMax:d.ncMax||'' };
+          const num=v=>(v===''||v===null||v===undefined)?'':Number(v);
+          CALL_LIMITS = { configured:true, rLcMin:num(d.rLcMin), rLcMax:num(d.rLcMax), rNcMin:num(d.rNcMin), rNcMax:num(d.rNcMax) };
           try{ if(getCurrentPageId()==='admin') populateCallLimitInputs(); }catch(e){}
         }
       });

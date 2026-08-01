@@ -2194,17 +2194,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <h3 style="margin:0 0 6px">🔒 Call Date Lock (for RMs)</h3>
           <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Set date limits for <b>Last Call</b> and <b>Next Call</b> in the RM's follow-up form. the RM will not be able to enter a date before or after these limits. Leave blank = no limit on that side. (No limit ever applies to Admin.)</p>
 
-          <div style="display:flex;gap:8px;margin:0 0 14px;background:#f1f5f9;padding:4px;border-radius:10px;width:fit-content">
-            <button type="button" id="cl-tab-rolling" class="btn" style="border:0;padding:7px 14px;border-radius:8px;font-size:.82rem" onclick="setCallLimitMode('rolling')">🔄 Rolling (auto)</button>
-            <button type="button" id="cl-tab-fixed" class="btn" style="border:0;padding:7px 14px;border-radius:8px;font-size:.82rem" onclick="setCallLimitMode('fixed')">📅 Fixed Dates</button>
-          </div>
+          <p style="margin:0 0 14px;font-size:.8rem;color:var(--gray);background:#ecfdf5;border-left:3px solid #10b981;padding:8px 10px;border-radius:6px">
+            ✅ <b>Rolling (auto):</b> the limit <b>automatically shifts forward every day</b> — no need to click daily. Enter below how many days' gap to allow from today. Blank = no limit in that direction.
+            <br>Example: <b>-7</b> = up to 7 days ago · <b>0</b> = today · <b>90</b> = up to 90 days from today.
+          </p>
 
-          <!-- ROLLING MODE -->
-          <div id="cl-pane-rolling" style="display:none;flex-direction:column;gap:14px">
-            <p style="margin:0;font-size:.8rem;color:var(--gray);background:#ecfdf5;border-left:3px solid #10b981;padding:8px 10px;border-radius:6px">
-              ✅ <b>Rolling mode:</b> the limit <b>automatically shifts forward every day</b> — no need to click daily. Enter below how many days' gap to allow from today. Blank = no limit in that direction.
-              <br>Example: <b>-7</b> = up to 7 days ago · <b>0</b> = today · <b>90</b> = up to 90 days from today.
-            </p>
+          <!-- ROLLING MODE (only mode) -->
+          <div id="cl-pane-rolling" style="display:flex;flex-direction:column;gap:14px">
             <div>
               <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -2224,31 +2220,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               </div>
             </div>
             <div id="cl-preview" style="font-size:.8rem;color:var(--navy);background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px"></div>
-          </div>
-
-          <!-- FIXED MODE -->
-          <div id="cl-pane-fixed" style="display:none;flex-direction:column;gap:14px">
-            <div>
-              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">📞 Last Call Date</div>
-              <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not before (earliest)
-                  <input type="date" id="cl-lc-min" style="padding:6px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not after (latest)
-                  <input type="date" id="cl-lc-max" style="padding:6px"></label>
-              </div>
-            </div>
-            <div>
-              <div style="font-weight:700;color:var(--navy);margin-bottom:6px">🔜 Next Call Date</div>
-              <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not before (earliest)
-                  <input type="date" id="cl-nc-min" style="padding:6px"></label>
-                <label style="font-size:.82rem;color:var(--gray);display:flex;flex-direction:column;gap:3px">Not after (latest)
-                  <input type="date" id="cl-nc-max" style="padding:6px"></label>
-              </div>
-            </div>
-            <p style="margin:0;font-size:.8rem;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:6px">
-              ⚠️ <b>Fixed mode:</b> these dates <b>stay fixed</b> — they don't advance automatically. For auto-shifting limits, choose "Rolling (auto)" above.
-            </p>
           </div>
 
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
