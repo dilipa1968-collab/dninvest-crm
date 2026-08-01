@@ -5236,6 +5236,8 @@ function showClientBrokerageHistory(scopeEmpName){
     +'<div id="bro-hist-count" style="font-size:12px;color:var(--text3);margin-top:8px"></div>'
     +'</div></div>';
 
+  let sortCol = 'total', sortDir = 'desc'; // persists across filter/search re-renders while the modal is open
+
   const renderTable = function(){
     const rmFilter = scopeEmpName ? '' : (document.getElementById('bro-hist-rm').value || '');
     const clientMap = buildClientMap(rmFilter);
@@ -5246,42 +5248,63 @@ function showClientBrokerageHistory(scopeEmpName){
       if(!q) return true;
       return String(c.code||'').toLowerCase().includes(q) || String(c.name||'').toLowerCase().includes(q);
     });
+    clients.forEach(c=>{ c.__total = allMonths.reduce((s,m)=>s+(c.byMonth[m]||0),0); });
+
+    // Generic sort: 'code'/'name'/'rm' → string compare; a month key or
+    // 'total'/'amount' → numeric compare. dir flips the direction.
+    const sortVal = (c, col) => {
+      if(col==='code') return String(c.code||'');
+      if(col==='name') return String(c.name||'');
+      if(col==='rm')   return String(c.rm||'');
+      if(col==='amount') return c.byMonth[monthSel]||0; // single-month mode
+      if(col==='total')  return c.__total;
+      return c.byMonth[col]||0; // a specific month key, matrix mode
+    };
+    clients.sort((a,b)=>{
+      const va=sortVal(a,sortCol), vb=sortVal(b,sortCol);
+      let cmp;
+      if(typeof va==='string') cmp = va.localeCompare(vb);
+      else cmp = va-vb;
+      return sortDir==='asc' ? cmp : -cmp;
+    });
+
+    const arrow = col => sortCol===col ? (sortDir==='asc'?' ▲':' ▼') : '';
+    const th = (col, label, align) => '<th data-sort-col="'+col+'" style="padding:8px 10px;text-align:'+align+';position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap;cursor:pointer;user-select:none">'+label+arrow(col)+'</th>';
 
     let theadHtml, tbodyHtml;
     if(!monthSel){
       // Matrix: one column per month, ascending chronological
-      clients.sort((a,b)=>{
-        const ta = Object.values(a.byMonth).reduce((s,v)=>s+v,0);
-        const tb = Object.values(b.byMonth).reduce((s,v)=>s+v,0);
-        return tb-ta;
-      });
       theadHtml = '<thead><tr style="background:var(--surface2)">'
-        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase">Code</th>'
-        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">Client Name</th>'
-        +(scopeEmpName?'':'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">RM</th>')
-        + allMonths.map(m=>'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap">'+mLabel(m)+'</th>').join('')
-        +'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap">Total</th>'
+        +'<th data-sort-col="code" style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase;cursor:pointer;user-select:none">Code'+arrow('code')+'</th>'
+        + th('name','Client Name','left')
+        +(scopeEmpName?'':th('rm','RM','left'))
+        + allMonths.map(m=>th(m, mLabel(m), 'right')).join('')
+        + th('total','Total','right')
         +'</tr></thead>';
       tbodyHtml = '<tbody>' + clients.map(c=>{
-        const total = allMonths.reduce((s,m)=>s+(c.byMonth[m]||0),0);
         return '<tr style="border-bottom:1px solid var(--border)">'
           +'<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+escapeHtml(c.code||'—')+'</td>'
           +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
           +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
           + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(c.byMonth[m]?'':';color:var(--text3)')+'">'+(c.byMonth[m]?inr2(c.byMonth[m]):'—')+'</td>').join('')
-          +'<td style="padding:7px 10px;text-align:right;font-weight:700">'+inr2(total)+'</td>'
+          +'<td style="padding:7px 10px;text-align:right;font-weight:700">'+inr2(c.__total)+'</td>'
           +'</tr>';
       }).join('') + '</tbody>';
       if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(3+allMonths.length+(scopeEmpName?0:1))+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found</td></tr></tbody>';
     } else {
-      // Single month: simple list, sorted by amount desc
+      // Single month: simple list
       clients = clients.filter(c=>c.byMonth[monthSel]);
-      clients.sort((a,b)=>(b.byMonth[monthSel]||0)-(a.byMonth[monthSel]||0));
+      if(sortCol==='total') sortCol='amount'; // 'total' column doesn't exist in this mode
+      clients.sort((a,b)=>{
+        const va=sortVal(a,sortCol), vb=sortVal(b,sortCol);
+        let cmp = typeof va==='string' ? va.localeCompare(vb) : va-vb;
+        return sortDir==='asc' ? cmp : -cmp;
+      });
       theadHtml = '<thead><tr style="background:var(--surface2)">'
-        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Code</th>'
-        +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Client Name</th>'
-        +(scopeEmpName?'':'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">RM</th>')
-        +'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Brokerage (₹) — '+mLabel(monthSel)+'</th>'
+        + th('code','Code','left')
+        + th('name','Client Name','left')
+        +(scopeEmpName?'':th('rm','RM','left'))
+        + th('amount','Brokerage (₹) — '+mLabel(monthSel),'right')
         +'</tr></thead>';
       tbodyHtml = '<tbody>' + clients.map(c=>
         '<tr style="border-bottom:1px solid var(--border)">'
@@ -5296,6 +5319,16 @@ function showClientBrokerageHistory(scopeEmpName){
 
     document.getElementById('bro-hist-table').innerHTML = theadHtml + tbodyHtml;
     document.getElementById('bro-hist-count').textContent = clients.length+' client(s) shown';
+
+    // Wire up click-to-sort on every header cell just rendered
+    document.querySelectorAll('#bro-hist-table th[data-sort-col]').forEach(el=>{
+      el.onclick = function(){
+        const col = el.getAttribute('data-sort-col');
+        if(sortCol===col) sortDir = (sortDir==='asc'?'desc':'asc');
+        else { sortCol = col; sortDir = (col==='code'||col==='name'||col==='rm') ? 'asc' : 'desc'; }
+        renderTable();
+      };
+    });
   };
 
   document.getElementById('bro-hist-search').oninput = renderTable;
