@@ -5297,12 +5297,12 @@ function showClientBrokerageHistory(scopeEmpName){
       const monthTotals = {};
       allMonths.forEach(m=>{ monthTotals[m] = clients.reduce((s,c)=>s+(c.byMonth[m]||0),0); });
       const grandTotal = clients.reduce((s,c)=>s+c.__total,0);
-      tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border)">'
-        +'<td style="padding:8px 10px;font-weight:700;position:sticky;left:0;background:var(--surface2)">TOTAL</td>'
-        +'<td style="padding:8px 10px"></td>'
-        +(scopeEmpName?'':'<td style="padding:8px 10px"></td>')
-        + allMonths.map(m=>'<td style="padding:8px 10px;text-align:right;font-weight:700">'+inr2(monthTotals[m])+'</td>').join('')
-        +'<td style="padding:8px 10px;text-align:right;font-weight:800">'+inr2(grandTotal)+'</td>'
+      tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2)">'
+        +'<td style="padding:8px 10px;font-weight:700;position:sticky;left:0;bottom:0;z-index:2;background:var(--surface2);border-top:2px solid var(--border)">TOTAL</td>'
+        +'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'
+        +(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>')
+        + allMonths.map(m=>'<td style="padding:8px 10px;text-align:right;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthTotals[m])+'</td>').join('')
+        +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(grandTotal)+'</td>'
         +'</tr></tfoot>' : '';
       lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]) );
       lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal]);
@@ -5332,11 +5332,11 @@ function showClientBrokerageHistory(scopeEmpName){
       ).join('') + '</tbody>';
       if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(scopeEmpName?3:4)+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found for '+mLabel(monthSel)+'</td></tr></tbody>';
       const monthSum = clients.reduce((s,c)=>s+(c.byMonth[monthSel]||0),0);
-      tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border)">'
-        +'<td style="padding:8px 10px;font-weight:700">TOTAL</td>'
-        +'<td style="padding:8px 10px"></td>'
-        +(scopeEmpName?'':'<td style="padding:8px 10px"></td>')
-        +'<td style="padding:8px 10px;text-align:right;font-weight:800">'+inr2(monthSum)+'</td>'
+      tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2)">'
+        +'<td style="padding:8px 10px;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">TOTAL</td>'
+        +'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'
+        +(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>')
+        +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthSum)+'</td>'
         +'</tr></tfoot>' : '';
       lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat([c.byMonth[monthSel]||0]) );
       lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat([monthSum]);
