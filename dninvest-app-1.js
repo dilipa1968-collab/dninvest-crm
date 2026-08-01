@@ -11205,7 +11205,16 @@ async function doImport(){
         {
           const oldInv = parseFloat(ex.aum_detail && ex.aum_detail.inv)||0;
           const newInv = parseFloat(row.inv_amt)||0;
-          if(oldInv !== newInv && ex.aum_detail){   // don't log the very first Invested Amount a client ever gets
+          const isFirstEver = !ex.aum_detail; // client never had AUM detail before — first investment ever
+          if(isFirstEver && newInv>0){
+            // First-ever investment for this (pre-existing) client record — counts as
+            // a new-investor "win" too, same as a brand-new client added below.
+            ex.prev_invested = 0;
+            ex.invested_change_amt = newInv;
+            ex.invested_change_date = today();
+            const _td=today();
+            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
+          } else if(oldInv !== newInv && ex.aum_detail){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
@@ -11226,18 +11235,28 @@ async function doImport(){
         let rm = row.rm || '';
         if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) rm = CU.name;
         const nid = uid();
+        const newInv = parseFloat(row.inv_amt)||0;
         newClients.push({
           id: nid,
           name: row.name, pan: row.pan, client_id: row.client_id||'', mobile:(row.mobile?mob10(row.mobile):''), email:'', rm,
           status: 'Investor',
           aum: row.aum,
           aum_detail: _aumDetail(row),
+          // New investor's first invested amount counts as a "win" too — mark it
+          // so today's Win/Loss card (mfWins) picks it up as "+MF New" on add day.
+          prev_invested: 0,
+          invested_change_amt: newInv,
+          invested_change_date: newInv>0 ? today() : '',
           sip_amount: sipInfo.sip_amount||null,
           sip_count: sipInfo.sip_count||null,
           sip_details: sipInfo.sip_details||null,
           last_invest_date:'', last_call_date:'', next_call:'',
           followup_status:'', remarks:'', created: today(), updated: today()
         });
+        if(newInv>0){
+          const _td=today();
+          DB.addMfChangeLog({id:nid+'__'+_td, date:_td, clientId:nid, name:row.name||'', rm:rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
+        }
         if(importData.sip && (sipInfo.sip_details||sipInfo.sip_amount||sipInfo.sip_count)) sipApplied.add(nid);
         added++;
       }
