@@ -4720,6 +4720,7 @@ function parseBrokerageFile(inputEl){
       const bonus      = parseFloat(document.getElementById('bro-client-bonus').value)     || 700;
 
       const rmMap = {};
+      const unmatchedRows = []; // rows where no RM could be determined — surfaced to the admin instead of silently dropped
       let dataRows = 0;
       for(let i = headerRowIdx + 1; i < rawRows.length; i++){
         const row = rawRows[i];
@@ -4737,7 +4738,16 @@ function parseBrokerageFile(inputEl){
         const rm = (idxRm>=0)
           ? String(row[idxRm]||'').trim().toUpperCase()
           : String((codeRmMap && codeRmMap[_normBrkCode(code)]) || '').trim().toUpperCase();
-        if(!rm) continue; // rows with no matchable RM are skipped
+        if(!rm){
+          // No RM could be determined for this client — likely the code isn't
+          // present (or doesn't match) in the CRM's equity client list. Report
+          // it instead of silently dropping it from everyone's totals.
+          unmatchedRows.push({
+            code, name: cliName, bro,
+            reason: idxRm>=0 ? 'RM column blank in file' : (code ? 'Code not found in CRM equity clients' : 'No code in file and no name match in CRM')
+          });
+          continue;
+        }
         dataRows++;
         if(!rmMap[rm]) rmMap[rm] = {totalClients:0, eligibleClients:0, totalBrokerage:0, clients:[]};
         rmMap[rm].totalClients++;
@@ -4773,8 +4783,8 @@ function parseBrokerageFile(inputEl){
         });
       });
 
-      _broParseResult = {results, minClients, threshold, bonus};
-      renderBroUploadResult(results, minClients, threshold, bonus);
+      _broParseResult = {results, minClients, threshold, bonus, unmatchedRows};
+      renderBroUploadResult(results, minClients, threshold, bonus, unmatchedRows);
 
     } catch(err){
       console.error('Brokerage parse error:', err);
@@ -4789,7 +4799,8 @@ function parseBrokerageFile(inputEl){
   reader.readAsArrayBuffer(file);
 }
 
-function renderBroUploadResult(results, minClients, threshold, bonus){
+function renderBroUploadResult(results, minClients, threshold, bonus, unmatchedRows){
+  unmatchedRows = unmatchedRows || [];
   // Show results in a full-page overlay so renderIncentivePage() can never wipe it
   let overlay = document.getElementById('bro-result-overlay');
   if(!overlay){
@@ -4830,8 +4841,32 @@ function renderBroUploadResult(results, minClients, threshold, bonus){
     </tr>`;
   });
 
-  html += `</tbody></table></div>
-    <div style="display:flex;gap:10px;margin-top:16px">
+  html += `</tbody></table></div>`;
+
+  if(unmatchedRows.length){
+    html += `<div style="margin-top:16px;background:var(--red-bg,#FEF2F2);border:1px solid #F09595;border-radius:8px;padding:12px 14px">
+      <div style="font-weight:700;font-size:13px;color:var(--red-text,#B91C1C);margin-bottom:2px">⚠ ${unmatchedRows.length} client${unmatchedRows.length>1?'s':''} could not be matched to any RM — not counted anywhere</div>
+      <div style="font-size:11.5px;color:var(--red-text,#B91C1C);opacity:.85;margin-bottom:8px">Usually a brand-new client whose code isn't in the CRM's Equity Client list yet, or the code/RM in CRM doesn't match this file. Fix in the CRM, then re-upload this file.</div>
+      <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
+      <table style="font-size:12px;width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="padding:5px 8px;text-align:left">Code</th>
+          <th style="padding:5px 8px;text-align:left">Client Name</th>
+          <th style="padding:5px 8px;text-align:right">Brokerage (₹)</th>
+          <th style="padding:5px 8px;text-align:left">Reason</th>
+        </tr></thead><tbody>`;
+    unmatchedRows.forEach(u => {
+      html += `<tr style="border-top:1px solid #F0C6C6">
+        <td style="padding:5px 8px">${escapeHtml(u.code||'—')}</td>
+        <td style="padding:5px 8px">${escapeHtml(u.name||'—')}</td>
+        <td style="padding:5px 8px;text-align:right">${Number(u.bro||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td style="padding:5px 8px">${escapeHtml(u.reason||'')}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
+
+  html += `<div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn" style="flex:0 0 130px;padding:12px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db" onclick="cancelBrokerageUpload()">✖ Cancel</button>
       <button class="btn btn-primary" style="flex:1;padding:12px" onclick="applyBroClientIncentive()">✅ Apply to Selected Month's Incentive Data</button>
     </div>
@@ -4842,7 +4877,8 @@ function renderBroUploadResult(results, minClients, threshold, bonus){
   const inlineDiv = document.getElementById('bro-upload-result');
   if(inlineDiv){
     const qualCount = results.filter(r=>r.eligible && r.empName).length;
-    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ File parsed — ${results.length} RMs found, ${qualCount} qualify for bonus. <a href="#" onclick="renderBroUploadResult(window._broParseResult.results,window._broParseResult.minClients,window._broParseResult.threshold,window._broParseResult.bonus);return false" style="color:var(--accent)">View results</a></p>`;
+    const unmWarn = unmatchedRows.length ? ` <span style="color:var(--red-text,#B91C1C)">⚠ ${unmatchedRows.length} client${unmatchedRows.length>1?'s':''} unmatched</span>` : '';
+    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ File parsed — ${results.length} RMs found, ${qualCount} qualify for bonus.${unmWarn} <a href="#" onclick="renderBroUploadResult(window._broParseResult.results,window._broParseResult.minClients,window._broParseResult.threshold,window._broParseResult.bonus,window._broParseResult.unmatchedRows);return false" style="color:var(--accent)">View results</a></p>`;
   }
   // Store on window so the "View results" link can re-open
   window._broParseResult = _broParseResult;
