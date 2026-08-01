@@ -5220,31 +5220,55 @@ function showClientBrokerageHistory(scopeEmpName){
   const mLabel = m => new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
   const inr2 = n => Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  // RM pill colors — same fixed premium palette used elsewhere in the CRM,
-  // so an RM's color is consistent across screens.
-  const rmFixed={'ROHIT':'#4338CA','RIYA':'#BE185D','RAJU':'#9F1239','BHARAT':'#047857','KHOKHAN':'#0F766E','PUJA':'#0369A1','KOMAL':'#7E22CE','MEGHA':'#B45309','ANJALI':'#475569'};
-  const rmFallback=['#334155','#1E4620','#4C1D95','#831843','#155E75','#7C2D12','#365314','#5B21B6','#134E4A','#701A75'];
+  // RM pill colors — light "watercolor" pastel palette: soft tinted
+  // background + a matching soft-toned text color (no solid dark fills).
+  const rmPastel={
+    'ROHIT':{bg:'#E6E9FC',text:'#5B5FC7'},
+    'RIYA':{bg:'#FBE3EE',text:'#C2578A'},
+    'RAJU':{bg:'#FBE4E6',text:'#B85C6B'},
+    'BHARAT':{bg:'#E1F5EC',text:'#4C9A78'},
+    'KHOKHAN':{bg:'#DFF5F2',text:'#3E9A8F'},
+    'PUJA':{bg:'#E1EFFB',text:'#4E85B5'},
+    'KOMAL':{bg:'#F1E7FB',text:'#9868C4'},
+    'MEGHA':{bg:'#FBEEDC',text:'#C4923F'},
+    'ANJALI':{bg:'#EBEEF2',text:'#7C8798'}
+  };
+  const rmPastelFallback=[
+    {bg:'#E9ECF2',text:'#6B7A94'},{bg:'#E2F0E4',text:'#5A9067'},{bg:'#EDE6F9',text:'#8B6FC7'},
+    {bg:'#FBE6EE',text:'#C06B93'},{bg:'#DFF1F5',text:'#4E93A8'},{bg:'#FBEBDF',text:'#C08050'},
+    {bg:'#EAF3DE',text:'#7A9C4C'},{bg:'#EFE5F9',text:'#8865BD'},{bg:'#DDF0EC',text:'#3F9885'},
+    {bg:'#F5E4EF',text:'#B0619B'}
+  ];
   const rmColorCache={};
   const rmColorFor = name=>{
     const key=String(name||'—').trim().toUpperCase();
     if(!rmColorCache[key]){
-      if(rmFixed[key]) rmColorCache[key]=rmFixed[key];
-      else{ let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0; rmColorCache[key]=rmFallback[h%rmFallback.length]; }
+      if(rmPastel[key]) rmColorCache[key]=rmPastel[key];
+      else{ let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0; rmColorCache[key]=rmPastelFallback[h%rmPastelFallback.length]; }
     }
     return rmColorCache[key];
   };
-  const rmPill = name => name
-    ? '<span style="display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:'+rmColorFor(name)+'">'+escapeHtml(name)+'</span>'
-    : '';
-  // Brokerage cell: amounts over ₹100 get a green highlight so they pop
-  // out at a glance; smaller/blank amounts stay neutral.
+  const rmPill = name => {
+    if(!name) return '';
+    const c = rmColorFor(name);
+    return '<span style="display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:'+c.text+';background:'+c.bg+'">'+escapeHtml(name)+'</span>';
+  };
+  // Excel gets the exact same pastel per RM (used in the export's RM column)
+  const rmColorForExport = name=>{ const c=rmColorFor(name); return {bg:'FF'+c.bg.replace('#',''), font:'FF'+c.text.replace('#','')}; };
+
+  // Brokerage cell: amounts over ₹100 get a light watercolor-green
+  // highlight so they pop out at a glance; smaller/blank amounts stay neutral.
   const GREEN_THRESHOLD = 100;
+  const GREEN_BG = '#E4F7EC', GREEN_TEXT = '#4C9A78';
   const amtCell = (v, extraStyle) => {
     const n = Number(v)||0;
     if(!n) return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text3)'+(extraStyle||'')+'">—</td>';
     const hot = n>GREEN_THRESHOLD;
-    return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(hot?';background:#DCFCE7;color:#15803D;font-weight:700':'')+(extraStyle||'')+'">'+inr2(n)+'</td>';
+    return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(hot?';background:'+GREEN_BG+';color:'+GREEN_TEXT+';font-weight:700':'')+(extraStyle||'')+'">'+inr2(n)+'</td>';
   };
+  // Same threshold+colors for the Excel export (money columns)
+  const posGreenPastel = v=>{ const n=Number(v)||0; return n>GREEN_THRESHOLD ? {bg:'FF'+GREEN_BG.replace('#',''), font:'FF'+GREEN_TEXT.replace('#','')} : null; };
+
 
   const rmFilterHtml = scopeEmpName ? '' :
     '<select id="bro-hist-rm" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
@@ -5456,13 +5480,13 @@ function showClientBrokerageHistory(scopeEmpName){
 
   document.getElementById('bro-hist-export').onclick = function(){
     const scopeLabel = scopeEmpName ? scopeEmpName : ((!scopeEmpName && document.getElementById('bro-hist-rm').value) || 'All RMs');
-    const posGreen = v=>{ const n=Number(v)||0; return n>0?{bg:'FFC6EFCE', font:'FF006100'}:null; };
+    const rmCellColor = raw => raw ? rmColorForExport(raw) : null;
     let cols, title, fname;
     if(lastRmTotalOn){
-      cols = [{header:'RM', width:16}];
-      if(!lastExportMonthSel) allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true}));
-      else cols.push({header:'BROKERAGE (₹) — '+mLabel(lastExportMonthSel).toUpperCase(), width:18, money:true});
-      cols.push({header:'TOTAL', width:15, money:true, color:posGreen});
+      cols = [{header:'RM', width:16, color:rmCellColor}];
+      if(!lastExportMonthSel) allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true, color:posGreenPastel}));
+      else cols.push({header:'BROKERAGE (₹) — '+mLabel(lastExportMonthSel).toUpperCase(), width:18, money:true, color:posGreenPastel});
+      cols.push({header:'TOTAL', width:15, money:true, color:posGreenPastel});
       cols.push({header:'CLIENTS', width:10});
       title = 'D N Investment — RM-wise Brokerage Total'+(lastExportMonthSel?' · '+mLabel(lastExportMonthSel):'');
       fname = 'DN_RM_Brokerage_Total'+(lastExportMonthSel?'_'+lastExportMonthSel:'')+'.xlsx';
@@ -5471,9 +5495,9 @@ function showClientBrokerageHistory(scopeEmpName){
         {header:'CODE', width:14},
         {header:'CLIENT NAME', width:26}
       ];
-      if(!scopeEmpName) cols.push({header:'RM', width:12});
-      allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true}));
-      cols.push({header:'TOTAL', width:15, money:true, color:posGreen});
+      if(!scopeEmpName) cols.push({header:'RM', width:12, color:rmCellColor});
+      allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true, color:posGreenPastel}));
+      cols.push({header:'TOTAL', width:15, money:true, color:posGreenPastel});
       title = 'D N Investment — Client Brokerage History · '+scopeLabel;
       fname = 'DN_Client_Brokerage_History_'+(scopeEmpName||'AllRMs').replace(/\s+/g,'_')+'.xlsx';
     } else {
@@ -5481,8 +5505,8 @@ function showClientBrokerageHistory(scopeEmpName){
         {header:'CODE', width:14},
         {header:'CLIENT NAME', width:26}
       ];
-      if(!scopeEmpName) cols.push({header:'RM', width:12});
-      cols.push({header:'BROKERAGE (₹) — '+mLabel(lastExportMonthSel).toUpperCase(), width:18, money:true, color:posGreen});
+      if(!scopeEmpName) cols.push({header:'RM', width:12, color:rmCellColor});
+      cols.push({header:'BROKERAGE (₹) — '+mLabel(lastExportMonthSel).toUpperCase(), width:18, money:true, color:posGreenPastel});
       title = 'D N Investment — Client Brokerage · '+mLabel(lastExportMonthSel)+' · '+scopeLabel;
       fname = 'DN_Client_Brokerage_'+lastExportMonthSel+'_'+(scopeEmpName||'AllRMs').replace(/\s+/g,'_')+'.xlsx';
     }
