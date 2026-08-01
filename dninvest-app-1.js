@@ -2916,10 +2916,12 @@ function renderEqActivityTrend(activeEq){
 
   const cardClick = isAdmin ? (rmFilter ? `showEqActivityHistory('${escapeHtml(rmFilter)}')` : 'showEqActivityRmSplit()') : 'showEqActivityHistory()';
   const cardTitle = isAdmin ? (rmFilter ? `Click for ${rmFilter}'s date-wise history` : 'Click for RM-wise breakdown') : 'Click for date-wise history';
+  const badImportCount = isAdmin ? findEqBadImportCandidates().length : 0;
   const footerNote = isAdmin
     ? (rmFilter
         ? `📅 ${fmtDate(td)} · showing <b>${escapeHtml(rmFilter)}</b> only · click card for day-by-day history · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showEqActivityRmSplit()">all-RM split</span>`
         : `📅 ${fmtDate(td)} · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showEqActivityHistory()">date-wise history</span>`)
+      + (badImportCount ? ` · <span style="text-decoration:underline;cursor:pointer;color:#dc2626;font-weight:700" onclick="event.stopPropagation();openEqBadImportReview()">🧹 ${badImportCount} suspicious today — review</span>` : '')
     : `📅 ${fmtDate(td)} · click card for full date-wise history`;
 
   // "Today's Wins/Loss" — always visible, shows both gains and losses
@@ -2962,6 +2964,7 @@ function renderEqActivityTrend(activeEq){
         <div class="dash-stat-lbl" style="font-size:.58rem;color:#92400e">${icon} TODAY'S WIN/LOSS</div>
         <div style="font-size:1.3rem;font-weight:900;line-height:1.2">${mainNum}</div>
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
+        ${isAdmin && mfWins>0 ? `<div style="margin-top:4px"><span style="font-size:.56rem;text-decoration:underline;color:#92400e" onclick="event.stopPropagation();fixWrongMfNewTags()" title="Purane clients ka galat MF New tag hataye">🧹 Fix wrong MF New tags</span></div>` : ''}
       </div>`;
 
   el.innerHTML = `
@@ -3050,6 +3053,35 @@ function showEqActivityRmSplit(){
 
 // Called from the RM-wise split table — sets the dashboard card's RM filter
 // to the clicked RM and scrolls back to it.
+// Admin one-click fix: removes the wrong "MF New" tag from clients that were
+// already existing before today (their aum_detail simply hadn't been
+// imported before — they were NOT genuinely new investors). Only touches
+// records flagged as changed TODAY whose client record itself was not
+// created today. Triggered from the "🧹 Fix wrong MF New tags" link on the
+// Win/Loss dashboard card — no DevTools needed.
+async function fixWrongMfNewTags(){
+  if(CU.role!=='admin'){ toast('Admin only','error'); return; }
+  if(!confirm('Purane MF clients ka galat "MF New" tag hatana hai? (Genuinely naye clients touch nahi honge)')) return;
+  const td = today();
+  const mf = DB.get('mf_clients')||[];
+  let fixed = 0;
+  const updated = mf.map(c=>{
+    if(c.invested_change_date===td && !(parseFloat(c.prev_invested)||0) && c.created !== td){
+      fixed++;
+      const clean = {...c};
+      delete clean.invested_change_amt;
+      delete clean.invested_change_date;
+      delete clean.prev_invested;
+      return clean;
+    }
+    return c;
+  });
+  if(!fixed){ toast('Koi galat MF New tag nahi mila','info'); return; }
+  await DB.set('mf_clients', updated);
+  toast(`✅ ${fixed} client(s) fix ho gaye — dashboard refresh ho raha hai`,'success');
+  setTimeout(()=>location.reload(), 1200);
+}
+
 // Shows which clients changed Active/Inactive status today — called from Win/Loss box click
 function showTodaysWinLossList(){
   const td = today();
@@ -11534,6 +11566,70 @@ async function mergeMfDupsSelected(){
 }
 
 // ══════════════════════════════════════════
+// EQUITY BAD-IMPORT REVIEW — review-based (admin only)
+// Finds equity clients that look like they came from a wrongly-uploaded
+// MF AUM file (Client ID/Client Name/AUM columns get auto-mapped to
+// Code/Name/Asset Value, and since the MF file has no Last Trade Date,
+// every unmatched row becomes a brand-new "Active" equity client).
+// Signal used: added TODAY, with NO last_trade_date at all — a real
+// broker equity file always carries a Last Trade Date, so this is a very
+// safe marker. Nothing is deleted without the admin reviewing & confirming.
+// ══════════════════════════════════════════
+function findEqBadImportCandidates(){
+  const td = today();
+  const arr = DB.get('eq_clients')||[];
+  return arr.filter(c => c.created===td && !c.last_trade_date);
+}
+function openEqBadImportReview(){
+  if(CU.role!=='admin'){ toast('This tool is for admin only','error'); return; }
+  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cands = findEqBadImportCandidates();
+  const ov=document.createElement('div');
+  ov.id='eqBadImportOverlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
+  let body;
+  if(!cands.length){
+    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Kuch Nahi Mila</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">Aaj koi aisa equity client nahi mila jiska Last Trade Date blank ho.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'eqBadImportOverlay\').remove()">Band Karein</button></div></div>';
+  } else {
+    const rows = cands.map(c=>
+      '<tr>'
+      +'<td style="padding:5px 8px;border-top:1px solid #eee"><input type="checkbox" class="eqbad-chk" data-id="'+esc(c.id)+'" checked></td>'
+      +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.name||'—')+'</td>'
+      +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.code||'—')+'</td>'
+      +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.mobile||'—')+'</td>'
+      +'<td style="padding:5px 8px;border-top:1px solid #eee;text-align:right">'+(c.asset_value?'₹'+fmtNum(c.asset_value):'—')+'</td>'
+      +'<td style="padding:5px 8px;border-top:1px solid #eee">'+esc(c.rm||'—')+'</td>'
+      +'</tr>'
+    ).join('');
+    body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-weight:800;font-size:1.05rem">🧹 Aaj Ke Suspicious Equity Additions — Review</div>'
+      +'<button onclick="document.getElementById(\'eqBadImportOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
+      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">⚠️ Ye '+cands.length+' equity clients aaj add hue par inka Last Trade Date bilkul blank hai — real broker file me hamesha Last Trade Date hota hai, isliye ye galat file (jaise MF AUM file) se aaye lagte hain. Jinko delete nahi karna wo uncheck kar dijiye, phir neeche confirm kariye.</div>'
+      +'<div style="padding:16px 18px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:.8rem">'
+      +'<tr style="background:#f1f5f9;font-size:.72rem;color:#475569"><td style="padding:5px 8px"><input type="checkbox" id="eqbad-all" checked onchange="document.querySelectorAll(\'.eqbad-chk\').forEach(x=>x.checked=this.checked)"></td><td style="padding:5px 8px">NAAM</td><td style="padding:5px 8px">CODE</td><td style="padding:5px 8px">MOBILE</td><td style="padding:5px 8px;text-align:right">ASSET VALUE</td><td style="padding:5px 8px">RM</td></tr>'
+      +rows+'</table>'
+      +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">'
+      +'<button class="btn btn-outline" onclick="document.getElementById(\'eqBadImportOverlay\').remove()">Cancel</button>'
+      +'<button class="btn btn-teal" style="background:#dc2626;border-color:#dc2626" onclick="deleteEqBadImportSelected()">🗑️ Delete Selected</button></div></div>';
+  }
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+async function deleteEqBadImportSelected(){
+  const ids=[...document.querySelectorAll('.eqbad-chk')].filter(x=>x.checked).map(x=>x.getAttribute('data-id'));
+  if(!ids.length){ toast('Koi select nahi kiya','error'); return; }
+  if(!confirm('Confirm: '+ids.length+' equity client(s) permanently delete honge. Ye undo nahi ho sakta. Proceed?')) return;
+  try{
+    await DB.deleteClientsBulk('eq_clients', ids);
+    const ovx=document.getElementById('eqBadImportOverlay'); if(ovx) ovx.remove();
+    toast('✅ '+ids.length+' client(s) delete ho gaye','success');
+    renderEqTable(); refreshDash(); updateBadges();
+  }catch(e){ toast('Delete failed: '+(e&&e.message||e),'error'); }
+}
+
+// ══════════════════════════════════════════
 // EQUITY IMPORT (Asset Value + Last Trade Date)
 // ══════════════════════════════════════════
 var eqImportData = null;
@@ -11948,6 +12044,21 @@ function handleEqFile(input){
     // Recognised by its signature header columns (Clt Code + Risk Val etc).
     // If found, import risk metrics instead of the normal client sheet.
     if(tryImportRiskFile(rows)) return;
+
+    // ── GUARD: reject an MF AUM/SIP file dropped here by mistake ───────────
+    // The MF "AUM By Client" report has "Client Name"+"Client ID"+"AUM"
+    // columns, which auto-detect (below) would otherwise happily map onto
+    // Name/Code/Asset Value — and since that file has NO Last Trade Date,
+    // every unmatched Client ID gets added as a brand-new "Active" equity
+    // client. Block it outright instead, with a clear message.
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const hdrRow = (rows[i]||[]).map(h=>normHdr(h));
+      const hasMfSignature = hdrRow.some(h=>['invamt','investedamt','xirr','divpaid','divreinv','abrsrtn','absrtn'].includes(h));
+      if(hasMfSignature){
+        toast('⚠️ Ye MF AUM/SIP file lagti hai (Inv. Amt / XIRR / Div. Paid column mili) — Equity Import me nahi, MUTUAL FUND → Import Excel me upload kariye.','error');
+        return;
+      }
+    }
 
     // Find header row - look for a row containing recognizable column names
     let hdrIdx = -1, colMap = {};
