@@ -3085,7 +3085,18 @@ function showTodaysWinLossList(){
       'Trade'
     ]);
 
-  const rows = [...editRows, ...tradeRows];
+  // MF new investors added today (mirrors the mfWins count shown on the card)
+  const mfAll = (typeof getMyMfClients === 'function') ? getMyMfClients() : [];
+  const mfNewRows = mfAll
+    .filter(c => c.invested_change_amt > 0 && c.invested_change_date===td && !(parseFloat(c.prev_invested)||0))
+    .map(c=>[
+      escapeHtml(c.name||'—'),
+      c.rm||'—',
+      `<span style="color:var(--green);font-weight:700">▲ MF New (₹${fmtNum(c.invested_change_amt)})</span>`,
+      'New investor'
+    ]);
+
+  const rows = [...editRows, ...tradeRows, ...mfNewRows];
   if(!rows.length){
     toast('No status changes found today — check Activity Log for details','info');
     return;
