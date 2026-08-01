@@ -5252,11 +5252,12 @@ function showClientBrokerageHistory(scopeEmpName){
     +'</div></div>';
 
   let sortCol = 'total', sortDir = 'desc'; // persists across filter/search re-renders while the modal is open
-  let lastExportRows = [], lastExportTotalRow = null, lastExportMonthSel = '';
+  let lastExportRows = [], lastExportTotalRow = null, lastExportMonthSel = '', lastRmTotalOn = false;
 
   const renderTable = function(){
     const rmFilter = scopeEmpName ? '' : (document.getElementById('bro-hist-rm').value || '');
     const rmTotalOn = !scopeEmpName && !rmFilter && document.getElementById('bro-hist-rmtotal').checked;
+    lastRmTotalOn = rmTotalOn;
     const clientMap = buildClientMap(rmFilter);
     const q = (document.getElementById('bro-hist-search').value||'').trim().toLowerCase();
     const monthSel = document.getElementById('bro-hist-month').value || '';
@@ -5266,6 +5267,21 @@ function showClientBrokerageHistory(scopeEmpName){
       return String(c.code||'').toLowerCase().includes(q) || String(c.name||'').toLowerCase().includes(q);
     });
     clients.forEach(c=>{ c.__total = allMonths.reduce((s,m)=>s+(c.byMonth[m]||0),0); });
+
+    // RM-wise Total: collapse straight to one row per RM (sum across that
+    // RM's clients — respecting the current search) — no client rows at
+    // all, so there's nothing to scroll through, just each RM's total.
+    if(rmTotalOn){
+      const byRm = {};
+      clients.forEach(c=>{
+        const k = c.rm || '—';
+        if(!byRm[k]) byRm[k] = {rm:k, byMonth:{}, __total:0, __n:0};
+        allMonths.forEach(m=>{ byRm[k].byMonth[m] = (byRm[k].byMonth[m]||0) + (c.byMonth[m]||0); });
+        byRm[k].__total += c.__total;
+        byRm[k].__n += 1;
+      });
+      clients = Object.values(byRm);
+    }
 
     // Generic sort: 'code'/'name'/'rm' → string compare; a month key or
     // 'total'/'amount' → numeric compare. dir flips the direction.
@@ -5285,18 +5301,6 @@ function showClientBrokerageHistory(scopeEmpName){
       return sortDir==='asc' ? cmp : -cmp;
     });
 
-    // RM-wise Total: regroup rows so every RM's clients sit together
-    // (alphabetical by RM), keeping each group's internal order. A subtotal
-    // row is inserted after each group below. Re-applied after any further
-    // sort (e.g. the single-month branch re-sorts its own filtered list).
-    const groupByRm = list => {
-      if(!rmTotalOn) return list;
-      const byRm = {};
-      list.forEach(c=>{ const k=c.rm||'—'; (byRm[k]=byRm[k]||[]).push(c); });
-      return Object.keys(byRm).sort((a,b)=>a.localeCompare(b)).flatMap(k=>byRm[k]);
-    };
-    clients = groupByRm(clients);
-
     const arrow = col => sortCol===col ? (sortDir==='asc'?' ▲':' ▼') : '';
     const th = (col, label, align) => '<th data-sort-col="'+col+'" style="padding:8px 10px;text-align:'+align+';position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase;white-space:nowrap;cursor:pointer;user-select:none">'+label+arrow(col)+'</th>';
 
@@ -5304,59 +5308,52 @@ function showClientBrokerageHistory(scopeEmpName){
     if(!monthSel){
       // Matrix: one column per month, ascending chronological
       theadHtml = '<thead><tr style="background:var(--surface2)">'
-        +'<th data-sort-col="code" style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase;cursor:pointer;user-select:none">Code'+arrow('code')+'</th>'
-        + th('name','Client Name','left')
-        +(scopeEmpName?'':th('rm','RM','left'))
+        +(rmTotalOn
+          ? '<th data-sort-col="rm" style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase;cursor:pointer;user-select:none">RM'+arrow('rm')+'</th>'
+          : '<th data-sort-col="code" style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase;cursor:pointer;user-select:none">Code'+arrow('code')+'</th>'
+            + th('name','Client Name','left')
+            +(scopeEmpName?'':th('rm','RM','left')))
         + allMonths.map(m=>th(m, mLabel(m), 'right')).join('')
         + th('total','Total','right')
+        +(rmTotalOn ? '<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">Clients</th>' : '')
         +'</tr></thead>';
-      tbodyHtml = '<tbody>' + clients.map((c,i)=>{
-        const row = '<tr style="border-bottom:1px solid var(--border)">'
-          +'<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+escapeHtml(c.code||'—')+'</td>'
-          +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
-          +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
+      tbodyHtml = '<tbody>' + clients.map(c=>{
+        return '<tr style="border-bottom:1px solid var(--border)">'
+          +(rmTotalOn
+            ? '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff);font-weight:600">'+escapeHtml(c.rm||'—')+'</td>'
+            : '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff)">'+escapeHtml(c.code||'—')+'</td>'
+              +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
+              +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>'))
           + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums'+(c.byMonth[m]?'':';color:var(--text3)')+'">'+(c.byMonth[m]?inr2(c.byMonth[m]):'—')+'</td>').join('')
           +'<td style="padding:7px 10px;text-align:right;font-weight:700">'+inr2(c.__total)+'</td>'
+          +(rmTotalOn ? '<td style="padding:7px 10px;text-align:right;color:var(--text3)">'+c.__n+'</td>' : '')
           +'</tr>';
-        // End of an RM group (next row is a different RM, or last row) → subtotal
-        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
-          const grpItems = clients.filter(x=>x.rm===c.rm);
-          const grpMonthTot = {}; allMonths.forEach(m=>{ grpMonthTot[m]=grpItems.reduce((s,x)=>s+(x.byMonth[m]||0),0); });
-          const grpTotal = grpItems.reduce((s,x)=>s+x.__total,0);
-          return row + '<tr style="background:#eef2ff;font-weight:700;border-bottom:2px solid var(--border)">'
-            +'<td style="padding:7px 10px;position:sticky;left:0;background:#eef2ff" colspan="'+(scopeEmpName?2:3)+'">Subtotal — '+escapeHtml(c.rm||'—')+'</td>'
-            + allMonths.map(m=>'<td style="padding:7px 10px;text-align:right">'+inr2(grpMonthTot[m])+'</td>').join('')
-            +'<td style="padding:7px 10px;text-align:right">'+inr2(grpTotal)+'</td>'
-            +'</tr>';
-        }
-        return row;
       }).join('') + '</tbody>';
-      if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(3+allMonths.length+(scopeEmpName?0:1))+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found</td></tr></tbody>';
-      // Month-wise TOTAL row (sum of the clients currently shown, per month)
+      const leadCols = rmTotalOn ? 1 : (3+(scopeEmpName?0:0)); // RM-only: 1 lead col; else code+name(+rm handled below)
+      const totalCols = rmTotalOn ? (1+allMonths.length+1+1) : (3+allMonths.length+(scopeEmpName?0:1));
+      if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+totalCols+'" style="padding:18px;text-align:center;color:var(--text3)">No '+(rmTotalOn?'data':'clients')+' found</td></tr></tbody>';
+      // Month-wise TOTAL row (sum of the rows currently shown, per month)
       const monthTotals = {};
       allMonths.forEach(m=>{ monthTotals[m] = clients.reduce((s,c)=>s+(c.byMonth[m]||0),0); });
       const grandTotal = clients.reduce((s,c)=>s+c.__total,0);
+      const totalClientN = rmTotalOn ? clients.reduce((s,c)=>s+c.__n,0) : 0;
       tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2)">'
         +'<td style="padding:8px 10px;font-weight:700;position:sticky;left:0;bottom:0;z-index:2;background:var(--surface2);border-top:2px solid var(--border)">TOTAL</td>'
-        +'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'
-        +(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>')
+        +(rmTotalOn ? '' : '<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'+(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'))
         + allMonths.map(m=>'<td style="padding:8px 10px;text-align:right;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthTotals[m])+'</td>').join('')
         +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(grandTotal)+'</td>'
+        +(rmTotalOn ? '<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+totalClientN+'</td>' : '')
         +'</tr></tfoot>' : '';
-      lastExportRows = [];
-      clients.forEach((c,i)=>{
-        lastExportRows.push([c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]));
-        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
-          const grpItems = clients.filter(x=>x.rm===c.rm);
-          const grpMonthTot = {}; allMonths.forEach(m=>{ grpMonthTot[m]=grpItems.reduce((s,x)=>s+(x.byMonth[m]||0),0); });
-          const grpTotal = grpItems.reduce((s,x)=>s+x.__total,0);
-          lastExportRows.push(['Subtotal — '+(c.rm||'—'),''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>grpMonthTot[m])).concat([grpTotal]));
-        }
-      });
-      lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal]);
+      if(rmTotalOn){
+        lastExportRows = clients.map(c=> [c.rm||''].concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total, c.__n]) );
+        lastExportTotalRow = ['TOTAL'].concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal, totalClientN]);
+      } else {
+        lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]) );
+        lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal]);
+      }
       lastExportMonthSel = '';
     } else {
-      // Single month: simple list
+      // Single month: simple list (or RM-only summary when rmTotalOn)
       clients = clients.filter(c=>c.byMonth[monthSel]);
       if(sortCol==='total') sortCol='amount'; // 'total' column doesn't exist in this mode
       clients.sort((a,b)=>{
@@ -5364,52 +5361,48 @@ function showClientBrokerageHistory(scopeEmpName){
         let cmp = typeof va==='string' ? va.localeCompare(vb) : va-vb;
         return sortDir==='asc' ? cmp : -cmp;
       });
-      clients = groupByRm(clients);
       theadHtml = '<thead><tr style="background:var(--surface2)">'
-        + th('code','Code','left')
-        + th('name','Client Name','left')
-        +(scopeEmpName?'':th('rm','RM','left'))
+        +(rmTotalOn
+          ? th('rm','RM','left')
+          : th('code','Code','left') + th('name','Client Name','left') + (scopeEmpName?'':th('rm','RM','left')))
         + th('amount','Brokerage (₹) — '+mLabel(monthSel),'right')
+        +(rmTotalOn ? '<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">Clients</th>' : '')
         +'</tr></thead>';
-      tbodyHtml = '<tbody>' + clients.map((c,i)=>{
-        const row = '<tr style="border-bottom:1px solid var(--border)">'
-          +'<td style="padding:7px 10px">'+escapeHtml(c.code||'—')+'</td>'
-          +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
-          +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>')
-          +'<td style="padding:7px 10px;text-align:right;font-weight:600">'+inr2(c.byMonth[monthSel])+'</td>'
-          +'</tr>';
-        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
-          const grpItems = clients.filter(x=>x.rm===c.rm);
-          const grpTotal = grpItems.reduce((s,x)=>s+(x.byMonth[monthSel]||0),0);
-          return row + '<tr style="background:#eef2ff;font-weight:700;border-bottom:2px solid var(--border)">'
-            +'<td style="padding:7px 10px" colspan="'+(scopeEmpName?2:3)+'">Subtotal — '+escapeHtml(c.rm||'—')+'</td>'
-            +'<td style="padding:7px 10px;text-align:right">'+inr2(grpTotal)+'</td>'
-            +'</tr>';
-        }
-        return row;
-      }).join('') + '</tbody>';
-      if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+(scopeEmpName?3:4)+'" style="padding:18px;text-align:center;color:var(--text3)">No clients found for '+mLabel(monthSel)+'</td></tr></tbody>';
+      tbodyHtml = '<tbody>' + clients.map(c=>
+        '<tr style="border-bottom:1px solid var(--border)">'
+        +(rmTotalOn
+          ? '<td style="padding:7px 10px;font-weight:600">'+escapeHtml(c.rm||'—')+'</td>'
+          : '<td style="padding:7px 10px">'+escapeHtml(c.code||'—')+'</td>'
+            +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
+            +(scopeEmpName?'':'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(c.rm||'')+'</td>'))
+        +'<td style="padding:7px 10px;text-align:right;font-weight:600">'+inr2(c.byMonth[monthSel])+'</td>'
+        +(rmTotalOn ? '<td style="padding:7px 10px;text-align:right;color:var(--text3)">'+c.__n+'</td>' : '')
+        +'</tr>'
+      ).join('') + '</tbody>';
+      const totalCols2 = rmTotalOn ? 3 : (scopeEmpName?3:4);
+      if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+totalCols2+'" style="padding:18px;text-align:center;color:var(--text3)">No '+(rmTotalOn?'data':'clients')+' found for '+mLabel(monthSel)+'</td></tr></tbody>';
       const monthSum = clients.reduce((s,c)=>s+(c.byMonth[monthSel]||0),0);
+      const totalClientN2 = rmTotalOn ? clients.reduce((s,c)=>s+c.__n,0) : 0;
       tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2)">'
         +'<td style="padding:8px 10px;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">TOTAL</td>'
-        +'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'
-        +(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>')
+        +(rmTotalOn ? '' : '<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'+(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'))
         +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthSum)+'</td>'
+        +(rmTotalOn ? '<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+totalClientN2+'</td>' : '')
         +'</tr></tfoot>' : '';
-      lastExportRows = [];
-      clients.forEach((c,i)=>{
-        lastExportRows.push([c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat([c.byMonth[monthSel]||0]));
-        if(rmTotalOn && (i===clients.length-1 || clients[i+1].rm!==c.rm)){
-          const grpTotal = clients.filter(x=>x.rm===c.rm).reduce((s,x)=>s+(x.byMonth[monthSel]||0),0);
-          lastExportRows.push(['Subtotal — '+(c.rm||'—'),''].concat(scopeEmpName?[]:['']).concat([grpTotal]));
-        }
-      });
-      lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat([monthSum]);
+      if(rmTotalOn){
+        lastExportRows = clients.map(c=> [c.rm||''].concat([c.byMonth[monthSel]||0, c.__n]) );
+        lastExportTotalRow = ['TOTAL'].concat([monthSum, totalClientN2]);
+      } else {
+        lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat([c.byMonth[monthSel]||0]) );
+        lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat([monthSum]);
+      }
       lastExportMonthSel = monthSel;
     }
 
     document.getElementById('bro-hist-table').innerHTML = theadHtml + tbodyHtml + tfootHtml;
-    document.getElementById('bro-hist-count').textContent = clients.length+' client(s) shown';
+    document.getElementById('bro-hist-count').textContent = rmTotalOn
+      ? clients.length+' RM(s) shown'
+      : clients.length+' client(s) shown';
 
     // Wire up click-to-sort on every header cell just rendered
     document.querySelectorAll('#bro-hist-table th[data-sort-col]').forEach(el=>{
@@ -5432,7 +5425,15 @@ function showClientBrokerageHistory(scopeEmpName){
     const scopeLabel = scopeEmpName ? scopeEmpName : ((!scopeEmpName && document.getElementById('bro-hist-rm').value) || 'All RMs');
     const posGreen = v=>{ const n=Number(v)||0; return n>0?{bg:'FFC6EFCE', font:'FF006100'}:null; };
     let cols, title, fname;
-    if(!lastExportMonthSel){
+    if(lastRmTotalOn){
+      cols = [{header:'RM', width:16}];
+      if(!lastExportMonthSel) allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true}));
+      else cols.push({header:'BROKERAGE (₹) — '+mLabel(lastExportMonthSel).toUpperCase(), width:18, money:true});
+      cols.push({header:'TOTAL', width:15, money:true, color:posGreen});
+      cols.push({header:'CLIENTS', width:10});
+      title = 'D N Investment — RM-wise Brokerage Total'+(lastExportMonthSel?' · '+mLabel(lastExportMonthSel):'');
+      fname = 'DN_RM_Brokerage_Total'+(lastExportMonthSel?'_'+lastExportMonthSel:'')+'.xlsx';
+    } else if(!lastExportMonthSel){
       cols = [
         {header:'CODE', width:14},
         {header:'CLIENT NAME', width:26}
