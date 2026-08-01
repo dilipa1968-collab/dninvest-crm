@@ -874,7 +874,7 @@ input:focus, select:focus, textarea:focus{
           <div class="tbl-wrap"><div id="crm-sales-table"></div></div>
         </div>
         <div class="card admin-only" style="display:none;grid-column:1/-1">
-          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div>
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><div style="display:flex;gap:8px"><button onclick="showBroUnmatchedReport()" title="Clients that failed to match an RM in brokerage uploads" style="background:#B91C1C;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">⚠ Unmatched Clients</button><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div></div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
@@ -1428,6 +1428,12 @@ async function saveMfSip(d){ await DB.set('mfsip', d); }
 // The selected month comes from the #inc-month picker (defaults to current month).
 function getMfSipByMonth(){ return DB.get('mfsip_by_month', {}) || {}; }
 async function saveMfSipByMonth(d){ await DB.set('mfsip_by_month', d); }
+// Log of brokerage-upload rows that couldn't be matched to an RM, per month —
+// {month: [{code,name,bro,reason,assignedTo}, ...]}. assignedTo is null for
+// still-unresolved rows, or the employee name if the admin manually assigned
+// it via the dropdown at Apply time. Overwritten per-month on each Apply.
+function getBroUnmatchedLog(){ return DB.get('bro_unmatched_log', {}) || {}; }
+async function saveBroUnmatchedLog(d){ await DB.set('bro_unmatched_log', d); }
 
 // ─── CRM SALES DATA (pushed from CRM: MF Transactions/Demat → RM Summary → Push to HR) ───
 // CRM writes crm_data/rm_sales_summary = {month, rows:[{rm,mf_sales,sip_amount,demat_count,...}], generated_at, by}
@@ -4940,6 +4946,92 @@ async function clearBroForMonth(){
   alert('✅ Cleared applied brokerage for '+mLabel+'.');
 }
 
+// Admin report: every brokerage-upload row (across all months) that couldn't
+// be auto-matched to an RM — whether still unresolved or manually assigned
+// via the dropdown at Apply time. Filterable by Client Code and by status.
+function showBroUnmatchedReport(){
+  const logAll = getBroUnmatchedLog();
+  let rows = [];
+  Object.keys(logAll).sort().reverse().forEach(m=>{
+    (logAll[m]||[]).forEach(u=> rows.push({...u, month:m}));
+  });
+
+  let overlay = document.getElementById('bro-unm-report-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'bro-unm-report-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    document.body.appendChild(overlay);
+  }
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+
+  const mLabel = m => new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+
+  overlay.innerHTML = '<div style="background:var(--bg,#F7F6F3);border-radius:14px;padding:0;width:min(760px,95vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden" onclick="event.stopPropagation()">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 22px;flex-shrink:0;background:linear-gradient(135deg,var(--navy,#1a2744) 0%,var(--navy3,#2d4a8a) 100%)">'
+    +'<div style="font-weight:700;font-size:15.5px;color:#fff">⚠ Unmatched Brokerage Clients — all months</div>'
+    +'<button onclick="document.getElementById(\'bro-unm-report-overlay\').remove()" style="background:rgba(255,255,255,.12);border:none;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;color:#fff;line-height:1">✕</button>'
+    +'</div>'
+    +'<div style="padding:16px 22px 18px;overflow-y:auto">'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<input id="bro-unm-report-search" type="text" placeholder="Filter by Client Code…" style="flex:1;min-width:160px;font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    +'<select id="bro-unm-report-status" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    +'<option value="">All statuses</option><option value="unresolved">Unresolved only</option><option value="assigned">Manually assigned only</option>'
+    +'</select></div>'
+    +'<div style="overflow-x:auto;overflow-y:auto;max-height:52vh;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface,#fff)">'
+    +'<table style="font-size:12.5px;width:100%;border-collapse:collapse">'
+    +'<thead><tr style="background:var(--surface2)">'
+    +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Month</th>'
+    +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Code</th>'
+    +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Client Name</th>'
+    +'<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Brokerage (₹)</th>'
+    +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Status</th>'
+    +'<th style="padding:8px 10px;text-align:left;position:sticky;top:0;background:var(--surface2);font-size:11px;color:var(--text2);text-transform:uppercase">Reason</th>'
+    +'</tr></thead><tbody id="bro-unm-report-rows"></tbody></table></div>'
+    +'<div id="bro-unm-report-count" style="font-size:12px;color:var(--text3);margin-top:8px"></div>'
+    +'</div></div>';
+
+  const renderRows = function(){
+    const q = (document.getElementById('bro-unm-report-search').value||'').trim().toLowerCase();
+    const statusFilter = document.getElementById('bro-unm-report-status').value;
+    let list = rows.filter(r=>{
+      if(q && !String(r.code||'').toLowerCase().includes(q)) return false;
+      if(statusFilter==='unresolved' && r.assignedTo) return false;
+      if(statusFilter==='assigned' && !r.assignedTo) return false;
+      return true;
+    });
+    let html = '';
+    list.forEach(r=>{
+      html += '<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:7px 10px;color:var(--text3)">'+mLabel(r.month)+'</td>'
+        +'<td style="padding:7px 10px">'+escapeHtml(r.code||'—')+'</td>'
+        +'<td style="padding:7px 10px">'+escapeHtml(r.name||'')+'</td>'
+        +'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums">'+Number(r.bro||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'
+        +'<td style="padding:7px 10px">'+(r.assignedTo
+          ? '<span style="display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;background:var(--green-bg);color:var(--green-text);font-weight:600;white-space:nowrap">→ '+escapeHtml(r.assignedTo)+'</span>'
+          : '<span style="display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;background:var(--red-bg,#FEF2F2);color:var(--red-text,#B91C1C);font-weight:600;white-space:nowrap">Unresolved</span>')
+        +'</td>'
+        +'<td style="padding:7px 10px;color:var(--text3)">'+escapeHtml(r.reason||'')+'</td>'
+        +'</tr>';
+    });
+    if(!html) html = '<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--text3)">No matching rows'+(rows.length?' for this filter':' — nothing unmatched on record')+'</td></tr>';
+    document.getElementById('bro-unm-report-rows').innerHTML = html;
+    document.getElementById('bro-unm-report-count').textContent = list.length+' of '+rows.length+' row(s)';
+  };
+
+  document.getElementById('bro-unm-report-search').oninput = renderRows;
+  document.getElementById('bro-unm-report-status').onchange = renderRows;
+  renderRows();
+
+  document.addEventListener('keydown', function escClose(e){
+    if(e.key==='Escape'){
+      const ov = document.getElementById('bro-unm-report-overlay');
+      if(ov) ov.remove();
+      document.removeEventListener('keydown', escClose);
+    }
+  });
+}
+
 function cancelBrokerageUpload(){
   const ov = document.getElementById('bro-result-overlay');
   if(ov) ov.remove();
@@ -5087,10 +5179,12 @@ async function applyBroClientIncentive(){
   // client-wise row list — before saving.
   const workingResults = results.map(r => ({...r, clients:(r.clients||[]).slice()}));
   const stillUnassigned = [];
+  const manuallyAssigned = [];
   (unmatchedRows||[]).forEach((u, idx) => {
     const sel = document.getElementById('bro-unm-assign-'+idx);
     const empName = sel ? sel.value : '';
     if(!empName){ stillUnassigned.push(u); return; }
+    manuallyAssigned.push({...u, assignedTo: empName});
     let entry = workingResults.find(r => r.empName === empName);
     if(!entry){
       entry = { rm: empName.toUpperCase(), empName, totalClients:0, eligibleClients:0, totalBrokerage:0, clients:[], eligible:false, bonus:0 };
@@ -5132,6 +5226,15 @@ async function applyBroClientIncentive(){
     all[month][r.empName].broClientRows     = (r.clients||[]).map(c=>({code:c.code, name:c.name, bro:Math.round(c.bro*100)/100, eligible:c.eligible}));
   });
   await saveMfSipByMonth(all);
+
+  // Persist this upload's unmatched-clients outcome (both still-unresolved
+  // and manually-assigned) so the admin can review it later via the
+  // "Unmatched Clients" report — independent of mfsip_by_month so it never
+  // pollutes the per-employee incentive rows.
+  const logAll = getBroUnmatchedLog();
+  logAll[month] = stillUnassigned.map(u => ({code:u.code, name:u.name, bro:u.bro, reason:u.reason, assignedTo:null}))
+    .concat(manuallyAssigned.map(u => ({code:u.code, name:u.name, bro:u.bro, reason:u.reason, assignedTo:u.assignedTo})));
+  await saveBroUnmatchedLog(logAll);
 
   // Close the popup overlay
   const overlay = document.getElementById('bro-result-overlay');
