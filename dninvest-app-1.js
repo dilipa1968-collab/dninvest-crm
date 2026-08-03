@@ -5994,7 +5994,7 @@ async function saveClient(){
   } else {
     rec={
       id: newId,
-      name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'),
+      name, mobile:_mobileVal, alt_mobile:gv2('f_alt_mobile'), pan:gv2('f_pan').toUpperCase(), email:gv2('f_email'), dob:gv2('f_dob'),
       client_id: gv2('f_client_id'),
       rm, status:gv2('f_status')||'Investor',
       is_minor: document.getElementById('f_minor')?.checked || false,
@@ -6019,7 +6019,7 @@ async function saveClient(){
       // Audit log - track changed fields
       const auditFields = seg==='equity'
         ? ['name','mobile','email','dob','rm','status','code','asset_value','revenue','last_trade_date','last_call_date','next_call','followup_status','remarks']
-        : ['name','mobile','email','rm','status','pan','client_id','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
+        : ['name','mobile','email','dob','rm','status','pan','client_id','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
       const changes = [];
       auditFields.forEach(f=>{
         const ov = old[f]===null||old[f]===undefined?'':String(old[f]);
