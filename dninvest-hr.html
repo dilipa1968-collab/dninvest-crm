@@ -5259,7 +5259,7 @@ function showClientBrokerageHistory(scopeEmpName){
   // Brokerage cell: amounts over ₹100 get a soft green text color so they
   // pop out at a glance; smaller/blank amounts stay neutral. No background fill.
   const GREEN_THRESHOLD = 100;
-  const GREEN_TEXT = '#5DA980';
+  const GREEN_TEXT = '#7BAE93';
   const amtCell = (v, extraStyle) => {
     const n = Number(v)||0;
     if(!n) return '<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text3)'+(extraStyle||'')+'">—</td>';
