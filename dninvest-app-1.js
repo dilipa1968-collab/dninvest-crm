@@ -1496,20 +1496,33 @@ function initApp(){
         });
       }
 
-      // Real-time listener for announcements (single object, not array)
-      fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
-        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
-          const newData = doc.data().data;
-          const existing = DB.get('announcement');
-          if(JSON.stringify(newData) !== JSON.stringify(existing)){
-            localStorage.setItem('dninvest_announcement', JSON.stringify(newData));
-            console.log('Real-time update: announcement');
-            if(getCurrentPageId()==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
-            else if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
-            checkAnnouncement();
+      // Real-time listener for announcements (single object, not array).
+      // Any onSnapshot listener that has NO error callback silently dies forever
+      // on the first permission/network hiccup — RM then only gets the update on
+      // next full page reload, not live. attachAnnouncementListener() below wires
+      // an error callback that auto-reconnects (with backoff) so it self-heals.
+      let _annRetryDelay = 2000;
+      function attachAnnouncementListener(){
+        fdb.collection('crm_data').doc('announcement').onSnapshot(doc=>{
+          _annRetryDelay = 2000; // reset backoff on any successful event
+          if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+            const newData = doc.data().data;
+            const existing = DB.get('announcement');
+            if(JSON.stringify(newData) !== JSON.stringify(existing)){
+              DB.setLocal('announcement', newData); // updates localStorage AND in-memory cache
+              console.log('Real-time update: announcement');
+              if(getCurrentPageId()==='announcements'){ renderAnnouncementAdmin(); renderInbox(); }
+              else if(getCurrentPageId()==='admin') renderAnnouncementAdmin();
+              checkAnnouncement();
+            }
           }
-        }
-      });
+        }, err=>{
+          console.log('Announcement listener error, reconnecting in', _annRetryDelay, 'ms:', err);
+          setTimeout(attachAnnouncementListener, _annRetryDelay);
+          _annRetryDelay = Math.min(_annRetryDelay * 2, 60000); // exponential backoff, capped 60s
+        });
+      }
+      attachAnnouncementListener();
 
       // comm_history — instant onSnapshot (Admin sends announcement → RM sees it immediately)
       fdb.collection('crm_data').doc('comm_history').onSnapshot(doc=>{
