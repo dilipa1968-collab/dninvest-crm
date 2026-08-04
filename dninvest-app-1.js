@@ -2379,16 +2379,16 @@ function renderMfAumTrend(){
   window.__mfAumRows = mf;
   const totalInvested = mf.reduce((s,c)=>s+(parseFloat(c.aum_detail && c.aum_detail.inv)||0),0);
   const td = today();
-  const changed = mf.filter(c=>c.invested_change_amt && c.invested_change_date===td);
-  const increased = changed.filter(c=>c.invested_change_amt>0);
-  const decreased = changed.filter(c=>c.invested_change_amt<0);
-  const sumInc = increased.reduce((s,c)=>s+c.invested_change_amt,0);
-  const sumDec = decreased.reduce((s,c)=>s+Math.abs(c.invested_change_amt),0);
+  const changed = mfChangeLogRows(td);
+  const increased = changed.filter(r=>r.delta>0);
+  const decreased = changed.filter(r=>r.delta<0);
+  const sumInc = increased.reduce((s,r)=>s+r.delta,0);
+  const sumDec = decreased.reduce((s,r)=>s+Math.abs(r.delta),0);
   const isAdmin = CU.role==='admin';
   const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
   const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
   const footerNote = isAdmin
-    ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span><br><span style="text-decoration:underline;color:#92400e;cursor:pointer" onclick="event.stopPropagation();fixTodaysMfChangeFigures()" title="Aaj ke galat redemption/addition figures clear kare">🧹 Fix today's wrong change figures</span>`
+    ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
     : `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
@@ -2442,33 +2442,54 @@ function showMfZeroBalance(){
     zero.map(c=>[c.name||'—', c.rm||'—', c.mobile||'—', c.pan||'—', c.status||'—']));
 }
 
+// Reads MF invested-amount changes for a given date from the permanent,
+// append-only change log (dninvest_mf_change_log) — NOT from the live
+// invested_change_amt/prev_invested fields on mf_clients, which any cleanup
+// or re-import can legitimately clear/overwrite. The log is the durable
+// source of truth: every real change is written here once and never
+// touched again, so dashboard totals stay correct even after a client's
+// live fields get reset. Pass rmName to scope to one RM (admin drilldown);
+// otherwise scoped to the logged-in user's own dealer names (+ temp access),
+// same rule as getMyMfClients — admin sees everything.
+function mfChangeLogRows(dateStr, rmName){
+  let log=[];
+  try{ log = JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ log=[]; }
+  let rows = log.filter(x=>x && x.date===dateStr);
+  if(rmName){
+    rows = rows.filter(x=>(x.rm||'').trim().toUpperCase()===String(rmName).trim().toUpperCase());
+  } else if(CU.role!=='admin'){
+    const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    const tempDealers = getTempAccessDealers('mf');
+    const allDealers=[...new Set([...dealers,...tempDealers])];
+    rows = rows.filter(x=>allDealers.includes((x.rm||'').trim().toUpperCase()));
+  }
+  return rows;
+}
+
 // Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
 function showMfAumList(){
-  const rows = window.__mfAumRows || [];
   const td = today();
-  const changed = rows.filter(c=>c.invested_change_amt && c.invested_change_date===td).sort((a,b)=>Math.abs(b.invested_change_amt)-Math.abs(a.invested_change_amt));
+  const changed = mfChangeLogRows(td).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
   if(!changed.length){ toast('No Invested Amount change record for today — this will appear here after an AUM By Client import','info'); return; }
-  const table = changed.map(c=>{
-    const up = c.invested_change_amt>0;
-    const newInv = (c.aum_detail && c.aum_detail.inv) || 0;
-    return [c.name, c.rm||'—', '₹'+fmtNum(c.prev_invested||0), '₹'+fmtNum(newInv),
-      `<span style="color:${up?'var(--green)':'var(--red)'};font-weight:700">${up?'▲ +':'▼ -'}₹${fmtNum(Math.abs(c.invested_change_amt))}</span>`,
-      c.invested_change_date?fmtDate(c.invested_change_date):'—'];
+  const table = changed.map(r=>{
+    const up = r.delta>0;
+    return [r.name, r.rm||'—', '₹'+fmtNum(r.prevInvested||0), '₹'+fmtNum(r.newInvested||0),
+      `<span style="color:${up?'var(--green)':'var(--red)'};font-weight:700">${up?'▲ +':'▼ -'}₹${fmtNum(Math.abs(r.delta))}</span>`,
+      fmtDate(td)];
   });
   showReport('📈 MF Invested Amount — Changes (Today)', ['Name','RM','Previous Invested','Current Invested','Change','Date'], table);
 }
 
 // Admin-only: RM-wise split of AUM increases/decreases.
 function showMfAumRmSplit(){
-  const rows = window.__mfAumRows || [];
   const td = today();
-  const changed = rows.filter(c=>c.invested_change_amt && c.invested_change_date===td);
+  const changed = mfChangeLogRows(td);
   const rmMap = {};
-  changed.forEach(c=>{
-    const rm = c.rm || '— (no RM)';
+  changed.forEach(r=>{
+    const rm = r.rm || '— (no RM)';
     if(!rmMap[rm]) rmMap[rm] = {inc:0, dec:0, incAmt:0, decAmt:0};
-    if(c.invested_change_amt>0){ rmMap[rm].inc++; rmMap[rm].incAmt+=c.invested_change_amt; }
-    else { rmMap[rm].dec++; rmMap[rm].decAmt+=Math.abs(c.invested_change_amt); }
+    if(r.delta>0){ rmMap[rm].inc++; rmMap[rm].incAmt+=r.delta; }
+    else { rmMap[rm].dec++; rmMap[rm].decAmt+=Math.abs(r.delta); }
   });
   const table = Object.entries(rmMap).map(([rm,v])=>{
     const rmCell = rm==='— (no RM)' ? rm : `<span style="text-decoration:underline;cursor:pointer;color:var(--blue)" onclick="closeModal('reportModal');showMfAumList()">${escapeHtml(rm)}</span>`;
@@ -2899,8 +2920,7 @@ function renderEqActivityTrend(activeEq){
   // "Today's Wins/Loss" — always visible, shows both gains and losses
   const eqWins = yesterdayEntry ? Math.max(0, nActive - yesterdayEntry.active) : 0;
   const eqLoss = yesterdayEntry ? Math.max(0, yesterdayEntry.active - nActive) : 0;
-  const mfAll = (typeof getMyMfClients === 'function') ? getMyMfClients() : [];
-  const mfWins = mfAll.filter(c => c.invested_change_amt > 0 && c.invested_change_date===td && !(parseFloat(c.prev_invested)||0)).length;
+  const mfWins = mfChangeLogRows(td).filter(r => r.delta > 0 && !(parseFloat(r.prevInvested)||0)).length;
   const totalWins = eqWins + mfWins;
   const totalLoss = eqLoss;
 
@@ -2936,7 +2956,6 @@ function renderEqActivityTrend(activeEq){
         <div class="dash-stat-lbl" style="font-size:.58rem;color:#92400e">${icon} TODAY'S WIN/LOSS</div>
         <div style="font-size:1.3rem;font-weight:900;line-height:1.2">${mainNum}</div>
         <span style="font-size:.6rem;font-weight:700">${noData ? '<span style="color:var(--gray)">no data yet</span>' : (winLines || '<span style="color:var(--gray)">no change</span>')}</span>
-        ${isAdmin && mfWins>0 ? `<div style="margin-top:4px"><span style="font-size:.56rem;text-decoration:underline;color:#92400e" onclick="event.stopPropagation();fixWrongMfNewTags()" title="Purane clients ka galat MF New tag hataye">🧹 Fix wrong MF New tags</span></div>` : ''}
       </div>`;
 
   el.innerHTML = `
@@ -3025,67 +3044,6 @@ function showEqActivityRmSplit(){
 
 // Called from the RM-wise split table — sets the dashboard card's RM filter
 // to the clicked RM and scrolls back to it.
-// Admin one-click fix: removes the wrong "MF New" tag from clients that were
-// already existing before today (their aum_detail simply hadn't been
-// imported before — they were NOT genuinely new investors). Only touches
-// records flagged as changed TODAY whose client record itself was not
-// created today. Triggered from the "🧹 Fix wrong MF New tags" link on the
-// Win/Loss dashboard card — no DevTools needed.
-async function fixWrongMfNewTags(){
-  if(CU.role!=='admin'){ toast('Admin only','error'); return; }
-  if(!confirm('Purane MF clients ka galat "MF New" tag hatana hai? (Genuinely naye clients touch nahi honge)')) return;
-  const td = today();
-  const mf = DB.get('mf_clients')||[];
-  let fixed = 0;
-  const updated = mf.map(c=>{
-    if(c.invested_change_date===td && !(parseFloat(c.prev_invested)||0) && c.created !== td){
-      fixed++;
-      const clean = {...c};
-      delete clean.invested_change_amt;
-      delete clean.invested_change_date;
-      delete clean.prev_invested;
-      return clean;
-    }
-    return c;
-  });
-  if(!fixed){ toast('Koi galat MF New tag nahi mila','info'); return; }
-  await DB.set('mf_clients', updated);
-  toast(`✅ ${fixed} client(s) fix ho gaye — dashboard refresh ho raha hai`,'success');
-  setTimeout(()=>location.reload(), 1200);
-}
-
-// Admin one-click fix: clears today's invested-amount change figures
-// (prev_invested / invested_change_amt / invested_change_date) for continuing
-// investors — these were computed by the old buggy fallback that used a
-// client's previous total AUM (market value, includes growth) as a stand-in
-// for their previous Invested Amount whenever aum_detail hadn't been captured
-// before, producing fake redemption/addition numbers. Fresh "MF New" investor
-// rows (prev_invested===0) are left untouched — those were never affected by
-// this bug. Triggered from the "🧹 Fix today's wrong change figures" link on
-// the MF Invested Amount dashboard card. One-time cleanup: from the next AUM
-// import onward the fixed code computes these correctly on its own.
-async function fixTodaysMfChangeFigures(){
-  if(CU.role!=='admin'){ toast('Admin only','error'); return; }
-  if(!confirm("Aaj ke MF Invested Amount ke Addition/Redemption figures clear karne hain? (Genuinely naye 'MF New' investors touch nahi honge — sirf purane investors ke aaj ke galat change-figures hatenge. Agla AUM import sahi figures dobara bana dega.)")) return;
-  const td = today();
-  const mf = DB.get('mf_clients')||[];
-  let fixed = 0;
-  const updated = mf.map(c=>{
-    if(c.invested_change_date===td && (parseFloat(c.prev_invested)||0) > 0){
-      fixed++;
-      const clean = {...c};
-      delete clean.invested_change_amt;
-      delete clean.invested_change_date;
-      delete clean.prev_invested;
-      return clean;
-    }
-    return c;
-  });
-  if(!fixed){ toast('Koi galat change figure nahi mila','info'); return; }
-  await DB.set('mf_clients', updated);
-  toast(`✅ ${fixed} client(s) ke aaj ke change-figures clear ho gaye — dashboard refresh ho raha hai`,'success');
-  setTimeout(()=>location.reload(), 1200);
-}
 
 // Shows which clients changed Active/Inactive status today — called from Win/Loss box click
 function showTodaysWinLossList(){
@@ -3123,13 +3081,12 @@ function showTodaysWinLossList(){
     ]);
 
   // MF new investors added today (mirrors the mfWins count shown on the card)
-  const mfAll = (typeof getMyMfClients === 'function') ? getMyMfClients() : [];
-  const mfNewRows = mfAll
-    .filter(c => c.invested_change_amt > 0 && c.invested_change_date===td && !(parseFloat(c.prev_invested)||0))
-    .map(c=>[
-      escapeHtml(c.name||'—'),
-      c.rm||'—',
-      `<span style="color:var(--green);font-weight:700">▲ MF New (₹${fmtNum(c.invested_change_amt)})</span>`,
+  const mfNewRows = mfChangeLogRows(td)
+    .filter(r => r.delta > 0 && !(parseFloat(r.prevInvested)||0))
+    .map(r=>[
+      escapeHtml(r.name||'—'),
+      r.rm||'—',
+      `<span style="color:var(--green);font-weight:700">▲ MF New (₹${fmtNum(r.delta)})</span>`,
       'New investor'
     ]);
 
