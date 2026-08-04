@@ -361,6 +361,32 @@ const DB = {
       return merged;
     }catch(e){ console.log('MF change log fetch error:',e); return null; }
   },
+  // Remove specific entries from the change log by id — used for a precise,
+  // targeted cleanup (e.g. removing only entries flagged `estimated:true`),
+  // unlike editing live client fields which can't distinguish good from bad.
+  async removeMfChangeLogEntries(ids){
+    const idSet = new Set(ids);
+    let local=[];
+    try{ local=JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ local=[]; }
+    local = local.filter(x=>!(x&&idSet.has(x.id)));
+    try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(local)); }catch(e){}
+    if(typeof fdb==='undefined') return local;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_change_log');
+      let finalData=null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        finalData = latest.filter(x=>!(x&&idSet.has(x.id)));
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
+      return finalData;
+    }catch(e){
+      console.log('MF change log remove error:',e);
+      return local;
+    }
+  },
   // Keep the shared call_logs document safely under Firestore's 1 MiB limit.
   // Newest entries are kept; oldest are dropped once the JSON size crosses the cap.
   _pruneCallLogs(arr, maxBytes){
@@ -2387,8 +2413,13 @@ function renderMfAumTrend(){
   const isAdmin = CU.role==='admin';
   const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
   const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
+  let estimatedLeftoverCount = 0;
+  if(isAdmin){
+    try{ estimatedLeftoverCount = (JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]')||[]).filter(x=>x&&x.estimated===true).length; }catch(e){}
+  }
   const footerNote = isAdmin
     ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
+      + (estimatedLeftoverCount ? `<br><span style="text-decoration:underline;color:#92400e;cursor:pointer" onclick="event.stopPropagation();removeEstimatedMfChangeEntries()" title="Purani approximate (guess-based) entries hataye">🧹 ${estimatedLeftoverCount} approximate entries — click to remove</span>` : '')
     : `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
@@ -2464,6 +2495,36 @@ function mfChangeLogRows(dateStr, rmName){
     rows = rows.filter(x=>allDealers.includes((x.rm||'').trim().toUpperCase()));
   }
   return rows;
+}
+
+// One-time cleanup: removes only the approximated/guessed change-log entries
+// (flagged estimated:true) that were created while the now-reverted estimate
+// logic was briefly live — these were never real purchase/redemption
+// amounts, just a rough guess. Precise by design (unlike the earlier live-
+// field cleanup attempts): only touches entries explicitly flagged as
+// estimated, so genuine exact changes are never at risk. Safe to run once;
+// no-ops harmlessly if there's nothing to clean.
+async function removeEstimatedMfChangeEntries(){
+  if(CU.role!=='admin'){ toast('Admin only','error'); return; }
+  let log=[];
+  try{ log = JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ log=[]; }
+  const bad = log.filter(x=>x && x.estimated===true);
+  if(!bad.length){ toast('Koi approximate (estimated) entry nahi mili','info'); return; }
+  if(!confirm(`${bad.length} approximate entries hatani hain? Yeh guess-based figures the, asli purchase/redemption amount nahi. Agle AUM import se sahi exact figures banni shuru hongi.`)) return;
+  await DB.removeMfChangeLogEntries(bad.map(x=>x.id));
+  const badKey = new Set(bad.map(x=>x.clientId+'__'+x.date));
+  const mf = DB.get('mf_clients')||[];
+  const updated = mf.map(c=>{
+    if(c.invested_change_date && badKey.has(c.id+'__'+c.invested_change_date)){
+      const clean={...c};
+      delete clean.invested_change_amt; delete clean.invested_change_date; delete clean.prev_invested;
+      return clean;
+    }
+    return c;
+  });
+  await DB.set('mf_clients', updated);
+  toast(`✅ ${bad.length} approximate entries hata di gayi — dashboard refresh ho raha hai`,'success');
+  setTimeout(()=>location.reload(), 1200);
 }
 
 // Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
@@ -11211,24 +11272,13 @@ async function doImport(){
         {
           const hadAumDetail = !!ex.aum_detail;
           const newInv = parseFloat(row.inv_amt)||0;
-          const newAumVal = parseFloat(row.aum)||0;
-          let oldInv, estimated = false;
-          if(hadAumDetail){
-            oldInv = parseFloat(ex.aum_detail.inv)||0;
-          } else if(oldAumBeforeUpdate>0 && newAumVal>0){
-            // No real previous Invested Amount on file (aum_detail never captured
-            // before this client). Redemption ≠ pure invested-amount drop — part of
-            // any withdrawal is principal, part is profit (e.g. invested ₹20,000 in
-            // an AUM of ₹30,000 — a ₹15,000 redemption only pulls out ~₹10,000 of
-            // principal, ~₹5,000 is profit). We don't know the old profit ratio, so
-            // we estimate the old Invested Amount by applying TODAY's principal-to-
-            // AUM ratio to the OLD total AUM — an approximation, not exact, but far
-            // closer than treating the whole old AUM as if it were all principal.
-            oldInv = Math.round(oldAumBeforeUpdate * (newInv/newAumVal));
-            estimated = true;
-          } else {
-            oldInv = null; // can't even estimate (old AUM was 0, or new AUM is 0/missing) — leave untracked this time
-          }
+          // Only track a change when we have a GENUINE previous Invested Amount
+          // (from a prior import's aum_detail.inv) to compare against — no
+          // guessing/estimating. A guessed number isn't a real purchase or
+          // redemption amount, so if the baseline is missing we silently
+          // establish it this import (aum_detail set just below) and start
+          // tracking exactly from the next import onward.
+          const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : null;
           const isFirstEver = !hadAumDetail && oldAumBeforeUpdate===0; // no prior AUM detail AND zero AUM before — genuinely never invested until now
           if(isFirstEver && newInv>0){
             // First-ever investment for this (pre-existing) client record — counts as
@@ -11237,13 +11287,13 @@ async function doImport(){
             ex.invested_change_amt = newInv;
             ex.invested_change_date = today();
             const _td=today();
-            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv, estimated:false});
+            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
           } else if(oldInv!==null && oldInv !== newInv){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
             const _td=today();
-            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv, estimated});
+            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv});
           }
         }
         ex.aum_detail = _aumDetail(row);
