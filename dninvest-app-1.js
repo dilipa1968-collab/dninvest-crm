@@ -11220,12 +11220,7 @@ async function doImport(){
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
         {
           const hadAumDetail = !!ex.aum_detail;
-          // Fall back to the client's previous total AUM when aum_detail was
-          // never populated before (older imports didn't capture the detailed
-          // breakdown) — otherwise an old, already-invested client whose
-          // aum_detail simply hadn't been imported yet gets wrongly tagged
-          // "MF New" on their next top-up.
-          const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : oldAumBeforeUpdate;
+          const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : null;
           const newInv = parseFloat(row.inv_amt)||0;
           const isFirstEver = !hadAumDetail && oldAumBeforeUpdate===0; // no prior AUM detail AND zero AUM before — genuinely never invested until now
           if(isFirstEver && newInv>0){
@@ -11236,13 +11231,19 @@ async function doImport(){
             ex.invested_change_date = today();
             const _td=today();
             DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
-          } else if(oldInv !== newInv){
+          } else if(hadAumDetail && oldInv !== newInv){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
             const _td=today();
             DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv});
           }
+          // else: old client whose aum_detail (real Invested Amount) was never
+          // captured before, and not first-ever — we have no genuine baseline to
+          // compare against (old total AUM includes market growth, not just
+          // principal, so using it as a stand-in produces bogus redemption/
+          // addition figures). Skip change tracking this one time; aum_detail
+          // set just below establishes the correct baseline for future imports.
         }
         ex.aum_detail = _aumDetail(row);
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
