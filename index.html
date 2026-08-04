@@ -2319,6 +2319,17 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <!-- ══ MODALS ══ -->
 
+<!-- Trade History Modal (Last Trade Date click) -->
+<div class="modal-overlay" id="tradeHistModal" onclick="if(event.target===this)closeModal('tradeHistModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="tradeHistTitle">Trade History</h3>
+      <button class="modal-close" onclick="closeModal('tradeHistModal')">×</button>
+    </div>
+    <div class="modal-body" id="tradeHistBody"></div>
+  </div>
+</div>
+
 <!-- Client Modal (Equity + MF) -->
 <div class="modal-overlay" id="sipDetailModal" onclick="if(event.target===this)closeModal('sipDetailModal')">
   <div class="modal wide">
