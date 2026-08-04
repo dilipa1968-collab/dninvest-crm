@@ -2388,7 +2388,7 @@ function renderMfAumTrend(){
   const cardClick = isAdmin ? 'showMfAumRmSplit()' : 'showMfAumList()';
   const cardTitle = isAdmin ? 'Click for RM-wise breakdown' : 'Click for full list';
   const footerNote = isAdmin
-    ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
+    ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span><br><span style="text-decoration:underline;color:#92400e;cursor:pointer" onclick="event.stopPropagation();fixTodaysMfChangeFigures()" title="Aaj ke galat redemption/addition figures clear kare">🧹 Fix today's wrong change figures</span>`
     : `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
@@ -3051,6 +3051,39 @@ async function fixWrongMfNewTags(){
   if(!fixed){ toast('Koi galat MF New tag nahi mila','info'); return; }
   await DB.set('mf_clients', updated);
   toast(`✅ ${fixed} client(s) fix ho gaye — dashboard refresh ho raha hai`,'success');
+  setTimeout(()=>location.reload(), 1200);
+}
+
+// Admin one-click fix: clears today's invested-amount change figures
+// (prev_invested / invested_change_amt / invested_change_date) for continuing
+// investors — these were computed by the old buggy fallback that used a
+// client's previous total AUM (market value, includes growth) as a stand-in
+// for their previous Invested Amount whenever aum_detail hadn't been captured
+// before, producing fake redemption/addition numbers. Fresh "MF New" investor
+// rows (prev_invested===0) are left untouched — those were never affected by
+// this bug. Triggered from the "🧹 Fix today's wrong change figures" link on
+// the MF Invested Amount dashboard card. One-time cleanup: from the next AUM
+// import onward the fixed code computes these correctly on its own.
+async function fixTodaysMfChangeFigures(){
+  if(CU.role!=='admin'){ toast('Admin only','error'); return; }
+  if(!confirm("Aaj ke MF Invested Amount ke Addition/Redemption figures clear karne hain? (Genuinely naye 'MF New' investors touch nahi honge — sirf purane investors ke aaj ke galat change-figures hatenge. Agla AUM import sahi figures dobara bana dega.)")) return;
+  const td = today();
+  const mf = DB.get('mf_clients')||[];
+  let fixed = 0;
+  const updated = mf.map(c=>{
+    if(c.invested_change_date===td && (parseFloat(c.prev_invested)||0) > 0){
+      fixed++;
+      const clean = {...c};
+      delete clean.invested_change_amt;
+      delete clean.invested_change_date;
+      delete clean.prev_invested;
+      return clean;
+    }
+    return c;
+  });
+  if(!fixed){ toast('Koi galat change figure nahi mila','info'); return; }
+  await DB.set('mf_clients', updated);
+  toast(`✅ ${fixed} client(s) ke aaj ke change-figures clear ho gaye — dashboard refresh ho raha hai`,'success');
   setTimeout(()=>location.reload(), 1200);
 }
 
