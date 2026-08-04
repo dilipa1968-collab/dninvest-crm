@@ -2527,18 +2527,74 @@ async function removeEstimatedMfChangeEntries(){
   setTimeout(()=>location.reload(), 1200);
 }
 
-// Full list of every MF investor whose Invested Amount changed since the last import — biggest change first.
-function showMfAumList(){
+// Same scoping as mfChangeLogRows (own dealers unless admin / rmName given),
+// but over an inclusive [fromDate,toDate] range instead of a single day —
+// backs the date-range picker in showMfAumList.
+function mfChangeLogRange(fromDate, toDate, rmName){
+  let log=[];
+  try{ log = JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ log=[]; }
+  let rows = log.filter(x=>x && x.date && x.date>=fromDate && x.date<=toDate);
+  if(rmName){
+    rows = rows.filter(x=>(x.rm||'').trim().toUpperCase()===String(rmName).trim().toUpperCase());
+  } else if(CU.role!=='admin'){
+    const dealers=(CU.mf_dealers||[CU.name]).map(d=>d.trim().toUpperCase());
+    const tempDealers = getTempAccessDealers('mf');
+    const allDealers=[...new Set([...dealers,...tempDealers])];
+    rows = rows.filter(x=>allDealers.includes((x.rm||'').trim().toUpperCase()));
+  }
+  return rows;
+}
+
+// Full list of every MF investor whose Invested Amount changed, split into
+// two sections: Additions (invested amount increased) and Redemptions
+// (invested amount decreased) — never mixed into one table. Defaults to
+// Today; user can widen the range with the date pickers and hit Apply.
+function showMfAumList(fromDate, toDate){
   const td = today();
-  const changed = mfChangeLogRows(td).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
-  if(!changed.length){ toast('No Invested Amount change record for today — this will appear here after an AUM By Client import','info'); return; }
-  const table = changed.map(r=>{
-    const up = r.delta>0;
-    return [r.name, r.rm||'—', '₹'+fmtNum(r.prevInvested||0), '₹'+fmtNum(r.newInvested||0),
-      `<span style="color:${up?'var(--green)':'var(--red)'};font-weight:700">${up?'▲ +':'▼ -'}₹${fmtNum(Math.abs(r.delta))}</span>`,
-      fmtDate(td)];
-  });
-  showReport('📈 MF Invested Amount — Changes (Today)', ['Name','RM','Previous Invested','Current Invested','Change','Date'], table);
+  fromDate = fromDate || td;
+  toDate = toDate || td;
+  const changed = mfChangeLogRange(fromDate, toDate).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+  if(!changed.length){ toast('No Invested Amount change record for this range — this will appear here after an AUM By Client import','info'); return; }
+  const additions = changed.filter(r=>r.delta>0);
+  const redemptions = changed.filter(r=>r.delta<0);
+  const sumInc = additions.reduce((s,r)=>s+r.delta,0);
+  const sumDec = redemptions.reduce((s,r)=>s+Math.abs(r.delta),0);
+  const showDateCol = fromDate!==toDate;
+
+  const rowHtml = r => `<tr><td>${escapeHtml(r.name||'—')}</td><td>${escapeHtml(r.rm||'—')}</td><td>₹${fmtNum(r.prevInvested||0)}</td><td>₹${fmtNum(r.newInvested||0)}</td><td style="font-weight:700;color:${r.delta>0?'var(--green)':'var(--red)'}">${r.delta>0?'▲ +':'▼ -'}₹${fmtNum(Math.abs(r.delta))}</td>${showDateCol?`<td>${fmtDate(r.date)}</td>`:''}</tr>`;
+
+  const rangeBar = `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">
+      <span style="font-size:.72rem;font-weight:700;color:var(--gray)">📅 RANGE:</span>
+      <input type="date" id="mfAumFromDate" value="${fromDate}" style="padding:5px;font-size:.75rem">
+      <span style="font-size:.72rem;color:var(--gray)">to</span>
+      <input type="date" id="mfAumToDate" value="${toDate}" style="padding:5px;font-size:.75rem">
+      <button class="btn btn-sm btn-outline" onclick="showMfAumList(document.getElementById('mfAumFromDate').value, document.getElementById('mfAumToDate').value)">Apply</button>
+      <button class="btn btn-sm btn-outline" onclick="showMfAumList()">Today</button>
+    </div>`;
+
+  const sectionHtml = (label, color, bg, rows, sum) => `
+    <div style="margin-bottom:6px;padding:7px 10px;background:${bg};border-radius:6px;font-weight:800;font-size:.8rem;color:${color}">
+      ${label} — ${rows.length} client${rows.length===1?'':'s'} · ₹${fmtNum(sum)}
+    </div>
+    <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr><th>Name</th><th>RM</th><th>Previous Invested</th><th>Current Invested</th><th>Change</th>${showDateCol?'<th>Date</th>':''}</tr></thead>
+    <tbody>${rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="${showDateCol?6:5}" style="text-align:center;color:var(--gray)">None</td></tr>`}</tbody></table></div></div>`;
+
+  const body = rangeBar
+    + sectionHtml('🟢 ADDITIONS', 'var(--green)', '#f0fdf4', additions, sumInc)
+    + `<div style="height:14px"></div>`
+    + sectionHtml('🔴 REDEMPTIONS', 'var(--red)', '#fef2f2', redemptions, sumDec);
+
+  const rangeLabel = fromDate===toDate ? fmtDate(fromDate) : `${fmtDate(fromDate)} to ${fmtDate(toDate)}`;
+  document.getElementById('reportModalTitle').textContent = `📈 MF Invested Amount — Changes (${rangeLabel})`;
+  document.getElementById('reportModalBody').innerHTML = body;
+  // Keep Export CSV working on this modal: combined table with an explicit Type column.
+  currentReportData = {
+    title: 'MF Invested Amount Changes '+rangeLabel,
+    headers: ['Type','Name','RM','Previous Invested','Current Invested','Change','Date'],
+    rows: changed.map(r=>[r.delta>0?'Addition':'Redemption', r.name, r.rm||'—', r.prevInvested||0, r.newInvested||0, r.delta, r.date])
+  };
+  document.getElementById('reportModal').classList.add('open');
 }
 
 // Admin-only: RM-wise split of AUM increases/decreases.
