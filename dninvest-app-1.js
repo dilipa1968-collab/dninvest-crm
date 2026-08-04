@@ -11253,8 +11253,25 @@ async function doImport(){
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
         {
           const hadAumDetail = !!ex.aum_detail;
-          const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : null;
           const newInv = parseFloat(row.inv_amt)||0;
+          const newAumVal = parseFloat(row.aum)||0;
+          let oldInv, estimated = false;
+          if(hadAumDetail){
+            oldInv = parseFloat(ex.aum_detail.inv)||0;
+          } else if(oldAumBeforeUpdate>0 && newAumVal>0){
+            // No real previous Invested Amount on file (aum_detail never captured
+            // before this client). Redemption ≠ pure invested-amount drop — part of
+            // any withdrawal is principal, part is profit (e.g. invested ₹20,000 in
+            // an AUM of ₹30,000 — a ₹15,000 redemption only pulls out ~₹10,000 of
+            // principal, ~₹5,000 is profit). We don't know the old profit ratio, so
+            // we estimate the old Invested Amount by applying TODAY's principal-to-
+            // AUM ratio to the OLD total AUM — an approximation, not exact, but far
+            // closer than treating the whole old AUM as if it were all principal.
+            oldInv = Math.round(oldAumBeforeUpdate * (newInv/newAumVal));
+            estimated = true;
+          } else {
+            oldInv = null; // can't even estimate (old AUM was 0, or new AUM is 0/missing) — leave untracked this time
+          }
           const isFirstEver = !hadAumDetail && oldAumBeforeUpdate===0; // no prior AUM detail AND zero AUM before — genuinely never invested until now
           if(isFirstEver && newInv>0){
             // First-ever investment for this (pre-existing) client record — counts as
@@ -11263,20 +11280,14 @@ async function doImport(){
             ex.invested_change_amt = newInv;
             ex.invested_change_date = today();
             const _td=today();
-            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
-          } else if(hadAumDetail && oldInv !== newInv){
+            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv, estimated:false});
+          } else if(oldInv!==null && oldInv !== newInv){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
             const _td=today();
-            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv});
+            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv, estimated});
           }
-          // else: old client whose aum_detail (real Invested Amount) was never
-          // captured before, and not first-ever — we have no genuine baseline to
-          // compare against (old total AUM includes market growth, not just
-          // principal, so using it as a stand-in produces bogus redemption/
-          // addition figures). Skip change tracking this one time; aum_detail
-          // set just below establishes the correct baseline for future imports.
         }
         ex.aum_detail = _aumDetail(row);
         if(sipInfo.sip_amount) ex.sip_amount = sipInfo.sip_amount;
