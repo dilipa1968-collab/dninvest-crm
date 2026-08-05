@@ -1726,9 +1726,17 @@ function checkTier2Eligible(demat, sip, lumpsum){
 function fmt(n){return '₹'+Math.round(n).toLocaleString('en-IN')}
 function initials(n){return n.split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2)}
 function today(){
-  // Use device local date (matches CRM's today()) — avoids UTC vs local date mismatch
+  // IST-safe: computed from true UTC + 5:30, NOT device-local getFullYear/Month/Date.
+  // Device-local was vulnerable — if a login device's system timezone (or a stuck
+  // clock) was off from IST, this could resolve to the WRONG calendar date during
+  // early-morning IST hours, causing that device's login/heartbeat to silently
+  // target and overwrite YESTERDAY's attendance record (out-time wipe → half-day
+  // bug, 5-Aug-2026 incident). This calc matches _hbIstNow()/autoOutTimeCheck's
+  // IST derivation and is immune to device timezone/clock-date misconfiguration.
   const n=new Date();
-  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  const utc=n.getTime()+n.getTimezoneOffset()*60000;
+  const ist=new Date(utc+5.5*3600000);
+  return ist.getFullYear()+'-'+String(ist.getMonth()+1).padStart(2,'0')+'-'+String(ist.getDate()).padStart(2,'0');
 }
 function nowTime(){
   const n=new Date();
@@ -2386,6 +2394,39 @@ async function migrateHalfDayFromJuly1(){
   }catch(e){ console.log('HD migration error:', e); }
 }
 setTimeout(migrateHalfDayFromJuly1, 8000); // runs after the DB loads
+
+// ── One-time repair (5-Aug-2026 incident): a login device with a wrong/stuck
+// clock-date this morning caused today() to resolve to '2026-08-04' instead of
+// the real IST date, which made doLogin's "re-login, clear early out" branch
+// wipe these 6 RMs' already-correct ~6PM out-time on their 4-Aug record, and
+// the following heartbeat then wrote the ~09:1x login time into 'out' instead
+// (since it was now empty). reconcileRecentHalfDays then saw out<1:30PM and
+// flipped status to 'Half day'. today() is now IST-safe (see above), so this
+// specific failure mode shouldn't recur. This restores the 6 records to their
+// actual 4-Aug-2026 state: out ~18:00, status Present (all 6 in-times were
+// well before the 10:00 late cutoff). Admin-only, runs once (localStorage flag).
+async function repairAug4HalfDayIncident(){
+  try{
+    if(!isAdmin) return;
+    if(localStorage.getItem('fix_aug4_2026_halfday_v1')) return;
+    const affected=['Anjali','Bharat','Komal','Megha','Puja','Raju'];
+    const att=getAtt();
+    let fixed=0;
+    for(const emp of affected){
+      const rec=(att[emp]||[]).find(r=>r.date==='2026-08-04');
+      if(rec && rec.status==='Half day'){
+        await saveAttRecord(emp, {...rec, out:'18:00', status:'Present'});
+        fixed++;
+      }
+    }
+    localStorage.setItem('fix_aug4_2026_halfday_v1','done');
+    if(fixed>0){
+      if(typeof toast==='function') toast(fixed+' record(s) repaired — 4-Aug out-time restored to 18:00, status Present','success');
+      if(typeof renderDashboard==='function') renderDashboard();
+    }
+  }catch(e){ console.log('Aug4 half-day repair error:', e); }
+}
+setTimeout(repairAug4HalfDayIncident, 8500); // runs after the DB loads
 
 // ── Rolling half-day safety (Admin): pichhle 7 din (aaj chhod ke) ke un records ko
 // Half day mark karo jinka out 1:30 PM se pehle ka hai (Mon–Fri). Ab out-time har
