@@ -2455,7 +2455,7 @@ function renderMfAumTrend(){
   }
   const footerNote = isAdmin
     ? `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for RM-wise split · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumList()">full list</span> · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`
-      + (estimatedLeftoverCount ? `<br><span style="text-decoration:underline;color:#92400e;cursor:pointer" onclick="event.stopPropagation();removeEstimatedMfChangeEntries()" title="Purani approximate (guess-based) entries hataye">🧹 ${estimatedLeftoverCount} approximate entries — click to remove</span>` : '')
+      + (estimatedLeftoverCount ? `<br><span style="text-decoration:underline;color:#92400e;cursor:pointer" onclick="event.stopPropagation();removeEstimatedMfChangeEntries()" title="Remove old approximate (guess-based) entries">🧹 ${estimatedLeftoverCount} approximate entries — click to remove</span>` : '')
     : `📅 ${fmtDate(today())} · today's changes from the AUM By Client import · click card for full list · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showMfAumHistory()">date-wise history</span>`;
   const zeroBalance = mf.filter(c=>!(parseFloat(c.aum)||0));
   el.innerHTML = `
@@ -2545,21 +2545,25 @@ async function removeEstimatedMfChangeEntries(){
   let log=[];
   try{ log = JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ log=[]; }
   const bad = log.filter(x=>x && x.estimated===true);
-  if(!bad.length){ toast('Koi approximate (estimated) entry nahi mili','info'); return; }
-  if(!confirm(`${bad.length} approximate entries hatani hain? Yeh guess-based figures the, asli purchase/redemption amount nahi. Agle AUM import se sahi exact figures banni shuru hongi.`)) return;
+  if(!bad.length){ toast('No approximate (estimated) entries found','info'); return; }
+  if(!confirm(`Remove ${bad.length} approximate entries? These were guess-based figures, not the real purchase/redemption amount. The next AUM import will produce correct exact figures.`)) return;
   await DB.removeMfChangeLogEntries(bad.map(x=>x.id));
   const badKey = new Set(bad.map(x=>x.clientId+'__'+x.date));
   const mf = DB.get('mf_clients')||[];
-  const updated = mf.map(c=>{
+  // Only touch the specific records flagged as estimated, and write them via
+  // setClientsBulk (transaction merge) instead of a blind full-array DB.set —
+  // a blind overwrite here could silently wipe another RM's concurrent edit
+  // to a *different* client made while this admin cleanup was running.
+  const changed = [];
+  mf.forEach(c=>{
     if(c.invested_change_date && badKey.has(c.id+'__'+c.invested_change_date)){
       const clean={...c};
       delete clean.invested_change_amt; delete clean.invested_change_date; delete clean.prev_invested;
-      return clean;
+      changed.push(clean);
     }
-    return c;
   });
-  await DB.set('mf_clients', updated);
-  toast(`✅ ${bad.length} approximate entries hata di gayi — dashboard refresh ho raha hai`,'success');
+  if(changed.length) await DB.setClientsBulk('mf_clients', changed);
+  toast(`✅ ${bad.length} approximate entries removed — refreshing dashboard`,'success');
   setTimeout(()=>location.reload(), 1200);
 }
 
@@ -3433,7 +3437,23 @@ function updateSeminarBlink(){
 setInterval(updateSeminarBlink, 5000);
 
 // Auto-refresh the whole CRM every 30 minutes so data always stays up to date.
-setInterval(()=>{ location.reload(); }, 30*60*1000);
+// Guarded: if the user is mid-way through filling a form (a modal is open, or
+// they're actively typing in a text field) the reload is postponed instead of
+// firing blindly — otherwise an RM's unsaved entry (new client, lead, call
+// note, etc.) would silently vanish the moment the 30-min timer landed
+// mid-edit, which looked to the RM like their update "got auto-deleted".
+// It keeps re-checking every minute until the coast is clear, then reloads.
+function _safeAutoReload(){
+  const modalOpen = document.querySelector('.modal-overlay.open, .modal.open');
+  const ae = document.activeElement;
+  const typing = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable) && ae.value;
+  if(modalOpen || typing){
+    setTimeout(_safeAutoReload, 60*1000); // recheck in 1 min
+    return;
+  }
+  location.reload();
+}
+setInterval(_safeAutoReload, 30*60*1000);
 
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
@@ -11703,7 +11723,7 @@ function openEqBadImportReview(){
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
   let body;
   if(!cands.length){
-    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Kuch Nahi Mila</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">Aaj koi aisa equity client nahi mila jiska Last Trade Date blank ho.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'eqBadImportOverlay\').remove()">Band Karein</button></div></div>';
+    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Nothing Found</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">No equity client added today has a blank Last Trade Date.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'eqBadImportOverlay\').remove()">Close</button></div></div>';
   } else {
     const rows = cands.map(c=>
       '<tr>'
@@ -11716,9 +11736,9 @@ function openEqBadImportReview(){
       +'</tr>'
     ).join('');
     body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
-      +'<div style="font-weight:800;font-size:1.05rem">🧹 Aaj Ke Suspicious Equity Additions — Review</div>'
+      +'<div style="font-weight:800;font-size:1.05rem">🧹 Today\'s Suspicious Equity Additions — Review</div>'
       +'<button onclick="document.getElementById(\'eqBadImportOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
-      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">⚠️ Ye '+cands.length+' equity clients aaj add hue par inka Last Trade Date bilkul blank hai — real broker file me hamesha Last Trade Date hota hai, isliye ye galat file (jaise MF AUM file) se aaye lagte hain. Jinko delete nahi karna wo uncheck kar dijiye, phir neeche confirm kariye.</div>'
+      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">⚠️ These '+cands.length+' equity clients were added today but have a completely blank Last Trade Date — a real broker file always carries a Last Trade Date, so these look like they came from a wrongly-uploaded file (e.g. an MF AUM file). Uncheck any you don\'t want to delete, then confirm below.</div>'
       +'<div style="padding:16px 18px">'
       +'<table style="width:100%;border-collapse:collapse;font-size:.8rem">'
       +'<tr style="background:#f1f5f9;font-size:.72rem;color:#475569"><td style="padding:5px 8px"><input type="checkbox" id="eqbad-all" checked onchange="document.querySelectorAll(\'.eqbad-chk\').forEach(x=>x.checked=this.checked)"></td><td style="padding:5px 8px">NAAM</td><td style="padding:5px 8px">CODE</td><td style="padding:5px 8px">MOBILE</td><td style="padding:5px 8px;text-align:right">ASSET VALUE</td><td style="padding:5px 8px">RM</td></tr>'
@@ -11733,12 +11753,12 @@ function openEqBadImportReview(){
 }
 async function deleteEqBadImportSelected(){
   const ids=[...document.querySelectorAll('.eqbad-chk')].filter(x=>x.checked).map(x=>x.getAttribute('data-id'));
-  if(!ids.length){ toast('Koi select nahi kiya','error'); return; }
-  if(!confirm('Confirm: '+ids.length+' equity client(s) permanently delete honge. Ye undo nahi ho sakta. Proceed?')) return;
+  if(!ids.length){ toast('Nothing selected','error'); return; }
+  if(!confirm('Confirm: '+ids.length+' equity client(s) will be permanently deleted. This cannot be undone. Proceed?')) return;
   try{
     await DB.deleteClientsBulk('eq_clients', ids);
     const ovx=document.getElementById('eqBadImportOverlay'); if(ovx) ovx.remove();
-    toast('✅ '+ids.length+' client(s) delete ho gaye','success');
+    toast('✅ '+ids.length+' client(s) deleted','success');
     renderEqTable(); refreshDash(); updateBadges();
   }catch(e){ toast('Delete failed: '+(e&&e.message||e),'error'); }
 }
@@ -12169,7 +12189,7 @@ function handleEqFile(input){
       const hdrRow = (rows[i]||[]).map(h=>normHdr(h));
       const hasMfSignature = hdrRow.some(h=>['invamt','investedamt','xirr','divpaid','divreinv','abrsrtn','absrtn'].includes(h));
       if(hasMfSignature){
-        toast('⚠️ Ye MF AUM/SIP file lagti hai (Inv. Amt / XIRR / Div. Paid column mili) — Equity Import me nahi, MUTUAL FUND → Import Excel me upload kariye.','error');
+        toast('⚠️ This looks like an MF AUM/SIP file (Inv. Amt / XIRR / Div. Paid column found) — upload it under MUTUAL FUND → Import Excel, not Equity Import.','error');
         return;
       }
     }
