@@ -168,6 +168,42 @@ const DB = {
     if(this._mem) this._mem[key] = val;   // keep cache in sync
     try{ localStorage.setItem('dninvest_'+key,JSON.stringify(val)); }catch(e){}
   },
+  // ── mf_business: transactional append (avoids the classic race where two
+  // RMs save around the same moment and the second write's blind full-array
+  // overwrite silently wipes the first RM's brand-new entry — same class of
+  // bug as addActivityLog below, applied to MF Transactions/Demat entries) ──
+  _mfbWriting:0,
+  async appendMfBizEntry(arrayKey, entry){   // arrayKey: 'entries' (MF txns) or 'eq_entries' (Demat opens)
+    let biz = this.get('mf_business');
+    let curEntries = Array.isArray(biz) ? biz.slice() : (biz?.entries||[]).slice();
+    let curEq = Array.isArray(biz) ? [] : (biz?.eq_entries||[]).slice();
+    if(arrayKey==='entries') curEntries.push(entry); else curEq.push(entry);
+    this.setLocal('mf_business', {entries:curEntries, eq_entries:curEq});
+    if(typeof fdb==='undefined') return {entries:curEntries, eq_entries:curEq};
+    this._mfbWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_business');
+      let finalData=null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
+        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
+        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
+        if(arrayKey==='entries'){ if(!lEntries.some(e=>e&&e.id===entry.id)) lEntries.push(entry); }
+        else { if(!lEq.some(e=>e&&e.id===entry.id)) lEq.push(entry); }
+        finalData = {entries:lEntries, eq_entries:lEq};
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData){ this.setLocal('mf_business', finalData); }
+      return finalData;
+    }catch(e){
+      console.log('mf_business append error:',e);
+      try{ toast('Sync error: '+e.message,'error'); }catch(e2){}
+      return null;
+    }finally{
+      this._mfbWriting=Math.max(0,this._mfbWriting-1);
+    }
+  },
   // Append one or more entries to the shared append-only activity_logs array
   // WITHOUT clobbering other RMs' concurrent entries. Transaction merge-by-id,
   // keeps the newest 2000 by date.
@@ -4455,10 +4491,7 @@ async function confirmConvertLeadEq(){
 
   // Equity: Add "Open Demat Account" entry in New Business
   try{
-    let biz = DB.get('mf_business');
-    let mfEntries = Array.isArray(biz) ? biz : (biz?.entries || []);
-    let eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries || []);
-    eqEntries.push({
+    const newEqEntry = {
       id: uid(),
       client_id: newId,
       client_name: lead.name,
@@ -4472,9 +4505,8 @@ async function confirmConvertLeadEq(){
       created: today(),
       status: CU.role==='admin' ? 'Approved' : 'Pending',
       decline_reason: ''
-    });
-    const newBiz = { entries: mfEntries, eq_entries: eqEntries };
-    await DB.set('mf_business', newBiz);
+    };
+    await DB.appendMfBizEntry('eq_entries', newEqEntry);
   }catch(e){ console.error('eq new business entry error',e); }
 
   await DB.deleteClient('leads',id);
@@ -6623,7 +6655,7 @@ function saveBusinessEntry(){
   const client = mf.find(c=>c.id===currentBusinessTarget.id);
   const rm = client ? client.rm : (CU.role!=='admin'?CU.name:'');
 
-  entries.push({
+  const newEntry = {
     id: uid(),
     client_id: currentBusinessTarget.id,
     client_name: currentBusinessTarget.name,
@@ -6641,9 +6673,8 @@ function saveBusinessEntry(){
     status: CU.role==='admin' ? 'Approved' : 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
-  });
-  const eqEntries2 = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
-  DB.set('mf_business', {entries, eq_entries: eqEntries2});
+  };
+  DB.appendMfBizEntry('entries', newEntry).then(()=>{ renderMfTxnTable(); });
   learnFundName(fundName);
   if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
   closeModal('businessModal');
@@ -7260,8 +7291,7 @@ function saveMfTxnEntry(){
   const firstPay = (sched && firstPayDone) ? amount : null;
   if(sched && !startDate){ toast('Please enter the start date','error'); return; }
 
-  const entries=getMfBizEntries();
-  entries.push({
+  const newEntry = {
     id: uid(),
     client_id: mfTxnSelectedClient.id,
     client_name: mfTxnSelectedClient.name,
@@ -7279,8 +7309,8 @@ function saveMfTxnEntry(){
     status: CU.role==='admin' ? 'Approved' : 'Pending',
     decline_reason: '',
     cross_remark: '', cross_remark_by: '', cross_remark_at: ''
-  });
-  setMfBizEntries(entries);
+  };
+  DB.appendMfBizEntry('entries', newEntry).then(()=>{ renderMfTxnTable(); });
   learnFundName(fundName);
   if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
   toast(`${type} entry saved — ${mfTxnSelectedClient.name}`,'success');
@@ -7630,8 +7660,7 @@ function saveEqDematEntry(){
   const tradeSel=document.getElementById('eqdemat-rm-select');
   if(CU.role==='admin' && tradeSel && tradeSel.style.display!=='none' && tradeSel.value){ tradingRm = tradeSel.value; }
 
-  const eqEntries=getEqDematEntries();
-  eqEntries.push({
+  const newEqEntry = {
     id: uid(),
     client_id: eqDematSelectedClient.id,
     client_name: eqDematSelectedClient.name,
@@ -7645,8 +7674,8 @@ function saveEqDematEntry(){
     created: today(),
     status: CU.role==='admin' ? 'Approved' : 'Pending',
     decline_reason: ''
-  });
-  setEqDematEntries(eqEntries);
+  };
+  DB.appendMfBizEntry('eq_entries', newEqEntry).then(()=>{ renderEqDematTable(); });
   toast(`Demat entry saved — ${eqDematSelectedClient.name}`,'success');
 
   // Reset form for next entry but keep date for fast repeated entry
