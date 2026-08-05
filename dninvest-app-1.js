@@ -3784,7 +3784,7 @@ function renderEqTable(){
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.ac_bal)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
-      <td>${c.last_trade_date?`<a href="#" onclick="showTradeHistory('${c.id}');return false" style="color:inherit;text-decoration:underline dotted;cursor:pointer" title="Click: pichla trade date + color dekhein">${fmtDate(c.last_trade_date)}</a>`:'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
+      <td>${fmtDate(c.last_trade_date)||'—'}${days!==null?`<br><small style="color:${days>=90?'var(--red)':days>=30?'var(--orange)':'var(--green)'}">${days}d ago</small>`:''}</td>
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td class="eqc-wrap"><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
@@ -6223,7 +6223,7 @@ function viewClient(id,seg){
       ${di('🎂 Date of Birth',c.dob?fmtDate(c.dob):null)}
       ${di('Asset Value',c.asset_value?'₹'+fmtNum(c.asset_value):null)}
       ${di('Revenue/Brokerage',c.revenue?'₹'+fmtNum(c.revenue):null)}
-      ${di('Last Trade Date',c.last_trade_date?`<a href="#" onclick="showTradeHistory('${c.id}');return false" style="text-decoration:underline dotted;cursor:pointer">${fmtDate(c.last_trade_date)}</a>`+(days!==null?` <small>(${days} days ago)</small>`:''):'—')}
+      ${di('Last Trade Date',fmtDate(c.last_trade_date)+(days!==null?` <small>(${days} days ago)</small>`:''))}
       ${di('Last Trade Month',c.last_trade_month)}
       ${di('Last Calling Date',fmtDate(c.last_call_date))}
       ${di('Next Calling Date',fmtDate(c.next_call))}
@@ -7327,8 +7327,13 @@ function getFilteredMfTxns(){
   let entries=getMfBizEntries();
   // RM scoping — only plain RMs are restricted to their own entries.
   // Admin and anyone with MF Desk access (pure role or RM+MF Desk) see everyone's.
+  // Include entries the RM personally entered (created_by) as well as ones
+  // attributed to them (rm) — otherwise a temp-access cover entry (credited
+  // to the absent colleague's name) vanishes from the covering RM's own
+  // list the instant they save it.
   if(CU.role!=='admin' && !hasMfDeskAccess(CU)){
-    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase());
+    const myName=(CU.name||'').trim().toLowerCase();
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===myName || (e.created_by||'').trim().toLowerCase()===myName);
   }
   const q=(document.getElementById('mftxn-search')?.value||'').trim().toLowerCase();
   const rmF=document.getElementById('mftxn-rm-filter')?.value||'';
@@ -10732,41 +10737,6 @@ function sipCntCell(c){
     style="cursor:pointer;background:var(--teal,#0d9488);color:#fff;border-radius:6px;padding:1px 8px;font-weight:700;font-size:.78rem;display:inline-block">${n}</span>`;
 }
 
-// Last Trade Date pe click -> is client ka comeback/trade history dikhao:
-// har baar jab import se Last Trade Date update hui, uska PURANA date +
-// us waqt ka color (Blue/Green/Yellow) yahan se pata chalega.
-function showTradeHistory(id){
-  const list = DB.get('eq_clients')||[];
-  const c = list.find(x=>x.id===id);
-  if(!c) return;
-  const hist = Array.isArray(c.trade_history) ? [...c.trade_history].reverse() : [];
-  document.getElementById('tradeHistTitle').innerHTML = `Trade History — ${c.name} <span style="font-weight:500;opacity:.7">(Current Last Trade: ${fmtDate(c.last_trade_date)||'—'})</span>`;
-  const tagLabel = t => t==='yellow'?'🟡 Yellow (6m+ gap)':t==='green'?'🟢 Green (3-6m gap)':t==='blue'?'🔵 Blue (1-3m gap)':'—';
-  let h;
-  if(!hist.length){
-    h = `<p style="color:#888;text-align:center;padding:24px">Is client ke liye trade history abhi record nahi hui — history sirf ab se track hoti hai (aage jab bhi Last Trade Date badlegi, purani date yahan dikhegi).</p>`;
-  } else {
-    h = `<div style="overflow:auto"><table class="tbl" style="width:100%;font-size:.85rem">
-      <thead><tr>
-        <th style="text-align:left">Naya Last Trade Date</th>
-        <th style="text-align:left">Isse Pehle Ka Trade Date</th>
-        <th style="text-align:center">Gap</th>
-        <th style="text-align:center">Color Diya Gaya</th>
-      </tr></thead><tbody>`;
-    hist.forEach(x=>{
-      h += `<tr>
-        <td style="text-align:left;font-weight:700">${fmtDate(x.new)||'—'}</td>
-        <td style="text-align:left">${x.prev?fmtDate(x.prev):'<span style="color:#aaa">(pehli entry)</span>'}</td>
-        <td style="text-align:center">${x.gap!==null&&x.gap!==undefined?x.gap+'d':'—'}</td>
-        <td style="text-align:center">${tagLabel(x.tag)}</td>
-      </tr>`;
-    });
-    h += `</tbody></table></div>`;
-  }
-  document.getElementById('tradeHistBody').innerHTML = h;
-  document.getElementById('tradeHistModal').classList.add('open');
-}
-
 function showSipDetails(id){
   const list = DB.get('mf_clients')||[];
   const c = list.find(x=>x.id===id);
@@ -12308,12 +12278,6 @@ async function doEqImport(){
         else if(gapDays!==null && gapDays>=30) ex.comeback_tag='blue';
         else ex.comeback_tag='';
         ex.comeback_date = row.last_trade_date;   // tag only applies while this stays the latest trade date
-        // Trade history log: before overwriting, record what the PREVIOUS
-        // last-trade-date was, so "click on Last Trade" can later show
-        // "isse pehle client ne kab trade kiya tha" + the color it earned.
-        if(!Array.isArray(ex.trade_history)) ex.trade_history = [];
-        ex.trade_history.push({ prev: ex.last_trade_date||'', new: row.last_trade_date, tag: ex.comeback_tag||'', gap: gapDays, logged: today() });
-        if(ex.trade_history.length>25) ex.trade_history = ex.trade_history.slice(-25); // cap growth
         ex.last_trade_date = row.last_trade_date;
       }
       if(row.email) ex.email = row.email;      // always overwrite email from file
