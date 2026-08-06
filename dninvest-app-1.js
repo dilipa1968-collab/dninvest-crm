@@ -6959,7 +6959,19 @@ function populateMfTxnMonths(){
   const MNF=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const label=m=>{const [y,mo]=m.split('-');return MNF[+mo]+' '+y;};
   sel.innerHTML='<option value="">All Months</option>'+months.map(m=>`<option value="${m}">${label(m)}</option>`).join('');
-  if(months.includes(cur)) sel.value=cur;
+  if(months.includes(cur)){
+    sel.value=cur;
+  } else if(!sel.dataset.autoDefaulted){
+    // Very first time this page loads this session (nothing picked yet, and
+    // the user hasn't pressed Clear either — that also lands on "" but is a
+    // deliberate choice we shouldn't override). Default to the current
+    // month instead of "All Months" so the page opens already scoped to
+    // what's relevant today; once the user changes it (or clears it), that
+    // choice is respected on every later visit to this page this session.
+    const curMonth = today().slice(0,7);
+    if(months.includes(curMonth)) sel.value = curMonth;
+  }
+  sel.dataset.autoDefaulted = '1';
 }
 
 // Month chunne pe From/To date clear kar do taaki conflict na ho.
