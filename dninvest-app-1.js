@@ -11388,6 +11388,12 @@ async function doImport(){
           // redemption amount, so if the baseline is missing we silently
           // establish it this import (aum_detail set just below) and start
           // tracking exactly from the next import onward.
+          // Threshold of ₹1: the RTA's file sometimes carries paisa-level
+          // rounding noise between two exports of the SAME investment (e.g.
+          // ₹5,50,000.00 one day, ₹5,50,000.30 the next) with no real
+          // transaction behind it. Below ₹1 isn't a purchase/redemption —
+          // it's just export noise — so it's not logged as a change (avoids
+          // meaningless "▲ +₹0" / "▼ -₹0" rows in the Additions/Redemptions list).
           const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : null;
           const isFirstEver = !hadAumDetail && oldAumBeforeUpdate===0; // no prior AUM detail AND zero AUM before — genuinely never invested until now
           if(isFirstEver && newInv>0){
@@ -11398,7 +11404,7 @@ async function doImport(){
             ex.invested_change_date = today();
             const _td=today();
             DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
-          } else if(oldInv!==null && oldInv !== newInv){
+          } else if(oldInv!==null && Math.abs(newInv - oldInv) >= 1){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
             ex.invested_change_date = today();
