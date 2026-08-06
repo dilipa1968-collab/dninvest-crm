@@ -11313,9 +11313,21 @@ async function doImport(){
   //                   KUMAR) alag-alag logon ke hain; unhe naam se match karna ek
   //                   ka data doosre pe likh dega. Isliye skip + report.
   const existingMap = {}, byClientId = {}, byMobile = {}, nameMap = {}, nameCount = {};
+  // How many existing clients (guardian + any minors) share each PAN. A minor
+  // legally carries the guardian's PAN, so a family can have 2+ CRM records
+  // on the very same PAN. If a file row's Client ID doesn't resolve (e.g. the
+  // minor's own Client ID was never captured), falling back to PAN alone
+  // would silently attribute that row to whichever one record happens to sit
+  // in existingMap — usually the guardian — even when the row was actually
+  // the minor's own transaction. panOwnerCount lets the PAN-fallback below
+  // detect "this PAN belongs to more than one person" and refuse to guess.
+  const panOwnerCount = {};
   existing.forEach(c => {
     const p = String(c.pan||'').trim().toUpperCase();
-    if(p && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p) && !c.is_minor) existingMap[p] = c;
+    if(p && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)){
+      panOwnerCount[p] = (panOwnerCount[p]||0)+1;
+      if(!c.is_minor) existingMap[p] = c;
+    }
     if(c.client_id) byClientId[String(c.client_id).trim()] = c;
     if(/^\d{4,}$/.test(p) && !c.is_minor) byClientId[p] = c;      // legacy: Client ID stuck in the PAN field
     const m = mob10(c.mobile); if(m.length===10) byMobile[m] = c;
@@ -11354,11 +11366,15 @@ async function doImport(){
         : {};
 
       // Match order: Client ID → PAN → Mobile → Name.
-      // (existingMap above already excludes minors, so a minor carrying the
-      // guardian's PAN will skip straight to Client ID / Mobile matching
-      // instead of landing on the guardian's record.)
+      // PAN is skipped when panOwnerCount[pan] > 1 — a guardian+minor family
+      // sharing one PAN — because without a Client ID we can't safely tell
+      // whose transaction this row actually is; guessing "the guardian" would
+      // silently overwrite the guardian's record with the minor's numbers (or
+      // vice versa). That case falls through to Name matching / ambiguous
+      // instead, same as if PAN had found nothing.
+      const panIsUnambiguous = row.pan && (panOwnerCount[row.pan]||0) <= 1;
       let ex = (row.client_id && byClientId[String(row.client_id).trim()])
-            || (row.pan && existingMap[row.pan])
+            || (panIsUnambiguous && existingMap[row.pan])
             || (row.mobile && byMobile[mob10(row.mobile)])
             || null;
       if(!ex){
@@ -11461,8 +11477,12 @@ async function doImport(){
     });
     Object.values(importData.sip).forEach(row => {
       const upName = nmKey(row.name);
+      const rowPan = validPan(row.pan) ? String(row.pan).trim().toUpperCase() : '';
+      // Same guardian+minor PAN-sharing guard as the AUM import above — don't
+      // fall back to a shared PAN without a Client ID to disambiguate.
+      const panIsUnambiguous = rowPan && (panOwnerCount[rowPan]||0) <= 1;
       let ex = (row.client_id && byClientId[String(row.client_id).trim()])
-            || (validPan(row.pan) && existingMap[String(row.pan).trim().toUpperCase()])
+            || (panIsUnambiguous && existingMap[rowPan])
             || null;
       if(!ex){
         // Naam se match SIRF jab dono taraf unique ho — warna same-naam alag
