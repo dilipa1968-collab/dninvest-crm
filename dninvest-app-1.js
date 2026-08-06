@@ -11361,10 +11361,6 @@ async function doImport(){
   if(importData.aum){
     importData.aum.forEach(row => {
       const upName = nmKey(row.name);
-      const sipInfo = importData.sip
-        ? (importData.sip['CID:'+row.client_id] || (row.pan && importData.sip[row.pan]) || importData.sip[upName] || {})
-        : {};
-
       // Match order: Client ID → PAN → Mobile → Name.
       // PAN is skipped when panOwnerCount[pan] > 1 — a guardian+minor family
       // sharing one PAN — because without a Client ID we can't safely tell
@@ -11373,6 +11369,17 @@ async function doImport(){
       // vice versa). That case falls through to Name matching / ambiguous
       // instead, same as if PAN had found nothing.
       const panIsUnambiguous = row.pan && (panOwnerCount[row.pan]||0) <= 1;
+      // Same guard applies to pulling in this row's SIP data (sip_amount/
+      // sip_count/sip_details from the separately-parsed SIP report) — this
+      // used to fall back to `importData.sip[row.pan]` unconditionally, which
+      // is exactly the same guardian/minor mix-up bug as the client-match
+      // above, just one step further down: even after `ex` correctly resolved
+      // to the right person, their record could still get the OTHER family
+      // member's SIP numbers glued on via this PAN-keyed lookup.
+      const sipInfo = importData.sip
+        ? (importData.sip['CID:'+row.client_id] || (panIsUnambiguous && importData.sip[row.pan]) || importData.sip[upName] || {})
+        : {};
+
       let ex = (row.client_id && byClientId[String(row.client_id).trim()])
             || (panIsUnambiguous && existingMap[row.pan])
             || (row.mobile && byMobile[mob10(row.mobile)])
