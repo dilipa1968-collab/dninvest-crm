@@ -3455,6 +3455,31 @@ function _safeAutoReload(){
 }
 setInterval(_safeAutoReload, 30*60*1000);
 
+// Live-deploy detection (6-Aug-2026): whenever a new build is pushed to
+// Vercel, everyone's open CRM tab should refresh itself automatically —
+// nobody should have to be told "please hard-refresh". This needs NO manual
+// version bump (that was rejected earlier — too easy to forget on a
+// deployment): it reads the page's own ETag/Last-Modified header, which
+// Vercel changes automatically on every deploy, and polls for a change.
+// When a new deploy is detected it reuses the same _safeAutoReload() above,
+// so an RM's unsaved form is never wiped mid-edit — the refresh just waits
+// until they're done, exactly like the 30-min timer already does.
+let _appDeployTag = null;
+async function _checkForNewDeploy(){
+  try{
+    const res = await fetch(location.pathname + (location.pathname.includes('?')?'&':'?') + '_chk=' + Date.now(), {method:'HEAD', cache:'no-store'});
+    const tag = res.headers.get('etag') || res.headers.get('last-modified');
+    if(!tag) return; // header not exposed — silently skip, 30-min blind timer above still covers this
+    if(_appDeployTag===null){ _appDeployTag = tag; return; } // first check just records the baseline
+    if(tag !== _appDeployTag){
+      _appDeployTag = tag;
+      _safeAutoReload();
+    }
+  }catch(e){ /* offline, or a network hiccup — just try again next tick */ }
+}
+setInterval(_checkForNewDeploy, 2*60*1000); // check every 2 minutes
+_checkForNewDeploy(); // record baseline right away (won't reload on this first call)
+
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
   const activeEq=getActiveEqClients();
