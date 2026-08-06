@@ -882,7 +882,7 @@ input:focus, select:focus, textarea:focus{
           <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="showClientBrokerageHistory(null)" title="Every client's brokerage, month by month, across all RMs" style="background:var(--navy,#1a2744);border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📅 Client History (All RMs)</button><button onclick="showBroUnmatchedReport()" title="Clients that failed to match an RM in brokerage uploads" style="background:#B91C1C;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">⚠ Unmatched Clients</button><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -4116,6 +4116,21 @@ async function confirmDeleteAdvance(name, id){
 }
 
 // ─── INCENTIVE ───────────────────────────────────────────────────────────────
+// Counts "late" (yellow/amber badge) attendance days for an employee within
+// a given month — same badge logic the Attendance pages already use
+// (presentBadgeClass for a Present record's in-time, or an explicit
+// status==='Late' record), so this always matches what the RM/admin sees as
+// yellow on the attendance screen. Used by totalIncentive() for the late-
+// coming incentive deduction (1% of incentive per late day).
+function lateDaysInMonth(name, month){
+  const all = DB.get('attendance', {})[name] || [];
+  const monthRecs = all.filter(r=>r.date && r.date.startsWith(month));
+  return monthRecs.filter(r=>{
+    if(r.status==='Present') return presentBadgeClass(r)==='badge-amber';
+    return r.status==='Late';
+  }).length;
+}
+
 function totalIncentive(name, salary, month){
   // Prefer month-specific data; fall back to legacy single-bucket data if present.
   const monthData = month ? getMfSipForMonth(month) : {};
@@ -4141,9 +4156,16 @@ function totalIncentive(name, salary, month){
   const netSalesInc = netSales*(rates.netSalesRate||0)/100;
   const sipInc = sip*(rates.sipRate||0)/100;
   const pp=perfIncentivePayout(name, month);
-  const total = br.total + dematInc + mfInc + netSalesInc + sipInc + other + broClientInc + pp.pay;
+  const rawTotal = br.total + dematInc + mfInc + netSalesInc + sipInc + other + broClientInc + pp.pay;
 
-  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, total, tier2Eligible: br.tier2Eligible};
+  // Late-coming deduction: 1% of the incentive per "yellow" (late) attendance
+  // day this month, capped so it can never push the payable amount negative.
+  const lateDays = month ? lateDaysInMonth(name, month) : 0;
+  const lateDeductionPct = Math.min(lateDays*1, 100);
+  const lateDeductionAmt = Math.round(rawTotal * lateDeductionPct/100);
+  const total = rawTotal - lateDeductionAmt;
+
+  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, rawTotal, lateDays, lateDeductionPct, lateDeductionAmt, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -4211,6 +4233,7 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
         ${t.broClientRows&&t.broClientRows.length>0?'<tr><td colspan="2" style="padding:4px 0"><button onclick="showBroClientDetail(\''+currentUser+'\',\''+selMonth+'\')" style="font-size:11.5px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer;width:100%">📋 Client-wise brokerage detail ('+t.broClientTotal+' clients, '+t.broClientCount+' eligible)</button></td></tr>':''}
+        ${t.lateDeductionAmt>0?`<tr><td style="color:var(--red);padding:4px 0">Late-coming deduction <span style="color:var(--text3);font-size:11px">(${t.lateDays} late day${t.lateDays>1?'s':''} × 1%)</span></td><td style="text-align:right;color:var(--red)">−${fmt(t.lateDeductionAmt)}</td></tr>`:''}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
@@ -4237,7 +4260,7 @@ function renderIncentivePage(){
         // accumulate column totals
         T.incSal+=(sal+perf); T.brok+=tt.brok; T.tier1+=tt.br.base5; T.tier2+=tt.br.extra2;
         T.demat+=tt.demat; T.mf+=tt.mf; T.netSales=(T.netSales||0)+tt.netSales; T.sip+=tt.sip; T.broCl+=tt.broClientInc;
-        T.other+=(tt.other+tt.perfPay); T.total+=tt.total; T.paid+=paid; T.balance+=balance;
+        T.other+=(tt.other+tt.perfPay); T.lateDed=(T.lateDed||0)+tt.lateDeductionAmt; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
           <td title="Salary ${fmt(sal)}${perf>0?' + Perf. Inc. '+fmt(perf):''}">${fmt(sal+perf)}${perf>0?'<br><small style="font-weight:400;color:var(--text3)">('+fmt(sal)+'+'+fmt(perf)+')</small>':''}</td>
@@ -4250,6 +4273,7 @@ function renderIncentivePage(){
           <td>${fmt(tt.sip)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(incl. perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
+          <td style="color:${tt.lateDeductionAmt>0?'var(--red)':'var(--text3)'}" title="${tt.lateDays} late day(s) this month">${tt.lateDeductionAmt>0?'−'+fmt(tt.lateDeductionAmt)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.lateDays+' late × 1%)</small>':'—'}</td>
           <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
@@ -4268,6 +4292,7 @@ function renderIncentivePage(){
           <td>${fmt(T.sip)}</td>
           <td style="color:${T.broCl>0?'var(--green)':'var(--text3)'}">${T.broCl>0?fmt(T.broCl):'—'}</td>
           <td>${fmt(T.other)}</td>
+          <td style="color:${T.lateDed>0?'var(--red)':'var(--text3)'}">${T.lateDed>0?'−'+fmt(T.lateDed):'—'}</td>
           <td style="color:var(--green)">${fmt(T.total)}</td>
           <td style="color:var(--green)">${fmt(T.paid)}</td>
           <td style="color:${T.balance>0?'var(--red)':'var(--green)'}">${fmt(T.balance)}</td>
@@ -4350,12 +4375,13 @@ function downloadTeamIncentiveReport(){
     {header:'BRO.CL.BONUS', width:13, money:true, color:posGreen},
     {header:'PERF. INC.\n(attendance-adj ÷26)', width:15, money:true, color:posGreen},
     {header:'OTHER', width:10, money:true},
+    {header:'LATE DED.\n(1% / late day)', width:13, money:true, color:v=>{const n=Number(String(v).replace(/[₹,\s]/g,''))||0; return n>0?{bg:'FFFFC7CE',font:'FF9C0006'}:null;}},
     {header:'TOTAL INCENTIVE', width:15, money:true, color:posGreen},
     {header:'PAID', width:11, money:true},
     {header:'BALANCE', width:12, money:true, color:balColor}
   ];
 
-  const T={incSal:0,brok:0,t1:0,t2:0,demat:0,dInc:0,mf:0,mfInc:0,ns:0,nsInc:0,sip:0,sipInc:0,broCl:0,perf:0,other:0,total:0,paid:0,bal:0};
+  const T={incSal:0,brok:0,t1:0,t2:0,demat:0,dInc:0,mf:0,mfInc:0,ns:0,nsInc:0,sip:0,sipInc:0,broCl:0,perf:0,other:0,lateDed:0,total:0,paid:0,bal:0};
   const rows=EMPLOYEES.map(e=>{
     const sal=getEmpSalary(e.name), perf=getPerfIncentive(e.name);
     const tt=totalIncentive(e.name,sal,month);
@@ -4364,12 +4390,12 @@ function downloadTeamIncentiveReport(){
     T.incSal+=(sal+perf); T.brok+=tt.brok; T.t1+=tt.br.base5; T.t2+=tt.br.extra2;
     T.demat+=tt.demat; T.dInc+=tt.dematInc; T.mf+=tt.mf; T.mfInc+=tt.mfInc;
     T.ns+=tt.netSales; T.nsInc+=(tt.netSalesInc||0); T.sip+=tt.sip; T.sipInc+=tt.sipInc;
-    T.broCl+=tt.broClientInc; T.perf+=tt.perfPay; T.other+=tt.other; T.total+=tt.total; T.paid+=paid; T.bal+=bal;
+    T.broCl+=tt.broClientInc; T.perf+=tt.perfPay; T.other+=tt.other; T.lateDed+=tt.lateDeductionAmt; T.total+=tt.total; T.paid+=paid; T.bal+=bal;
     return [e.name, sal+perf, tt.brok, tt.br.base5, tt.br.extra2, tt.demat, tt.dematInc,
             tt.mf, tt.mfInc, tt.netSales, tt.netSalesInc||0, tt.sip, tt.sipInc,
-            tt.broClientInc, tt.perfPay, tt.other, tt.total, paid, bal];
+            tt.broClientInc, tt.perfPay, tt.other, tt.lateDeductionAmt, tt.total, paid, bal];
   });
-  const totalRow=['TOTAL',T.incSal,T.brok,T.t1,T.t2,T.demat,T.dInc,T.mf,T.mfInc,T.ns,T.nsInc,T.sip,T.sipInc,T.broCl,T.perf,T.other,T.total,T.paid,T.bal];
+  const totalRow=['TOTAL',T.incSal,T.brok,T.t1,T.t2,T.demat,T.dInc,T.mf,T.mfInc,T.ns,T.nsInc,T.sip,T.sipInc,T.broCl,T.perf,T.other,T.lateDed,T.total,T.paid,T.bal];
 
   // Summary sheet
   const summaryRows=[
@@ -4385,6 +4411,7 @@ function downloadTeamIncentiveReport(){
     ['Brokerage Client Bonus', T.broCl],
     ['Performance Incentive (attendance-adj)', T.perf],
     ['Other / Special', T.other],
+    ['Late-Coming Deduction (1% / late day)', T.lateDed],
     ['TOTAL INCENTIVE', T.total],
     ['Paid', T.paid],
     ['Balance Payable', T.bal]
