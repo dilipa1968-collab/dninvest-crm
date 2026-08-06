@@ -6604,6 +6604,7 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
   const clientWrap=document.getElementById('biz_client_wrap'); if(clientWrap) clientWrap.style.display='none';
   const rmNoteWrap=document.getElementById('biz_rm_note_wrap'); if(rmNoteWrap) rmNoteWrap.style.display='none';
+  const mfDeskNoteWrap=document.getElementById('biz_mfdesk_note_wrap'); if(mfDeskNoteWrap) mfDeskNoteWrap.style.display='none';
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
@@ -6612,6 +6613,12 @@ function openBusinessModal(clientId, clientName){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value='';
   toggleBizTarget();
   document.getElementById('biz_date').value = today();
+  // New entries are always fully editable (Add is a fresh, self-attributed
+  // entry) — clear any Type/Amount/Target-Scheme lock left over from a
+  // previous MF-Desk restricted edit session.
+  document.getElementById('biz_type').disabled = false;
+  document.getElementById('biz_amount').disabled = false;
+  if(btEl) btEl.disabled = false;
   document.getElementById('businessModal').classList.add('open');
 }
 
@@ -6641,7 +6648,7 @@ function saveBusinessEntry(){
   if(editingBusinessId){
     const idx = entries.findIndex(e=>e.id===editingBusinessId);
     if(idx>=0){
-      if(CU.role!=='admin' && entries[idx].created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
+      if(CU.role!=='admin' && entries[idx].created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
       // Admin can reassign the Client and/or re-attribute the RM — but only
       // for this one transaction entry. Neither touches the client's actual
       // RM assignment in mf_clients; that mapping stays exactly as it was.
@@ -6651,10 +6658,17 @@ function saveBusinessEntry(){
         entries[idx].client_name = currentBusinessTarget.name;
         entries[idx].rm = document.getElementById('biz_client_rm')?.value || '';
       }
-      entries[idx].type = type;
-      entries[idx].amount = amount;
+      // MF Desk (pure role, or RM+MF Desk access) editing someone else's
+      // entry: Type / Amount / Target Scheme stay exactly as they were,
+      // regardless of what the (disabled) form fields show — this holds
+      // even if the UI lock is ever bypassed. Only Fund Name, Start Date,
+      // Date and Paid status can change for them.
+      const mfDeskRestricted = isMfDeskRestrictedBizEdit();
+      const finalType = mfDeskRestricted ? entries[idx].type : type;
+      entries[idx].type = finalType;
+      entries[idx].amount = mfDeskRestricted ? entries[idx].amount : amount;
       entries[idx].fund_name = fundName;
-      entries[idx].target_scheme = mfTxnTypeNeedsTarget(type) ? targetScheme : '';
+      entries[idx].target_scheme = mfDeskRestricted ? entries[idx].target_scheme : (mfTxnTypeNeedsTarget(type) ? targetScheme : '');
       entries[idx].first_payment = sched ? firstPay : null;
       entries[idx].start_date = sched ? startDate : '';
       entries[idx].date = date;
@@ -7476,7 +7490,8 @@ function renderMfTxnTable(){
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
             <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit (all fields)">✏️</button>
-            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
+            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:
+            (hasMfDeskAccess(CU)?`<button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit (Date/Fund/Paid only)">✏️</button>`:'')}</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -8823,7 +8838,7 @@ function renderBizReportTable(){
     const remarkCell = e.cross_remark
       ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
       : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Rmk</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
-    const canEdit = CU.role==='admin' || e.created_by===CU.name;
+    const canEdit = CU.role==='admin' || e.created_by===CU.name || hasMfDeskAccess(CU);
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
     h+=`<td style="min-width:140px">${remarkCell}</td>`;
     h+=`<td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>`;
@@ -8840,19 +8855,32 @@ function renderBizReportTable(){
   document.getElementById('reportModalBody').innerHTML=h;
 }
 
+// MF Desk (pure role, or an RM granted MF Desk access) can now open and edit
+// any business entry — but only to fix Start Date / Date / Fund Name / Paid
+// status (e.g. backfilling from a statement). They can never touch Amount,
+// Type, Target Scheme, Client or RM through this modal, and can never delete
+// (delete stays admin-only, unchanged, in deleteBusinessEntry/deleteMfTxnEntry).
+function isMfDeskRestrictedBizEdit(){
+  return !!(CU && CU.role!=='admin' && hasMfDeskAccess(CU));
+}
+
 function editBusinessEntry(id){
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
-  if(CU.role!=='admin' && e.created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
+  if(CU.role!=='admin' && e.created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
   currentBusinessTarget = {id: e.client_id, name: e.client_name};
   editingBusinessId = id;
   document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
+
+  const restricted = isMfDeskRestrictedBizEdit();
 
   const clientWrap=document.getElementById('biz_client_wrap');
   if(clientWrap) clientWrap.style.display = CU.role==='admin' ? '' : 'none';
   const rmNoteWrap=document.getElementById('biz_rm_note_wrap');
   if(rmNoteWrap) rmNoteWrap.style.display = CU.role==='admin' ? '' : 'none';
+  const mfDeskNoteWrap=document.getElementById('biz_mfdesk_note_wrap');
+  if(mfDeskNoteWrap) mfDeskNoteWrap.style.display = restricted ? '' : 'none';
   const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=e.client_name||'';
   populateBizRmDropdown(e.rm||'');
   const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
@@ -8866,6 +8894,15 @@ function editBusinessEntry(id){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value = e.start_date||'';
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
+
+  // MF Desk restricted edit: lock Type / Amount / Target Scheme; leave
+  // Start Date, Date, Fund Name and the Paid checkbox editable.
+  const typeEl=document.getElementById('biz_type');
+  const amtEl=document.getElementById('biz_amount');
+  if(typeEl) typeEl.disabled = restricted;
+  if(amtEl) amtEl.disabled = restricted;
+  if(btEl) btEl.disabled = restricted;
+
   document.getElementById('businessModal').classList.add('open');
 }
 
