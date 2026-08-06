@@ -538,6 +538,53 @@ const DB = {
     }
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
+  // Transaction-safe seminar mutation, used for every attendee add/edit/
+  // remove and seminar-metadata edit. `mutate(freshSeminar)` receives the
+  // LATEST seminar record straight from Firestore at write time — not the
+  // caller's local copy, which may be stale by the time the write lands —
+  // and mutates it in place. This is what fixes attendees silently
+  // "disappearing": two RMs adding different attendees to the same seminar
+  // around the same time used to each blindly overwrite the WHOLE seminar
+  // record with their own stale local snapshot, so whichever save landed
+  // second wiped out the other RM's new attendee. Now every save is applied
+  // on top of whatever is actually on the server at that moment, so
+  // concurrent adds/edits from different RMs never clobber each other.
+  // Return `false` from mutate() to abort the write (e.g. "already added").
+  async mutateSeminar(seminarId, mutate){
+    // Keep the local UI responsive with an optimistic local-only update too.
+    let localArr = this.get('seminars')||[];
+    const lIdx = localArr.findIndex(x=>x.id===seminarId);
+    if(lIdx>=0){
+      const clone = JSON.parse(JSON.stringify(localArr[lIdx]));
+      if(mutate(clone)!==false){ localArr=localArr.slice(); localArr[lIdx]=clone; this.setLocal('seminars', localArr); }
+    }
+
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    const docRef = fdb.collection('crm_data').doc('seminars');
+    let finalData=null, aborted=false;
+    this._writing['seminars'] = (this._writing['seminars']||0) + 1;
+    try{
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : (this.get('seminars')||[]);
+        const idx = latest.findIndex(x=>x.id===seminarId);
+        if(idx<0){ aborted=true; return; }
+        const sem = {...latest[idx], attendees:(latest[idx].attendees||[]).map(a=>({...a}))};
+        const res = mutate(sem);
+        if(res===false){ aborted=true; return; }
+        latest = latest.slice();
+        latest[idx] = sem;
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        finalData = latest;
+      });
+      if(finalData) this.setLocal('seminars', finalData);
+      return {ok:true, aborted};
+    }catch(e){
+      console.log('mutateSeminar error:', e);
+      toast('Sync error: '+e.message,'error');
+      return {ok:false, error:e.message};
+    } finally{ this._writing['seminars'] = Math.max(0,(this._writing['seminars']||1)-1); }
+  },
   // Delete a single client record (merge-on-write delete)
   async deleteClient(key, id){
     let arr = (this.get(key)||[]).filter(c=>c.id!==id);
@@ -3455,31 +3502,6 @@ function _safeAutoReload(){
 }
 setInterval(_safeAutoReload, 30*60*1000);
 
-// Live-deploy detection (6-Aug-2026): whenever a new build is pushed to
-// Vercel, everyone's open CRM tab should refresh itself automatically —
-// nobody should have to be told "please hard-refresh". This needs NO manual
-// version bump (that was rejected earlier — too easy to forget on a
-// deployment): it reads the page's own ETag/Last-Modified header, which
-// Vercel changes automatically on every deploy, and polls for a change.
-// When a new deploy is detected it reuses the same _safeAutoReload() above,
-// so an RM's unsaved form is never wiped mid-edit — the refresh just waits
-// until they're done, exactly like the 30-min timer already does.
-let _appDeployTag = null;
-async function _checkForNewDeploy(){
-  try{
-    const res = await fetch(location.pathname + (location.pathname.includes('?')?'&':'?') + '_chk=' + Date.now(), {method:'HEAD', cache:'no-store'});
-    const tag = res.headers.get('etag') || res.headers.get('last-modified');
-    if(!tag) return; // header not exposed — silently skip, 30-min blind timer above still covers this
-    if(_appDeployTag===null){ _appDeployTag = tag; return; } // first check just records the baseline
-    if(tag !== _appDeployTag){
-      _appDeployTag = tag;
-      _safeAutoReload();
-    }
-  }catch(e){ /* offline, or a network hiccup — just try again next tick */ }
-}
-setInterval(_checkForNewDeploy, 2*60*1000); // check every 2 minutes
-_checkForNewDeploy(); // record baseline right away (won't reload on this first call)
-
 function updateBadges(){
   const eq=getMyEqClients(), mf=getMyMfClients();
   const activeEq=getActiveEqClients();
@@ -4779,18 +4801,22 @@ async function saveSeminar(){
   const notes=document.getElementById('sem_notes').value.trim();
   if(!name||!date){ toast('Seminar name and date are required','error'); return; }
 
-  const seminars=DB.get('seminars')||[];
-  let rec;
   if(currentEditSeminarId){
-    rec = seminars.find(x=>x.id===currentEditSeminarId);
-    if(!rec) return;
-    rec.name=name; rec.date=date; rec.notes=notes; rec.updated=today();
+    // Editing name/date/notes of an existing seminar — go through mutateSeminar
+    // (not a blind setClient) so this can never race with someone concurrently
+    // adding/editing an attendee on the same seminar and wipe their change.
+    const r = await DB.mutateSeminar(currentEditSeminarId, sem=>{
+      sem.name=name; sem.date=date; sem.notes=notes; sem.updated=today();
+    });
+    if(!r.ok || r.aborted) return;
   } else {
+    // Brand-new seminar (fresh id) — no concurrent-edit risk, plain setClient is fine.
+    const seminars=DB.get('seminars')||[];
     let newId=uid();
     while(seminars.some(x=>x.id===newId)) newId=uid();
-    rec={id:newId, name, date, notes, attendees:[], created_by:CU.name, created:today(), updated:today()};
+    const rec={id:newId, name, date, notes, attendees:[], created_by:CU.name, created:today(), updated:today()};
+    await DB.setClient('seminars',rec);
   }
-  await DB.setClient('seminars',rec);
   closeModal('seminarModal');
   toast(currentEditSeminarId?'Seminar updated!':'Seminar added!','success');
   renderSeminarsTable();
@@ -5054,104 +5080,109 @@ async function addSeminarAttendeesToLeads(){
 // ── End Seminar → Lead helpers ───────────────────────────────────────────────
 
 async function setAttendeeStatus(attendeeId,status){
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
-  if(!a) return;
-  a.status=status;
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  await DB.mutateSeminar(currentSeminarId, sem=>{
+    const a=(sem.attendees||[]).find(x=>x.id===attendeeId);
+    if(!a) return false;
+    a.status=status;
+    sem.updated=today();
+  });
   renderSeminarsTable();
 }
 
 async function setAttendeeRsvp(attendeeId,rsvp){
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
-  if(!a) return;
-  a.rsvp=rsvp;
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  await DB.mutateSeminar(currentSeminarId, sem=>{
+    const a=(sem.attendees||[]).find(x=>x.id===attendeeId);
+    if(!a) return false;
+    a.rsvp=rsvp;
+    sem.updated=today();
+  });
 }
 
 async function setAttendeeCount(attendeeId,val){
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
-  if(!a) return;
-  a.expected_count = val===''?null:parseInt(val);
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  await DB.mutateSeminar(currentSeminarId, sem=>{
+    const a=(sem.attendees||[]).find(x=>x.id===attendeeId);
+    if(!a) return false;
+    a.expected_count = val===''?null:parseInt(val);
+    sem.updated=today();
+  });
 }
 
 async function setAttendeeRemarks(attendeeId,val){
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-  const a=(s.attendees||[]).find(x=>x.id===attendeeId);
-  if(!a) return;
-  a.remarks = val;
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  await DB.mutateSeminar(currentSeminarId, sem=>{
+    const a=(sem.attendees||[]).find(x=>x.id===attendeeId);
+    if(!a) return false;
+    a.remarks = val;
+    sem.updated=today();
+  });
 }
 
 // Admin-only: RM ko table se hi change karo (equity + mf dono RMs). Client-linked
 // attendee ho to master record ka RM bhi sync ho jata hai.
 async function onAttRmChange(sel){
   if(CU.role!=='admin'){ sel.value=sel.dataset.prev||''; toast('Only Admin can change RM','error'); return; }
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s){ return; }
-  const a=(s.attendees||[]).find(x=>x.id===sel.dataset.id);
-  if(!a){ return; }
   const newRm=normRm(sel.value);
-  a.rm=newRm;
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  let a=null, srcId=null, srcType=null;
+  const r = await DB.mutateSeminar(currentSeminarId, sem=>{
+    a=(sem.attendees||[]).find(x=>x.id===sel.dataset.id);
+    if(!a) return false;
+    a.rm=newRm;
+    sem.updated=today();
+    srcId=a.source_id; srcType=a.type;
+  });
+  if(!r.ok || r.aborted) return;
   // Client master RM sync (equity/mf linked attendee)
-  if(a.source_id && (a.type==='equity'||a.type==='mf')){
-    const coll = a.type==='equity' ? 'eq_clients' : 'mf_clients';
+  if(srcId && (srcType==='equity'||srcType==='mf')){
+    const coll = srcType==='equity' ? 'eq_clients' : 'mf_clients';
     const list=DB.get(coll)||[];
-    const c=list.find(x=>x.id===a.source_id);
+    const c=list.find(x=>x.id===srcId);
     if(c && (c.rm||'')!==newRm){ c.rm=newRm; await DB.setClient(coll,c); }
   }
   sel.dataset.prev=newRm;
   toast('RM updated'+(newRm?' → '+newRm:''),'success');
-  try{ rebuildSemRmOptions(s.attendees||[]); }catch(e){}
+  try{ rebuildSemRmOptions((DB.get('seminars')||[]).find(x=>x.id===currentSeminarId)?.attendees||[]); }catch(e){}
 }
 
 async function saveSeminarAttendeeChanges(){
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
+  // Read the DOM edits first (independent of any stale local `s` snapshot),
+  // then apply them inside the transaction onto whatever is actually on the
+  // server at write time — same fix as every other attendee mutation here.
+  const edits=[];
   document.querySelectorAll('#seminar-attendees-table tbody tr').forEach(row=>{
     const id=row.dataset.id;
     if(!id) return;
-    const a=(s.attendees||[]).find(x=>x.id===id);
-    if(!a) return;
-    // Only save changes for attendees this user is actually allowed to edit.
-    // Other RMs' rows are rendered disabled (read-only) in this table, but
-    // their <select>/<input> elements still exist in the DOM — reading and
-    // re-saving their values here was silently overwriting other RMs'
-    // attendance status (e.g. resetting "Attended" back to "Pending").
-    const isMyAttendee = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
-    if(!isMyAttendee) return;
     const rsvpEl=row.querySelector('.att-rsvp');
     const countEl=row.querySelector('.att-count');
     const statusEl=row.querySelector('.att-status');
     const remarksEl=row.querySelector('.att-remarks');
     const typeEl=row.querySelector('.att-type');
-    if(rsvpEl) a.rsvp=rsvpEl.value;
-    if(countEl) a.expected_count = countEl.value===''?null:parseInt(countEl.value);
-    if(statusEl) a.status=statusEl.value;
-    if(remarksEl) a.remarks=remarksEl.value;
-    if(typeEl) a.type=typeEl.value;
+    edits.push({
+      id,
+      rsvp: rsvpEl?rsvpEl.value:undefined,
+      count: countEl?(countEl.value===''?null:parseInt(countEl.value)):undefined,
+      status: statusEl?statusEl.value:undefined,
+      remarks: remarksEl?remarksEl.value:undefined,
+      type: typeEl?typeEl.value:undefined
+    });
   });
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  await DB.mutateSeminar(currentSeminarId, sem=>{
+    edits.forEach(e=>{
+      const a=(sem.attendees||[]).find(x=>x.id===e.id);
+      if(!a) return;
+      // Only save changes for attendees this user is actually allowed to edit.
+      // Other RMs' rows are rendered disabled (read-only) in this table, but
+      // their <select>/<input> elements still exist in the DOM — reading and
+      // re-saving their values here was silently overwriting other RMs'
+      // attendance status (e.g. resetting "Attended" back to "Pending").
+      const isMyAttendee = CU.role==='admin' || (a.rm||'').trim().toLowerCase()===(CU.name||'').trim().toLowerCase();
+      if(!isMyAttendee) return;
+      if(e.rsvp!==undefined) a.rsvp=e.rsvp;
+      if(e.count!==undefined) a.expected_count=e.count;
+      if(e.status!==undefined) a.status=e.status;
+      if(e.remarks!==undefined) a.remarks=e.remarks;
+      if(e.type!==undefined) a.type=e.type;
+    });
+    sem.updated=today();
+  });
   renderSeminarsTable();
   toast('Changes saved!','success');
 }
@@ -5561,29 +5592,30 @@ function openEditAttendee(attendeeId){
 
 async function saveAttendeeEdit(){
   if(!_editAttId) return;
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-  const a=(s.attendees||[]).find(x=>x.id===_editAttId);
-  if(!a) return;
-
   const name=document.getElementById('editAtt_name').value.trim();
   const mobile=document.getElementById('editAtt_mobile').value.replace(/\D/g,'');
   const rmSel=document.getElementById('editAtt_rm');
-  const rm = CU.role==='admin' ? normRm(rmSel.value) : a.rm;
+  const rmIfAdmin = CU.role==='admin' ? normRm(rmSel.value) : null;
 
   if(!name){ toast('Name cannot be empty','error'); return; }
   if(mobile!=='' && mobile.length!==10){ toast('Enter a valid 10-digit mobile (or leave blank)','error'); return; }
 
-  a.name=name; a.mobile=mobile; a.rm=rm;
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  let srcId=null, srcType=null;
+  const r = await DB.mutateSeminar(currentSeminarId, sem=>{
+    const a=(sem.attendees||[]).find(x=>x.id===_editAttId);
+    if(!a) return false;
+    a.name=name; a.mobile=mobile;
+    a.rm = rmIfAdmin!==null ? rmIfAdmin : a.rm; // non-admin: keep whatever RM is currently on the server
+    sem.updated=today();
+    srcId=a.source_id; srcType=a.type;
+  });
+  if(!r.ok || r.aborted) return;
 
   // Client master sync (name + mobile)
-  if(a.source_id && (a.type==='equity'||a.type==='mf') && document.getElementById('editAtt_sync').checked){
-    const coll = a.type==='equity' ? 'eq_clients' : 'mf_clients';
+  if(srcId && (srcType==='equity'||srcType==='mf') && document.getElementById('editAtt_sync').checked){
+    const coll = srcType==='equity' ? 'eq_clients' : 'mf_clients';
     const list=DB.get(coll)||[];
-    const c=list.find(x=>x.id===a.source_id);
+    const c=list.find(x=>x.id===srcId);
     if(c){
       let changed=false;
       if((c.name||'')!==name){ c.name=name; changed=true; }
@@ -5600,12 +5632,10 @@ async function saveAttendeeEdit(){
 }
 
 async function removeAttendee(attendeeId){
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-  s.attendees=(s.attendees||[]).filter(x=>x.id!==attendeeId);
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  await DB.mutateSeminar(currentSeminarId, sem=>{
+    sem.attendees=(sem.attendees||[]).filter(x=>x.id!==attendeeId);
+    sem.updated=today();
+  });
   renderSeminarAttendees();
   renderSeminarsTable();
 }
@@ -5717,13 +5747,17 @@ async function addClientToSeminarDirect(sourceId, type, seminarId){
   if(CU.role!=='admin' && (src.rm||'').trim().toLowerCase()!==(CU.name||'').trim().toLowerCase()){
     toast('This client is mapped to '+(src.rm||'another RM')+' — you can only add your own clients','error'); return;
   }
-  s.attendees=s.attendees||[];
-  if(s.attendees.some(a=>a.source_id===sourceId && a.type===type)){ toast(src.name+' already in “'+s.name+'”','error'); return; }
-  let newId=uid(); while(s.attendees.some(x=>x.id===newId)) newId=uid();
-  s.attendees.push({ id:newId, source_id:sourceId, type, name:src.name, mobile:src.mobile||'', rm:src.rm||'', status:'Pending' });
-  s.updated=today();
-  await DB.setClient('seminars',s);
-  toast('✓ '+src.name+' → “'+s.name+'”','success');
+  let already=false;
+  const r = await DB.mutateSeminar(seminarId, sem=>{
+    sem.attendees=sem.attendees||[];
+    if(sem.attendees.some(a=>a.source_id===sourceId && a.type===type)){ already=true; return false; }
+    let newId=uid(); while(sem.attendees.some(x=>x.id===newId)) newId=uid();
+    sem.attendees.push({ id:newId, source_id:sourceId, type, name:src.name, mobile:src.mobile||'', rm:src.rm||'', status:'Pending' });
+    sem.updated=today();
+  });
+  if(already){ toast(src.name+' already in "'+s.name+'"','error'); return; }
+  if(!r.ok) return;
+  toast('✓ '+src.name+' → "'+s.name+'"','success');
   if(currentSeminarId===seminarId){ try{ renderSeminarAttendees(); }catch(e){} }
   try{ renderSeminarsTable(); }catch(e){}
 }
@@ -5741,16 +5775,15 @@ async function addAttendee(sourceId,type){
     return;
   }
 
-  s.attendees = s.attendees||[];
-  if(s.attendees.some(a=>a.source_id===sourceId && a.type===type)) return; // already added
-
-  let newId=uid();
-  while(s.attendees.some(x=>x.id===newId)) newId=uid();
-  s.attendees.push({
-    id:newId, source_id:sourceId, type, name:src.name, mobile:src.mobile||'', rm:src.rm||'', status:'Pending'
+  const r = await DB.mutateSeminar(currentSeminarId, sem=>{
+    sem.attendees = sem.attendees||[];
+    if(sem.attendees.some(a=>a.source_id===sourceId && a.type===type)) return false; // already added — checked against the SERVER's latest list, not a stale local one
+    let newId=uid();
+    while(sem.attendees.some(x=>x.id===newId)) newId=uid();
+    sem.attendees.push({ id:newId, source_id:sourceId, type, name:src.name, mobile:src.mobile||'', rm:src.rm||'', status:'Pending' });
+    sem.updated=today();
   });
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  if(!r.ok) return;
   renderSeminarAttendees();
   renderSeminarsTable();
   searchAttendees(); // refresh "Added" state
@@ -5762,18 +5795,14 @@ async function addGuestAttendee(){
   const rm=normRm(document.getElementById('guest_rm').value);
   if(!name){ toast('Please enter the guest name','error'); return; }
 
-  const seminars=DB.get('seminars')||[];
-  const s=seminars.find(x=>x.id===currentSeminarId);
-  if(!s) return;
-
-  s.attendees = s.attendees||[];
-  let newId=uid();
-  while(s.attendees.some(x=>x.id===newId)) newId=uid();
-  s.attendees.push({
-    id:newId, source_id:null, type:'guest', name, mobile, rm:rm||(CU.role!=='admin'?CU.name:''), status:'Pending'
+  const r = await DB.mutateSeminar(currentSeminarId, sem=>{
+    sem.attendees = sem.attendees||[];
+    let newId=uid();
+    while(sem.attendees.some(x=>x.id===newId)) newId=uid();
+    sem.attendees.push({ id:newId, source_id:null, type:'guest', name, mobile, rm:rm||(CU.role!=='admin'?CU.name:''), status:'Pending' });
+    sem.updated=today();
   });
-  s.updated=today();
-  await DB.setClient('seminars',s);
+  if(!r.ok) return;
 
   document.getElementById('guest_name').value='';
   document.getElementById('guest_mobile').value='';
@@ -6629,7 +6658,6 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
   const clientWrap=document.getElementById('biz_client_wrap'); if(clientWrap) clientWrap.style.display='none';
   const rmNoteWrap=document.getElementById('biz_rm_note_wrap'); if(rmNoteWrap) rmNoteWrap.style.display='none';
-  const mfDeskNoteWrap=document.getElementById('biz_mfdesk_note_wrap'); if(mfDeskNoteWrap) mfDeskNoteWrap.style.display='none';
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
@@ -6638,12 +6666,6 @@ function openBusinessModal(clientId, clientName){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value='';
   toggleBizTarget();
   document.getElementById('biz_date').value = today();
-  // New entries are always fully editable (Add is a fresh, self-attributed
-  // entry) — clear any Type/Amount/Target-Scheme lock left over from a
-  // previous MF-Desk restricted edit session.
-  document.getElementById('biz_type').disabled = false;
-  document.getElementById('biz_amount').disabled = false;
-  if(btEl) btEl.disabled = false;
   document.getElementById('businessModal').classList.add('open');
 }
 
@@ -6673,7 +6695,7 @@ function saveBusinessEntry(){
   if(editingBusinessId){
     const idx = entries.findIndex(e=>e.id===editingBusinessId);
     if(idx>=0){
-      if(CU.role!=='admin' && entries[idx].created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
+      if(CU.role!=='admin' && entries[idx].created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
       // Admin can reassign the Client and/or re-attribute the RM — but only
       // for this one transaction entry. Neither touches the client's actual
       // RM assignment in mf_clients; that mapping stays exactly as it was.
@@ -6683,17 +6705,10 @@ function saveBusinessEntry(){
         entries[idx].client_name = currentBusinessTarget.name;
         entries[idx].rm = document.getElementById('biz_client_rm')?.value || '';
       }
-      // MF Desk (pure role, or RM+MF Desk access) editing someone else's
-      // entry: Type / Amount / Target Scheme stay exactly as they were,
-      // regardless of what the (disabled) form fields show — this holds
-      // even if the UI lock is ever bypassed. Only Fund Name, Start Date,
-      // Date and Paid status can change for them.
-      const mfDeskRestricted = isMfDeskRestrictedBizEdit();
-      const finalType = mfDeskRestricted ? entries[idx].type : type;
-      entries[idx].type = finalType;
-      entries[idx].amount = mfDeskRestricted ? entries[idx].amount : amount;
+      entries[idx].type = type;
+      entries[idx].amount = amount;
       entries[idx].fund_name = fundName;
-      entries[idx].target_scheme = mfDeskRestricted ? entries[idx].target_scheme : (mfTxnTypeNeedsTarget(type) ? targetScheme : '');
+      entries[idx].target_scheme = mfTxnTypeNeedsTarget(type) ? targetScheme : '';
       entries[idx].first_payment = sched ? firstPay : null;
       entries[idx].start_date = sched ? startDate : '';
       entries[idx].date = date;
@@ -7515,8 +7530,7 @@ function renderMfTxnTable(){
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
             <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit (all fields)">✏️</button>
-            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:
-            (hasMfDeskAccess(CU)?`<button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit (Date/Fund/Paid only)">✏️</button>`:'')}</td>
+            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -8863,7 +8877,7 @@ function renderBizReportTable(){
     const remarkCell = e.cross_remark
       ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
       : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Rmk</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
-    const canEdit = CU.role==='admin' || e.created_by===CU.name || hasMfDeskAccess(CU);
+    const canEdit = CU.role==='admin' || e.created_by===CU.name;
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
     h+=`<td style="min-width:140px">${remarkCell}</td>`;
     h+=`<td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>`;
@@ -8880,32 +8894,19 @@ function renderBizReportTable(){
   document.getElementById('reportModalBody').innerHTML=h;
 }
 
-// MF Desk (pure role, or an RM granted MF Desk access) can now open and edit
-// any business entry — but only to fix Start Date / Date / Fund Name / Paid
-// status (e.g. backfilling from a statement). They can never touch Amount,
-// Type, Target Scheme, Client or RM through this modal, and can never delete
-// (delete stays admin-only, unchanged, in deleteBusinessEntry/deleteMfTxnEntry).
-function isMfDeskRestrictedBizEdit(){
-  return !!(CU && CU.role!=='admin' && hasMfDeskAccess(CU));
-}
-
 function editBusinessEntry(id){
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
-  if(CU.role!=='admin' && e.created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
+  if(CU.role!=='admin' && e.created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
   currentBusinessTarget = {id: e.client_id, name: e.client_name};
   editingBusinessId = id;
   document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
-
-  const restricted = isMfDeskRestrictedBizEdit();
 
   const clientWrap=document.getElementById('biz_client_wrap');
   if(clientWrap) clientWrap.style.display = CU.role==='admin' ? '' : 'none';
   const rmNoteWrap=document.getElementById('biz_rm_note_wrap');
   if(rmNoteWrap) rmNoteWrap.style.display = CU.role==='admin' ? '' : 'none';
-  const mfDeskNoteWrap=document.getElementById('biz_mfdesk_note_wrap');
-  if(mfDeskNoteWrap) mfDeskNoteWrap.style.display = restricted ? '' : 'none';
   const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=e.client_name||'';
   populateBizRmDropdown(e.rm||'');
   const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
@@ -8919,15 +8920,6 @@ function editBusinessEntry(id){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value = e.start_date||'';
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
-
-  // MF Desk restricted edit: lock Type / Amount / Target Scheme; leave
-  // Start Date, Date, Fund Name and the Paid checkbox editable.
-  const typeEl=document.getElementById('biz_type');
-  const amtEl=document.getElementById('biz_amount');
-  if(typeEl) typeEl.disabled = restricted;
-  if(amtEl) amtEl.disabled = restricted;
-  if(btEl) btEl.disabled = restricted;
-
   document.getElementById('businessModal').classList.add('open');
 }
 
