@@ -11606,7 +11606,14 @@ function _mfDupKey(c){
   return n ? 'N:'+n : '';
 }
 function findMfDupGroups(){
-  const arr = DB.get('mf_clients')||[];
+  // Minors are excluded from duplicate-scanning entirely — a minor legally
+  // carries the guardian's PAN (and often the guardian's mobile too, since
+  // a child doesn't have their own phone), so grouping them by PAN/mobile
+  // makes a real guardian+minor pair look like the same person duplicated.
+  // "Merge Selected" deletes every non-primary record in a group, so without
+  // this exclusion a minor's own investor record could get permanently
+  // deleted as a false "duplicate" of their parent.
+  const arr = (DB.get('mf_clients')||[]).filter(c=>!c.is_minor);
   const map = {};
   arr.forEach(c=>{ const k=_mfDupKey(c); if(!k) return; (map[k]=map[k]||[]).push(c); });
   return Object.keys(map).filter(k=>map[k].length>1).map(k=>({key:k, recs:map[k]}));
