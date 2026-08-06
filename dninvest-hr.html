@@ -210,16 +210,19 @@ td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text)}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface2)}
 
-/* TEAM INCENTIVE TABLE — many columns, so a tighter, evenly-spaced layout
-   (colgroup above sets proportional widths) reads a lot less cramped than
-   the default table sizing, which let long headers wrap raggedly. */
-.team-inc-table{table-layout:fixed}
-.team-inc-table th,.team-inc-table td{padding:8px 7px;font-size:12px;line-height:1.35;word-break:break-word}
-.team-inc-table th{font-size:10px;white-space:normal}
-.team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:12px}
-.team-inc-table input[type=number]{width:100%;min-width:0;box-sizing:border-box;padding:5px 6px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface);color:var(--text);outline:none;text-align:right}
+/* TEAM INCENTIVE TABLE — many columns; auto layout (not fixed) so it sizes
+   to its content and scrolls horizontally inside .tbl-wrap rather than
+   squeezing headers into broken mid-word wraps or squashing the Save button.
+   Headers stay on one line for a crisp look; the table is simply wider than
+   the card and scrolls, same idea as any wide spreadsheet-style view. */
+.team-inc-table{table-layout:auto;width:max-content;min-width:100%}
+.team-inc-table th,.team-inc-table td{padding:9px 10px;font-size:12.5px;line-height:1.4;white-space:nowrap}
+.team-inc-table td small{white-space:nowrap}
+.team-inc-table th{font-size:10.5px}
+.team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:14px}
+.team-inc-table input[type=number]{width:72px;box-sizing:border-box;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:var(--surface);color:var(--text);outline:none;text-align:right}
 .team-inc-table input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg,rgba(37,99,235,.12))}
-.team-inc-table .btn-sm{width:100%;white-space:nowrap}
+.team-inc-table .btn-sm{white-space:nowrap;padding:6px 14px}
 
 /* BADGES */
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
@@ -893,9 +896,6 @@ input:focus, select:focus, textarea:focus{
           <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="showClientBrokerageHistory(null)" title="Every client's brokerage, month by month, across all RMs" style="background:var(--navy,#1a2744);border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📅 Client History (All RMs)</button><button onclick="showBroUnmatchedReport()" title="Clients that failed to match an RM in brokerage uploads" style="background:#B91C1C;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">⚠ Unmatched Clients</button><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div></div>
           <div class="tbl-wrap">
             <table class="team-inc-table">
-              <colgroup>
-                <col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:6.5%"><col style="width:7%"><col style="width:4.5%"><col style="width:6%"><col style="width:6.5%"><col style="width:5.5%"><col style="width:7%"><col style="width:6%"><col style="width:7.5%"><col style="width:7.5%"><col style="width:8.5%"><col style="width:7.5%"><col style="width:5%">
-              </colgroup>
               <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
