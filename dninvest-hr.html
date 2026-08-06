@@ -210,6 +210,17 @@ td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text)}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface2)}
 
+/* TEAM INCENTIVE TABLE — many columns, so a tighter, evenly-spaced layout
+   (colgroup above sets proportional widths) reads a lot less cramped than
+   the default table sizing, which let long headers wrap raggedly. */
+.team-inc-table{table-layout:fixed}
+.team-inc-table th,.team-inc-table td{padding:8px 7px;font-size:12px;line-height:1.35;word-break:break-word}
+.team-inc-table th{font-size:10px;white-space:normal}
+.team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:12px}
+.team-inc-table input[type=number]{width:100%;min-width:0;box-sizing:border-box;padding:5px 6px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface);color:var(--text);outline:none;text-align:right}
+.team-inc-table input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg,rgba(37,99,235,.12))}
+.team-inc-table .btn-sm{width:100%;white-space:nowrap}
+
 /* BADGES */
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
 .badge-green{background:var(--green-bg);color:var(--green-text)}
@@ -881,8 +892,11 @@ input:focus, select:focus, textarea:focus{
         <div class="card admin-only" style="display:none;grid-column:1/-1">
           <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Team incentive <span id="team-inc-month-label" style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none"></span></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="showClientBrokerageHistory(null)" title="Every client's brokerage, month by month, across all RMs" style="background:var(--navy,#1a2744);border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📅 Client History (All RMs)</button><button onclick="showBroUnmatchedReport()" title="Clients that failed to match an RM in brokerage uploads" style="background:#B91C1C;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">⚠ Unmatched Clients</button><button onclick="downloadTeamIncentiveReport()" title="Download colourful Excel report" style="background:#1D6F42;border:none;color:#fff;font-weight:600;font-size:11.5px;padding:6px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;text-transform:none">📥 Excel Report</button></div></div>
           <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+            <table class="team-inc-table">
+              <colgroup>
+                <col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:6.5%"><col style="width:7%"><col style="width:4.5%"><col style="width:6%"><col style="width:6.5%"><col style="width:5.5%"><col style="width:7%"><col style="width:6%"><col style="width:7.5%"><col style="width:7.5%"><col style="width:8.5%"><col style="width:7.5%"><col style="width:5%">
+              </colgroup>
+              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl.Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -4160,12 +4174,19 @@ function totalIncentive(name, salary, month){
 
   // Late-coming deduction: 1% of the incentive per "yellow" (late) attendance
   // day this month, capped so it can never push the payable amount negative.
+  // Admin can override this per employee/month (e.g. waive it to ₹0) from the
+  // Team Incentive table — that override, once saved, always wins over the
+  // auto-calculated figure.
   const lateDays = month ? lateDaysInMonth(name, month) : 0;
   const lateDeductionPct = Math.min(lateDays*1, 100);
-  const lateDeductionAmt = Math.round(rawTotal * lateDeductionPct/100);
+  const autoLateDeductionAmt = Math.round(rawTotal * lateDeductionPct/100);
+  const payMonth = month ? getPaymentsForMonth(month) : {};
+  const lateDedOverride = payMonth[name] ? payMonth[name].lateDedOverride : undefined;
+  const lateDeductionOverridden = lateDedOverride!==undefined && lateDedOverride!==null;
+  const lateDeductionAmt = lateDeductionOverridden ? Math.max(0, Number(lateDedOverride)||0) : autoLateDeductionAmt;
   const total = rawTotal - lateDeductionAmt;
 
-  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, rawTotal, lateDays, lateDeductionPct, lateDeductionAmt, total, tier2Eligible: br.tier2Eligible};
+  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, rawTotal, lateDays, lateDeductionPct, autoLateDeductionAmt, lateDeductionOverridden, lateDeductionAmt, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -4273,9 +4294,9 @@ function renderIncentivePage(){
           <td>${fmt(tt.sip)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(incl. perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
-          <td style="color:${tt.lateDeductionAmt>0?'var(--red)':'var(--text3)'}" title="${tt.lateDays} late day(s) this month">${tt.lateDeductionAmt>0?'−'+fmt(tt.lateDeductionAmt)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.lateDays+' late × 1%)</small>':'—'}</td>
+          <td title="${tt.lateDays} late day(s) this month = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDays} late${tt.lateDeductionOverridden?' · edited':''}</small></td>
           <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
-          <td><input type="number" id="inc-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
+          <td><input type="number" id="inc-paid-${safeId}" value="${paid}" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
           <td><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
         </tr>`;
@@ -4328,7 +4349,9 @@ async function markIncentivePaid(name){
   const safeId=name.replace(/[^a-zA-Z0-9]/g,'');
   const input=document.getElementById('inc-paid-'+safeId);
   const amount=input?parseInt(input.value)||0:0;
+  const ldInput=document.getElementById('inc-lateded-'+safeId);
   await setPaidAmount(name, month, 'incPaid', amount);
+  if(ldInput) await setPaidAmount(name, month, 'lateDedOverride', parseInt(ldInput.value)||0);
   renderIncentivePage();
 }
 
