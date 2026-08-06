@@ -7602,7 +7602,16 @@ function populateEqDematMonths(){
   const MNF=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const label=m=>{const [y,mo]=m.split('-');return MNF[+mo]+' '+y;};
   sel.innerHTML='<option value="">All Months</option>'+months.map(m=>`<option value="${m}">${label(m)}</option>`).join('');
-  if(months.includes(cur)) sel.value=cur;
+  if(months.includes(cur)){
+    sel.value=cur;
+  } else if(!sel.dataset.autoDefaulted){
+    // Same first-load default as the MF Transactions month filter — open
+    // straight to the current month instead of "All Months", but only once
+    // per session; a later explicit choice (including Clear) is respected.
+    const curMonth = today().slice(0,7);
+    if(months.includes(curMonth)) sel.value = curMonth;
+  }
+  sel.dataset.autoDefaulted = '1';
 }
 
 // Month chunne pe From/To date clear taaki conflict na ho.
