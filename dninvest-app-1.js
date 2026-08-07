@@ -7579,7 +7579,7 @@ function renderMfTxnTable(){
           <td style="width:40px;font-size:.67rem;white-space:nowrap">${escapeHtml(e.rm||'—')}</td>
           <td style="width:62px;white-space:nowrap"><span class="badge" style="background:${color}22;color:${color};font-size:.61rem;padding:1px 5px">${escapeHtml(e.type||'—')}</span></td>
           <td style="width:155px;max-width:160px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(e.fund_name||'')}${e.target_scheme?' → '+escapeHtml(e.target_scheme):''}">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<span style="font-size:.63rem;color:var(--teal,#0891b2);margin-left:3px">↳ ${escapeHtml(e.target_scheme)}</span>`:''}</td>
-          <td style="text-align:right;font-weight:600;width:70px;font-size:.67rem;white-space:nowrap">₹${brkFmt(e.amount)}</td>
+          <td style="text-align:right;font-weight:600;width:70px;font-size:.67rem;white-space:nowrap">₹${brkFmt(e.amount)}${e.first_payment?` <span title="${e.type==='SWP'?'First withdrawal received':'First payment received'}" style="display:inline-block;color:#fff;background:var(--green,#16a34a);font-size:.55rem;font-weight:700;line-height:1;border-radius:3px;padding:2px 3px;vertical-align:middle">P</span>`:''}</td>
           ${INC.cell('mf',e)}
           <td style="width:95px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
