@@ -195,7 +195,7 @@ window.QUIZ = (function(){
   host.hiddenBanks = {};                            // { filmi: true } — built-in banks the admin chose to remove from the list
   host.unsubCustomBanks = null;
   function defaultBankArr(){
-    var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''});
+    var arr=[]; for(var i=0;i<5;i++) arr.push({type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:'',actual:''});
     return arr;
   }
   async function writeBankToFirestore(arr){
@@ -580,7 +580,10 @@ window.QUIZ = (function(){
       if(el) el.textContent='🟢 Connected · live state: '+(d.state||'—')+' · q'+(d.qIndex==null?'—':d.qIndex)+' · opts:'+((d.options||[]).length);
       var aw=document.getElementById('quiz-actual-wrap');
       if(aw) aw.style.display=(d.type==='guess' && d.state==='live')?'flex':'none';
-      if(d.state==='live'){ var av=document.getElementById('quiz-actual-value'); if(av) av.value=''; }
+      if(d.state==='live'){
+        var av=document.getElementById('quiz-actual-value');
+        if(av) av.value=(d.type==='guess' && d.presetActual!=null) ? String(d.presetActual) : '';
+      }
       if(host.lastRespSnap) renderHostResults(host.lastRespSnap);  // re-filter with the live question
     }, function(){});
     host.unsubPlayers = PLAYERS().onSnapshot(function(snap){
@@ -1038,7 +1041,7 @@ window.QUIZ = (function(){
     var box=document.getElementById('quiz-bank'); if(!box) return;
     var html='';
     for(var n=0;n<5;n++){
-      var q=host_bank[n]||{type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:''};
+      var q=host_bank[n]||{type:'mcq',text:'',opts:['','','',''],correct:0,time:20,prize:'',actual:''};
       var optRows='';
       for(var i=0;i<4;i++){
         optRows+='<label style="display:flex;align-items:center;gap:6px"><input type="radio" name="qb'+n+'-correct" value="'+i+'"'+(q.correct===i?' checked':'')+'>'
@@ -1056,6 +1059,11 @@ window.QUIZ = (function(){
         + '</div>'
         + '<input type="text" id="qb'+n+'-text" value="'+esc(q.text||'')+'" placeholder="Question '+(n+1)+' Text…" style="width:100%;box-sizing:border-box;padding:7px;font-size:.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">'
         + '<div id="qb'+n+'-opts" style="display:'+(q.type==='mcq'?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+optRows+'</div>'
+        + '<div id="qb'+n+'-actualwrap" style="display:'+(q.type==='guess'?'flex':'none')+';align-items:center;gap:6px;margin-bottom:8px;background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:6px 8px">'
+        +   '<span style="font-size:.78rem;font-weight:700;color:#b45309">🎯 Actual (Correct) Value:</span>'
+        +   '<input type="text" id="qb'+n+'-actual" value="'+esc(q.actual||'')+'" placeholder="e.g. 24570" style="flex:1;min-width:100px;padding:5px 6px;font-size:.8rem;border:1px solid var(--border);border-radius:6px">'
+        +   '<span style="font-size:.68rem;color:#94a3b8">Push Karte Hi Yeh Reveal Box Mein Apne-Aap Aa Jayega</span>'
+        + '</div>'
         + '<button class="btn btn-teal" style="padding:6px 14px;font-size:.82rem" onclick="QUIZ.pushQuestion('+n+')">🚀 Push Q'+(n+1)+'</button>'
         + '</div>';
     }
@@ -1064,6 +1072,7 @@ window.QUIZ = (function(){
   function bankTypeChange(n){
     var t=(document.getElementById('qb'+n+'-type')||{}).value||'mcq';
     var o=document.getElementById('qb'+n+'-opts'); if(o) o.style.display=(t==='mcq')?'grid':'none';
+    var a=document.getElementById('qb'+n+'-actualwrap'); if(a) a.style.display=(t==='guess')?'flex':'none';
   }
   function readBankRow(n){
     var opts=[]; for(var i=0;i<4;i++){ opts.push(((document.getElementById('qb'+n+'-opt'+i)||{}).value||'')); }
@@ -1073,7 +1082,8 @@ window.QUIZ = (function(){
       text:((document.getElementById('qb'+n+'-text')||{}).value||'').trim(),
       opts:opts, correct:sel?parseInt(sel.value,10):0,
       time:parseInt((document.getElementById('qb'+n+'-time')||{}).value,10)||20,
-      prize:((document.getElementById('qb'+n+'-prize')||{}).value||'').trim()
+      prize:((document.getElementById('qb'+n+'-prize')||{}).value||'').trim(),
+      actual:((document.getElementById('qb'+n+'-actual')||{}).value||'').trim()
     };
   }
   async function saveBank(){
@@ -1100,7 +1110,14 @@ window.QUIZ = (function(){
       if(options.length<2){ alert('Q'+(n+1)+': Add At Least 2 Options.'); return; }
       if(q.correct>=options.length){ alert('Q'+(n+1)+': The Correct-Option Slot Is Empty.'); return; }
     }
-    await launchQuestionObj({type:q.type, text:q.text, options:options, correct:q.correct, time:q.time, prize:q.prize});
+    var presetActual=null;
+    if(q.type==='guess'){
+      var rawA=(q.actual||'').replace(/,/g,'');
+      if(!rawA){ alert('Q'+(n+1)+': 🎯 Guess The Number Ke Liye "Actual (Correct) Value" Field Mein Sahi Number Daalein.'); return; }
+      presetActual=parseFloat(rawA);
+      if(isNaN(presetActual)){ alert('Q'+(n+1)+': "Actual (Correct) Value" Mein Ek Valid Number Daalein.'); return; }
+    }
+    await launchQuestionObj({type:q.type, text:q.text, options:options, correct:q.correct, time:q.time, prize:q.prize, actual:presetActual});
   }
   async function saveBankSilent(){
     var arr=[]; for(var n=0;n<5;n++) arr.push(readBankRow(n));
@@ -1123,7 +1140,8 @@ window.QUIZ = (function(){
         state:'live', type:q.type, qIndex:host.qIndex, sessionId:host.sessionId,
         question:q.text, options:(q.type==='mcq'?q.options:[]), prize:(q.prize||''), timeSec:(q.time||20),
         startedAt:Date.now(), startedAtServer:firebase.firestore.FieldValue.serverTimestamp(),
-        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null
+        revealIndex:null, winnerName:null, winnerMs:null, winnerPts:null, actualValue:null, winnerGuess:null, winnerTie:null,
+        presetActual:(q.type==='guess'&&q.actual!=null?q.actual:null)
       }, {merge:true});
       // read back from the SERVER (not cache) so the resolved serverTimestamp is captured;
       // a fresh write's serverTimestamp can still be pending/null in a cached read, retry a few times
@@ -1136,7 +1154,7 @@ window.QUIZ = (function(){
         if(!host.startedAtServerMs) await new Promise(function(r){ setTimeout(r,250); });
       }
       if(!host.startedAtServerMs) host.startedAtServerMs=Date.now(); // fallback so timing still shows (may be slightly off)
-      try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs }); }catch(e){}
+      try{ await ANSWERKEY().set({ qIndex:host.qIndex, sessionId:host.sessionId, correctIndex:host.correctIndex, type:q.type, startedAtServerMs:host.startedAtServerMs, presetActual:(q.type==='guess'&&q.actual!=null?q.actual:null) }); }catch(e){}
       var st=document.getElementById('quiz-live-status');
       if(st) st.innerHTML='🟢 LIVE — Q'+host.qIndex+': <b>'+esc(q.text)+'</b>'+(q.prize?' · 🎁 '+esc(q.prize):'');
       var box=document.getElementById('quiz-results'); if(box) box.innerHTML='<div style="color:var(--gray);font-size:.82rem">Waiting For Answers…</div>';
@@ -1174,18 +1192,21 @@ window.QUIZ = (function(){
     await window.waitForFdb(8000); if(!window.fdb) return;
     try{
       // recover the correct answer + timing from the answer-key doc (reload-proof)
+      var akPresetActual=null;
       try{
         var ak=await ANSWERKEY().get();
         if(ak.exists){ var a=ak.data()||{};
           if((a.sessionId||'')===host.sessionId && (a.qIndex||0)===host.qIndex){
             host.correctIndex=a.correctIndex; host.type=a.type||host.type;
             if(a.startedAtServerMs) host.startedAtServerMs=a.startedAtServerMs;
+            if(a.presetActual!=null) akPresetActual=a.presetActual;
           }
         }
       }catch(e){}
       var actualValue=null;
       if(host.type==='guess'){
         var avEl=document.getElementById('quiz-actual-value');
+        if(avEl && !avEl.value && akPresetActual!=null) avEl.value=String(akPresetActual);  // auto-fill from the preset value if the box is still empty
         var raw=(avEl?avEl.value:'').trim().replace(/,/g,'');
         if(!raw){ alert('🎯 Guess Question — Please Enter The Actual Value First (e.g. Today\'s Sensex Closing), Then Hit Reveal.'); return; }
         actualValue=parseFloat(raw);
