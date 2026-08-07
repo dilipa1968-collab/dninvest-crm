@@ -6788,34 +6788,29 @@ async function saveBusinessEntry(){
     if(CU.role!=='admin' && original.created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
     if(CU.role==='admin' && !currentBusinessTarget.id){ toast('Please select a client','error'); return; }
 
-    // MF Desk editing someone else's entry: Amount/Type/Target Scheme/Client/RM
-    // are locked (UI already disables them, but this is the save-side guard
-    // that actually enforces it — the disabled attribute alone is only a UI
-    // hint). Their save can only ever change Fund Name/Date/Start Date/Paid.
-    const restricted = isMfDeskRestrictedBizEdit(original);
-    const finalType = restricted ? original.type : type;
-    const finalAmount = restricted ? original.amount : amount;
-    const finalSched = mfTxnHasSchedule(finalType);
-    const finalFirstPay = (finalSched && firstPayDone) ? finalAmount : null;
-    const finalTargetScheme = restricted ? original.target_scheme : (mfTxnTypeNeedsTarget(finalType) ? targetScheme : '');
+    const finalSched = sched;
+    const finalFirstPay = firstPay;
 
     const r = await DB.updateMfBizEntry('entries', editingBusinessId, fresh=>{
+      // Client + RM reassignment: Admin only (the RM dropdown is hidden for
+      // everyone else, but this is the save-side guard that actually
+      // enforces it — a hidden field alone is only a UI hint).
       if(CU.role==='admin'){
         fresh.client_id = currentBusinessTarget.id;
         fresh.client_name = currentBusinessTarget.name;
         fresh.rm = document.getElementById('biz_client_rm')?.value || '';
       }
-      fresh.type = finalType;
-      fresh.amount = finalAmount;
+      fresh.type = type;
+      fresh.amount = amount;
       fresh.fund_name = fundName;
-      fresh.target_scheme = finalTargetScheme;
+      fresh.target_scheme = mfTxnTypeNeedsTarget(type) ? targetScheme : '';
       fresh.first_payment = finalSched ? finalFirstPay : null;
       fresh.start_date = finalSched ? startDate : '';
       fresh.date = date;
     });
     if(!r.ok || r.aborted){ if(r.aborted) toast('Entry no longer exists','error'); return; }
     learnFundName(fundName);
-    if(mfTxnTypeNeedsTarget(finalType) && !restricted) learnFundName(targetScheme);
+    if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
     closeModal('businessModal');
     toast('Business entry updated!','success');
     editingBusinessId = null;
@@ -6873,22 +6868,6 @@ function bizStatusBadge(status){
 function hasMfDeskAccess(user){
   if(!user) return false;
   return user.role==='mf_desk' || (user.role==='rm' && user.mf_desk_access===true);
-}
-
-// MF Desk (dedicated `mf_desk` role, or an RM with mf_desk_access=true) can
-// open ANY other RM's business entry to help backfill it — fix a fund name
-// typo, mark the First Payment tick, correct a date — without needing to be
-// its creator. But they must NOT be able to quietly change the financial
-// substance or attribution of someone else's entry, so Amount/Type/Target
-// Scheme/Client/RM stay locked in that case. Editing your OWN entry (any
-// role, including mf_desk) is unaffected by this — full edit rights there
-// as before; this restriction only kicks in when mf-desk access is being
-// used to touch someone ELSE's entry.
-function isMfDeskRestrictedBizEdit(entry){
-  if(!entry) return false;
-  if(CU.role==='admin') return false;
-  if(entry.created_by===CU.name) return false;
-  return hasMfDeskAccess(CU);
 }
 
 // ── Cross-check remarks ──
@@ -7663,7 +7642,8 @@ function renderMfTxnTable(){
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingBusinessEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
             <button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit (all fields)">✏️</button>
-            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
+            <button class="btn-icon" onclick="deleteMfTxnEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`
+          : (hasMfDeskAccess(CU) ? `<button class="btn-icon" onclick="editBusinessEntry('${e.id}')" title="Edit">✏️</button>` : '')}</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -9036,10 +9016,17 @@ function editBusinessEntry(id){
   editingBusinessId = id;
   document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
 
+  // Client + RM reassignment row: Admin only. MF Desk access does NOT extend
+  // to changing who a transaction is attributed to — that stays exactly the
+  // same as before this feature: Amount/Type/Target Scheme/Fund Name/Dates
+  // are open to edit, but Client and RM are locked/hidden for everyone
+  // except Admin.
   const clientWrap=document.getElementById('biz_client_wrap');
   if(clientWrap) clientWrap.style.display = CU.role==='admin' ? '' : 'none';
   const rmNoteWrap=document.getElementById('biz_rm_note_wrap');
   if(rmNoteWrap) rmNoteWrap.style.display = CU.role==='admin' ? '' : 'none';
+  const mfNoteWrap = document.getElementById('biz_mfdesk_note_wrap');
+  if(mfNoteWrap) mfNoteWrap.style.display = (hasMfDeskAccess(CU) && CU.role!=='admin') ? '' : 'none';
   const cSel=document.getElementById('biz_client_selected'); if(cSel) cSel.value=e.client_name||'';
   populateBizRmDropdown(e.rm||'');
   const cSearch=document.getElementById('biz_client_search'); if(cSearch) cSearch.value='';
@@ -9054,17 +9041,13 @@ function editBusinessEntry(id){
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
 
-  // MF Desk touching someone else's entry — lock Amount/Type/Target Scheme
-  // (Client/RM are already hidden for every non-admin above).
-  const restricted = isMfDeskRestrictedBizEdit(e);
-  const mfNoteWrap = document.getElementById('biz_mfdesk_note_wrap');
-  if(mfNoteWrap) mfNoteWrap.style.display = restricted ? '' : 'none';
+  // Nothing is locked/disabled anymore for MF Desk — full edit rights on
+  // every field except Delete, which stays Admin-only (its button is simply
+  // never rendered for non-admins, elsewhere).
   ['biz_type','biz_amount','biz_target_fund'].forEach(fid=>{
     const el=document.getElementById(fid);
     if(!el) return;
-    el.disabled = restricted;
-    el.style.background = restricted ? '#f3f4f6' : '';
-    el.style.cursor = restricted ? 'not-allowed' : '';
+    el.disabled = false; el.style.background=''; el.style.cursor='';
   });
 
   document.getElementById('businessModal').classList.add('open');
