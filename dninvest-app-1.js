@@ -404,10 +404,23 @@ const DB = {
   // needed (id = clientId+date, so re-importing the same day just updates it).
   _mclWriting:0,
   async addMfChangeLog(entry){   // entry = {id, date, clientId, name, rm, prevInvested, newInvested, delta}
+    return this.addMfChangeLogBatch([entry]);
+  },
+  // Same as addMfChangeLog but for many entries in ONE Firestore transaction —
+  // used by the AUM import, which can touch hundreds of clients' Invested
+  // Amount in a single upload. Calling addMfChangeLog once per client (fire-
+  // and-forget, unawaited) meant dozens/hundreds of transactions racing to
+  // read-modify-write the SAME 'mf_change_log' document at once; under that
+  // much contention some would exhaust their retries and fail silently (only
+  // a console.log, no visible error) — additions/redemptions for some clients
+  // would just never make it into the log, exactly like nothing happened.
+  async addMfChangeLogBatch(entries){
+    entries = (entries||[]).filter(Boolean);
+    if(!entries.length) return;
     let local=[];
     try{ local=JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ local=[]; }
     const byId={}; local.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-    byId[entry.id]=entry;
+    entries.forEach(entry=>{ byId[entry.id]=entry; });
     try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(Object.values(byId))); }catch(e){}
     if(typeof fdb==='undefined') return;
     this._mclWriting++;
@@ -418,13 +431,14 @@ const DB = {
         const doc = await tx.get(docRef);
         let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
         const byId2={}; latest.forEach(x=>{ if(x&&x.id) byId2[x.id]=x; });
-        byId2[entry.id]=entry;
+        entries.forEach(entry=>{ byId2[entry.id]=entry; });
         finalData = DB._pruneCallLogs(Object.values(byId2), 850000); // same date-priority pruning as call_logs
         tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
-      console.log('MF change log sync error:',e);
+      console.log('MF change log batch sync error:',e);
+      try{ toast('⚠️ Some Invested Amount changes may not have saved — please re-import if the Additions/Redemptions list looks incomplete','error'); }catch(e2){}
     }finally{
       this._mclWriting=Math.max(0,this._mclWriting-1);
     }
@@ -11563,6 +11577,7 @@ async function doImport(){
     if(n) fileNameCount[n] = (fileNameCount[n]||0)+1;
   });
   const ambigRows = [];      // couldn't be identified safely
+  const mfChangeLogBatch = []; // Invested Amount changes collected here, written in ONE transaction at the end (see addMfChangeLogBatch)
   const claimed = new Set(); // guard: never let two file rows write the same client
   
   // Compact performance snapshot kept on the MF client so the AUM cell can be
@@ -11626,34 +11641,49 @@ async function doImport(){
         {
           const hadAumDetail = !!ex.aum_detail;
           const newInv = parseFloat(row.inv_amt)||0;
+          const _td = today();
+          // Same-day re-uploads must all diff against YESTERDAY's figure, not
+          // against each other. Without this, uploading a corrected/completed
+          // file 2-3 times in one day (common when the source file comes in
+          // partial) would compare the 2nd upload against the 1st upload's
+          // possibly-incomplete numbers and log a fake addition/redemption.
+          // `invested_baseline_*` is the Invested Amount as it stood at the
+          // END of the last DIFFERENT calendar day — it's set once (the first
+          // import of a new day) and then left untouched through every
+          // further same-day re-upload, so every re-upload today keeps
+          // comparing against that same fixed starting point. The log entry
+          // itself (id = clientId+today) naturally gets refined/overwritten
+          // by each re-upload rather than duplicated.
+          if(hadAumDetail && ex.invested_baseline_date!==_td){
+            ex.invested_baseline_inv = parseFloat(ex.aum_detail.inv)||0;
+            ex.invested_baseline_date = _td;
+          }
+          const oldInv = (ex.invested_baseline_date===_td) ? (parseFloat(ex.invested_baseline_inv)||0) : null;
           // Only track a change when we have a GENUINE previous Invested Amount
-          // (from a prior import's aum_detail.inv) to compare against — no
-          // guessing/estimating. A guessed number isn't a real purchase or
-          // redemption amount, so if the baseline is missing we silently
-          // establish it this import (aum_detail set just below) and start
-          // tracking exactly from the next import onward.
+          // to compare against — no guessing/estimating. A guessed number
+          // isn't a real purchase or redemption amount, so if there's no
+          // baseline yet, this import silently establishes one (aum_detail
+          // set just below) and tracking starts cleanly from tomorrow.
           // Threshold of ₹1: the RTA's file sometimes carries paisa-level
           // rounding noise between two exports of the SAME investment (e.g.
           // ₹5,50,000.00 one day, ₹5,50,000.30 the next) with no real
           // transaction behind it. Below ₹1 isn't a purchase/redemption —
           // it's just export noise — so it's not logged as a change (avoids
           // meaningless "▲ +₹0" / "▼ -₹0" rows in the Additions/Redemptions list).
-          const oldInv = hadAumDetail ? (parseFloat(ex.aum_detail.inv)||0) : null;
           const isFirstEver = !hadAumDetail && oldAumBeforeUpdate===0; // no prior AUM detail AND zero AUM before — genuinely never invested until now
           if(isFirstEver && newInv>0){
             // First-ever investment for this (pre-existing) client record — counts as
             // a new-investor "win" too, same as a brand-new client added below.
             ex.prev_invested = 0;
             ex.invested_change_amt = newInv;
-            ex.invested_change_date = today();
-            const _td=today();
-            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
+            ex.invested_change_date = _td;
+            ex.invested_baseline_inv = 0; ex.invested_baseline_date = _td;
+            mfChangeLogBatch.push({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
           } else if(oldInv!==null && Math.abs(newInv - oldInv) >= 1){
             ex.prev_invested = oldInv;
             ex.invested_change_amt = newInv - oldInv;
-            ex.invested_change_date = today();
-            const _td=today();
-            DB.addMfChangeLog({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv});
+            ex.invested_change_date = _td;
+            mfChangeLogBatch.push({id:ex.id+'__'+_td, date:_td, clientId:ex.id, name:ex.name||'', rm:ex.rm||'', prevInvested:oldInv, newInvested:newInv, delta:newInv-oldInv});
           }
         }
         ex.aum_detail = _aumDetail(row);
@@ -11689,7 +11719,7 @@ async function doImport(){
         });
         if(newInv>0){
           const _td=today();
-          DB.addMfChangeLog({id:nid+'__'+_td, date:_td, clientId:nid, name:row.name||'', rm:rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
+          mfChangeLogBatch.push({id:nid+'__'+_td, date:_td, clientId:nid, name:row.name||'', rm:rm||'', prevInvested:0, newInvested:newInv, delta:newInv});
         }
         if(importData.sip && (sipInfo.sip_details||sipInfo.sip_amount||sipInfo.sip_count)) sipApplied.add(nid);
         added++;
@@ -11812,6 +11842,9 @@ async function doImport(){
   // newClients contains only touched/new records; setClientsBulk merges
   // them into the existing local array and writes only these docs to Firestore.
   await DB.setClientsBulk('mf_clients', newClients);
+  // One single transaction for every Invested Amount change detected this
+  // import (see addMfChangeLogBatch) — not N separate ones racing each other.
+  await DB.addMfChangeLogBatch(mfChangeLogBatch);
   closeModal('importModal');
   let _imsg = `✅ Import done! ${updated} updated + ${added} new clients`;
   if(importData.sip){
