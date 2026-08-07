@@ -1073,6 +1073,18 @@ window.QUIZ = (function(){
     var t=(document.getElementById('qb'+n+'-type')||{}).value||'mcq';
     var o=document.getElementById('qb'+n+'-opts'); if(o) o.style.display=(t==='mcq')?'grid':'none';
     var a=document.getElementById('qb'+n+'-actualwrap'); if(a) a.style.display=(t==='guess')?'flex':'none';
+    if(t==='guess'){
+      // MCQ se Guess The Number par switch karte hi, jo option "correct" select tha uska number
+      // apne-aap Actual (Correct) Value mein bhar do (agar wo box abhi khaali hai)
+      var actualEl=document.getElementById('qb'+n+'-actual');
+      if(actualEl && !actualEl.value.trim()){
+        var sel=document.querySelector('input[name="qb'+n+'-correct"]:checked');
+        var idx=sel?parseInt(sel.value,10):0;
+        var optEl=document.getElementById('qb'+n+'-opt'+idx);
+        var raw=optEl?(optEl.value||'').replace(/[^0-9.\-]/g,''):'';   // ₹, commas, text hata kar sirf number rakho
+        if(raw) actualEl.value=raw;
+      }
+    }
   }
   function readBankRow(n){
     var opts=[]; for(var i=0;i<4;i++){ opts.push(((document.getElementById('qb'+n+'-opt'+i)||{}).value||'')); }
