@@ -1657,12 +1657,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Amount (₹) *</label>
-              <input type="number" id="mftxn-amount" placeholder="e.g. 25000">
+              <input type="number" id="mftxn-amount" placeholder="e.g. 25000" oninput="updateFirstPayHint('mftxn')">
             </div>
             <div class="form-field" id="mftxn-firstpay-wrap" style="min-width:160px;display:none">
               <label id="mftxn-firstpay-label">First Payment</label>
               <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--navy);cursor:pointer;height:38px">
-                <input type="checkbox" id="mftxn-firstpay" style="width:18px;height:18px;cursor:pointer">
+                <input type="checkbox" id="mftxn-firstpay" style="width:18px;height:18px;cursor:pointer" onchange="updateFirstPayHint('mftxn')">
                 <span id="mftxn-firstpay-hint">Done (= amount)</span>
               </label>
             </div>
@@ -2559,9 +2559,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="form-row" id="biz_rm_note_wrap" style="display:none;margin-top:-8px;margin-bottom:14px">
         <p style="font-size:.74rem;color:var(--gray)">ℹ️ Changing RM here only re-attributes this one transaction. The client's actual RM in their profile stays unchanged.</p>
       </div>
-      <div class="form-row" id="biz_mfdesk_note_wrap" style="display:none;margin-top:-8px;margin-bottom:14px">
-        <p style="font-size:.74rem;color:var(--gray)">ℹ️ MF Desk access: you can edit Start Date, Date, Fund Name and Paid status only. Amount and RM are locked.</p>
-      </div>
       <div class="form-row">
         <div class="form-field"><label>Type *</label>
           <select id="biz_type" onchange="toggleBizTarget()">
@@ -2577,12 +2574,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="SIP Pause">SIP Pause</option>
           </select>
         </div>
-        <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000"></div>
+        <div class="form-field"><label>Amount (₹) *</label><input id="biz_amount" type="number" placeholder="e.g. 25000" oninput="updateFirstPayHint('biz')"></div>
       </div>
       <div class="form-row" id="biz_schedule_wrap" style="display:none">
         <div class="form-field"><label id="biz_firstpay_label">First Payment</label>
           <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--navy);cursor:pointer;padding:6px 0">
-            <input type="checkbox" id="biz_firstpay" style="width:18px;height:18px;cursor:pointer">
+            <input type="checkbox" id="biz_firstpay" style="width:18px;height:18px;cursor:pointer" onchange="updateFirstPayHint('biz')">
             <span id="biz_firstpay_hint">Done (= amount)</span>
           </label>
         </div>

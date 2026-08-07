@@ -6937,6 +6937,24 @@ function mfTxnHasSchedule(t){ return t==='SIP' || t==='STP' || t==='SWP'; }
 function mfFirstPayLabel(t){ return t==='SWP' ? 'First Withdrawal' : 'First Payment'; }
 // Checkbox hint text depends on type.
 function mfFirstPayHint(t){ return t==='SWP' ? 'Withdrawn (= amount)' : 'Paid (= amount)'; }
+// When the First Payment/Withdrawal tick is checked, swap the generic
+// "Paid (= amount)" placeholder text for the actual entered amount in
+// small green text — a quick visual confirmation of what's being marked
+// paid, instead of the same static hint whether ticked or not.
+function updateFirstPayHint(prefix){
+  const hint=document.getElementById(prefix+'-firstpay-hint') || document.getElementById(prefix+'_firstpay_hint');
+  if(!hint) return;
+  const checked = (document.getElementById(prefix+'-firstpay') || document.getElementById(prefix+'_firstpay'))?.checked;
+  const type = (document.getElementById(prefix+'-type') || document.getElementById(prefix+'_type'))?.value || '';
+  const amtEl = document.getElementById(prefix+'-amount') || document.getElementById(prefix+'_amount');
+  const amt = parseFloat(amtEl?.value);
+  if(checked && amt>0){
+    const verb = type==='SWP' ? 'Withdrawn' : 'Paid';
+    hint.innerHTML = `<b style="color:var(--green,#16a34a)">✓ ₹${brkFmt(amt)} ${verb}</b>`;
+  } else {
+    hint.textContent = mfFirstPayHint(type);
+  }
+}
 
 // Show/hide the Target Scheme field on the MF Transactions form based on Type,
 // and relabel the Fund Name field as "Source Scheme (From)" for Switch/STP so
@@ -6958,7 +6976,7 @@ function toggleMfTxnTarget(){
   const fpWrap=document.getElementById('mftxn-firstpay-wrap'); if(fpWrap) fpWrap.style.display = sched ? '' : 'none';
   const sdWrap=document.getElementById('mftxn-startdate-wrap'); if(sdWrap) sdWrap.style.display = sched ? '' : 'none';
   const fpLbl=document.getElementById('mftxn-firstpay-label'); if(fpLbl) fpLbl.textContent = mfFirstPayLabel(type);
-  const fpHint=document.getElementById('mftxn-firstpay-hint'); if(fpHint) fpHint.textContent = mfFirstPayHint(type);
+  const fpHint=document.getElementById('mftxn-firstpay-hint'); if(fpHint) updateFirstPayHint('mftxn');
   if(!sched){
     const fp=document.getElementById('mftxn-firstpay'); if(fp) fp.checked=false;
     const sd=document.getElementById('mftxn-startdate'); if(sd) sd.value='';
@@ -6982,7 +7000,7 @@ function toggleBizTarget(){
   const sched = mfTxnHasSchedule(type);
   const schedWrap=document.getElementById('biz_schedule_wrap'); if(schedWrap) schedWrap.style.display = sched ? '' : 'none';
   const fpLbl=document.getElementById('biz_firstpay_label'); if(fpLbl) fpLbl.textContent = mfFirstPayLabel(type);
-  const fpHint=document.getElementById('biz_firstpay_hint'); if(fpHint) fpHint.textContent = mfFirstPayHint(type);
+  const fpHint=document.getElementById('biz_firstpay_hint'); if(fpHint) updateFirstPayHint('biz');
   if(!sched){
     const fp=document.getElementById('biz_firstpay'); if(fp) fp.checked=false;
     const sd=document.getElementById('biz_startdate'); if(sd) sd.value='';
