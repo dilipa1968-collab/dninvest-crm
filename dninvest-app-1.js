@@ -9507,12 +9507,49 @@ function isWithinActiveWindowNow(){
   return h >= win.start && h < win.end;
 }
 
+// Pure/read-only version of the auto-schedule decision — used to cheaply
+// check locally (no Firestore hit) whether this minute's tick would
+// actually change anything, before paying for a transaction read+write.
+function _wouldAutoScheduleChange(users, istHour, shouldBeActive){
+  return (users||[]).some(u=>{
+    if(u.role === 'admin') return false;
+    if(u.manualOverride){
+      const overrideTime = new Date(u.manualOverrideTime);
+      const utc = overrideTime.getTime() + overrideTime.getTimezoneOffset()*60000;
+      const istO = new Date(utc + 5.5*3600000);
+      const overrideHour = istO.getHours() + istO.getMinutes()/60;
+      const overrideDow = istO.getDay();
+      const overrideWin = isHolidayToday() ? null : getActiveWindowForDay(overrideDow);
+      const dayChanged = getISTDateStr() !== (isNaN(istO) ? '' :
+        istO.getFullYear()+'-'+String(istO.getMonth()+1).padStart(2,'0')+'-'+String(istO.getDate()).padStart(2,'0'));
+      let crossedBoundary = dayChanged;
+      if(!dayChanged && overrideWin){
+        crossedBoundary = (overrideHour < overrideWin.start && istHour >= overrideWin.start) ||
+                           (overrideHour >= overrideWin.start && overrideHour < overrideWin.end && istHour >= overrideWin.end);
+      }
+      return crossedBoundary;
+    }
+    return (u.active !== false) !== shouldBeActive;
+  });
+}
+
 function runAutoSchedule(){
   const istHour = getISTHour();
   const dow = getISTDayOfWeek();
   // Holiday → behave exactly like Sunday (no active window, RMs deactivate).
   const win = isHolidayToday() ? null : getActiveWindowForDay(dow);
   const shouldBeActive = win ? (istHour >= win.start && istHour < win.end) : false;
+
+  // Cheap local-only check FIRST — this runs every minute in every open tab
+  // of every user, so touching Firestore here unconditionally (which the
+  // transaction-safe rewrite did) meant a fresh document read every single
+  // minute all day, for everyone — the #1 driver behind a sudden jump in the
+  // Firebase bill. A schedule boundary is only actually crossed a handful of
+  // times a day, so almost every one of these ticks needs zero Firestore
+  // contact at all.
+  const localUsers = DB.get('users')||[];
+  if(!_wouldAutoScheduleChange(localUsers, istHour, shouldBeActive)) return;
+
   DB.mutateUsers(users=>{
     let changed = false;
     users.forEach((u, idx) => {
@@ -9551,9 +9588,14 @@ function runAutoSchedule(){
   }).then(r=>{ if(r.ok && !r.aborted) renderAdmin && renderAdmin(); });
 }
 
-// Auto-schedule every minute (refresh holiday calendar first so a holiday
-// declared in HR Portal flows here without a CRM reload).
-setInterval(()=>{ refreshHolidaySet().then(runAutoSchedule); }, 60000);
+// Auto-schedule check every minute (cheap — see _wouldAutoScheduleChange
+// above, only touches Firestore when a boundary is actually crossed).
+// Holiday calendar itself is refreshed separately, every 15 min — a holiday
+// is a rare, planned event, so it doesn't need minute-level freshness, and
+// re-reading that doc every single minute in every open tab all day was
+// pure waste on top of the auto-schedule cost.
+setInterval(runAutoSchedule, 60000);
+setInterval(refreshHolidaySet, 15*60000);
 
 // ── Late-Login Auto-Absent (Mon-Fri: 10:00 AM, Saturday: 10:30 AM) ──
 // On working days (same Mon-Sat window as the auto-schedule, no Sunday/holiday
@@ -9563,6 +9605,13 @@ setInterval(()=>{ refreshHolidaySet().then(runAutoSchedule); }, 60000);
 // status flips to "Late" and they're reactivated immediately (see
 // recordHrAttendanceOnCrmLogin). Runs from whichever app (CRM or HR Portal) is
 // opened first — both share the same Firestore project.
+// Per-tab flag (resets on reload, not persisted) — once a run finds nothing
+// left to check for today, later minute-ticks in THIS tab skip Firestore
+// entirely instead of re-fetching holidays+attendance every minute for the
+// rest of the day. (A user's own login is handled by the normal login flow,
+// not this check, so once nobody is left unresolved there's truly nothing
+// more for this function to do until the date changes.)
+let _lateAbsentResolvedForDate = null;
 async function runLateAbsentCheck(){
   try{
     if(typeof fdb==='undefined') return;
@@ -9573,15 +9622,8 @@ async function runLateAbsentCheck(){
     if(istHour < absentCutoff) return;
 
     const td = today();
-
-    // Check holiday calendar — skip entirely on a declared holiday
-    let isHoliday=false;
-    try{
-      const holDoc = await fdb.collection('hr_data').doc('holidays').get();
-      const holidays = (holDoc.exists && holDoc.data() && holDoc.data().data) ? holDoc.data().data : [];
-      if(holidays.some(h=>h.date===td)) isHoliday=true;
-    }catch(e){}
-    if(isHoliday) return;
+    if(_lateAbsentResolvedForDate===td) return; // already confirmed fully resolved this session
+    if(isHolidayToday()){ _lateAbsentResolvedForDate=td; return; } // uses the shared _holidaySet — no separate Firestore read needed here
 
     const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
 
@@ -9592,6 +9634,7 @@ async function runLateAbsentCheck(){
     let usersChanged=false;
     const usersList = DB.get('users') || [];
     const idsToMarkAbsent = []; // collected during the loop, applied via a single safe mutateUsers() at the end
+    let anyStillUnresolved = false;
 
     for(const u of usersList){
       if(u.role==='admin') continue;
@@ -9610,6 +9653,7 @@ async function runLateAbsentCheck(){
       // Not logged in by 10 AM — deactivate + mark Absent
       idsToMarkAbsent.push(u.id);
       usersChanged = true;
+      anyStillUnresolved = true; // this write could fail (see catch below) — worth re-checking next minute
 
       try{
         await fdb.runTransaction(async (tx)=>{
@@ -9639,6 +9683,7 @@ async function runLateAbsentCheck(){
       });
       renderAdmin && renderAdmin();
     }
+    if(!anyStillUnresolved) _lateAbsentResolvedForDate = td; // nothing left to check today — skip Firestore for the rest of the day in this tab
   }catch(e){
     console.log('runLateAbsentCheck error:', e);
   }

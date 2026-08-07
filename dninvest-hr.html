@@ -2209,7 +2209,7 @@ async function updateOfficeStatusBanner(){
 }
 updateOfficeStatusBanner();
 fetchAccessControlOnce().then(updateOfficeStatusBanner);
-setInterval(()=>{ fetchAccessControlOnce().then(updateOfficeStatusBanner); }, 60000);
+setInterval(()=>{ fetchAccessControlOnce().then(updateOfficeStatusBanner); }, 5*60000); // every 5 min — office-open/closed status doesn't need minute-level freshness
 
 // ── 10 AM Late-Login Auto-Absent (HR Portal side) ──
 // Mirrors the same check in the CRM (dninvest-crm). Whichever app — CRM or
@@ -2278,8 +2278,18 @@ async function runLateAbsentCheckHr(){
     console.log('runLateAbsentCheckHr error:', e);
   }
 }
-setInterval(runLateAbsentCheckHr, 60000);
-runLateAbsentCheckHr();
+// DISABLED (7-Aug-2026, cost cleanup): the main CRM (dninvest-app-1.js,
+// runLateAbsentCheck) already does this exact job every minute, including a
+// safe transaction-based write. Having BOTH apps poll the same two Firestore
+// documents (crm_data/users, hr_data/attendance) every minute — whenever
+// both are open, which is the normal case for Admin — doubled the read/write
+// cost for zero extra benefit, and this copy's blind `usersDocRef.set(...)`
+// full-array overwrite could also race with/clobber other concurrent
+// changes to crm_data/users (e.g. Temporary Access grants). Left the
+// function defined (unused) rather than deleted, in case HR Portal ever
+// needs to run standalone without the CRM open.
+// setInterval(runLateAbsentCheckHr, 60000);
+// runLateAbsentCheckHr();
 
 // ── Auto Out-Time: Mon–Fri 6:15 PM, Saturday 2:15 PM ────────────────────────
 // Every minute: if current IST time >= cutoff and today's record has no out_time,
