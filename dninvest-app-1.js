@@ -585,6 +585,45 @@ const DB = {
       return {ok:false, error:e.message};
     } finally{ this._writing['seminars'] = Math.max(0,(this._writing['seminars']||1)-1); }
   },
+  // Transaction-safe bulk mutation of the whole `users` array (same idea as
+  // mutateSeminar above). `mutate(freshUsers)` receives the LATEST users
+  // array straight from Firestore and mutates it in place; return `false`
+  // to skip the write entirely (e.g. nothing actually changed).
+  // This exists because granting/expiring Temporary Access used to blindly
+  // overwrite the whole `users` doc with a possibly-stale local snapshot —
+  // e.g. cleanExpiredTempAccess() ran on page load using whatever was in
+  // this browser's local cache at that moment. If admin had *just* granted
+  // someone temp access a moment earlier and that grant hadn't finished
+  // syncing to this particular tab yet, the cleanup would write back the
+  // OLDER copy (without the new grant) and silently erase it — exactly the
+  // "refresh karte hi temp access hat jaata hai" bug.
+  async mutateUsers(mutate){
+    let localArr = this.get('users')||[];
+    const clone = JSON.parse(JSON.stringify(localArr));
+    if(mutate(clone)!==false) this.setLocal('users', clone);
+
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    const docRef = fdb.collection('crm_data').doc('users');
+    let finalData=null, aborted=false;
+    this._writing['users'] = (this._writing['users']||0) + 1;
+    try{
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : (this.get('users')||[]);
+        latest = JSON.parse(JSON.stringify(latest));
+        const res = mutate(latest);
+        if(res===false){ aborted=true; return; }
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        finalData = latest;
+      });
+      if(finalData) this.setLocal('users', finalData);
+      return {ok:true, aborted};
+    }catch(e){
+      console.log('mutateUsers error:', e);
+      toast('Sync error: '+e.message,'error');
+      return {ok:false, error:e.message};
+    } finally{ this._writing['users'] = Math.max(0,(this._writing['users']||1)-1); }
+  },
   // Delete a single client record (merge-on-write delete)
   async deleteClient(key, id){
     let arr = (this.get(key)||[]).filter(c=>c.id!==id);
@@ -944,9 +983,11 @@ async function doLogin(){
   const insideWindow = isWithinActiveWindowNow();
   if(userExists && userExists.active===false && userExists.lateAbsentMarked!==td){
     if(insideWindow && !userExists.manualOverride){
-      const fixList = DB.get('users') || [];
-      const fi = fixList.findIndex(x=>x.id===userExists.id);
-      if(fi>=0){ fixList[fi].active = true; DB.set('users', fixList); }
+      DB.mutateUsers(fixList=>{
+        const fi = fixList.findIndex(x=>x.id===userExists.id);
+        if(fi<0) return false;
+        fixList[fi].active = true;
+      });
       userExists.active = true;
     } else {
       document.getElementById('lerr').textContent = userExists.manualOverride
@@ -1153,15 +1194,14 @@ async function recordHrAttendanceOnCrmLogin(user){
         }
       }
       // Reactivate the user account that the 10 AM check had deactivated
-      const usersList = DB.get('users') || [];
-      const uidx = usersList.findIndex(x=>x.id===user.id);
-      if(uidx>=0){
+      await DB.mutateUsers(usersList=>{
+        const uidx = usersList.findIndex(x=>x.id===user.id);
+        if(uidx<0) return false;
         usersList[uidx].active = true;
         usersList[uidx].manualOverride = false;
         usersList[uidx].lateAbsentMarked = '';
-        DB.set('users', usersList);
-        CU.active = true; // keep current session's in-memory user object in sync
-      }
+      });
+      CU.active = true; // keep current session's in-memory user object in sync
       return;
     }
 
@@ -1304,16 +1344,16 @@ async function doResetPassword(){
   if(typeof fdb!=='undefined'){
     try{ await DB.syncFromFirebase(); }catch(e){}
   }
-  const users = DB.get('users') || DEFAULT_USERS;
-  const idx = users.findIndex(x=>x.username===username);
-  if(idx===-1){
+  const r = await DB.mutateUsers(users=>{
+    const idx = users.findIndex(x=>x.username===username);
+    if(idx<0) return false;
+    users[idx].password = newpass;
+  });
+  if(r.aborted){
     errEl.textContent='Username not found';
     errEl.style.display='block';
     return;
   }
-
-  users[idx].password = newpass;
-  await DB.set('users', users);
 
   okEl.style.display='block';
   document.getElementById('fp_username').value='';
@@ -9170,7 +9210,7 @@ function userForm(u){
     <input type="hidden" id="uf_id" value="${u?.id||''}">`;
 }
 
-function saveUser(){
+async function saveUser(){
   const id=document.getElementById('uf_id').value;
   const name=document.getElementById('uf_name').value.trim();
   const uname=document.getElementById('uf_uname').value.trim().toLowerCase();
@@ -9189,51 +9229,54 @@ function saveUser(){
 
   if(!name||!uname){ toast('Name and username required','error'); return; }
   if(!segs.length){ toast('Select at least one segment','error'); return; }
+  if(!id && !pwd){ toast('Password required for new user','error'); return; }
 
-  const users=DB.get('users')||[];
-  if(id){
-    const idx=users.findIndex(u=>u.id===id);
-    if(idx>=0){
-      const mob=document.getElementById('uf_mobile').value.trim();
-      const eml=document.getElementById('uf_email').value.trim();
-      users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
-      if(pwd) users[idx].password=pwd;
-      if(role==='rm' && pinVal) users[idx].pin=pinVal;
+  const r = await DB.mutateUsers(users=>{
+    if(id){
+      const idx=users.findIndex(u=>u.id===id);
+      if(idx>=0){
+        const mob=document.getElementById('uf_mobile').value.trim();
+        const eml=document.getElementById('uf_email').value.trim();
+        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
+        if(pwd) users[idx].password=pwd;
+        if(role==='rm' && pinVal) users[idx].pin=pinVal;
+      }
+    } else {
+      if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return false; }
+      const mob2=document.getElementById('uf_mobile').value.trim();
+      const eml2=document.getElementById('uf_email').value.trim();
+      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
+      if(role==='rm' && pinVal) newUser.pin=pinVal;
+      users.push(newUser);
     }
-  } else {
-    if(!pwd){ toast('Password required for new user','error'); return; }
-    if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return; }
-    const mob2=document.getElementById('uf_mobile').value.trim();
-    const eml2=document.getElementById('uf_email').value.trim();
-    const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
-    if(role==='rm' && pinVal) newUser.pin=pinVal;
-    users.push(newUser);
-  }
-  DB.set('users',users);
+  });
+  if(!r.ok || r.aborted) return;
   closeModal('userModal');
   toast(id?'User updated!':'User added!','success');
   renderAdmin();
   populateRmDropdowns();
 }
 
-function toggleUser(id){
+async function toggleUser(id){
   const users=DB.get('users')||[];
-  const idx=users.findIndex(u=>u.id===id);
-  if(idx<0) return;
-  const u = users[idx];
+  const u = users.find(x=>x.id===id);
+  if(!u) return;
   const newActive = !u.active;
   // Manual override: set manualOverride flag with timestamp
   // Auto-schedule will resume at next scheduled boundary
-  users[idx].active = newActive;
-  users[idx].manualOverride = true;
-  users[idx].manualOverrideTime = new Date().toISOString();
-  users[idx].manualOverrideActive = newActive;
-  DB.set('users', users);
+  await DB.mutateUsers(users=>{
+    const idx=users.findIndex(u=>u.id===id);
+    if(idx<0) return false;
+    users[idx].active = newActive;
+    users[idx].manualOverride = true;
+    users[idx].manualOverrideTime = new Date().toISOString();
+    users[idx].manualOverrideActive = newActive;
+  });
   renderAdmin();
   toast((newActive ? '✅ Activated' : '🔴 Deactivated') + ' — will resume at the next auto-schedule boundary', 'success');
 }
 
-function deleteUser(id){
+async function deleteUser(id){
   const users=DB.get('users')||[];
   const idx=users.findIndex(u=>u.id===id);
   if(idx<0) return;
@@ -9254,8 +9297,11 @@ function deleteUser(id){
   }
   if(!confirm(msg)) return;
 
-  users.splice(idx,1);
-  DB.set('users',users);
+  await DB.mutateUsers(users=>{
+    const i=users.findIndex(x=>x.id===id);
+    if(i<0) return false;
+    users.splice(i,1);
+  });
   renderAdmin();
   populateRmDropdowns();
   toast(u.name+' has been deleted','success');
@@ -9358,49 +9404,47 @@ function isWithinActiveWindowNow(){
 }
 
 function runAutoSchedule(){
-  const users = DB.get('users') || [];
   const istHour = getISTHour();
   const dow = getISTDayOfWeek();
   // Holiday → behave exactly like Sunday (no active window, RMs deactivate).
   const win = isHolidayToday() ? null : getActiveWindowForDay(dow);
   const shouldBeActive = win ? (istHour >= win.start && istHour < win.end) : false;
-  let changed = false;
-  users.forEach((u, idx) => {
-    if(u.role === 'admin') return; // admins skip
-    if(u.manualOverride){
-      // Check if next scheduled boundary has passed → clear override
-      const overrideTime = new Date(u.manualOverrideTime);
-      const utc = overrideTime.getTime() + overrideTime.getTimezoneOffset()*60000;
-      const istO = new Date(utc + 5.5*3600000);
-      const overrideHour = istO.getHours() + istO.getMinutes()/60;
-      const overrideDow = istO.getDay();
-      const overrideWin = isHolidayToday() ? null : getActiveWindowForDay(overrideDow);
-      // Has the day changed since the override, or has the active window
-      // (start/end) for today been crossed since the override was set?
-      const dayChanged = getISTDateStr() !== (isNaN(istO) ? '' :
-        istO.getFullYear()+'-'+String(istO.getMonth()+1).padStart(2,'0')+'-'+String(istO.getDate()).padStart(2,'0'));
-      let crossedBoundary = dayChanged;
-      if(!dayChanged && overrideWin){
-        crossedBoundary = (overrideHour < overrideWin.start && istHour >= overrideWin.start) ||
-                           (overrideHour >= overrideWin.start && overrideHour < overrideWin.end && istHour >= overrideWin.end);
+  DB.mutateUsers(users=>{
+    let changed = false;
+    users.forEach((u, idx) => {
+      if(u.role === 'admin') return; // admins skip
+      if(u.manualOverride){
+        // Check if next scheduled boundary has passed → clear override
+        const overrideTime = new Date(u.manualOverrideTime);
+        const utc = overrideTime.getTime() + overrideTime.getTimezoneOffset()*60000;
+        const istO = new Date(utc + 5.5*3600000);
+        const overrideHour = istO.getHours() + istO.getMinutes()/60;
+        const overrideDow = istO.getDay();
+        const overrideWin = isHolidayToday() ? null : getActiveWindowForDay(overrideDow);
+        // Has the day changed since the override, or has the active window
+        // (start/end) for today been crossed since the override was set?
+        const dayChanged = getISTDateStr() !== (isNaN(istO) ? '' :
+          istO.getFullYear()+'-'+String(istO.getMonth()+1).padStart(2,'0')+'-'+String(istO.getDate()).padStart(2,'0'));
+        let crossedBoundary = dayChanged;
+        if(!dayChanged && overrideWin){
+          crossedBoundary = (overrideHour < overrideWin.start && istHour >= overrideWin.start) ||
+                             (overrideHour >= overrideWin.start && overrideHour < overrideWin.end && istHour >= overrideWin.end);
+        }
+        if(crossedBoundary){
+          users[idx].manualOverride = false;
+          users[idx].active = shouldBeActive;
+          changed = true;
+        }
+        return; // still in manual override, don't change
       }
-      if(crossedBoundary){
-        users[idx].manualOverride = false;
+      // Auto mode
+      if((u.active !== false) !== shouldBeActive){
         users[idx].active = shouldBeActive;
         changed = true;
       }
-      return; // still in manual override, don't change
-    }
-    // Auto mode
-    if((u.active !== false) !== shouldBeActive){
-      users[idx].active = shouldBeActive;
-      changed = true;
-    }
-  });
-  if(changed){
-    DB.set('users', users);
-    renderAdmin && renderAdmin();
-  }
+    });
+    if(!changed) return false; // nothing to change — skip the write entirely
+  }).then(r=>{ if(r.ok && !r.aborted) renderAdmin && renderAdmin(); });
 }
 
 // Auto-schedule every minute (refresh holiday calendar first so a holiday
@@ -9443,6 +9487,7 @@ async function runLateAbsentCheck(){
 
     let usersChanged=false;
     const usersList = DB.get('users') || [];
+    const idsToMarkAbsent = []; // collected during the loop, applied via a single safe mutateUsers() at the end
 
     for(const u of usersList){
       if(u.role==='admin') continue;
@@ -9459,11 +9504,7 @@ async function runLateAbsentCheck(){
       if(hasLoggedInToday) continue; // already logged in today, leave alone
 
       // Not logged in by 10 AM — deactivate + mark Absent
-      const idx = usersList.findIndex(x=>x.id===u.id);
-      if(idx<0) continue;
-      usersList[idx].active = false;
-      usersList[idx].manualOverride = false; // this is an auto action, not a manual one
-      usersList[idx].lateAbsentMarked = td;
+      idsToMarkAbsent.push(u.id);
       usersChanged = true;
 
       try{
@@ -9480,7 +9521,18 @@ async function runLateAbsentCheck(){
     }
 
     if(usersChanged){
-      DB.set('users', usersList);
+      await DB.mutateUsers(fresh=>{
+        let changed=false;
+        idsToMarkAbsent.forEach(id=>{
+          const idx=fresh.findIndex(x=>x.id===id);
+          if(idx<0 || fresh[idx].lateAbsentMarked===td) return; // already marked (e.g. by another tab) — don't redo
+          fresh[idx].active = false;
+          fresh[idx].manualOverride = false; // this is an auto action, not a manual one
+          fresh[idx].lateAbsentMarked = td;
+          changed=true;
+        });
+        if(!changed) return false;
+      });
       renderAdmin && renderAdmin();
     }
   }catch(e){
@@ -10667,11 +10719,7 @@ function openTempAccessModal(userId){
   document.getElementById('tempAccessModal').classList.add('open');
 }
 
-function saveTempAccess(){
-  const users = DB.get('users')||[];
-  const idx = users.findIndex(u=>u.id===_taTargetUserId);
-  if(idx<0){ toast('User not found','error'); return; }
-
+async function saveTempAccess(){
   const today = new Date().toISOString().split('T')[0];
   const checkboxes = document.querySelectorAll('#ta-rm-list input[type=checkbox]');
   const selected = [];
@@ -10679,14 +10727,22 @@ function saveTempAccess(){
     if(cb.checked) selected.push({absentUserId: cb.value, expiry: today});
   });
 
-  // Keep future access entries (if any), replace today's
-  const existing = (users[idx].tempAccess||[]).filter(t=>t.expiry!==today);
-  users[idx].tempAccess = [...existing, ...selected];
+  let targetName='', grantedNames='', finalTempAccess=null;
+  const r = await DB.mutateUsers(users=>{
+    const idx = users.findIndex(u=>u.id===_taTargetUserId);
+    if(idx<0) return false;
+    // Keep future access entries (if any), replace today's
+    const existing = (users[idx].tempAccess||[]).filter(t=>t.expiry!==today);
+    users[idx].tempAccess = [...existing, ...selected];
+    targetName = users[idx].name;
+    grantedNames = selected.map(s=>(users.find(u=>u.id===s.absentUserId)||{}).name||'').join(', ');
+    finalTempAccess = users[idx].tempAccess;
+  });
+  if(!r.ok || r.aborted){ if(r.aborted) toast('User not found','error'); return; }
 
-  DB.set('users', users);
   // Update CU if granting to logged-in user
-  if(CU.id === users[idx].id){
-    CU.tempAccess = users[idx].tempAccess;
+  if(CU.id === _taTargetUserId){
+    CU.tempAccess = finalTempAccess;
     // Dropdown turant refresh ho, warna temp RM ka option reload tak nahi aata
     try{ populateRmDropdowns(); }catch(e){}
   }
@@ -10694,24 +10750,24 @@ function saveTempAccess(){
   closeModal('tempAccessModal');
   renderAdmin();
   if(selected.length){
-    const names = selected.map(s=>(users.find(u=>u.id===s.absentUserId)||{}).name||'').join(', ');
-    toast(`✅ ${users[idx].name} has been given access to ${names} for today!`, 'success');
+    toast(`✅ ${targetName} has been given access to ${grantedNames} for today!`, 'success');
   } else {
-    toast(`🔄 Removed ${users[idx].name}'s temporary access`, 'info');
+    toast(`🔄 Removed ${targetName}'s temporary access`, 'info');
   }
 }
 
 // Check & auto-expire temp access on load
-function cleanExpiredTempAccess(){
-  const users = DB.get('users')||[];
+async function cleanExpiredTempAccess(){
   const today = new Date().toISOString().split('T')[0];
-  let changed = false;
-  users.forEach((u,i)=>{
-    if(!u.tempAccess?.length) return;
-    const valid = u.tempAccess.filter(t=>t.expiry>=today);
-    if(valid.length !== u.tempAccess.length){ users[i].tempAccess=valid; changed=true; }
+  await DB.mutateUsers(users=>{
+    let changed = false;
+    users.forEach((u,i)=>{
+      if(!u.tempAccess?.length) return;
+      const valid = u.tempAccess.filter(t=>t.expiry>=today);
+      if(valid.length !== u.tempAccess.length){ users[i].tempAccess=valid; changed=true; }
+    });
+    if(!changed) return false; // nothing expired — skip the write entirely
   });
-  if(changed) DB.set('users', users);
 }
 
 
@@ -10726,7 +10782,7 @@ function openChangeCredModal(){
   document.getElementById('changeCredModal').classList.add('open');
 }
 
-function saveChangeCred(){
+async function saveChangeCred(){
   if(!CU) return;
   const current = document.getElementById('cc_current').value;
   const newPass = document.getElementById('cc_newpass').value;
@@ -10751,18 +10807,18 @@ function saveChangeCred(){
     return;
   }
 
-  const users = DB.get('users') || [];
-  const idx = users.findIndex(u => u.id === CU.id);
-  if(idx < 0){ toast('User not found','error'); return; }
-
-  if(newPass) users[idx].password = newPass;
-  if(newPin && CU.role==='rm') users[idx].pin = newPin;
+  const r = await DB.mutateUsers(users=>{
+    const idx = users.findIndex(u => u.id === CU.id);
+    if(idx<0) return false;
+    if(newPass) users[idx].password = newPass;
+    if(newPin && CU.role==='rm') users[idx].pin = newPin;
+  });
+  if(!r.ok || r.aborted){ toast('User not found','error'); return; }
 
   // Update persistent session so auto-login keeps working with the new credential
   if(newPass){ CU.password = newPass; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass, at:Date.now()})); }
   if(newPin && CU.role==='rm'){ CU.pin = newPin; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPin, at:Date.now()})); }
 
-  DB.set('users', users);
   closeModal('changeCredModal');
   toast('✅ Password/PIN updated!', 'success');
 }
