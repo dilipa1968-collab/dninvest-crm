@@ -204,6 +204,53 @@ const DB = {
       this._mfbWriting=Math.max(0,this._mfbWriting-1);
     }
   },
+  // Transaction-safe update of ONE existing mf_business entry by id — same
+  // idea as mutateSeminar/mutateUsers above. `mutate(freshEntry)` receives
+  // the LATEST version of this entry straight from Firestore and mutates it
+  // in place; return `false` to abort. Editing a business entry used to read
+  // the whole entries array locally, edit it, and write the WHOLE array back
+  // with a blind DB.set — exactly the same "someone else's concurrent
+  // change gets clobbered" risk fixed elsewhere for seminars/users.
+  async updateMfBizEntry(arrayKey, id, mutate){
+    let biz = this.get('mf_business');
+    let curEntries = Array.isArray(biz) ? biz.slice() : (biz?.entries||[]).slice();
+    let curEq = Array.isArray(biz) ? [] : (biz?.eq_entries||[]).slice();
+    const localArr = arrayKey==='entries' ? curEntries : curEq;
+    const lIdx = localArr.findIndex(e=>e&&e.id===id);
+    if(lIdx>=0){
+      const clone = JSON.parse(JSON.stringify(localArr[lIdx]));
+      if(mutate(clone)!==false){ localArr[lIdx]=clone; this.setLocal('mf_business', {entries:curEntries, eq_entries:curEq}); }
+    }
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    this._mfbWriting++;
+    let finalData=null, aborted=false;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_business');
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
+        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
+        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
+        const arr = arrayKey==='entries' ? lEntries : lEq;
+        const idx = arr.findIndex(e=>e&&e.id===id);
+        if(idx<0){ aborted=true; return; }
+        const fresh = {...arr[idx]};
+        const res = mutate(fresh);
+        if(res===false){ aborted=true; return; }
+        arr[idx]=fresh;
+        finalData = {entries:lEntries, eq_entries:lEq};
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData) this.setLocal('mf_business', finalData);
+      return {ok:true, aborted};
+    }catch(e){
+      console.log('mf_business update error:',e);
+      try{ toast('Sync error: '+e.message,'error'); }catch(e2){}
+      return {ok:false, error:e.message};
+    }finally{
+      this._mfbWriting=Math.max(0,this._mfbWriting-1);
+    }
+  },
   // Append one or more entries to the shared append-only activity_logs array
   // WITHOUT clobbering other RMs' concurrent entries. Transaction merge-by-id,
   // keeps the newest 2000 by date.
@@ -6698,6 +6745,12 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('businessModalTitle').textContent = 'Add Business — ' + clientName;
   const clientWrap=document.getElementById('biz_client_wrap'); if(clientWrap) clientWrap.style.display='none';
   const rmNoteWrap=document.getElementById('biz_rm_note_wrap'); if(rmNoteWrap) rmNoteWrap.style.display='none';
+  const mfNoteWrap=document.getElementById('biz_mfdesk_note_wrap'); if(mfNoteWrap) mfNoteWrap.style.display='none';
+  ['biz_type','biz_amount','biz_target_fund'].forEach(fid=>{
+    const el=document.getElementById(fid);
+    if(!el) return;
+    el.disabled=false; el.style.background=''; el.style.cursor='';
+  });
   document.getElementById('biz_type').value = 'Lumpsum';
   document.getElementById('biz_amount').value = '';
   const bfEl=document.getElementById('biz_fund'); if(bfEl) bfEl.value='';
@@ -6709,7 +6762,7 @@ function openBusinessModal(clientId, clientName){
   document.getElementById('businessModal').classList.add('open');
 }
 
-function saveBusinessEntry(){
+async function saveBusinessEntry(){
   if(!currentBusinessTarget) return;
   const type = document.getElementById('biz_type').value;
   const amount = parseFloat(document.getElementById('biz_amount').value);
@@ -6729,34 +6782,40 @@ function saveBusinessEntry(){
   const firstPay = (sched && firstPayDone) ? amount : null;
   if(sched && !startDate){ toast('Please enter the start date','error'); return; }
 
-  const biz = DB.get('mf_business');
-  const entries = Array.isArray(biz) ? biz : (biz?.entries || []);
-
   if(editingBusinessId){
-    const idx = entries.findIndex(e=>e.id===editingBusinessId);
-    if(idx>=0){
-      if(CU.role!=='admin' && entries[idx].created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
-      // Admin can reassign the Client and/or re-attribute the RM — but only
-      // for this one transaction entry. Neither touches the client's actual
-      // RM assignment in mf_clients; that mapping stays exactly as it was.
+    const original = getMfBizEntries().find(e=>e.id===editingBusinessId);
+    if(!original){ toast('Entry no longer exists','error'); editingBusinessId=null; closeModal('businessModal'); return; }
+    if(CU.role!=='admin' && original.created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
+    if(CU.role==='admin' && !currentBusinessTarget.id){ toast('Please select a client','error'); return; }
+
+    // MF Desk editing someone else's entry: Amount/Type/Target Scheme/Client/RM
+    // are locked (UI already disables them, but this is the save-side guard
+    // that actually enforces it — the disabled attribute alone is only a UI
+    // hint). Their save can only ever change Fund Name/Date/Start Date/Paid.
+    const restricted = isMfDeskRestrictedBizEdit(original);
+    const finalType = restricted ? original.type : type;
+    const finalAmount = restricted ? original.amount : amount;
+    const finalSched = mfTxnHasSchedule(finalType);
+    const finalFirstPay = (finalSched && firstPayDone) ? finalAmount : null;
+    const finalTargetScheme = restricted ? original.target_scheme : (mfTxnTypeNeedsTarget(finalType) ? targetScheme : '');
+
+    const r = await DB.updateMfBizEntry('entries', editingBusinessId, fresh=>{
       if(CU.role==='admin'){
-        if(!currentBusinessTarget.id){ toast('Please select a client','error'); return; }
-        entries[idx].client_id = currentBusinessTarget.id;
-        entries[idx].client_name = currentBusinessTarget.name;
-        entries[idx].rm = document.getElementById('biz_client_rm')?.value || '';
+        fresh.client_id = currentBusinessTarget.id;
+        fresh.client_name = currentBusinessTarget.name;
+        fresh.rm = document.getElementById('biz_client_rm')?.value || '';
       }
-      entries[idx].type = type;
-      entries[idx].amount = amount;
-      entries[idx].fund_name = fundName;
-      entries[idx].target_scheme = mfTxnTypeNeedsTarget(type) ? targetScheme : '';
-      entries[idx].first_payment = sched ? firstPay : null;
-      entries[idx].start_date = sched ? startDate : '';
-      entries[idx].date = date;
-    }
-    const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
-    DB.set('mf_business', {entries, eq_entries: eqEntries});
+      fresh.type = finalType;
+      fresh.amount = finalAmount;
+      fresh.fund_name = fundName;
+      fresh.target_scheme = finalTargetScheme;
+      fresh.first_payment = finalSched ? finalFirstPay : null;
+      fresh.start_date = finalSched ? startDate : '';
+      fresh.date = date;
+    });
+    if(!r.ok || r.aborted){ if(r.aborted) toast('Entry no longer exists','error'); return; }
     learnFundName(fundName);
-    if(mfTxnTypeNeedsTarget(type)) learnFundName(targetScheme);
+    if(mfTxnTypeNeedsTarget(finalType) && !restricted) learnFundName(targetScheme);
     closeModal('businessModal');
     toast('Business entry updated!','success');
     editingBusinessId = null;
@@ -6814,6 +6873,22 @@ function bizStatusBadge(status){
 function hasMfDeskAccess(user){
   if(!user) return false;
   return user.role==='mf_desk' || (user.role==='rm' && user.mf_desk_access===true);
+}
+
+// MF Desk (dedicated `mf_desk` role, or an RM with mf_desk_access=true) can
+// open ANY other RM's business entry to help backfill it — fix a fund name
+// typo, mark the First Payment tick, correct a date — without needing to be
+// its creator. But they must NOT be able to quietly change the financial
+// substance or attribution of someone else's entry, so Amount/Type/Target
+// Scheme/Client/RM stay locked in that case. Editing your OWN entry (any
+// role, including mf_desk) is unaffected by this — full edit rights there
+// as before; this restriction only kicks in when mf-desk access is being
+// used to touch someone ELSE's entry.
+function isMfDeskRestrictedBizEdit(entry){
+  if(!entry) return false;
+  if(CU.role==='admin') return false;
+  if(entry.created_by===CU.name) return false;
+  return hasMfDeskAccess(CU);
 }
 
 // ── Cross-check remarks ──
@@ -8935,7 +9010,7 @@ function renderBizReportTable(){
     const remarkCell = e.cross_remark
       ? `<div style="font-size:.78rem;color:var(--navy)">${escapeHtml(e.cross_remark)}</div><div style="font-size:.68rem;color:var(--gray);margin-top:2px">— ${escapeHtml(e.cross_remark_by||'')}, ${fmtDate(e.cross_remark_at)}</div>${canRemark?`<span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">✏️ Edit</span>`:''}${CU.role==='admin'?` <span class="btn-icon" style="cursor:pointer;font-size:.72rem;color:var(--red)" onclick="clearCrossRemark('${e.id}')">🗑️ Clear</span>`:''}`
       : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Rmk</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
-    const canEdit = CU.role==='admin' || e.created_by===CU.name;
+    const canEdit = CU.role==='admin' || e.created_by===CU.name || hasMfDeskAccess(CU);
     h+=`<tr>${cells.map(c=>`<td>${c!=null&&c!==''?c:'—'}</td>`).join('')}`;
     h+=`<td style="min-width:140px">${remarkCell}</td>`;
     h+=`<td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>`;
@@ -8956,7 +9031,7 @@ function editBusinessEntry(id){
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
-  if(CU.role!=='admin' && e.created_by!==CU.name){ toast('You can only edit entries you created','error'); return; }
+  if(CU.role!=='admin' && e.created_by!==CU.name && !hasMfDeskAccess(CU)){ toast('You can only edit entries you created','error'); return; }
   currentBusinessTarget = {id: e.client_id, name: e.client_name};
   editingBusinessId = id;
   document.getElementById('businessModalTitle').textContent = 'Edit Business — '+e.client_name;
@@ -8978,6 +9053,20 @@ function editBusinessEntry(id){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value = e.start_date||'';
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
+
+  // MF Desk touching someone else's entry — lock Amount/Type/Target Scheme
+  // (Client/RM are already hidden for every non-admin above).
+  const restricted = isMfDeskRestrictedBizEdit(e);
+  const mfNoteWrap = document.getElementById('biz_mfdesk_note_wrap');
+  if(mfNoteWrap) mfNoteWrap.style.display = restricted ? '' : 'none';
+  ['biz_type','biz_amount','biz_target_fund'].forEach(fid=>{
+    const el=document.getElementById(fid);
+    if(!el) return;
+    el.disabled = restricted;
+    el.style.background = restricted ? '#f3f4f6' : '';
+    el.style.cursor = restricted ? 'not-allowed' : '';
+  });
+
   document.getElementById('businessModal').classList.add('open');
 }
 
