@@ -251,6 +251,79 @@ const DB = {
       this._mfbWriting=Math.max(0,this._mfbWriting-1);
     }
   },
+  // Transaction-safe REMOVAL of one mf_business entry by id — same reasoning
+  // as updateMfBizEntry, for the delete case (which can't just "mutate a
+  // clone in place" since the whole point is the entry no longer exists).
+  async deleteMfBizEntry(arrayKey, id){
+    let biz = this.get('mf_business');
+    let curEntries = Array.isArray(biz) ? biz.slice() : (biz?.entries||[]).slice();
+    let curEq = Array.isArray(biz) ? [] : (biz?.eq_entries||[]).slice();
+    if(arrayKey==='entries') curEntries = curEntries.filter(e=>!e||e.id!==id);
+    else curEq = curEq.filter(e=>!e||e.id!==id);
+    this.setLocal('mf_business', {entries:curEntries, eq_entries:curEq});
+
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    this._mfbWriting++;
+    let finalData=null;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_business');
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
+        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
+        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
+        if(arrayKey==='entries') lEntries = lEntries.filter(e=>!e||e.id!==id);
+        else lEq = lEq.filter(e=>!e||e.id!==id);
+        finalData = {entries:lEntries, eq_entries:lEq};
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+      });
+      if(finalData) this.setLocal('mf_business', finalData);
+      return {ok:true};
+    }catch(e){
+      console.log('mf_business delete error:',e);
+      try{ toast('Sync error: '+e.message,'error'); }catch(e2){}
+      return {ok:false, error:e.message};
+    }finally{
+      this._mfbWriting=Math.max(0,this._mfbWriting-1);
+    }
+  },
+  // Transaction-safe bulk APPEND to mf_business (used by the Excel bulk
+  // upload) — reads the latest array inside the transaction and appends
+  // newEntries onto THAT, rather than onto a possibly-stale local read, so a
+  // concurrent single-entry edit/approve elsewhere can't get lost under it.
+  async appendMfBizEntriesBulk(arrayKey, newEntries){
+    let biz = this.get('mf_business');
+    let curEntries = Array.isArray(biz) ? biz.slice() : (biz?.entries||[]).slice();
+    let curEq = Array.isArray(biz) ? [] : (biz?.eq_entries||[]).slice();
+    if(arrayKey==='entries') curEntries = curEntries.concat(newEntries);
+    else curEq = curEq.concat(newEntries);
+    this.setLocal('mf_business', {entries:curEntries, eq_entries:curEq});
+
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    this._mfbWriting++;
+    let finalData2=null;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_business');
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
+        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
+        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
+        if(arrayKey==='entries') lEntries = lEntries.concat(newEntries);
+        else lEq = lEq.concat(newEntries);
+        finalData2 = {entries:lEntries, eq_entries:lEq};
+        tx.set(docRef, {data:finalData2, updated:new Date().toISOString()});
+      });
+      if(finalData2) this.setLocal('mf_business', finalData2);
+      return {ok:true};
+    }catch(e){
+      console.log('mf_business bulk-append error:',e);
+      try{ toast('Sync error: '+e.message,'error'); }catch(e2){}
+      return {ok:false, error:e.message};
+    }finally{
+      this._mfbWriting=Math.max(0,this._mfbWriting-1);
+    }
+  },
   // Append one or more entries to the shared append-only activity_logs array
   // WITHOUT clobbering other RMs' concurrent entries. Transaction merge-by-id,
   // keeps the newest 2000 by date.
@@ -836,7 +909,14 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
     if(typeof fdb==='undefined') return;
-    for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
+    // All ~17 collections fetched IN PARALLEL (was a sequential for-loop with
+    // await inside — each collection waited for the previous one to finish
+    // round-tripping to Firestore before even starting its own request, which
+    // meant login/refresh/the 30-min auto-reload paid for 17+ round-trips
+    // back to back instead of all at once). Each key still has its own
+    // try/catch so one failing fetch doesn't block or break the others.
+    const keys = ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'];
+    await Promise.all(keys.map(async key=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
         if(this._isSharded(key)){
@@ -849,7 +929,7 @@ const DB = {
             console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
                         this._shardCache[key].map(p=>p.length));
           }
-          continue;
+          return;
         }
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -865,7 +945,7 @@ const DB = {
             const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
             localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
             console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
-            continue;
+            return;
           }
           if(Array.isArray(d)){
             if(key==='call_logs'){
@@ -896,7 +976,7 @@ const DB = {
           }
         }
       }catch(e){ console.log('Firebase sync error for',key,':',e); }
-      }
+    }));
     try{ if(typeof clearEqRiskCache==='function') clearEqRiskCache(); }catch(e){}
   }
 };
@@ -6907,17 +6987,18 @@ function canAddCrossRemark(e){
   return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
 }
 
-function addCrossRemark(id){
+async function addCrossRemark(id){
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
   if(!canAddCrossRemark(e)){ toast('You are not allowed to remark on this entry','error'); return; }
   const remark = prompt('Your remark on this entry (e.g. checking if this business belongs to someone else):', e.cross_remark||'');
   if(remark===null) return;
-  e.cross_remark = remark.trim();
-  e.cross_remark_by = CU.name;
-  e.cross_remark_at = today();
-  setMfBizEntries(entries);
+  await DB.updateMfBizEntry('entries', id, fresh=>{
+    fresh.cross_remark = remark.trim();
+    fresh.cross_remark_by = CU.name;
+    fresh.cross_remark_at = today();
+  });
   toast('Remark saved','success');
   renderMfTxnTable();
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
@@ -6925,56 +7006,48 @@ function addCrossRemark(id){
 
 // Admin-only: clear/reverse a cross-check remark in one click, without having
 // to open the prompt and manually delete the text.
-function clearCrossRemark(id){
+async function clearCrossRemark(id){
   if(CU.role!=='admin') return;
   if(!confirm('Clear this cross-check remark?')) return;
-  const entries = getMfBizEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.cross_remark = '';
-  e.cross_remark_by = '';
-  e.cross_remark_at = '';
-  setMfBizEntries(entries);
+  await DB.updateMfBizEntry('entries', id, fresh=>{
+    fresh.cross_remark = '';
+    fresh.cross_remark_by = '';
+    fresh.cross_remark_at = '';
+  });
   toast('Remark cleared','success');
   renderMfTxnTable();
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
 }
 
-function approveBusinessEntry(id){
+async function approveBusinessEntry(id){
   if(CU.role!=='admin') return;
-  const entries = getMfBizEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Approved';
-  e.decline_reason = '';
-  setMfBizEntries(entries);
+  await DB.updateMfBizEntry('entries', id, fresh=>{
+    fresh.status = 'Approved';
+    fresh.decline_reason = '';
+  });
   toast('Business approved!','success');
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
   renderMfTxnTable();
 }
 
-function declineBusinessEntry(id){
+async function declineBusinessEntry(id){
   if(CU.role!=='admin') return;
   const reason = prompt('Decline reason (optional):','') || '';
-  const entries = getMfBizEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Declined';
-  e.decline_reason = reason.trim();
-  setMfBizEntries(entries);
+  await DB.updateMfBizEntry('entries', id, fresh=>{
+    fresh.status = 'Declined';
+    fresh.decline_reason = reason.trim();
+  });
   toast('Business declined','success');
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
   renderMfTxnTable();
 }
 
-function markPendingBusinessEntry(id){
+async function markPendingBusinessEntry(id){
   if(CU.role!=='admin') return;
-  const entries = getMfBizEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Pending';
-  e.decline_reason = '';
-  setMfBizEntries(entries);
+  await DB.updateMfBizEntry('entries', id, fresh=>{
+    fresh.status = 'Pending';
+    fresh.decline_reason = '';
+  });
   toast('Status reset to Pending','success');
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
   renderMfTxnTable();
@@ -7673,11 +7746,10 @@ function renderMfTxnTable(){
   MFTBULK.afterRender();
 }
 
-function deleteMfTxnEntry(id){
+async function deleteMfTxnEntry(id){
   if(CU.role!=='admin') return;
   if(!confirm('Delete this transaction entry?')) return;
-  const entries=getMfBizEntries().filter(e=>e.id!==id);
-  setMfBizEntries(entries);
+  await DB.deleteMfBizEntry('entries', id);
   toast('Entry deleted','success');
   renderMfTxnTable();
 }
@@ -7983,48 +8055,41 @@ function renderEqDematTable(){
   </table>`;
 }
 
-function approveEqDematEntry(id){
+async function approveEqDematEntry(id){
   if(CU.role!=='admin') return;
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Approved';
-  e.decline_reason = '';
-  setEqDematEntries(entries);
+  await DB.updateMfBizEntry('eq_entries', id, fresh=>{
+    fresh.status = 'Approved';
+    fresh.decline_reason = '';
+  });
   toast('Demat entry approved!','success');
   renderEqDematTable();
 }
 
-function declineEqDematEntry(id){
+async function declineEqDematEntry(id){
   if(CU.role!=='admin') return;
   const reason = prompt('Decline reason (optional):','') || '';
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Declined';
-  e.decline_reason = reason.trim();
-  setEqDematEntries(entries);
+  await DB.updateMfBizEntry('eq_entries', id, fresh=>{
+    fresh.status = 'Declined';
+    fresh.decline_reason = reason.trim();
+  });
   toast('Demat entry declined','success');
   renderEqDematTable();
 }
 
-function markPendingEqDematEntry(id){
+async function markPendingEqDematEntry(id){
   if(CU.role!=='admin') return;
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Pending';
-  e.decline_reason = '';
-  setEqDematEntries(entries);
+  await DB.updateMfBizEntry('eq_entries', id, fresh=>{
+    fresh.status = 'Pending';
+    fresh.decline_reason = '';
+  });
   toast('Status reset to Pending','success');
   renderEqDematTable();
 }
 
-function deleteEqDematEntry(id){
+async function deleteEqDematEntry(id){
   if(CU.role!=='admin') return;
   if(!confirm('Delete this Demat account entry?')) return;
-  const entries = getEqDematEntries().filter(e=>e.id!==id);
-  setEqDematEntries(entries);
+  await DB.deleteMfBizEntry('eq_entries', id);
   toast('Entry deleted','success');
   renderEqDematTable();
 }
@@ -8053,19 +8118,21 @@ function editEqDematEntry(id){
   document.getElementById('dematEditModal').classList.add('open');
 }
 
-function saveDematEdit(){
+async function saveDematEdit(){
   if(CU.role!=='admin') return;
   if(!editingDematId) return;
   const date = document.getElementById('demat_edit_date').value;
   if(!date){ toast('Date is required','error'); return; }
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===editingDematId);
-  if(!e){ toast('Entry not found','error'); return; }
-  e.client_code = document.getElementById('demat_edit_code').value.trim().toUpperCase();
-  e.date        = date;
-  e.remarks     = document.getElementById('demat_edit_remarks').value.trim();
-  e.opening_rm  = document.getElementById('demat_edit_opening_rm').value;
-  setEqDematEntries(entries);
+  const code = document.getElementById('demat_edit_code').value.trim().toUpperCase();
+  const remarks = document.getElementById('demat_edit_remarks').value.trim();
+  const openingRm = document.getElementById('demat_edit_opening_rm').value;
+  const r = await DB.updateMfBizEntry('eq_entries', editingDematId, fresh=>{
+    fresh.client_code = code;
+    fresh.date        = date;
+    fresh.remarks     = remarks;
+    fresh.opening_rm  = openingRm;
+  });
+  if(!r.ok || r.aborted){ if(r.aborted) toast('Entry not found','error'); return; }
   toast('Demat entry updated!','success');
   closeModal('dematEditModal');
   editingDematId = null;
@@ -9069,13 +9136,10 @@ function editBusinessEntry(id){
   document.getElementById('businessModal').classList.add('open');
 }
 
-function deleteBusinessEntry(id){
+async function deleteBusinessEntry(id){
   if(CU.role!=='admin') return;
   if(!confirm('Delete this business entry? This cannot be undone.')) return;
-  const biz = DB.get('mf_business');
-  const entries = (Array.isArray(biz) ? biz : (biz?.entries||[])).filter(e=>e.id!==id);
-  const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
-  DB.set('mf_business', {entries, eq_entries: eqEntries});
+  await DB.deleteMfBizEntry('entries', id);
   toast('Entry deleted','success');
   newBusinessMonthlyReport();
 }

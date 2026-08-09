@@ -1132,12 +1132,10 @@ const MFUP = {
       }
       if(!newEntries.length){ toast('No valid rows found','error'); return; }
       if(!confirm(newEntries.length+' MF business entries will be uploaded (status: Approved)'+(skipped?(', '+skipped+' blank/invalid skipped'):'')+'.\nConfirm?')) return;
-      const biz=DB.get('mf_business');
-      const entries=(Array.isArray(biz)?biz:(biz?.entries||[])).concat(newEntries);
-      const eqEntries=Array.isArray(biz)?[]:(biz?.eq_entries||[]);
-      DB.set('mf_business',{entries,eq_entries:eqEntries});
-      if(typeof renderMfTxnTable==='function') renderMfTxnTable();
-      refreshDash&&refreshDash();
+      DB.appendMfBizEntriesBulk('entries', newEntries).then(()=>{
+        if(typeof renderMfTxnTable==='function') renderMfTxnTable();
+        refreshDash&&refreshDash();
+      });
       toast(newEntries.length+' MF entries uploaded','success');
     });
   },
