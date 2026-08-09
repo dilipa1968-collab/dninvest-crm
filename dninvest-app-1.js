@@ -1051,7 +1051,9 @@ async function doLogin(){
       });
       userExists.active = true;
     } else {
-      document.getElementById('lerr').textContent = userExists.manualOverride
+      document.getElementById('lerr').textContent = userExists.left_company
+        ? '🚶 This account is marked as Left. Please contact Admin if this is incorrect.'
+        : userExists.manualOverride
         ? '🔒 Your access has been disabled by Admin. Please contact Admin.'
         : '🕐 Login not allowed outside office hours. Please try again during working hours.';
       document.getElementById('lerr').style.display='block';
@@ -9227,7 +9229,7 @@ function renderAdmin(){
     <div class="user-card">
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
-        <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
+        <div class="user-name">${u.name} ${u.left_company?'<span style="color:#fff;background:var(--gray);font-size:.72rem;padding:1px 7px;border-radius:4px;margin-left:4px">🚶 LEFT'+(u.left_date?' · '+u.left_date:'')+'</span>':(!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':'')}${!u.left_company&&u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${!u.left_company&&u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
         <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
@@ -9237,9 +9239,14 @@ function renderAdmin(){
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="editUser('${u.id}')">Edit</button>
-        ${u.role!=='admin'?`<button class="btn" onclick="forceLogoutUser('${u.id}')" style="background:#d97706;color:#fff;border:none" title="Force logout now — also stamps HR out-time">🚪 Force Logout</button>`:''}
-        ${u.role!=='admin'?`<button class="btn" onclick="openTempAccessModal('${u.id}')" style="background:var(--teal);color:#fff;border:none" title="Temp Access">🔄 Temp</button>`:''}
-        <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
+        ${u.left_company?`
+          <button class="btn btn-success" onclick="reactivateUser('${u.id}')" title="Bring them back onto the normal login/auto-schedule">↩️ Reactivate</button>
+        `:`
+          ${u.role!=='admin'?`<button class="btn" onclick="forceLogoutUser('${u.id}')" style="background:#d97706;color:#fff;border:none" title="Force logout now — also stamps HR out-time">🚪 Force Logout</button>`:''}
+          ${u.role!=='admin'?`<button class="btn" onclick="openTempAccessModal('${u.id}')" style="background:var(--teal);color:#fff;border:none" title="Temp Access">🔄 Temp</button>`:''}
+          <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
+          ${u.role!=='admin'?`<button class="btn" onclick="markUserLeft('${u.id}')" style="background:var(--gray);color:#fff;border:none" title="Employee has left the company — disables login, keeps all history, one-click Reactivate later">🚶 Mark as Left</button>`:''}
+        `}
         <button class="btn btn-danger" onclick="deleteUser('${u.id}')">Delete</button>
       </div>
     </div>`).join('');
@@ -9380,6 +9387,48 @@ async function toggleUser(id){
   toast((newActive ? '✅ Activated' : '🔴 Deactivated') + ' — will resume at the next auto-schedule boundary', 'success');
 }
 
+// "Left Company" — a distinct state from the daily Activate/Deactivate toggle.
+// Deactivate is for the day-to-day auto-schedule (resumes on its own at the
+// next boundary); this is for someone who's actually gone: login disabled,
+// manualOverride locked ON so the every-minute auto-schedule never touches
+// them again, and a clear "LEFT" tag in the list. Nothing about their
+// history/clients/incentive records is deleted — one click on "Reactivate"
+// brings them fully back onto the normal schedule.
+async function markUserLeft(id){
+  const users=DB.get('users')||[];
+  const u=users.find(x=>x.id===id);
+  if(!u) return;
+  if(!confirm(u.name+' ko "Left" mark karna hai?\n\nUnka login band ho jayega aur daily auto-schedule ab unhe kabhi activate nahi karega. Poora record (clients, history, incentive) surakshit rehta hai — "Reactivate" se kabhi bhi wapas la sakte hain.')) return;
+  await DB.mutateUsers(users=>{
+    const idx=users.findIndex(x=>x.id===id);
+    if(idx<0) return false;
+    users[idx].left_company = true;
+    users[idx].left_date = today();
+    users[idx].active = false;
+    users[idx].manualOverride = true;
+    users[idx].manualOverrideTime = new Date().toISOString();
+    users[idx].manualOverrideActive = false;
+  });
+  renderAdmin();
+  toast('🚶 '+u.name+' marked as Left — login disabled, auto-schedule will not reactivate them','success');
+}
+
+async function reactivateUser(id){
+  const users=DB.get('users')||[];
+  const u=users.find(x=>x.id===id);
+  if(!u) return;
+  await DB.mutateUsers(users=>{
+    const idx=users.findIndex(x=>x.id===id);
+    if(idx<0) return false;
+    users[idx].left_company = false;
+    users[idx].left_date = '';
+    users[idx].manualOverride = false; // hand back to the normal daily auto-schedule
+    users[idx].active = isWithinActiveWindowNow();
+  });
+  renderAdmin();
+  toast('↩️ '+u.name+' reactivated — back on the normal login/auto-schedule','success');
+}
+
 async function deleteUser(id){
   const users=DB.get('users')||[];
   const idx=users.findIndex(u=>u.id===id);
@@ -9513,6 +9562,7 @@ function isWithinActiveWindowNow(){
 function _wouldAutoScheduleChange(users, istHour, shouldBeActive){
   return (users||[]).some(u=>{
     if(u.role === 'admin') return false;
+    if(u.left_company) return false; // marked Left — never auto-touched, only "Reactivate" clears this
     if(u.manualOverride){
       const overrideTime = new Date(u.manualOverrideTime);
       const utc = overrideTime.getTime() + overrideTime.getTimezoneOffset()*60000;
@@ -9554,6 +9604,7 @@ function runAutoSchedule(){
     let changed = false;
     users.forEach((u, idx) => {
       if(u.role === 'admin') return; // admins skip
+      if(u.left_company) return; // marked Left — never auto-touched, only "Reactivate" clears this
       if(u.manualOverride){
         // Check if next scheduled boundary has passed → clear override
         const overrideTime = new Date(u.manualOverrideTime);
@@ -9638,6 +9689,7 @@ async function runLateAbsentCheck(){
 
     for(const u of usersList){
       if(u.role==='admin') continue;
+      if(u.left_company) continue; // marked Left — don't keep marking them Absent every day
       if(u.lateAbsentMarked===td) continue; // already handled today, don't repeat
 
       const rawName = String(u.name || u.username || '').trim();

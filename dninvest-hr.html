@@ -1010,6 +1010,16 @@ input:focus, select:focus, textarea:focus{
           <tbody id="emp-table"></tbody>
         </table>
       </div>
+
+      <div id="left-emp-wrap" style="display:none;margin-top:22px">
+        <div style="font-weight:700;color:var(--gray);font-size:14px;margin-bottom:8px">🚶 Left Employees</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Name</th><th></th></tr></thead>
+            <tbody id="left-emp-table"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- REPORTS (admin only) -->
@@ -5861,11 +5871,30 @@ function renderEmployees(){
       <td>
         <div style="display:flex;gap:6px">
           <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}'))+'\\nPerf. Inc.: '+fmt(getPerfIncentive('${e.name}'))+'\\nIncentive Salary: '+fmt(getIncentiveSalary('${e.name}')))">View</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.name}')">Delete</button>
+          <button class="btn btn-sm" onclick="deleteEmployee('${e.name}')" style="background:var(--gray);color:#fff;border:none" title="Employee has left — keeps all history, one-click Reactivate later">🚶 Mark as Left</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+  renderLeftEmployees();
+}
+
+// "Left Employees" — anyone soft-removed via "Mark as Left" (persistRemoveEmployee),
+// shown separately with a one-click Reactivate. Their history was never touched;
+// this list is purely so Admin can find and bring someone back without having to
+// remember their exact name to re-Add them.
+function renderLeftEmployees(){
+  const wrap=document.getElementById('left-emp-wrap');
+  const box=document.getElementById('left-emp-table');
+  if(!wrap || !box) return;
+  const removed=getEmployeeChanges().removed||[];
+  if(!removed.length){ wrap.style.display='none'; box.innerHTML=''; return; }
+  wrap.style.display='';
+  box.innerHTML=removed.map(name=>`
+    <tr>
+      <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px;background:var(--gray)">${initials(name)}</div><div><div class="emp-name">${name}</div></div></div></td>
+      <td><button class="btn btn-sm btn-primary" onclick="reactivateEmployee('${name}')">↩️ Reactivate</button></td>
+    </tr>`).join('');
 }
 
 // ─── ACCESS CONTROL UI ──────────────────────────────────────────────────────
@@ -5965,10 +5994,22 @@ async function saveEsicNo(name){
 }
 
 async function deleteEmployee(name){
-  if(!confirm('Remove '+name+' from the employee list?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed.\n\nThis cannot be undone from here.')) return;
+  if(!confirm('Mark '+name+' as Left?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed. You can bring them back any time from "Left Employees" below.')) return;
   await persistRemoveEmployee(name);
   renderEmployees();
-  alert(name+' has been removed from the employee list.');
+}
+
+// Reactivate a previously-removed ("Left") employee — un-does persistRemoveEmployee.
+// Works for both base and previously-added employees: applyEmployeeChanges() just
+// filters EMPLOYEES_BASE+added by the `removed` list, so taking a name back out of
+// `removed` is all that's needed for them to reappear.
+async function reactivateEmployee(name){
+  await _commitEmployeeChanges(({added,removed})=>({
+    added,
+    removed: removed.filter(n=>n!==name)
+  }));
+  renderEmployees();
+  alert(name+' has been reactivated and is back in the active employee list.');
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
