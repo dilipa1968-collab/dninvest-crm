@@ -1088,12 +1088,44 @@ function isMobileDevice(){
   return uaMobile && smallScreen;
 }
 
+// See the call site in doLogin() above for the full explanation. Fixes ANY
+// user whose username is 'dilip' or 'admin' (there can be more than one
+// owner-style account) and whose role isn't currently 'admin'.
+async function ensureOwnerAdminRole(){
+  try{
+    const users = DB.get('users')||[];
+    const ownerNames = ['dilip','admin'];
+    const broken = users.filter(u=>ownerNames.includes(String(u.username||'').toLowerCase()) && u.role!=='admin');
+    if(!broken.length) return;
+    const brokenIds = broken.map(u=>u.id);
+    await DB.mutateUsers(fresh=>{
+      let changed=false;
+      fresh.forEach(u=>{
+        if(brokenIds.includes(u.id) && u.role!=='admin'){ u.role='admin'; changed=true; }
+      });
+      if(!changed) return false;
+    });
+    console.log('ensureOwnerAdminRole: corrected role back to admin for', broken.map(u=>u.username).join(', '));
+  }catch(e){ console.log('ensureOwnerAdminRole error:', e); }
+}
+
 async function doLogin(){
   const u = document.getElementById('lusr').value.trim().toLowerCase();
   const p = document.getElementById('lpwd').value;
   if(typeof fdb!=='undefined'){
     try{ await DB.syncFromFirebase(); }catch(e){}
   }
+  // Owner-account safety net. Dilip's (or the 'admin' username's) role in
+  // Firestore has been observed to silently flip away from 'admin' — root
+  // cause never fully pinned down. When that happens, EVERY RM-scoped filter
+  // (dashboard totals, "my clients", "my leads" — see getMyEqClients/
+  // getMyMfClients/getMyLeads above) returns completely empty for that
+  // account, since an admin-turned-RM has no eq_dealers/mf_dealers set up:
+  // the login itself works fine, but every screen quietly shows zero. This
+  // runs on every login attempt, right after syncFromFirebase and before
+  // credentials are even checked, and force-corrects the role back to
+  // 'admin' for any owner-username account found to be anything else.
+  try{ await ensureOwnerAdminRole(); }catch(e){}
   // The active/inactive flag is flipped by runAutoSchedule(), which until now
   // only ran inside an already logged-in session. If nobody was logged in when
   // the window opened (8:00 AM Mon-Fri), every RM's flag stayed at last night's
@@ -1524,6 +1556,13 @@ async function tryAutoLogin(){
   if(saved){
     try{
       const {username, password, at} = JSON.parse(saved);
+      // Same owner-role safety net as doLogin() (see there for the full
+      // explanation) — this path (session restore on every page load/the
+      // 30-min auto-reload) never went through doLogin() at all, so without
+      // this here too, a broken owner role would just keep silently
+      // persisting across every reload instead of ever getting a chance to
+      // self-heal.
+      try{ await ensureOwnerAdminRole(); }catch(e){}
       const users = DB.get('users') || DEFAULT_USERS;
       const td = today();
       // Same credential + active rules as doLogin():
