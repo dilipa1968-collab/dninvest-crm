@@ -4477,10 +4477,13 @@ function leadForm(c){
 function rmFieldHtmlLead(c){
   const rms=[...new Set([...getSegRMs('equity'),...getSegRMs('mf')])];
   if(CU.role!=='admin'){
-    const myName=CU.name;
+    // Same fix as rmFieldHtml above — editing an EXISTING lead must keep its
+    // own current RM, not silently reassign it to whoever is editing/saving.
+    const isEdit = !!(c && c.id);
+    const lockedName = isEdit ? (c.rm || CU.name) : CU.name;
     return `<div class="form-field"><label>RM</label>
-      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
-      <input type="hidden" id="l_rm" value="${myName}"></div>`;
+      <input type="text" value="${lockedName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="l_rm" value="${lockedName}"></div>`;
   }
   const opts=rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
   return `<div class="form-field"><label>RM</label><select id="l_rm"><option value="">Select RM</option>${opts}</select></div>`;
@@ -6070,11 +6073,19 @@ async function confirmDeleteClient(id, seg, name){
 function rmFieldHtml(seg, c, label){
   const rms = getSegRMs(seg);
   if(CU.role!=='admin'){
-    // Staff: lock RM to their own name
-    const myName = CU.name;
+    // Staff: for a NEW record (no c / c.id), lock to their own name — a
+    // record they're adding naturally belongs to them. But for EDITING an
+    // EXISTING client, the hidden field must carry that client's OWN current
+    // RM, not the editor's name — otherwise every save (including a normal
+    // follow-up/remarks update, and especially a Temp Access "cover for a
+    // colleague's client" edit) silently reassigns ownership to whoever
+    // happened to save the form. This is what caused a temp-access RM's
+    // client to permanently switch RM the moment they logged a call/update.
+    const isEdit = !!(c && c.id);
+    const lockedName = isEdit ? (c.rm || CU.name) : CU.name;
     return `<div class="form-field"><label>${label}</label>
-      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
-      <input type="hidden" id="f_rm" value="${myName}"></div>`;
+      <input type="text" value="${lockedName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="f_rm" value="${lockedName}"></div>`;
   }
   const opts = rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
   return `<div class="form-field"><label>${label}</label><select id="f_rm"><option value="">Select RM</option>${opts}</select></div>`;
