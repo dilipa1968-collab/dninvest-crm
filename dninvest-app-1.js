@@ -7731,7 +7731,8 @@ function getFilteredMfTxns(){
 
 const MFTXN_TYPE_COLOR = {
   Lumpsum:'#1D9E75', SIP:'#185FA5', 'SIP Stop':'#C0392B', Switch:'#B7950B',
-  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
+  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED',
+  'Transfer In':'#2563EB', 'Transfer Out':'#EA580C'
 };
 
 function renderMfTxnTable(){
@@ -9052,11 +9053,11 @@ function fuPendingMf(){
 let _bizReportEntries = [];
 let _bizReportSort = {col:null, dir:1};
 
-const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Additional Buy','SIP Bounce Buy','SIP Pause','Remarks'];
-const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, 'Additional Buy':7, 'SIP Bounce Buy':8, 'SIP Pause':9};
+const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Additional Buy','SIP Bounce Buy','SIP Pause','Transfer In','Transfer Out','Remarks'];
+const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, 'Additional Buy':7, 'SIP Bounce Buy':8, 'SIP Pause':9, 'Transfer In':10, 'Transfer Out':11};
 
 function bizReportRowCells(e){
-  const amts = new Array(8).fill('');
+  const amts = new Array(12).fill('');
   const idx = BIZ_REPORT_TYPECOL[e.type];
   if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
   const ym = (e.date||'').slice(0,7);
