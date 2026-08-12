@@ -3002,6 +3002,9 @@ var bcMultiRowCount = 0;
 var BC_MULTI_SEG_LABELS = { equity_intraday:'Equity Intraday', equity_delivery:'Equity Delivery', futures:'Futures (F&O)',
                             options:'Options', commodity_futures:'Commodity Futures', commodity_options:'Commodity Options',
                             currency_futures:'Currency Futures', currency_options:'Currency Options' };
+// Snapshot of the last Calculate Combined Bill run — used by bcPrintMultiTrade so the PDF matches what's on screen
+// instead of silently recalculating (rows could differ if the user edited a field after calculating).
+var bcMultiLastResults = null;
 
 function bcAddMultiRow(){
   bcMultiRowCount++;
@@ -3037,6 +3040,7 @@ function bcRemoveMultiRow(id){
 function bcClearMultiTrade(){
   document.getElementById('bcMultiRows').innerHTML = '';
   document.getElementById('bcMultiResults').innerHTML = '';
+  bcMultiLastResults = null;
   bcAddMultiRow();
   bcAddMultiRow();
 }
@@ -3048,6 +3052,7 @@ function bcCalcMultiTrade(){
 
   var grand = {brokerage:0, charges:0, total:0, grossPL:0};
   var rowsHtml = '';
+  var printRows = [];
   var anyApproxOptions = false;
 
   rows.forEach(function(rowEl){
@@ -3094,6 +3099,7 @@ function bcCalcMultiTrade(){
     grand.brokerage += brokerage; grand.charges += otherCharges; grand.total += total;
     grand.grossPL += (sellTurnover - buyTurnover);
     rowsHtml += '<tr><td>'+BC_MULTI_SEG_LABELS[seg]+' ('+qty+' qty)</td><td>'+bcFmt(totalTurnover)+'</td><td>'+bcFmt(brokerage)+'</td><td>'+bcFmt(otherCharges)+'</td><td>'+bcFmt(total)+'</td></tr>';
+    printRows.push({ segLabel:BC_MULTI_SEG_LABELS[seg], qty:qty, turnover:totalTurnover, brokerage:brokerage, charges:otherCharges, total:total });
   });
 
   rowsHtml += '<tr class="bc-multi-total"><td>Combined Total</td><td></td><td>'+bcFmt(grand.brokerage)+'</td><td>'+bcFmt(grand.charges)+'</td><td>'+bcFmt(grand.total)+'</td></tr>';
@@ -3112,6 +3118,14 @@ function bcCalcMultiTrade(){
     +netBoxHtml
     +(bcCurrentClientKey && bcClients[bcCurrentClientKey] ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:6px">Using '+bcClients[bcCurrentClientKey].label+'\'s saved rate where available, segment default otherwise.</div>' : '')
     +(anyApproxOptions ? '<div class="bc-bulk-note" style="font-size:.68rem;color:var(--gray);margin-top:2px">⚠️ Lot Size wasn\'t entered for one or more Options/Commodity Options rows — Quantity was treated as the lot count directly. Fill in Lot Size for an accurate turnover + brokerage split.</div>' : '');
+
+  bcMultiLastResults = {
+    rows: printRows,
+    grand: grand,
+    netPL: netPL,
+    isProfit: isProfit,
+    clientLabel: (bcCurrentClientKey && bcClients[bcCurrentClientKey]) ? bcClients[bcCurrentClientKey].label : null
+  };
 }
 
 // Saves the current Multiple-Trades row layout (segment/buy/sell/qty for each line) under the selected client,
@@ -3374,6 +3388,45 @@ function bcPrintSummary(){
     +'</div>'
     +segTableHtml
     +totalsHtml
+    +'<div class="pv-footer">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates. Please verify against your latest contract note.</div>';
+
+  document.getElementById('bcPrintView').innerHTML = html;
+  window.print();
+}
+
+// Clean printable Combined Bill for the Multiple Trades section — same #bcPrintView / print-CSS mechanism
+// as bcPrintSummary above, just with the combined-bill columns (Segment/Turnover/Brokerage/Other Charges/Total Bill)
+// instead of the full per-segment charge breakdown.
+function bcPrintMultiTrade(){
+  if(!bcMultiLastResults || !bcMultiLastResults.rows.length){
+    bcCalcMultiTrade();
+    if(!bcMultiLastResults || !bcMultiLastResults.rows.length){
+      alert('Add at least one trade line and click Calculate Combined Bill first.');
+      return;
+    }
+  }
+  var r = bcMultiLastResults;
+  var today = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+  var searchBoxVal = (document.getElementById('bcClientSearch').value||'').trim();
+  var clientLabel = r.clientLabel || searchBoxVal || 'New Client';
+
+  var rowsHtml = r.rows.map(function(row){
+    return '<tr><td>'+row.segLabel+' ('+row.qty+' qty)</td><td>'+bcFmt(row.turnover)+'</td><td>'+bcFmt(row.brokerage)+'</td><td>'+bcFmt(row.charges)+'</td><td>'+bcFmt(row.total)+'</td></tr>';
+  }).join('');
+  var totRow = '<tr class="pv-tot-row"><td>Combined Total</td><td></td><td>'+bcFmt(r.grand.brokerage)+'</td><td>'+bcFmt(r.grand.charges)+'</td><td>'+bcFmt(r.grand.total)+'</td></tr>';
+
+  var netHtml = '<div class="pv-net '+(r.isProfit?'pv-profit':'pv-loss')+'">'
+    +'<div class="pv-amt">'+bcFmt(r.netPL)+'</div>'
+    +'<div class="pv-lbl2">Gross '+(r.grand.grossPL>=0?'Profit':'Loss')+' '+bcFmt(Math.abs(r.grand.grossPL))+' − Total Bill '+bcFmt(r.grand.total)+' = Net '+(r.isProfit?'Receivable':'Payable')+'</div>'
+  +'</div>';
+
+  var html =
+    '<div class="pv-hdr"><h1>D N <span class="pv-gold">INVESTMENT</span></h1><div class="pv-sub">Multiple Trades — Combined Bill</div></div>'
+    +'<div class="pv-meta"><span>Client: '+clientLabel+'</span><span>'+today+'</span></div>'
+    +'<div class="pv-section"><h2>Combined Bill</h2><table class="pv-seg-table"><thead><tr>'
+      +'<th>Segment</th><th>Turnover</th><th>Brokerage</th><th>Other Charges</th><th>Total Bill</th>'
+      +'</tr></thead><tbody>'+rowsHtml+totRow+'</tbody></table></div>'
+    +netHtml
     +'<div class="pv-footer">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates. Please verify against your latest contract note.</div>';
 
   document.getElementById('bcPrintView').innerHTML = html;
