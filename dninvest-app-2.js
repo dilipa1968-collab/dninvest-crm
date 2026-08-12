@@ -3099,7 +3099,10 @@ function bcCalcMultiTrade(){
     grand.brokerage += brokerage; grand.charges += otherCharges; grand.total += total;
     grand.grossPL += (sellTurnover - buyTurnover);
     rowsHtml += '<tr><td>'+BC_MULTI_SEG_LABELS[seg]+' ('+qty+' qty)</td><td>'+bcFmt(totalTurnover)+'</td><td>'+bcFmt(brokerage)+'</td><td>'+bcFmt(otherCharges)+'</td><td>'+bcFmt(total)+'</td></tr>';
-    printRows.push({ segLabel:BC_MULTI_SEG_LABELS[seg], qty:qty, turnover:totalTurnover, brokerage:brokerage, charges:otherCharges, total:total });
+    printRows.push({ segLabel:BC_MULTI_SEG_LABELS[seg], qty:qty, buy:buy, sell:sell,
+      buyTurnover:buyTurnover, sellTurnover:sellTurnover, turnover:totalTurnover,
+      brokerage:brokerage, stt:stt, txn:txn, stamp:stamp, sebi:sebi, gst:gst,
+      charges:otherCharges, total:total });
   });
 
   rowsHtml += '<tr class="bc-multi-total"><td>Combined Total</td><td></td><td>'+bcFmt(grand.brokerage)+'</td><td>'+bcFmt(grand.charges)+'</td><td>'+bcFmt(grand.total)+'</td></tr>';
@@ -3411,9 +3414,19 @@ function bcPrintMultiTrade(){
   var clientLabel = r.clientLabel || searchBoxVal || 'New Client';
 
   var rowsHtml = r.rows.map(function(row){
-    return '<tr><td>'+row.segLabel+' ('+row.qty+' qty)</td><td>'+bcFmt(row.turnover)+'</td><td>'+bcFmt(row.brokerage)+'</td><td>'+bcFmt(row.charges)+'</td><td>'+bcFmt(row.total)+'</td></tr>';
+    return '<tr><td>'+row.segLabel+'</td><td>'+row.qty.toLocaleString('en-IN')+'</td><td>₹'+row.buy+'</td><td>₹'+row.sell+'</td>'
+      +'<td>'+bcFmt(row.turnover)+'</td><td>'+bcFmt(row.brokerage)+'</td><td>'+bcFmt(row.stt)+'</td><td>'+bcFmt(row.txn)+'</td>'
+      +'<td>'+bcFmt(row.stamp)+'</td><td>'+bcFmt(row.sebi)+'</td><td>'+bcFmt(row.gst)+'</td><td>'+bcFmt(row.charges)+'</td><td>'+bcFmt(row.total)+'</td></tr>';
   }).join('');
-  var totRow = '<tr class="pv-tot-row"><td>Combined Total</td><td></td><td>'+bcFmt(r.grand.brokerage)+'</td><td>'+bcFmt(r.grand.charges)+'</td><td>'+bcFmt(r.grand.total)+'</td></tr>';
+
+  var sums = {qty:0, turnover:0, stt:0, txn:0, stamp:0, sebi:0, gst:0};
+  r.rows.forEach(function(row){
+    sums.qty += row.qty; sums.turnover += row.turnover; sums.stt += row.stt; sums.txn += row.txn;
+    sums.stamp += row.stamp; sums.sebi += row.sebi; sums.gst += row.gst;
+  });
+  var totRow = '<tr class="pv-tot-row"><td>Combined Total</td><td>'+sums.qty.toLocaleString('en-IN')+'</td><td>—</td><td>—</td>'
+    +'<td>'+bcFmt(sums.turnover)+'</td><td>'+bcFmt(r.grand.brokerage)+'</td><td>'+bcFmt(sums.stt)+'</td><td>'+bcFmt(sums.txn)+'</td>'
+    +'<td>'+bcFmt(sums.stamp)+'</td><td>'+bcFmt(sums.sebi)+'</td><td>'+bcFmt(sums.gst)+'</td><td>'+bcFmt(r.grand.charges)+'</td><td>'+bcFmt(r.grand.total)+'</td></tr>';
 
   var netHtml = '<div class="pv-net '+(r.isProfit?'pv-profit':'pv-loss')+'">'
     +'<div class="pv-amt">'+bcFmt(r.netPL)+'</div>'
@@ -3423,8 +3436,8 @@ function bcPrintMultiTrade(){
   var html =
     '<div class="pv-hdr"><h1>D N <span class="pv-gold">INVESTMENT</span></h1><div class="pv-sub">Multiple Trades — Combined Bill</div></div>'
     +'<div class="pv-meta"><span>Client: '+clientLabel+'</span><span>'+today+'</span></div>'
-    +'<div class="pv-section"><h2>Combined Bill</h2><table class="pv-seg-table"><thead><tr>'
-      +'<th>Segment</th><th>Turnover</th><th>Brokerage</th><th>Other Charges</th><th>Total Bill</th>'
+    +'<div class="pv-section"><h2>Combined Bill — Full Charges Breakdown</h2><table class="pv-seg-table"><thead><tr>'
+      +'<th>Segment</th><th>Qty</th><th>Buy</th><th>Sell</th><th>Turnover</th><th>Brokerage</th><th>STT/CTT</th><th>Txn Chg.</th><th>Stamp Duty</th><th>SEBI Fees</th><th>GST</th><th>Total Chg.</th><th>Total Bill</th>'
       +'</tr></thead><tbody>'+rowsHtml+totRow+'</tbody></table></div>'
     +netHtml
     +'<div class="pv-footer">Statutory charges (STT/CTT, Stamp Duty, Transaction Charges, SEBI Fees, GST) are fixed government/exchange rates. Please verify against your latest contract note.</div>';
