@@ -2768,8 +2768,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
     <div class="modal-body" style="padding:18px">
       <div style="font-size:.85rem;color:var(--gray);margin-bottom:14px">
-        <b id="ta-rm-name"></b> can access an absent RM's clients for today.<br>
-        <span style="color:var(--red);font-size:.78rem">⏰ This will auto-expire at midnight (IST) today.</span>
+        <b id="ta-rm-name"></b> can access an absent RM's clients until the date chosen below.<br>
+        <span style="color:var(--red);font-size:.78rem">⏰ Access auto-expires at midnight (IST) on the chosen date.</span>
+      </div>
+      <div class="form-field" style="margin-bottom:14px">
+        <label>Access valid until:</label>
+        <input type="date" id="ta-expiry-date" style="margin-top:6px">
       </div>
       <div class="form-field" style="margin-bottom:14px">
         <label>Select the absent RM (whose clients to grant access to):</label>

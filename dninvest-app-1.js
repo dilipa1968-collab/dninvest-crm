@@ -251,79 +251,6 @@ const DB = {
       this._mfbWriting=Math.max(0,this._mfbWriting-1);
     }
   },
-  // Transaction-safe REMOVAL of one mf_business entry by id — same reasoning
-  // as updateMfBizEntry, for the delete case (which can't just "mutate a
-  // clone in place" since the whole point is the entry no longer exists).
-  async deleteMfBizEntry(arrayKey, id){
-    let biz = this.get('mf_business');
-    let curEntries = Array.isArray(biz) ? biz.slice() : (biz?.entries||[]).slice();
-    let curEq = Array.isArray(biz) ? [] : (biz?.eq_entries||[]).slice();
-    if(arrayKey==='entries') curEntries = curEntries.filter(e=>!e||e.id!==id);
-    else curEq = curEq.filter(e=>!e||e.id!==id);
-    this.setLocal('mf_business', {entries:curEntries, eq_entries:curEq});
-
-    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
-    this._mfbWriting++;
-    let finalData=null;
-    try{
-      const docRef = fdb.collection('crm_data').doc('mf_business');
-      await fdb.runTransaction(async (tx)=>{
-        const doc = await tx.get(docRef);
-        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
-        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
-        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
-        if(arrayKey==='entries') lEntries = lEntries.filter(e=>!e||e.id!==id);
-        else lEq = lEq.filter(e=>!e||e.id!==id);
-        finalData = {entries:lEntries, eq_entries:lEq};
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
-      });
-      if(finalData) this.setLocal('mf_business', finalData);
-      return {ok:true};
-    }catch(e){
-      console.log('mf_business delete error:',e);
-      try{ toast('Sync error: '+e.message,'error'); }catch(e2){}
-      return {ok:false, error:e.message};
-    }finally{
-      this._mfbWriting=Math.max(0,this._mfbWriting-1);
-    }
-  },
-  // Transaction-safe bulk APPEND to mf_business (used by the Excel bulk
-  // upload) — reads the latest array inside the transaction and appends
-  // newEntries onto THAT, rather than onto a possibly-stale local read, so a
-  // concurrent single-entry edit/approve elsewhere can't get lost under it.
-  async appendMfBizEntriesBulk(arrayKey, newEntries){
-    let biz = this.get('mf_business');
-    let curEntries = Array.isArray(biz) ? biz.slice() : (biz?.entries||[]).slice();
-    let curEq = Array.isArray(biz) ? [] : (biz?.eq_entries||[]).slice();
-    if(arrayKey==='entries') curEntries = curEntries.concat(newEntries);
-    else curEq = curEq.concat(newEntries);
-    this.setLocal('mf_business', {entries:curEntries, eq_entries:curEq});
-
-    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
-    this._mfbWriting++;
-    let finalData2=null;
-    try{
-      const docRef = fdb.collection('crm_data').doc('mf_business');
-      await fdb.runTransaction(async (tx)=>{
-        const doc = await tx.get(docRef);
-        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
-        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
-        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
-        if(arrayKey==='entries') lEntries = lEntries.concat(newEntries);
-        else lEq = lEq.concat(newEntries);
-        finalData2 = {entries:lEntries, eq_entries:lEq};
-        tx.set(docRef, {data:finalData2, updated:new Date().toISOString()});
-      });
-      if(finalData2) this.setLocal('mf_business', finalData2);
-      return {ok:true};
-    }catch(e){
-      console.log('mf_business bulk-append error:',e);
-      try{ toast('Sync error: '+e.message,'error'); }catch(e2){}
-      return {ok:false, error:e.message};
-    }finally{
-      this._mfbWriting=Math.max(0,this._mfbWriting-1);
-    }
-  },
   // Append one or more entries to the shared append-only activity_logs array
   // WITHOUT clobbering other RMs' concurrent entries. Transaction merge-by-id,
   // keeps the newest 2000 by date.
@@ -909,14 +836,7 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
     if(typeof fdb==='undefined') return;
-    // All ~17 collections fetched IN PARALLEL (was a sequential for-loop with
-    // await inside — each collection waited for the previous one to finish
-    // round-tripping to Firestore before even starting its own request, which
-    // meant login/refresh/the 30-min auto-reload paid for 17+ round-trips
-    // back to back instead of all at once). Each key still has its own
-    // try/catch so one failing fetch doesn't block or break the others.
-    const keys = ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'];
-    await Promise.all(keys.map(async key=>{
+    for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
         if(this._isSharded(key)){
@@ -929,7 +849,7 @@ const DB = {
             console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
                         this._shardCache[key].map(p=>p.length));
           }
-          return;
+          continue;
         }
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -945,7 +865,7 @@ const DB = {
             const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
             localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
             console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
-            return;
+            continue;
           }
           if(Array.isArray(d)){
             if(key==='call_logs'){
@@ -976,7 +896,7 @@ const DB = {
           }
         }
       }catch(e){ console.log('Firebase sync error for',key,':',e); }
-    }));
+      }
     try{ if(typeof clearEqRiskCache==='function') clearEqRiskCache(); }catch(e){}
   }
 };
@@ -1088,44 +1008,12 @@ function isMobileDevice(){
   return uaMobile && smallScreen;
 }
 
-// See the call site in doLogin() above for the full explanation. Fixes ANY
-// user whose username is 'dilip' or 'admin' (there can be more than one
-// owner-style account) and whose role isn't currently 'admin'.
-async function ensureOwnerAdminRole(){
-  try{
-    const users = DB.get('users')||[];
-    const ownerNames = ['dilip','admin'];
-    const broken = users.filter(u=>ownerNames.includes(String(u.username||'').toLowerCase()) && u.role!=='admin');
-    if(!broken.length) return;
-    const brokenIds = broken.map(u=>u.id);
-    await DB.mutateUsers(fresh=>{
-      let changed=false;
-      fresh.forEach(u=>{
-        if(brokenIds.includes(u.id) && u.role!=='admin'){ u.role='admin'; changed=true; }
-      });
-      if(!changed) return false;
-    });
-    console.log('ensureOwnerAdminRole: corrected role back to admin for', broken.map(u=>u.username).join(', '));
-  }catch(e){ console.log('ensureOwnerAdminRole error:', e); }
-}
-
 async function doLogin(){
   const u = document.getElementById('lusr').value.trim().toLowerCase();
   const p = document.getElementById('lpwd').value;
   if(typeof fdb!=='undefined'){
     try{ await DB.syncFromFirebase(); }catch(e){}
   }
-  // Owner-account safety net. Dilip's (or the 'admin' username's) role in
-  // Firestore has been observed to silently flip away from 'admin' — root
-  // cause never fully pinned down. When that happens, EVERY RM-scoped filter
-  // (dashboard totals, "my clients", "my leads" — see getMyEqClients/
-  // getMyMfClients/getMyLeads above) returns completely empty for that
-  // account, since an admin-turned-RM has no eq_dealers/mf_dealers set up:
-  // the login itself works fine, but every screen quietly shows zero. This
-  // runs on every login attempt, right after syncFromFirebase and before
-  // credentials are even checked, and force-corrects the role back to
-  // 'admin' for any owner-username account found to be anything else.
-  try{ await ensureOwnerAdminRole(); }catch(e){}
   // The active/inactive flag is flipped by runAutoSchedule(), which until now
   // only ran inside an already logged-in session. If nobody was logged in when
   // the window opened (8:00 AM Mon-Fri), every RM's flag stayed at last night's
@@ -1163,9 +1051,7 @@ async function doLogin(){
       });
       userExists.active = true;
     } else {
-      document.getElementById('lerr').textContent = userExists.left_company
-        ? '🚶 This account is marked as Left. Please contact Admin if this is incorrect.'
-        : userExists.manualOverride
+      document.getElementById('lerr').textContent = userExists.manualOverride
         ? '🔒 Your access has been disabled by Admin. Please contact Admin.'
         : '🕐 Login not allowed outside office hours. Please try again during working hours.';
       document.getElementById('lerr').style.display='block';
@@ -1556,13 +1442,6 @@ async function tryAutoLogin(){
   if(saved){
     try{
       const {username, password, at} = JSON.parse(saved);
-      // Same owner-role safety net as doLogin() (see there for the full
-      // explanation) — this path (session restore on every page load/the
-      // 30-min auto-reload) never went through doLogin() at all, so without
-      // this here too, a broken owner role would just keep silently
-      // persisting across every reload instead of ever getting a chance to
-      // self-heal.
-      try{ await ensureOwnerAdminRole(); }catch(e){}
       const users = DB.get('users') || DEFAULT_USERS;
       const td = today();
       // Same credential + active rules as doLogin():
@@ -2197,7 +2076,7 @@ function getTempAccessDealers(seg){
   const me = users.find(u=>u.id===CU.id);
   if(!me || !me.tempAccess || !me.tempAccess.length) return [];
   const today = new Date().toISOString().split('T')[0];
-  const valid = me.tempAccess.filter(t=>t.expiry===today);
+  const valid = me.tempAccess.filter(t=>t.expiry>=today);
   if(!valid.length) return [];
   const extraDealers = [];
   const seen = new Set();
@@ -2260,7 +2139,7 @@ function getTempAccessGroups(seg){
   if(!me || !me.tempAccess || !me.tempAccess.length) return [];
   const today = new Date().toISOString().split('T')[0];
   const groups=[];
-  me.tempAccess.filter(t=>t.expiry===today).forEach(t=>{
+  me.tempAccess.filter(t=>t.expiry>=today).forEach(t=>{
     const au = users.find(u=>u.id===t.absentUserId);
     if(!au) return;
     const raw = seg==='eq' ? au.eq_dealers : au.mf_dealers;
@@ -4477,13 +4356,10 @@ function leadForm(c){
 function rmFieldHtmlLead(c){
   const rms=[...new Set([...getSegRMs('equity'),...getSegRMs('mf')])];
   if(CU.role!=='admin'){
-    // Same fix as rmFieldHtml above — editing an EXISTING lead must keep its
-    // own current RM, not silently reassign it to whoever is editing/saving.
-    const isEdit = !!(c && c.id);
-    const lockedName = isEdit ? (c.rm || CU.name) : CU.name;
+    const myName=CU.name;
     return `<div class="form-field"><label>RM</label>
-      <input type="text" value="${lockedName}" disabled style="background:var(--bg);color:var(--gray)">
-      <input type="hidden" id="l_rm" value="${lockedName}"></div>`;
+      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="l_rm" value="${myName}"></div>`;
   }
   const opts=rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
   return `<div class="form-field"><label>RM</label><select id="l_rm"><option value="">Select RM</option>${opts}</select></div>`;
@@ -6073,19 +5949,11 @@ async function confirmDeleteClient(id, seg, name){
 function rmFieldHtml(seg, c, label){
   const rms = getSegRMs(seg);
   if(CU.role!=='admin'){
-    // Staff: for a NEW record (no c / c.id), lock to their own name — a
-    // record they're adding naturally belongs to them. But for EDITING an
-    // EXISTING client, the hidden field must carry that client's OWN current
-    // RM, not the editor's name — otherwise every save (including a normal
-    // follow-up/remarks update, and especially a Temp Access "cover for a
-    // colleague's client" edit) silently reassigns ownership to whoever
-    // happened to save the form. This is what caused a temp-access RM's
-    // client to permanently switch RM the moment they logged a call/update.
-    const isEdit = !!(c && c.id);
-    const lockedName = isEdit ? (c.rm || CU.name) : CU.name;
+    // Staff: lock RM to their own name
+    const myName = CU.name;
     return `<div class="form-field"><label>${label}</label>
-      <input type="text" value="${lockedName}" disabled style="background:var(--bg);color:var(--gray)">
-      <input type="hidden" id="f_rm" value="${lockedName}"></div>`;
+      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="f_rm" value="${myName}"></div>`;
   }
   const opts = rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
   return `<div class="form-field"><label>${label}</label><select id="f_rm"><option value="">Select RM</option>${opts}</select></div>`;
@@ -7037,18 +6905,17 @@ function canAddCrossRemark(e){
   return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
 }
 
-async function addCrossRemark(id){
+function addCrossRemark(id){
   const entries = getMfBizEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
   if(!canAddCrossRemark(e)){ toast('You are not allowed to remark on this entry','error'); return; }
   const remark = prompt('Your remark on this entry (e.g. checking if this business belongs to someone else):', e.cross_remark||'');
   if(remark===null) return;
-  await DB.updateMfBizEntry('entries', id, fresh=>{
-    fresh.cross_remark = remark.trim();
-    fresh.cross_remark_by = CU.name;
-    fresh.cross_remark_at = today();
-  });
+  e.cross_remark = remark.trim();
+  e.cross_remark_by = CU.name;
+  e.cross_remark_at = today();
+  setMfBizEntries(entries);
   toast('Remark saved','success');
   renderMfTxnTable();
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
@@ -7056,48 +6923,56 @@ async function addCrossRemark(id){
 
 // Admin-only: clear/reverse a cross-check remark in one click, without having
 // to open the prompt and manually delete the text.
-async function clearCrossRemark(id){
+function clearCrossRemark(id){
   if(CU.role!=='admin') return;
   if(!confirm('Clear this cross-check remark?')) return;
-  await DB.updateMfBizEntry('entries', id, fresh=>{
-    fresh.cross_remark = '';
-    fresh.cross_remark_by = '';
-    fresh.cross_remark_at = '';
-  });
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.cross_remark = '';
+  e.cross_remark_by = '';
+  e.cross_remark_at = '';
+  setMfBizEntries(entries);
   toast('Remark cleared','success');
   renderMfTxnTable();
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
 }
 
-async function approveBusinessEntry(id){
+function approveBusinessEntry(id){
   if(CU.role!=='admin') return;
-  await DB.updateMfBizEntry('entries', id, fresh=>{
-    fresh.status = 'Approved';
-    fresh.decline_reason = '';
-  });
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Approved';
+  e.decline_reason = '';
+  setMfBizEntries(entries);
   toast('Business approved!','success');
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
   renderMfTxnTable();
 }
 
-async function declineBusinessEntry(id){
+function declineBusinessEntry(id){
   if(CU.role!=='admin') return;
   const reason = prompt('Decline reason (optional):','') || '';
-  await DB.updateMfBizEntry('entries', id, fresh=>{
-    fresh.status = 'Declined';
-    fresh.decline_reason = reason.trim();
-  });
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Declined';
+  e.decline_reason = reason.trim();
+  setMfBizEntries(entries);
   toast('Business declined','success');
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
   renderMfTxnTable();
 }
 
-async function markPendingBusinessEntry(id){
+function markPendingBusinessEntry(id){
   if(CU.role!=='admin') return;
-  await DB.updateMfBizEntry('entries', id, fresh=>{
-    fresh.status = 'Pending';
-    fresh.decline_reason = '';
-  });
+  const entries = getMfBizEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Pending';
+  e.decline_reason = '';
+  setMfBizEntries(entries);
   toast('Status reset to Pending','success');
   if(document.getElementById('reportModal')?.classList.contains('open')) newBusinessMonthlyReport();
   renderMfTxnTable();
@@ -7731,8 +7606,7 @@ function getFilteredMfTxns(){
 
 const MFTXN_TYPE_COLOR = {
   Lumpsum:'#1D9E75', SIP:'#185FA5', 'SIP Stop':'#C0392B', Switch:'#B7950B',
-  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED',
-  'Transfer In':'#2563EB', 'Transfer Out':'#EA580C'
+  STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
 };
 
 function renderMfTxnTable(){
@@ -7797,10 +7671,11 @@ function renderMfTxnTable(){
   MFTBULK.afterRender();
 }
 
-async function deleteMfTxnEntry(id){
+function deleteMfTxnEntry(id){
   if(CU.role!=='admin') return;
   if(!confirm('Delete this transaction entry?')) return;
-  await DB.deleteMfBizEntry('entries', id);
+  const entries=getMfBizEntries().filter(e=>e.id!==id);
+  setMfBizEntries(entries);
   toast('Entry deleted','success');
   renderMfTxnTable();
 }
@@ -8106,41 +7981,48 @@ function renderEqDematTable(){
   </table>`;
 }
 
-async function approveEqDematEntry(id){
+function approveEqDematEntry(id){
   if(CU.role!=='admin') return;
-  await DB.updateMfBizEntry('eq_entries', id, fresh=>{
-    fresh.status = 'Approved';
-    fresh.decline_reason = '';
-  });
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Approved';
+  e.decline_reason = '';
+  setEqDematEntries(entries);
   toast('Demat entry approved!','success');
   renderEqDematTable();
 }
 
-async function declineEqDematEntry(id){
+function declineEqDematEntry(id){
   if(CU.role!=='admin') return;
   const reason = prompt('Decline reason (optional):','') || '';
-  await DB.updateMfBizEntry('eq_entries', id, fresh=>{
-    fresh.status = 'Declined';
-    fresh.decline_reason = reason.trim();
-  });
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Declined';
+  e.decline_reason = reason.trim();
+  setEqDematEntries(entries);
   toast('Demat entry declined','success');
   renderEqDematTable();
 }
 
-async function markPendingEqDematEntry(id){
+function markPendingEqDematEntry(id){
   if(CU.role!=='admin') return;
-  await DB.updateMfBizEntry('eq_entries', id, fresh=>{
-    fresh.status = 'Pending';
-    fresh.decline_reason = '';
-  });
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = 'Pending';
+  e.decline_reason = '';
+  setEqDematEntries(entries);
   toast('Status reset to Pending','success');
   renderEqDematTable();
 }
 
-async function deleteEqDematEntry(id){
+function deleteEqDematEntry(id){
   if(CU.role!=='admin') return;
   if(!confirm('Delete this Demat account entry?')) return;
-  await DB.deleteMfBizEntry('eq_entries', id);
+  const entries = getEqDematEntries().filter(e=>e.id!==id);
+  setEqDematEntries(entries);
   toast('Entry deleted','success');
   renderEqDematTable();
 }
@@ -8169,21 +8051,19 @@ function editEqDematEntry(id){
   document.getElementById('dematEditModal').classList.add('open');
 }
 
-async function saveDematEdit(){
+function saveDematEdit(){
   if(CU.role!=='admin') return;
   if(!editingDematId) return;
   const date = document.getElementById('demat_edit_date').value;
   if(!date){ toast('Date is required','error'); return; }
-  const code = document.getElementById('demat_edit_code').value.trim().toUpperCase();
-  const remarks = document.getElementById('demat_edit_remarks').value.trim();
-  const openingRm = document.getElementById('demat_edit_opening_rm').value;
-  const r = await DB.updateMfBizEntry('eq_entries', editingDematId, fresh=>{
-    fresh.client_code = code;
-    fresh.date        = date;
-    fresh.remarks     = remarks;
-    fresh.opening_rm  = openingRm;
-  });
-  if(!r.ok || r.aborted){ if(r.aborted) toast('Entry not found','error'); return; }
+  const entries = getEqDematEntries();
+  const e = entries.find(x=>x.id===editingDematId);
+  if(!e){ toast('Entry not found','error'); return; }
+  e.client_code = document.getElementById('demat_edit_code').value.trim().toUpperCase();
+  e.date        = date;
+  e.remarks     = document.getElementById('demat_edit_remarks').value.trim();
+  e.opening_rm  = document.getElementById('demat_edit_opening_rm').value;
+  setEqDematEntries(entries);
   toast('Demat entry updated!','success');
   closeModal('dematEditModal');
   editingDematId = null;
@@ -9053,11 +8933,11 @@ function fuPendingMf(){
 let _bizReportEntries = [];
 let _bizReportSort = {col:null, dir:1};
 
-const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Additional Buy','SIP Bounce Buy','SIP Pause','Transfer In','Transfer Out','Remarks'];
-const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, 'Additional Buy':7, 'SIP Bounce Buy':8, 'SIP Pause':9, 'Transfer In':10, 'Transfer Out':11};
+const BIZ_REPORT_HEADERS = ['Month','RM','Client','Fund Name','Date','Lumpsum','SIP','SIP Stop','Switch','STP','Redemption','SWP','Additional Buy','SIP Bounce Buy','SIP Pause','Remarks'];
+const BIZ_REPORT_TYPECOL = {Lumpsum:0, SIP:1, 'SIP Stop':2, Switch:3, STP:4, Redemption:5, SWP:6, 'Additional Buy':7, 'SIP Bounce Buy':8, 'SIP Pause':9};
 
 function bizReportRowCells(e){
-  const amts = new Array(12).fill('');
+  const amts = new Array(8).fill('');
   const idx = BIZ_REPORT_TYPECOL[e.type];
   if(idx!==undefined) amts[idx] = '₹'+fmtNum(e.amount);
   const ym = (e.date||'').slice(0,7);
@@ -9187,10 +9067,13 @@ function editBusinessEntry(id){
   document.getElementById('businessModal').classList.add('open');
 }
 
-async function deleteBusinessEntry(id){
+function deleteBusinessEntry(id){
   if(CU.role!=='admin') return;
   if(!confirm('Delete this business entry? This cannot be undone.')) return;
-  await DB.deleteMfBizEntry('entries', id);
+  const biz = DB.get('mf_business');
+  const entries = (Array.isArray(biz) ? biz : (biz?.entries||[])).filter(e=>e.id!==id);
+  const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
+  DB.set('mf_business', {entries, eq_entries: eqEntries});
   toast('Entry deleted','success');
   newBusinessMonthlyReport();
 }
@@ -9344,24 +9227,19 @@ function renderAdmin(){
     <div class="user-card">
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
-        <div class="user-name">${u.name} ${u.left_company?'<span style="color:#fff;background:var(--gray);font-size:.72rem;padding:1px 7px;border-radius:4px;margin-left:4px">🚶 LEFT'+(u.left_date?' · '+u.left_date:'')+'</span>':(!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':'')}${!u.left_company&&u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${!u.left_company&&u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
+        <div class="user-name">${u.name} ${!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
         <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
-        ${(()=>{ const today=new Date().toISOString().split('T')[0]; const ta=(u.tempAccess||[]).filter(t=>t.expiry===today); if(!ta.length) return ''; const users2=DB.get('users')||[]; const names=ta.map(t=>(users2.find(x=>x.id===t.absentUserId)||{}).name||'').join(', '); return `<div class="user-role" style="margin-top:2px;color:var(--teal)">🔄 Temp: ${names}</div>`; })()}
+        ${(()=>{ const today=new Date().toISOString().split('T')[0]; const ta=(u.tempAccess||[]).filter(t=>t.expiry>=today); if(!ta.length) return ''; const users2=DB.get('users')||[]; const names=ta.map(t=>{ const nm=(users2.find(x=>x.id===t.absentUserId)||{}).name||''; return t.expiry===today ? nm : `${nm} (until ${t.expiry})`; }).join(', '); return `<div class="user-role" style="margin-top:2px;color:var(--teal)">🔄 Temp: ${names}</div>`; })()}
         <div class="user-segs">${(u.segments||[]).map(s=>`<span class="badge ${s==='equity'?'b-eq':'b-mf'}">${s==='equity'?'Equity':'MF'}</span>`).join('')}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="editUser('${u.id}')">Edit</button>
-        ${u.left_company?`
-          <button class="btn btn-success" onclick="reactivateUser('${u.id}')" title="Bring them back onto the normal login/auto-schedule">↩️ Reactivate</button>
-        `:`
-          ${u.role!=='admin'?`<button class="btn" onclick="forceLogoutUser('${u.id}')" style="background:#d97706;color:#fff;border:none" title="Force logout now — also stamps HR out-time">🚪 Force Logout</button>`:''}
-          ${u.role!=='admin'?`<button class="btn" onclick="openTempAccessModal('${u.id}')" style="background:var(--teal);color:#fff;border:none" title="Temp Access">🔄 Temp</button>`:''}
-          <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
-          ${u.role!=='admin'?`<button class="btn" onclick="markUserLeft('${u.id}')" style="background:var(--gray);color:#fff;border:none" title="Employee has left the company — disables login, keeps all history, one-click Reactivate later">🚶 Mark as Left</button>`:''}
-        `}
+        ${u.role!=='admin'?`<button class="btn" onclick="forceLogoutUser('${u.id}')" style="background:#d97706;color:#fff;border:none" title="Force logout now — also stamps HR out-time">🚪 Force Logout</button>`:''}
+        ${u.role!=='admin'?`<button class="btn" onclick="openTempAccessModal('${u.id}')" style="background:var(--teal);color:#fff;border:none" title="Temp Access">🔄 Temp</button>`:''}
+        <button class="btn ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u.id}')">${u.active===false?'Activate':'Deactivate'}</button>
         <button class="btn btn-danger" onclick="deleteUser('${u.id}')">Delete</button>
       </div>
     </div>`).join('');
@@ -9502,48 +9380,6 @@ async function toggleUser(id){
   toast((newActive ? '✅ Activated' : '🔴 Deactivated') + ' — will resume at the next auto-schedule boundary', 'success');
 }
 
-// "Left Company" — a distinct state from the daily Activate/Deactivate toggle.
-// Deactivate is for the day-to-day auto-schedule (resumes on its own at the
-// next boundary); this is for someone who's actually gone: login disabled,
-// manualOverride locked ON so the every-minute auto-schedule never touches
-// them again, and a clear "LEFT" tag in the list. Nothing about their
-// history/clients/incentive records is deleted — one click on "Reactivate"
-// brings them fully back onto the normal schedule.
-async function markUserLeft(id){
-  const users=DB.get('users')||[];
-  const u=users.find(x=>x.id===id);
-  if(!u) return;
-  if(!confirm(u.name+' ko "Left" mark karna hai?\n\nUnka login band ho jayega aur daily auto-schedule ab unhe kabhi activate nahi karega. Poora record (clients, history, incentive) surakshit rehta hai — "Reactivate" se kabhi bhi wapas la sakte hain.')) return;
-  await DB.mutateUsers(users=>{
-    const idx=users.findIndex(x=>x.id===id);
-    if(idx<0) return false;
-    users[idx].left_company = true;
-    users[idx].left_date = today();
-    users[idx].active = false;
-    users[idx].manualOverride = true;
-    users[idx].manualOverrideTime = new Date().toISOString();
-    users[idx].manualOverrideActive = false;
-  });
-  renderAdmin();
-  toast('🚶 '+u.name+' marked as Left — login disabled, auto-schedule will not reactivate them','success');
-}
-
-async function reactivateUser(id){
-  const users=DB.get('users')||[];
-  const u=users.find(x=>x.id===id);
-  if(!u) return;
-  await DB.mutateUsers(users=>{
-    const idx=users.findIndex(x=>x.id===id);
-    if(idx<0) return false;
-    users[idx].left_company = false;
-    users[idx].left_date = '';
-    users[idx].manualOverride = false; // hand back to the normal daily auto-schedule
-    users[idx].active = isWithinActiveWindowNow();
-  });
-  renderAdmin();
-  toast('↩️ '+u.name+' reactivated — back on the normal login/auto-schedule','success');
-}
-
 async function deleteUser(id){
   const users=DB.get('users')||[];
   const idx=users.findIndex(u=>u.id===id);
@@ -9677,7 +9513,6 @@ function isWithinActiveWindowNow(){
 function _wouldAutoScheduleChange(users, istHour, shouldBeActive){
   return (users||[]).some(u=>{
     if(u.role === 'admin') return false;
-    if(u.left_company) return false; // marked Left — never auto-touched, only "Reactivate" clears this
     if(u.manualOverride){
       const overrideTime = new Date(u.manualOverrideTime);
       const utc = overrideTime.getTime() + overrideTime.getTimezoneOffset()*60000;
@@ -9719,7 +9554,6 @@ function runAutoSchedule(){
     let changed = false;
     users.forEach((u, idx) => {
       if(u.role === 'admin') return; // admins skip
-      if(u.left_company) return; // marked Left — never auto-touched, only "Reactivate" clears this
       if(u.manualOverride){
         // Check if next scheduled boundary has passed → clear override
         const overrideTime = new Date(u.manualOverrideTime);
@@ -9804,7 +9638,6 @@ async function runLateAbsentCheck(){
 
     for(const u of usersList){
       if(u.role==='admin') continue;
-      if(u.left_company) continue; // marked Left — don't keep marking them Absent every day
       if(u.lateAbsentMarked===td) continue; // already handled today, don't repeat
 
       const rawName = String(u.name || u.username || '').trim();
@@ -11012,7 +10845,9 @@ function openTempAccessModal(userId){
   // Show all other RMs as options (not admin, not self)
   const otherRMs = users.filter(u=>u.role!=='admin' && u.id!==userId);
   const today = new Date().toISOString().split('T')[0];
-  const existing = (targetUser.tempAccess||[]).filter(t=>t.expiry===today).map(t=>t.absentUserId);
+  // "Currently active" = not yet expired (expiry could be today or a future date)
+  const activeEntries = (targetUser.tempAccess||[]).filter(t=>t.expiry>=today);
+  const existing = activeEntries.map(t=>t.absentUserId);
 
   let listHtml = '';
   otherRMs.forEach(u=>{
@@ -11024,10 +10859,20 @@ function openTempAccessModal(userId){
   });
   document.getElementById('ta-rm-list').innerHTML = listHtml || '<em style="color:var(--gray)">No other RM found</em>';
 
-  // Show current access
-  if(existing.length){
-    const names = existing.map(id=>(users.find(u=>u.id===id)||{}).name||id).join(', ');
-    document.getElementById('ta-current').innerHTML = `✅ Current temp access: <b>${names}</b> (expires today)`;
+  // Default the date picker: keep the latest chosen expiry if any active access exists, else today
+  const dateInput = document.getElementById('ta-expiry-date');
+  dateInput.min = today;
+  const maxExpiry = activeEntries.reduce((m,t)=> t.expiry>m ? t.expiry : m, today);
+  dateInput.value = maxExpiry;
+
+  // Show current access with each RM's actual expiry date
+  if(activeEntries.length){
+    const rows = activeEntries.map(t=>{
+      const nm = (users.find(u=>u.id===t.absentUserId)||{}).name || t.absentUserId;
+      const untilTxt = t.expiry===today ? 'today' : `until ${t.expiry}`;
+      return `${nm} (${untilTxt})`;
+    }).join(', ');
+    document.getElementById('ta-current').innerHTML = `✅ Current temp access: <b>${rows}</b>`;
   } else {
     document.getElementById('ta-current').textContent = '';
   }
@@ -11037,18 +10882,23 @@ function openTempAccessModal(userId){
 
 async function saveTempAccess(){
   const today = new Date().toISOString().split('T')[0];
+  const expiryInput = document.getElementById('ta-expiry-date');
+  let expiry = expiryInput ? expiryInput.value : today;
+  if(!expiry || expiry < today) expiry = today; // never allow a past date
   const checkboxes = document.querySelectorAll('#ta-rm-list input[type=checkbox]');
+  const allShownIds = Array.from(checkboxes).map(cb=>cb.value);
   const selected = [];
   checkboxes.forEach(cb=>{
-    if(cb.checked) selected.push({absentUserId: cb.value, expiry: today});
+    if(cb.checked) selected.push({absentUserId: cb.value, expiry});
   });
 
   let targetName='', grantedNames='', finalTempAccess=null;
   const r = await DB.mutateUsers(users=>{
     const idx = users.findIndex(u=>u.id===_taTargetUserId);
     if(idx<0) return false;
-    // Keep future access entries (if any), replace today's
-    const existing = (users[idx].tempAccess||[]).filter(t=>t.expiry!==today);
+    // Drop any existing entries for RMs shown in this modal (they're being re-set by this save);
+    // entries for RMs not shown here (shouldn't normally happen) are left untouched.
+    const existing = (users[idx].tempAccess||[]).filter(t=>!allShownIds.includes(t.absentUserId));
     users[idx].tempAccess = [...existing, ...selected];
     targetName = users[idx].name;
     grantedNames = selected.map(s=>(users.find(u=>u.id===s.absentUserId)||{}).name||'').join(', ');
@@ -11065,8 +10915,9 @@ async function saveTempAccess(){
 
   closeModal('tempAccessModal');
   renderAdmin();
+  const untilTxt = expiry===today ? 'for today' : `until ${expiry}`;
   if(selected.length){
-    toast(`✅ ${targetName} has been given access to ${grantedNames} for today!`, 'success');
+    toast(`✅ ${targetName} has been given access to ${grantedNames} ${untilTxt}!`, 'success');
   } else {
     toast(`🔄 Removed ${targetName}'s temporary access`, 'info');
   }
