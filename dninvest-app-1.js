@@ -5958,11 +5958,17 @@ async function confirmDeleteClient(id, seg, name){
 function rmFieldHtml(seg, c, label){
   const rms = getSegRMs(seg);
   if(CU.role!=='admin'){
-    // Staff: lock RM to their own name
-    const myName = CU.name;
+    // Staff: for a NEW client, or a client that's already their own, lock the
+    // RM field to their own name. For an EXISTING client that belongs to
+    // someone else (e.g. editing via Temporary Access while covering an
+    // absent colleague's clients), keep the client's real/original RM — the
+    // field used to always force-write CU.name here, so simply opening and
+    // saving another RM's client (even without touching this field) silently
+    // reassigned it to whoever happened to be editing it.
+    const lockedName = (c && c.rm && normRm(c.rm) !== normRm(CU.name)) ? c.rm : CU.name;
     return `<div class="form-field"><label>${label}</label>
-      <input type="text" value="${myName}" disabled style="background:var(--bg);color:var(--gray)">
-      <input type="hidden" id="f_rm" value="${myName}"></div>`;
+      <input type="text" value="${lockedName}" disabled style="background:var(--bg);color:var(--gray)">
+      <input type="hidden" id="f_rm" value="${lockedName}"></div>`;
   }
   const opts = rms.map(r=>`<option ${c&&c.rm===r?'selected':''}>${r}</option>`).join('');
   return `<div class="form-field"><label>${label}</label><select id="f_rm"><option value="">Select RM</option>${opts}</select></div>`;
@@ -6100,7 +6106,7 @@ function clientForm(seg, c){
     </div>
     <div class="form-section">Investment Details</div>
     <div class="form-row three">
-      <div class="form-field"><label>AUM (₹)</label><input id="f_aum" type="number" value="${c?.aum||''}" placeholder="e.g. 1000000"></div>
+      <div class="form-field"><label>AUM (₹)</label><input id="f_aum" type="number" value="${c&&c.aum!=null?(Math.round(c.aum*100)/100):''}" placeholder="e.g. 1000000"></div>
       <div class="form-field"><label>SIP Amount (₹/month)</label><input id="f_sip" type="number" value="${c?.sip_amount||''}" placeholder="e.g. 5000"></div>
       <div class="form-field"><label>SIP Count</label><input id="f_sip_count" type="number" value="${c?.sip_count||''}" placeholder="No. of SIPs"></div>
     </div>
@@ -11261,7 +11267,7 @@ function parseAumExcel(rows){
   if(hdrIdx===-1) return null;
 
   const isPan = v => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(v||'').trim().toUpperCase());
-  const num = v => parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0;
+  const num = v => Math.round((parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0)*100)/100;
   const at = (r,f) => colMap[f]!==undefined ? r[colMap[f]] : '';
 
   const data = rows.slice(hdrIdx+1).filter(r=>{
@@ -11342,7 +11348,7 @@ function parseSipExcel(rows){
   const amtCol = colMap.amount!==undefined ? colMap.amount : colMap.reg_amount;
   const usedRegAmt = colMap.amount===undefined;
   const at = (r,f) => colMap[f]!==undefined ? r[colMap[f]] : '';
-  const num = v => parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0;
+  const num = v => Math.round((parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0)*100)/100;
 
   const data = rows.slice(hdrIdx+1).filter(r=>{
     if(!r || !r.some(c=>c!=='' && c!=null)) return false;
