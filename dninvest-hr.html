@@ -5827,6 +5827,32 @@ function calcIncentive(){
     </table>`;
 }
 
+// Permanently delete an employee entry (different from "Mark as Left" — that
+// keeps a record in "Left Employees" for one-click Reactivate; this removes
+// the employee card entirely so they never show up anywhere in the list
+// again). Historical attendance/salary/incentive records are NOT touched
+// (same philosophy as the CRM side: deleting the person doesn't delete the
+// records already tied to their name).
+// Base team members (the original 10 hardcoded in EMPLOYEES_BASE) cannot be
+// permanently deleted this way — they're defined in source code, not in the
+// added/removed Firestore list, so there's nothing here to actually remove.
+// For them, "Mark as Left" is the only option.
+function isBaseEmployee(name){
+  return EMPLOYEES_BASE.some(e=>e.name.trim().toUpperCase()===String(name||'').trim().toUpperCase());
+}
+async function permanentlyDeleteEmployee(name){
+  if(isBaseEmployee(name)){
+    alert(name+' is one of the original team members (built into the app) and cannot be permanently deleted — use "Mark as Left" instead.');
+    return;
+  }
+  if(!confirm('Permanently delete '+name+'?\n\nThis removes them completely — they will NOT appear in "Left Employees" either, and cannot be undone from here. Their past attendance, salary and incentive records are kept, just no longer linked to an active employee card.\n\nIf you just want to remove them from the active list but keep the option to bring them back, use "Mark as Left" instead.')) return;
+  await _commitEmployeeChanges(({added,removed})=>({
+    added: added.filter(e=>e.name!==name),
+    removed: removed.filter(n=>n!==name)
+  }));
+  renderEmployees();
+}
+
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────
 function renderEmployees(){
   renderAccessControl();
@@ -5872,6 +5898,7 @@ function renderEmployees(){
         <div style="display:flex;gap:6px">
           <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}'))+'\\nPerf. Inc.: '+fmt(getPerfIncentive('${e.name}'))+'\\nIncentive Salary: '+fmt(getIncentiveSalary('${e.name}')))">View</button>
           <button class="btn btn-sm" onclick="deleteEmployee('${e.name}')" style="background:var(--gray);color:#fff;border:none" title="Employee has left — keeps all history, one-click Reactivate later">🚶 Mark as Left</button>
+          ${!isBaseEmployee(e.name)?`<button class="btn btn-sm" onclick="permanentlyDeleteEmployee('${e.name}')" style="background:var(--red);color:#fff;border:none" title="Permanently delete — cannot be undone, won't appear in Left Employees either">🗑️ Delete</button>`:''}
         </div>
       </td>
     </tr>`;
@@ -5893,7 +5920,10 @@ function renderLeftEmployees(){
   box.innerHTML=removed.map(name=>`
     <tr>
       <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px;background:var(--gray)">${initials(name)}</div><div><div class="emp-name">${name}</div></div></div></td>
-      <td><button class="btn btn-sm btn-primary" onclick="reactivateEmployee('${name}')">↩️ Reactivate</button></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="reactivateEmployee('${name}')">↩️ Reactivate</button>
+        ${!isBaseEmployee(name)?`<button class="btn btn-sm" onclick="permanentlyDeleteEmployee('${name}')" style="background:var(--red);color:#fff;border:none" title="Permanently delete — cannot be undone">🗑️ Delete</button>`:''}
+      </td>
     </tr>`).join('');
 }
 
