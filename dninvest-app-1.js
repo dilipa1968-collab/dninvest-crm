@@ -2942,7 +2942,7 @@ function refreshDash(){
     const mx2=rs2[0]?.[1]||1;
     const totMfAum=rs2.reduce((s,[,v])=>s+v,0);
     document.getElementById('rmMfChart').innerHTML = rs2.length
-      ? rs2.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx2*100).toFixed(0)}%;background:linear-gradient(90deg,#0d5c56,var(--teal))"></div></div><span class="bar-num">₹${fmtNum(v)}</span></div>`).join('')
+      ? rs2.map(([n,v])=>`<div class="bar-row"><span class="bar-name">${n}</span><div class="bar-wrap"><div class="bar-fill" style="width:${(v/mx2*100).toFixed(0)}%;background:var(--teal)"></div></div><span class="bar-num">₹${fmtNum(v)}</span></div>`).join('')
         + `<div class="bar-row" style="font-weight:700;border-top:2px solid var(--border,#ddd);margin-top:4px;padding-top:6px"><span class="bar-name">TOTAL</span><div class="bar-wrap"></div><span class="bar-num">₹${fmtNum(totMfAum)}</span></div>`
       : '<p style="color:var(--gray);font-size:.82rem;padding:8px 0">No MF clients yet</p>';
     document.getElementById('rmMfCard').style.display=hasMf?'':'none';
@@ -3575,18 +3575,12 @@ function showEqActivityHistory(rmName){
     ['Date','Active','Δ Active','Inactive','Δ Inactive','Total','Changed Clients'], table);
 }
 
-const STAT_ICONS = {
-  'Total EQ Clients':'👥', 'Asset':'💎', 'Follow-ups Due':'📞',
-  'MF Investors':'🧑\u200d💼', 'Total AUM':'💰', 'Monthly SIP':'🔄',
-  'SIP Clients':'📈', 'Total SIP Count':'#️⃣'
-};
 function sc(n,l,cls,seg){
   const segBadge=seg?`<span class="badge ${seg==='equity'?'b-eq':'b-mf'}" style="float:right;margin-top:2px">${seg==='equity'?'EQ':'MF'}</span>`:'';
   const len=String(n).length;
   const sizeCls = len>9?'stat-n-sm':len>7?'stat-n-md':'';
-  const icn = STAT_ICONS[l] || '📊';
   return `<div class="stat-card ${cls}" onclick="showPage('${seg==='equity'?'eq-clients':seg==='mf'?'mf-clients':'eq-clients'}')">
-    ${segBadge}<div class="stat-icn">${icn}</div><div class="stat-n ${sizeCls}">${n}</div><div class="stat-l">${l}</div></div>`;
+    ${segBadge}<div class="stat-n ${sizeCls}">${n}</div><div class="stat-l">${l}</div></div>`;
 }
 function fmtNum(n){ if(n>=10000000) return (n/10000000).toFixed(2)+'Cr'; if(n>=100000) return (n/100000).toFixed(2)+'L'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return Math.round(n); }
 
@@ -8388,10 +8382,10 @@ function renderSip(){
   const totalCount=sipClients.reduce((s,c)=>s+(parseInt(c.sip_count)||0),0);
 
   document.getElementById('sipStats').innerHTML=
-    `<div class="stat-card teal"><div class="stat-icn">📈</div><div class="stat-n">${sipClients.length}</div><div class="stat-l">SIP Clients</div></div>`+
-    `<div class="stat-card gold"><div class="stat-icn">🔄</div><div class="stat-n">₹${fmtNum(totalSIP)}</div><div class="stat-l">Monthly SIP</div></div>`+
-    `<div class="stat-card"><div class="stat-icn">#️⃣</div><div class="stat-n">${totalCount}</div><div class="stat-l">Total SIP Count</div></div>`+
-    `<div class="stat-card purple"><div class="stat-icn">💰</div><div class="stat-n">₹${fmtNum(totalAUM)}</div><div class="stat-l">Total AUM</div></div>`;
+    `<div class="stat-card teal"><div class="stat-n">${sipClients.length}</div><div class="stat-l">SIP Clients</div></div>`+
+    `<div class="stat-card gold"><div class="stat-n">₹${fmtNum(totalSIP)}</div><div class="stat-l">Monthly SIP</div></div>`+
+    `<div class="stat-card"><div class="stat-n">${totalCount}</div><div class="stat-l">Total SIP Count</div></div>`+
+    `<div class="stat-card purple"><div class="stat-n">₹${fmtNum(totalAUM)}</div><div class="stat-l">Total AUM</div></div>`;
 
   let sipData = applySort(sipClients, 'sip', {
     name:{get:c=>c.name, type:'str'},
