@@ -231,14 +231,6 @@ tr:hover td{background:var(--surface2)}
 .team-inc-table input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg,rgba(37,99,235,.12))}
 .team-inc-table .btn-sm{white-space:nowrap;padding:4px 8px;font-size:10.5px}
 
-/* EMPLOYEES TABLE (HR → All employees) — 10 columns with inline inputs and
-   action buttons per row; compact sizing so the whole table fits within
-   .content's max-width with NO horizontal scroll, instead of relying on
-   .tbl-wrap's overflow-x:auto fallback (which was forcing a side-scroll). */
-.emp-tbl{font-size:12px}
-.emp-tbl th,.emp-tbl td{padding:7px 6px}
-.emp-tbl th{font-size:9.5px;white-space:nowrap}
-
 /* BADGES */
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
 .badge-green{background:var(--green-bg);color:var(--green-text)}
@@ -1013,8 +1005,8 @@ input:focus, select:focus, textarea:focus{
         </div>
       </div>
       <div class="tbl-wrap">
-        <table class="emp-tbl">
-          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>ESIC No</th><th>ESI Reg.</th><th>Login</th><th>Status</th><th></th></tr></thead>
+        <table>
+          <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Salary</th><th>Perf. Inc.</th><th>ESIC No</th><th>ESI Registered</th><th>Login</th><th>Status</th><th></th></tr></thead>
           <tbody id="emp-table"></tbody>
         </table>
       </div>
@@ -1779,6 +1771,18 @@ function today(){
   const utc=n.getTime()+n.getTimezoneOffset()*60000;
   const ist=new Date(utc+5.5*3600000);
   return ist.getFullYear()+'-'+String(ist.getMonth()+1).padStart(2,'0')+'-'+String(ist.getDate()).padStart(2,'0');
+}
+// Before the 10 AM late-absent cutoff (CRM's runLateAbsentCheck / HR's
+// runLateAbsentCheckHr), "no attendance record yet" does NOT mean the person
+// is actually absent — it just means they haven't logged into CRM/HR Portal
+// yet today. Only after 10 AM does a missing record become a real Absent.
+// Used to avoid showing a misleading red "Absent" badge at 9 AM for someone
+// who simply hasn't opened the app yet.
+function isBeforeAbsentCutoff(){
+  const n=new Date();
+  const utc=n.getTime()+n.getTimezoneOffset()*60000;
+  const ist=new Date(utc+5.5*3600000);
+  return (ist.getHours()+ist.getMinutes()/60) < 10;
 }
 function nowTime(){
   const n=new Date();
@@ -2607,7 +2611,7 @@ function startClock(){
 function renderDashboard(){
   const att=getAtt(); const td=today();
   const todayHoliday=getHolidayName(td);
-  let present=0,absent=0,onleave=0;
+  let present=0,absent=0,onleave=0,pending=0;
 
   let halfToday=0;
   EMPLOYEES.forEach(e=>{
@@ -2615,11 +2619,13 @@ function renderDashboard(){
     if(todayHoliday) onleave++;
     else if(rec&&rec.status==='Present') present++;
     else if(rec&&rec.status==='Half day'){ present++; halfToday++; }
+    else if(!rec && isBeforeAbsentCutoff()) pending++; // hasn't checked in yet, but cutoff hasn't passed — not a confirmed absence
     else absent++;
   });
 
+  const dpend=document.getElementById('d-pending'); if(dpend) dpend.textContent=pending;
   const dp=document.getElementById('d-present'); if(dp) dp.textContent=present+(halfToday>0?' ('+halfToday+' half)':'');
-  const da=document.getElementById('d-absent'); if(da) da.textContent=absent;
+  const da=document.getElementById('d-absent'); if(da) da.textContent=absent+(pending>0?' ('+pending+' pending)':'');
   const dl=document.getElementById('d-leave'); if(dl) dl.textContent=onleave;
 
   // Quick top-row metric: total pending advance across the team (admin-only)
@@ -2640,6 +2646,7 @@ function renderDashboard(){
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
       else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-orange">Half day</span>';inT=rec.in||'—'}
+      else if(!rec && isBeforeAbsentCutoff()){badge='<span class="badge" style="background:#eef0f5;color:#5d6e8a">⏳ Not checked-in</span>'}
       else{badge='<span class="badge badge-red">Absent</span>'}
       const monthRecs=(att[currentUser]||[]).filter(r=>r.date&&r.date.startsWith(td.slice(0,7)));
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
@@ -2677,6 +2684,7 @@ function renderDashboard(){
       if(todayHoliday){badge='<span class="badge badge-amber">Holiday</span>'}
       else if(rec&&rec.status==='Present'){badge='<span class="badge '+presentBadgeClass(rec)+'">Present</span>';inT=rec.in}
       else if(rec&&rec.status==='Half day'){badge='<span class="badge badge-orange">Half day</span>';inT=rec.in||'—'}
+      else if(!rec && isBeforeAbsentCutoff()){badge='<span class="badge" style="background:#eef0f5;color:#5d6e8a">⏳ Not checked-in</span>'}
       else{badge='<span class="badge badge-red">Absent</span>'}
       const monthRecs=(att[e.name]||[]).filter(r=>r.date&&r.date.startsWith(td.slice(0,7)));
       const mGreen=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-green').length;
@@ -5872,41 +5880,41 @@ function renderEmployees(){
     const perf=getPerfIncentive(e.name);
     return `
     <tr>
-      <td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
+      <td><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
       <td>${e.role}</td><td>${e.joined}</td>
       <td>
-        <div style="display:flex;align-items:center;gap:4px">
+        <div style="display:flex;align-items:center;gap:6px">
           <span>₹</span>
-          <input type="number" value="${sal}" id="emp-sal-${e.name}" style="width:58px;padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-size:12px">
-          <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')" style="padding:4px 7px;font-size:11px">Set</button>
+          <input type="number" value="${sal}" id="emp-sal-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')">Set</button>
         </div>
       </td>
       <td>
-        <div style="display:flex;align-items:center;gap:4px">
+        <div style="display:flex;align-items:center;gap:6px">
           <span>₹</span>
-          <input type="number" value="${perf}" id="emp-perf-${e.name}" style="width:58px;padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-size:12px" title="Performance Incentive — added to salary to form the Incentive Salary base">
-          <button class="btn btn-sm btn-primary" onclick="saveEmpPerfInc('${e.name}')" style="padding:4px 7px;font-size:11px">Set</button>
+          <input type="number" value="${perf}" id="emp-perf-${e.name}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px" title="Performance Incentive — added to salary to form the Incentive Salary base">
+          <button class="btn btn-sm btn-primary" onclick="saveEmpPerfInc('${e.name}')">Set</button>
         </div>
       </td>
       <td>
-        <div style="display:flex;align-items:center;gap:4px">
-          <input type="text" value="${getEsicNumber(e.name)}" id="emp-esic-${e.name}" placeholder="ESIC No." style="width:68px;padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-size:12px">
-          <button class="btn btn-sm btn-primary" onclick="saveEsicNo('${e.name}')" style="padding:4px 7px;font-size:11px">Set</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="text" value="${getEsicNumber(e.name)}" id="emp-esic-${e.name}" placeholder="ESIC No." style="width:100px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn btn-sm btn-primary" onclick="saveEsicNo('${e.name}')">Set</button>
         </div>
       </td>
       <td>
-        <select onchange="toggleEsiRegistered('${e.name}', this.value==='1')" style="font-size:11px;padding:3px 4px;border:1px solid var(--border);border-radius:6px">
+        <select onchange="toggleEsiRegistered('${e.name}', this.value==='1')" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px">
           <option value="1" ${isEsiRegistered(e.name)?'selected':''}>Yes</option>
           <option value="0" ${!isEsiRegistered(e.name)?'selected':''}>No</option>
         </select>
       </td>
-      <td><span style="font-size:11px;color:var(--text3);white-space:nowrap">CRM login</span></td>
+      <td><span style="font-size:11px;color:var(--text3)">CRM credentials</span></td>
       <td><span class="badge badge-green">Active</span></td>
       <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-sm" style="padding:4px 7px;font-size:11px" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}'))+'\\nPerf. Inc.: '+fmt(getPerfIncentive('${e.name}'))+'\\nIncentive Salary: '+fmt(getIncentiveSalary('${e.name}')))">View</button>
-          <button class="btn btn-sm" onclick="deleteEmployee('${e.name}')" style="background:var(--gray);color:#fff;border:none;padding:4px 7px" title="Mark as Left — keeps all history, one-click Reactivate later">🚶</button>
-          ${!isBaseEmployee(e.name)?`<button class="btn btn-sm" onclick="permanentlyDeleteEmployee('${e.name}')" style="background:var(--red);color:#fff;border:none;padding:4px 7px" title="Permanently delete — cannot be undone, won't appear in Left Employees either">🗑️</button>`:''}
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="alert('${e.name} — ${e.role}\\nJoined: ${e.joined}\\nSalary: '+fmt(getEmpSalary('${e.name}'))+'\\nPerf. Inc.: '+fmt(getPerfIncentive('${e.name}'))+'\\nIncentive Salary: '+fmt(getIncentiveSalary('${e.name}')))">View</button>
+          <button class="btn btn-sm" onclick="deleteEmployee('${e.name}')" style="background:var(--gray);color:#fff;border:none" title="Employee has left — keeps all history, one-click Reactivate later">🚶 Mark as Left</button>
+          ${!isBaseEmployee(e.name)?`<button class="btn btn-sm" onclick="permanentlyDeleteEmployee('${e.name}')" style="background:var(--red);color:#fff;border:none" title="Permanently delete — cannot be undone, won't appear in Left Employees either">🗑️ Delete</button>`:''}
         </div>
       </td>
     </tr>`;
