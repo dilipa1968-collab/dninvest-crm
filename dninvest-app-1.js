@@ -836,7 +836,11 @@ const DB = {
   async syncFromFirebase(){
     if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
     if(typeof fdb==='undefined') return;
-    for(const key of ['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk']){
+    // All 17 collections fetched IN PARALLEL (not one-by-one) — this runs on every
+    // login, page refresh, and the 30-min auto-reload, so a sequential for-loop here
+    // directly adds up to slow login/page-open times (each collection = one network
+    // round-trip; sequential = sum of all of them, parallel = the slowest single one).
+    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'].map(async (key)=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
         if(this._isSharded(key)){
@@ -849,7 +853,7 @@ const DB = {
             console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
                         this._shardCache[key].map(p=>p.length));
           }
-          continue;
+          return;
         }
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -865,7 +869,7 @@ const DB = {
             const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
             localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
             console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
-            continue;
+            return;
           }
           if(Array.isArray(d)){
             if(key==='call_logs'){
@@ -896,7 +900,7 @@ const DB = {
           }
         }
       }catch(e){ console.log('Firebase sync error for',key,':',e); }
-      }
+    }));
     try{ if(typeof clearEqRiskCache==='function') clearEqRiskCache(); }catch(e){}
   }
 };
