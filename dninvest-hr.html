@@ -2418,7 +2418,15 @@ autoOutTimeCheck();
 
 // ── One-time retro fix (July 1, 2026 se): purane records jinka out 1:30 PM se
 // pehle ka hai unhe Half day mark karo. Sirf Admin device par, sirf ek baar
-// (localStorage flag). Aaj ka din live rule handle karta hai.
+// (localStorage flag). Aaj ka din live rule handle karta hai — isliye STRICTLY
+// aaj se pehle (<td, na ki <=td). Bug fixed (17-Aug-2026): comment yahi keh
+// raha tha, par code me `<=td` tha, jo aaj (still-in-progress) records ko bhi
+// scan kar leta tha — jis RM ka live heartbeat-updated 'out' abhi subah 1:30 PM
+// se pehle ka time dikha raha ho (matlab wo abhi kaam kar hi raha hai), use
+// turant "Half day" mark kar deta tha, cutoff (6:15 PM) ka wait kiye bina. Ye
+// bug sirf pehli baar chalta hai naye/fresh device par (localStorage flag se
+// gated) — isliye kabhi bhi kisi naye device se Admin login hone par phir se
+// trigger ho sakta tha.
 async function migrateHalfDayFromJuly1(){
   try{
     if(!isAdmin) return;
@@ -2428,7 +2436,7 @@ async function migrateHalfDayFromJuly1(){
     let fixed=0;
     for(const emp of Object.keys(att)){
       for(const rec of (att[emp]||[])){
-        if(rec.date>='2026-07-01' && rec.date<=td && (rec.status==='Present'||rec.status==='Late') && rec.out){
+        if(rec.date>='2026-07-01' && rec.date<td && (rec.status==='Present'||rec.status==='Late') && rec.out){
           if(dateIsSaturday(rec.date)) continue; // Saturday exempt — half day office by default
           const m=/^(\d{1,2}):(\d{2})$/.exec(rec.out);
           if(m && (Number(m[1])+Number(m[2])/60)<13.5){
@@ -2445,7 +2453,41 @@ async function migrateHalfDayFromJuly1(){
     }
   }catch(e){ console.log('HD migration error:', e); }
 }
+// One-time repair (17-Aug-2026): undo today's damage from the `<=td` bug above —
+// any employee whose TODAY record got wrongly flipped to "Half day" before the
+// actual cutoff (6:15 PM / Sat 2:15 PM) has passed. Reverts using the same
+// in-time-based Present/Late rule the live cutoff logic uses. Does NOT touch
+// 'out' (heartbeat keeps advancing it normally). Admin-only, runs once.
+async function repairTodayPrematureHalfDay(){
+  try{
+    if(!isAdmin) return;
+    if(localStorage.getItem('fix_premature_halfday_17aug_v1')) return;
+    const td=today();
+    const now=new Date(); const utc=now.getTime()+now.getTimezoneOffset()*60000;
+    const ist=new Date(utc+5.5*3600000);
+    const dow=ist.getDay(); const istH=ist.getHours()+ist.getMinutes()/60;
+    let cutoff=null; if(dow>=1&&dow<=5)cutoff=18.25; else if(dow===6)cutoff=14.25;
+    localStorage.setItem('fix_premature_halfday_17aug_v1','done'); // set regardless — this repair only matters once
+    if(cutoff===null || istH>=cutoff) return; // past cutoff already — live logic has since taken over correctly
+    const att=getAtt();
+    let fixed=0;
+    for(const emp of Object.keys(att)){
+      const rec=(att[emp]||[]).find(r=>r.date===td);
+      if(!rec || rec.status!=='Half day') continue;
+      const m=/^(\d{1,2}):(\d{2})$/.exec(rec.in||'');
+      const lateCut=(dow===6)?10.75:10;
+      const st=(m && (Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
+      await saveAttRecord(emp, {...rec, status:st});
+      fixed++;
+    }
+    if(fixed>0){
+      if(typeof toast==='function') toast(fixed+' record(s) — today\'s premature "Half day" fixed (was a bug, not real)','success');
+      if(typeof renderDashboard==='function') renderDashboard();
+    }
+  }catch(e){ console.log('premature half-day repair error:', e); }
+}
 setTimeout(migrateHalfDayFromJuly1, 8000); // runs after the DB loads
+setTimeout(repairTodayPrematureHalfDay, 8200); // one-time: undo today's damage from the <=td bug above
 
 // ── One-time repair (5-Aug-2026 incident): a login device with a wrong/stuck
 // clock-date this morning caused today() to resolve to '2026-08-04' instead of
