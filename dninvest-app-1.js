@@ -8512,6 +8512,7 @@ function renderReports(){
   ];
   const coCards=[
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
+    {icon:'🔀',title:'RM Shift History',desc:'Clients moved between RMs — date & RM wise',fn:'rmShiftReport'},
   ];
   document.getElementById('eq-reports').innerHTML=eqCards.map(r=>reportCard(r)).join('');
   document.getElementById('mf-reports').innerHTML=mfCards.map(r=>reportCard(r)).join('');
@@ -9202,6 +9203,44 @@ function rmPerf(){
   mf.forEach(c=>{ if(!rms[c.rm]) rms[c.rm]={eqC:0,mfC:0,aum:0,sip:0,rev:0}; rms[c.rm].mfC++; rms[c.rm].aum+=(c.aum||0); rms[c.rm].sip+=(c.sip_amount||0); });
   const rows=Object.entries(rms).sort().map(([rm,d])=>[rm,d.eqC,d.mfC,'₹'+fmtNum(d.aum),'₹'+fmtNum(d.sip),'₹'+fmtNum(d.rev)]);
   showReport('RM Performance Report',['RM','EQ Clients','MF Investors','Total AUM','Monthly SIP','Revenue'],rows);
+}
+
+// Whenever a client's RM changes — via the bulk "Set RM"/"Unmap" bar (BULK.setRm/
+// unmap in dninvest-app-2.js, logs type:'bulk_rm_update') or a single client Edit
+// form where the RM dropdown was changed (saveClient, logs type:'edit' with a 'rm'
+// entry in .changes) — an activity_log entry already gets written. This report
+// just reads those entries back out, filtered to RM changes only, so every shift
+// is visible date-wise and RM-wise without digging through the full Activity Log.
+function rmShiftReport(){
+  const logs = DB.get('activity_logs')||[];
+  const isAdmin = CU && CU.role==='admin';
+  const myName = (CU && CU.name||'').toLowerCase();
+  const segLbl = s => (s==='eq'||s==='equity') ? 'Equity' : (s==='mf' ? 'MF' : (s||'—'));
+  let entries = [];
+  logs.forEach(l=>{
+    if(l.type!=='bulk_rm_update' && l.type!=='edit') return;
+    const ch = (l.changes||[]).find(c=>c.field==='rm');
+    if(!ch) return;
+    entries.push({
+      date: (l.date||'').slice(0,10), // ISO — used for sort/filter; formatted only at display time
+      client: l.client_name||'—',
+      seg: segLbl(l.seg),
+      from: ch.old||'(unmapped)',
+      to: ch.new||'(unmapped)',
+      by: l.by||'—'
+    });
+  });
+  if(!isAdmin){
+    entries = entries.filter(e=> e.from.toLowerCase()===myName || e.to.toLowerCase()===myName);
+  }
+  if(!entries.length){ toast('No RM shift history found yet','error'); return; }
+  entries.sort((a,b)=> b.date.localeCompare(a.date));
+  const rows = entries.map(e=>[fmtDate(e.date)||e.date, e.client, e.seg, e.from, e.to, e.by]);
+  showReport(
+    `RM Shift History (${entries.length} changes)`,
+    ['Date','Client Name','Segment','From RM','To RM','Changed By'],
+    rows
+  );
 }
 
 // ══════════════════════════════════════════
