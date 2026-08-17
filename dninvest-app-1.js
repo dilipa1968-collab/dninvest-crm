@@ -1219,7 +1219,21 @@ async function recordHrAttendanceOnCrmLogin(user){
     if(typeof fdb==='undefined'){ console.log('[ATT] fdb still undefined after wait, skip'); return; }
     // Canonical HR employee names — MUST match dninvest-hr.html's EMPLOYEES list
     // exactly, so attendance is saved under the same key the HR Portal reads.
+    // The original 9 are hardcoded (stable, never renamed); anyone added later
+    // via HR Portal's "+ Add employee" (e.g. a new RM/Peon) only exists in
+    // Firestore (hr_data/employee_changes), NOT in this file — so a brand-new
+    // employee's name was never found here before, and attendance silently
+    // fell back to whatever raw string CRM had (which can differ in case/
+    // spacing from what Admin typed into HR Portal), writing to a key the HR
+    // Portal's exact-name lookup never finds. Fetch the live list to cover
+    // new hires too, in addition to the stable base 9.
     const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+    try{
+      const ecSnap = await fdb.collection('hr_data').doc('employee_changes').get();
+      const ecData = (ecSnap.exists && ecSnap.data() && ecSnap.data().data) ? ecSnap.data().data : {};
+      const added = Array.isArray(ecData.added) ? ecData.added : [];
+      added.forEach(e=>{ if(e && e.name && !HR_NAMES.some(n=>n.toLowerCase()===String(e.name).trim().toLowerCase())) HR_NAMES.push(String(e.name).trim()); });
+    }catch(e){ console.log('[ATT] employee_changes fetch failed, using base list only:', e.message); }
     const rawName = String(user.name || user.username || '').trim();
     // Match by full name or first word, case-insensitive
     const match = HR_NAMES.find(n =>
