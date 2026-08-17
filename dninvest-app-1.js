@@ -1129,15 +1129,40 @@ async function isCrmBlockedForRm(){
 // 6:15 PM auto-out-time job uses the LAST heartbeat as the out time — without
 // CRM pings, an RM's out time gets stuck at whenever their HR tab last pinged.
 // Same doc structure as HR Portal: {data:{Name:{date,time}}, updated}.
-function hrNameForCrmUser(user){
-  const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+// Shared, cached (fetched once per page-load) live HR employee-name list —
+// base 9 + anyone added later via HR Portal. Both the attendance-recorder and
+// the heartbeat name-resolver use this SAME function now; previously each had
+// its own hardcoded copy of just the base 9, so a new hire (e.g. "Shyam")
+// could match correctly in one place but not the other — his attendance got
+// recorded under the right name, but his live heartbeat/out-time updates
+// still resolved a name via the OTHER (stale) hardcoded list, so his "Out"
+// time looked frozen while everyone else's kept advancing.
+let _hrNamesCache = null;
+async function getLiveHrNames(){
+  if(_hrNamesCache) return _hrNamesCache;
+  const base = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
+  try{
+    if(typeof fdb!=='undefined'){
+      const ecSnap = await fdb.collection('hr_data').doc('employee_changes').get();
+      const ecData = (ecSnap.exists && ecSnap.data() && ecSnap.data().data) ? ecSnap.data().data : {};
+      const added = Array.isArray(ecData.added) ? ecData.added : [];
+      added.forEach(e=>{ if(e && e.name && !base.some(n=>n.toLowerCase()===String(e.name).trim().toLowerCase())) base.push(String(e.name).trim()); });
+    }
+  }catch(e){ console.log('[ATT] employee_changes fetch failed, using base list only:', e.message); }
+  _hrNamesCache = base;
+  return base;
+}
+function matchHrName(user, hrNames){
   const rawName = String(user.name || user.username || '').trim();
-  const match = HR_NAMES.find(n =>
+  const match = hrNames.find(n =>
     n.toLowerCase() === rawName.toLowerCase() ||
     n.toLowerCase() === rawName.split(' ')[0].toLowerCase() ||
     n.toLowerCase() === String(user.username||'').toLowerCase()
   );
   return match || rawName;
+}
+async function hrNameForCrmUser(user){
+  return matchHrName(user, await getLiveHrNames());
 }
 let _crmHbTimer=null, _crmHbName=null, _crmHbBlocked=false;
 function _crmHbCutoffH(){
@@ -1189,9 +1214,9 @@ async function crmLiveOutTime(hhmm){
     });
   }catch(e){ console.log('[HB] out-time update failed:', e); }
 }
-function startCrmHeartbeat(user){
+async function startCrmHeartbeat(user){
   if(_crmHbTimer) return; // already running
-  _crmHbName=hrNameForCrmUser(user);
+  _crmHbName=await hrNameForCrmUser(user);
   const n=new Date(), cutoff=_crmHbCutoffH();
   _crmHbBlocked = (cutoff!==null && (n.getHours()+n.getMinutes()/60)>=cutoff);
   sendCrmHeartbeat(); // immediate first ping (skips itself automatically in a blocked session)
@@ -1221,31 +1246,13 @@ async function recordHrAttendanceOnCrmLogin(user){
     // no attendance at all for the day.
     if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
     if(typeof fdb==='undefined'){ console.log('[ATT] fdb still undefined after wait, skip'); return; }
-    // Canonical HR employee names — MUST match dninvest-hr.html's EMPLOYEES list
+    // Canonical HR employee name — MUST match dninvest-hr.html's EMPLOYEES list
     // exactly, so attendance is saved under the same key the HR Portal reads.
-    // The original 9 are hardcoded (stable, never renamed); anyone added later
-    // via HR Portal's "+ Add employee" (e.g. a new RM/Peon) only exists in
-    // Firestore (hr_data/employee_changes), NOT in this file — so a brand-new
-    // employee's name was never found here before, and attendance silently
-    // fell back to whatever raw string CRM had (which can differ in case/
-    // spacing from what Admin typed into HR Portal), writing to a key the HR
-    // Portal's exact-name lookup never finds. Fetch the live list to cover
-    // new hires too, in addition to the stable base 9.
-    const HR_NAMES = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali'];
-    try{
-      const ecSnap = await fdb.collection('hr_data').doc('employee_changes').get();
-      const ecData = (ecSnap.exists && ecSnap.data() && ecSnap.data().data) ? ecSnap.data().data : {};
-      const added = Array.isArray(ecData.added) ? ecData.added : [];
-      added.forEach(e=>{ if(e && e.name && !HR_NAMES.some(n=>n.toLowerCase()===String(e.name).trim().toLowerCase())) HR_NAMES.push(String(e.name).trim()); });
-    }catch(e){ console.log('[ATT] employee_changes fetch failed, using base list only:', e.message); }
+    // getLiveHrNames() covers the stable base 9 PLUS anyone added later via HR
+    // Portal's "+ Add employee" (fetched live from hr_data/employee_changes) —
+    // shared with hrNameForCrmUser() so both paths always agree on the same name.
+    const name = matchHrName(user, await getLiveHrNames());
     const rawName = String(user.name || user.username || '').trim();
-    // Match by full name or first word, case-insensitive
-    const match = HR_NAMES.find(n =>
-      n.toLowerCase() === rawName.toLowerCase() ||
-      n.toLowerCase() === rawName.split(' ')[0].toLowerCase() ||
-      n.toLowerCase() === String(user.username||'').toLowerCase()
-    );
-    const name = match || rawName;
     const td = today();
     console.log('[ATT] user='+rawName+' matched='+name+' date='+td);
 
