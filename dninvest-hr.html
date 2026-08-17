@@ -1930,6 +1930,46 @@ async function doLogin(){
   startApp();
 }
 
+// Shared "premature Half day" healer — same logic that used to live only
+// inline inside doLoginHr()'s "already marked today" branch. Extracted so it
+// can ALSO run on the two paths that used to skip it entirely: a resumed
+// session (page reopened, already logged in) and the CRM→HR "autologin"
+// token link — both jumped straight to startApp() without ever touching this
+// logic. That's why a manual admin edit (e.g. setting out-time to fix a wrong
+// "Half day") followed by the employee simply reopening/relogging via those
+// paths never took effect — nothing ever re-ran the heal. Now all three
+// entry points (normal login, session resume, CRM autologin) call this.
+async function healTodayAttendanceIfNeeded(name){
+  try{
+    const td=today();
+    let attFresh = getAtt();
+    if(typeof fdb !== 'undefined'){
+      try{
+        const snap = await fdb.collection('hr_data').doc('attendance').get();
+        if(snap.exists && snap.data() && snap.data().data){
+          attFresh = snap.data().data;
+          DB.set('attendance', attFresh);
+        }
+      }catch(e){ /* fallback to cache */ }
+    }
+    const already=(attFresh[name]||[]).find(r=>r.date===td);
+    if(!already) return;
+    const _n=new Date(); const nowIst=new Date(_n.getTime()+_n.getTimezoneOffset()*60000+5.5*3600000);
+    const dow=nowIst.getDay(); const nowH=nowIst.getHours()+nowIst.getMinutes()/60;
+    let cut=null; if(dow>=1&&dow<=5)cut=18.25; else if(dow===6)cut=14.25;
+    if(already.out && cut!==null && nowH<cut && (already.status==='Present'||already.status==='Late'||already.status==='Half day')){
+      let st=already.status;
+      if(st==='Half day'){
+        const m=/^(\d{1,2}):(\d{2})$/.exec(already.in||'');
+        const lateCut=(dow===6)?10.75:10;
+        st=(m&&(Number(m[1])+Number(m[2])/60)>=lateCut)?'Late':'Present';
+      }
+      await saveAttRecord(name, {...already, out:'', status:st});
+      if(typeof renderDashboard==='function') renderDashboard();
+    }
+  }catch(e){ console.log('healTodayAttendanceIfNeeded error:', e); }
+}
+
 // Reactivates a user in the CRM's Firestore users list (crm_data/users) after
 // a delayed login that the 10 AM late-login check had auto-deactivated.
 async function reactivateCrmUser(userId){
@@ -2160,7 +2200,7 @@ async function doLogout(){
 (function(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
-    if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp();return;}
+    if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp(); if(!s.isAdmin) healTodayAttendanceIfNeeded(s.name); return;}
   }catch{}
 
   // Auto-login: CRM passes ?autologin=<token> when opening HR from the HR button.
@@ -2177,7 +2217,7 @@ async function doLogout(){
         localStorage.removeItem('dnihr_autologin_token'); // use once
         if(empName){
           currentUser=empName; isAdmin=empIsAdmin;
-          startApp(); return;
+          startApp(); if(!empIsAdmin) healTodayAttendanceIfNeeded(empName); return;
         }
       }
       localStorage.removeItem('dnihr_autologin_token');

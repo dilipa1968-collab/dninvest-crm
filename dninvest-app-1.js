@@ -1293,7 +1293,40 @@ async function recordHrAttendanceOnCrmLogin(user){
       return;
     }
 
-    if(todayRec) { console.log('[ATT] already marked, skip'); return; } // already marked today with a normal status, leave it
+    if(todayRec) {
+      // Already marked today with a normal status — but if it was wrongly
+      // flipped to "Half day" too early (out-time before 1:30 PM cutoff has
+      // even arrived, e.g. from the retroactive-migration bug, or simply
+      // stale), and this RM is actively logging back in well before the real
+      // cutoff, treat it the same as a fresh check-in: heal it back to
+      // Present/Late. Mirrors dninvest-hr.html's healTodayAttendanceIfNeeded —
+      // without this, a manual admin fix (e.g. editing out-time) followed by
+      // the RM just reopening/re-logging into CRM had no way to actually
+      // recompute status, since this function used to just skip silently here.
+      if(todayRec.status==='Half day' && todayRec.out){
+        const dayOfWeek2 = getISTDayOfWeek();
+        let cut2=null; if(dayOfWeek2>=1&&dayOfWeek2<=5) cut2=18.25; else if(dayOfWeek2===6) cut2=14.25;
+        const nowD=new Date(); const nowIst2=new Date(nowD.getTime()+nowD.getTimezoneOffset()*60000+5.5*3600000);
+        const nowH2=nowIst2.getHours()+nowIst2.getMinutes()/60;
+        if(cut2!==null && nowH2<cut2){
+          const m2=/^(\d{1,2}):(\d{2})$/.exec(todayRec.in||'');
+          const lateCut2=(dayOfWeek2===6)?10.75:10;
+          const st2=(m2 && (Number(m2[1])+Number(m2[2])/60)>=lateCut2)?'Late':'Present';
+          try{
+            await fdb.runTransaction(async (tx)=>{
+              const doc = await tx.get(docRef);
+              let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
+              const idx = (latest[name]||[]).findIndex(r=>r.date===td);
+              if(idx>=0) latest[name][idx]={...latest[name][idx], out:'', status:st2};
+              tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+            });
+            console.log('[ATT] ✅ healed premature Half day → '+st2);
+          }catch(e){ console.log('[ATT] heal attempt failed:', e.message); }
+        }
+      }
+      console.log('[ATT] already marked, skip');
+      return;
+    }
 
     // Determine in-time (login time - 2 min)
     const inDate = new Date(Date.now() - 2*60*1000);
