@@ -1135,28 +1135,16 @@ function hrNameForCrmUser(user){
   );
   return match || rawName;
 }
-let _crmHbTimer=null, _crmHbName=null, _crmHbBlocked=false, _crmAttEnsuredDate=null;
+let _crmHbTimer=null, _crmHbName=null, _crmHbBlocked=false;
 function _crmHbCutoffH(){
   const dow=new Date().getDay(); // 0=Sun,6=Sat (device time = IST)
   if(dow>=1 && dow<=5) return 18.25; // Mon–Fri 6:15 PM
   if(dow===6) return 14.25;          // Saturday 2:15 PM
   return null;                        // Sunday — no cutoff
 }
-// Safety net: a browser tab that was never reloaded overnight (laptop just
-// woken from sleep, tab left open for days) never re-runs tryAutoLogin/doLogin
-// today, so recordHrAttendanceOnCrmLogin() never fires even though the RM is
-// actively using the CRM. The 30-min auto-reload is SUPPOSED to catch this,
-// but can be delayed indefinitely by the "postpone while a modal is open/
-// typing" guard. The heartbeat, however, runs on its own setInterval every 5
-// min regardless of page reloads — so double as the real safety net: on each
-// heartbeat, make sure TODAY's attendance exists, once per session per date.
 async function sendCrmHeartbeat(){
   try{
     if(typeof fdb==='undefined' || !_crmHbName) return;
-    if(_crmAttEnsuredDate !== today() && typeof CU!=='undefined' && CU && CU.role!=='admin'){
-      _crmAttEnsuredDate = today(); // set before awaiting — avoid duplicate concurrent calls
-      recordHrAttendanceOnCrmLogin(CU); // fire-and-forget, doesn't block the heartbeat ping below
-    }
     // Session jo cutoff ke baad start hua — heartbeat mat bhejo, warna
     // late-night fresh login ka time out-time ban jata hai (HR portal jaisa hi fix)
     if(_crmHbBlocked) return;
