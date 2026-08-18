@@ -3974,7 +3974,7 @@ function renderEqTable(){
       if(badgeFilter==='M') return isM;
       if(badgeFilter==='H') return isH;
       if(badgeFilter==='MH') return isM && isH;
-      if(badgeFilter==='NONE') return !isM && !isH;
+      if(badgeFilter==='NONE') return !isM; // "Not MF Client" — ignore HNI status
       return true;
     });
   }
@@ -4172,7 +4172,7 @@ function renderMfTable(){
       if(badgeFilterMf==='E') return isE;
       if(badgeFilterMf==='H') return isH;
       if(badgeFilterMf==='EH') return isE && isH;
-      if(badgeFilterMf==='NONE') return !isE && !isH;
+      if(badgeFilterMf==='NONE') return !isE; // "Not Equity Client" — ignore HNI status
       return true;
     });
   }
