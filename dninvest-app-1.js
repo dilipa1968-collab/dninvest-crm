@@ -8518,6 +8518,13 @@ function renderMfProspects(){
     return !isMf;
   });
 
+  // Admin can restrict a non-admin RM to only certain Equity RMs' clients
+  // (mf_prospects_eq_rms). Empty/unset = no restriction (see everyone's).
+  if(CU.role!=='admin' && Array.isArray(CU.mf_prospects_eq_rms) && CU.mf_prospects_eq_rms.length){
+    const allowed = new Set(CU.mf_prospects_eq_rms.map(r=>r.trim().toUpperCase()));
+    data = data.filter(c=>allowed.has(String(c.rm||'').trim().toUpperCase()));
+  }
+
   const q=(document.getElementById('mfp-search')||{value:''}).value.trim().toLowerCase();
   if(q){ data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)); }
 
@@ -9566,10 +9573,19 @@ function userForm(u){
       </label>
     </div>
     <div class="form-field" id="uf_mfprospects_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
-      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
-        <input type="checkbox" id="uf_mfprospects_access" ${u?.mf_prospects_access?'checked':''}>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="uf_mfprospects_access" onchange="document.getElementById('uf_mfprospects_rms_wrap').style.display=this.checked?'':'none'" ${u?.mf_prospects_access?'checked':''}>
         Also give MF Prospects access (see Equity clients who aren't MF investors yet, and convert them)
       </label>
+      <div id="uf_mfprospects_rms_wrap" style="display:${u?.mf_prospects_access?'':'none'};margin-top:8px;padding:10px 12px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.78rem;color:var(--gray);margin-bottom:6px">Which Equity RM's clients should show up here? (leave all unchecked = show every Equity RM's clients)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          ${getSegRMs('equity').map(rmName=>`
+            <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;text-transform:none;letter-spacing:0;cursor:pointer">
+              <input type="checkbox" class="uf-mfp-eqrm" value="${rmName}" ${(u?.mf_prospects_eq_rms||[]).includes(rmName)?'checked':''}> ${rmName}
+            </label>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="form-field"><label>Segments Access</label>
       <div style="display:flex;gap:12px;margin-top:6px">
@@ -9593,6 +9609,7 @@ async function saveUser(){
   const riskUpload = role==='rm' && !!document.getElementById('uf_risk_upload')?.checked;
   const backofficeAccess = role==='rm' && !!document.getElementById('uf_backoffice_access')?.checked;
   const mfProspectsAccess = role==='rm' && !!document.getElementById('uf_mfprospects_access')?.checked;
+  const mfProspectsEqRms = mfProspectsAccess ? Array.from(document.querySelectorAll('.uf-mfp-eqrm:checked')).map(x=>x.value) : [];
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
     toast('PIN must be 4 digits (0-9)','error'); return;
   }
@@ -9610,7 +9627,7 @@ async function saveUser(){
       if(idx>=0){
         const mob=document.getElementById('uf_mobile').value.trim();
         const eml=document.getElementById('uf_email').value.trim();
-        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess};
+        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
         if(pwd) users[idx].password=pwd;
         if(role==='rm' && pinVal) users[idx].pin=pinVal;
       }
@@ -9618,7 +9635,7 @@ async function saveUser(){
       if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return false; }
       const mob2=document.getElementById('uf_mobile').value.trim();
       const eml2=document.getElementById('uf_email').value.trim();
-      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess};
+      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
       if(role==='rm' && pinVal) newUser.pin=pinVal;
       users.push(newUser);
     }
