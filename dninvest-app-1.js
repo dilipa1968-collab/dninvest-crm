@@ -3930,9 +3930,14 @@ function renderEqTable(){
       if(_ss.eqField!==undefined && _ss.eqField!==null){ eqSortField=_ss.eqField; eqSortDir=_ss.eqDir||1; } }catch(e){}
   }
   let data = getMyEqClients();
-  // Quick lookup so we can flag equity clients who are ALSO an MF investor —
-  // computed once per render (not per-row) using mobile number as the match key.
-  const _mfMobileSet = new Set((getMyMfClients()||[]).map(c=>String(c.mobile||'').trim()).filter(Boolean));
+  // Quick lookup so we can flag equity clients who are ALSO an MF investor.
+  // PAN is the reliable match (unique, doesn't change) — mobile is only a
+  // fallback for records where PAN is missing on one side, since some
+  // clients have a different mobile number saved against their MF account
+  // vs their Equity account (updated one side but not the other).
+  const _mfClientsForMatch = getMyMfClients()||[];
+  const _mfPanSet = new Set(_mfClientsForMatch.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
+  const _mfMobileSet = new Set(_mfClientsForMatch.map(c=>String(c.mobile||'').trim()).filter(Boolean));
   // Parse the RMS risk map ONCE per render (was being re-parsed per comparison
   // during sort → tens of thousands of JSON.parse of a 2700-entry object → hang).
   const _riskMap = (getEqRisk().code) || {};
@@ -4059,7 +4064,7 @@ function renderEqTable(){
     const rowStyle = comebackBg ? ` style="background:${comebackBg}"` : '';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}"${rowStyle}${comebackTag?` title="Comeback trade — ${comebackTag==='blue'?'~1':comebackTag==='green'?'~3':'~6'}+ month gap"`:''}>${BULK.td('eq',c.id)}
-      <td>${c.code||'—'}${_mfMobileSet.has(String(c.mobile||'').trim())?'<span title="Also an MF investor" style="margin-left:4px;font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">M</span>':''}</td>
+      <td>${c.code||'—'}${(_mfPanSet.has(String(c.pan||'').trim().toUpperCase())||_mfMobileSet.has(String(c.mobile||'').trim()))?'<span title="Also an MF investor" style="margin-left:4px;font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">M</span>':''}</td>
       <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
