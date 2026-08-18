@@ -223,14 +223,13 @@ tr:hover td{background:var(--surface2)}
    genuinely too-long single word — each column gets enough width that this
    essentially never triggers, avoiding the earlier ugly mid-word breaks. */
 .team-inc-table{table-layout:fixed;width:100%}
-.team-inc-table th,.team-inc-table td{padding:5px 4px;font-size:10px;line-height:1.25;overflow-wrap:break-word}
-.team-inc-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.team-inc-table td small{font-size:8.5px;white-space:normal}
-.team-inc-table th{font-size:8.5px}
-.team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:8px;overflow:visible;text-overflow:clip}
-.team-inc-table input[type=number]{width:100%;max-width:44px;box-sizing:border-box;padding:3px;border:1px solid var(--border);border-radius:5px;font-size:10px;background:var(--surface);color:var(--text);outline:none;text-align:right}
+.team-inc-table th,.team-inc-table td{padding:6px 5px;font-size:11px;line-height:1.3;overflow-wrap:break-word}
+.team-inc-table td small{font-size:9.5px}
+.team-inc-table th{font-size:9px}
+.team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:10px}
+.team-inc-table input[type=number]{width:100%;max-width:50px;box-sizing:border-box;padding:4px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--text);outline:none;text-align:right}
 .team-inc-table input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg,rgba(37,99,235,.12))}
-.team-inc-table .btn-sm{white-space:nowrap;padding:3px 7px;font-size:9.5px}
+.team-inc-table .btn-sm{white-space:nowrap;padding:4px 8px;font-size:10.5px}
 
 /* EMPLOYEES TABLE (HR → All employees) — 10 columns with inline inputs and
    action buttons per row; compact sizing so the whole table fits within
@@ -913,7 +912,7 @@ input:focus, select:focus, textarea:focus{
           <div class="tbl-wrap">
             <table class="team-inc-table">
               <colgroup>
-                <col style="width:11.5%"><col style="width:7%"><col style="width:6.5%"><col style="width:6%"><col style="width:7%"><col style="width:4%"><col style="width:5.5%"><col style="width:6%"><col style="width:4.5%"><col style="width:6.5%"><col style="width:5.5%"><col style="width:7%"><col style="width:7%"><col style="width:5.5%"><col style="width:6%"><col style="width:4.5%">
+                <col style="width:8%"><col style="width:7%"><col style="width:6.5%"><col style="width:6%"><col style="width:6%"><col style="width:3.5%"><col style="width:7.5%"><col style="width:8%"><col style="width:6%"><col style="width:5.5%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:4.5%"><col style="width:6%"><col style="width:4.5%">
               </colgroup>
               <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc. Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl. Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
