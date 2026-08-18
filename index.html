@@ -340,14 +340,14 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .stat-l{font-size:.68rem;color:var(--gray);margin-top:4px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
 
 /* ── FILTERS ── */
-.filters{background:#fff;border-radius:var(--radius);padding:8px 12px;display:flex;flex-wrap:wrap;
-  gap:5px;margin-bottom:10px;box-shadow:0 1px 4px rgba(10,20,50,.05);align-items:center;border:1px solid var(--border);}
-.filters input,.filters select{padding:4px 6px;border:1px solid var(--border);border-radius:6px;
-  font-size:.68rem;outline:none;background:var(--bg);transition:border .2s;}
+.filters{background:#fff;border-radius:var(--radius);padding:9px 12px;display:flex;flex-wrap:wrap;
+  gap:6px;margin-bottom:10px;box-shadow:0 1px 4px rgba(10,20,50,.05);align-items:center;border:1px solid var(--border);}
+.filters input,.filters select{padding:6px 8px;border:1px solid var(--border);border-radius:7px;
+  font-size:.78rem;outline:none;background:var(--bg);transition:border .2s;}
 .filters input:focus,.filters select:focus{border-color:var(--navy);background:#fff;}
-.filters input[type=text]{min-width:150px;}
-.filter-sep{width:1px;height:20px;background:var(--border);}
-.res-count{font-size:.72rem;color:var(--gray);margin-left:auto;white-space:nowrap;}
+.filters input[type=text]{min-width:170px;}
+.filter-sep{width:1px;height:22px;background:var(--border);}
+.res-count{font-size:.8rem;color:var(--gray);margin-left:auto;white-space:nowrap;}
 
 /* ── TABLE ── */
 .tbl-wrap{background:#fff;border-radius:var(--radius);box-shadow:0 2px 12px rgba(10,20,50,.08);overflow:hidden;border:1px solid var(--border);}
@@ -752,7 +752,7 @@ body{
   border:1px solid #e6eaf3;
   box-shadow:0 2px 12px rgba(16,30,60,.07);
 }
-.filters{border-radius:16px;padding:8px 12px;gap:5px}
+.filters{border-radius:16px;padding:9px 12px;gap:6px}
 .tbl-wrap{border-radius:16px}
 .stat-card{border-radius:16px;transition:transform .15s, box-shadow .15s;border-left-width:3px}
 .stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,30,60,.12)}
@@ -1419,39 +1419,39 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterEq()" id="eq-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
-          <select onchange="filterEq()" id="eq-comeback" title="Clients whose Name is highlighted today for a comeback trade" style="background:#FAFAF8;border:1px solid #E0DCB8;border-radius:8px;color:#1F2937;font-weight:500;max-width:130px"><option value="">🎨 Comeback</option>
+          <select onchange="filterEq()" id="eq-comeback" title="Clients whose Name is highlighted today for a comeback trade" style="background:#FAFAF8;border:1px solid #E0DCB8;border-radius:8px;color:#1F2937;font-weight:500;max-width:145px"><option value="">🎨 Comeback</option>
             <option value="blue">🔵 Blue (~1mo+)</option><option value="green">🟢 Green (~3mo+)</option><option value="yellow">🟡 Yellow (~6mo+)</option></select>
-          <select onchange="filterEq()" id="eq-followup-filter" style="background:#F8FCFE;border:1px solid #BFE0EC;border-radius:8px;color:#1F2937;font-weight:500;max-width:120px"><option value="">All Follow-ups</option>
+          <select onchange="filterEq()" id="eq-followup-filter" style="background:#F8FCFE;border:1px solid #BFE0EC;border-radius:8px;color:#1F2937;font-weight:500;max-width:135px"><option value="">All Follow-ups</option>
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL NOT CONNECTED">CALL NOT CONNECTED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option><option value="COME TO OFFICE">COME TO OFFICE</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
-          <select onchange="filterEq()" id="eq-badge" title="Filter by M (also an MF investor) / H (HNI) badge" style="background:#F6FBF6;border:1px solid #C6E6C6;border-radius:8px;color:#1F2937;font-weight:500;max-width:120px"><option value="">🏷️ Badges</option>
+          <select onchange="filterEq()" id="eq-badge" title="Filter by M (also an MF investor) / H (HNI) badge" style="background:#F6FBF6;border:1px solid #C6E6C6;border-radius:8px;color:#1F2937;font-weight:500;max-width:135px"><option value="">🏷️ Badges</option>
             <option value="M">🟢 M — MF Investor</option>
             <option value="H">🟣 H — HNI</option>
             <option value="MH">🟢🟣 M+H — Both</option>
             <option value="NONE">⬜ Not MF Client</option></select>
           <div class="filter-sep"></div>
-          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:88px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
+          <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:98px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
           </select>
-          <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:4px 9px;font-size:.68rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
+          <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:6px 11px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="eq-count"></span>
           <div style="flex-basis:100%;height:0"></div>
-          <label style="font-size:.68rem;color:#1F2937;display:flex;align-items:center;gap:3px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:7px;padding:3px 6px;font-weight:500">Last Call:
-            <input type="date" onchange="filterEq()" id="eq-last-call-from" title="From date" style="padding:3px;font-size:.66rem">
-            <span style="font-size:.64rem">to</span>
-            <input type="date" onchange="filterEq()" id="eq-last-call-to" title="To date" style="padding:3px;font-size:.66rem"></label>
-          <label style="font-size:.68rem;color:#1F2937;display:flex;align-items:center;gap:3px;background:#F8FCFA;border:1px solid #BFE0CB;border-radius:7px;padding:3px 6px;font-weight:500">Next Call:
-            <input type="date" onchange="filterEq()" id="eq-next-call-from" title="From date" style="padding:3px;font-size:.66rem">
-            <span style="font-size:.64rem">to</span>
-            <input type="date" onchange="filterEq()" id="eq-next-call-to" title="To date" style="padding:3px;font-size:.66rem"></label>
-          <label style="font-size:.68rem;color:#1F2937;display:flex;align-items:center;gap:3px;background:#FEFCF7;border:1px solid #EBCB8E;border-radius:7px;padding:3px 6px;font-weight:500">Last Trade:
-            <input type="date" onchange="filterEq()" id="eq-last-trade-from" title="From date" style="padding:3px;font-size:.66rem">
-            <span style="font-size:.64rem">to</span>
-            <input type="date" onchange="filterEq()" id="eq-last-trade-to" title="To date" style="padding:3px;font-size:.66rem"></label>
+          <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:7px;padding:4px 7px;font-weight:500">Last Call:
+            <input type="date" onchange="filterEq()" id="eq-last-call-from" title="From date" style="padding:4px;font-size:.73rem">
+            <span style="font-size:.7rem">to</span>
+            <input type="date" onchange="filterEq()" id="eq-last-call-to" title="To date" style="padding:4px;font-size:.73rem"></label>
+          <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FCFA;border:1px solid #BFE0CB;border-radius:7px;padding:4px 7px;font-weight:500">Next Call:
+            <input type="date" onchange="filterEq()" id="eq-next-call-from" title="From date" style="padding:4px;font-size:.73rem">
+            <span style="font-size:.7rem">to</span>
+            <input type="date" onchange="filterEq()" id="eq-next-call-to" title="To date" style="padding:4px;font-size:.73rem"></label>
+          <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#FEFCF7;border:1px solid #EBCB8E;border-radius:7px;padding:4px 7px;font-weight:500">Last Trade:
+            <input type="date" onchange="filterEq()" id="eq-last-trade-from" title="From date" style="padding:4px;font-size:.73rem">
+            <span style="font-size:.7rem">to</span>
+            <input type="date" onchange="filterEq()" id="eq-last-trade-to" title="To date" style="padding:4px;font-size:.73rem"></label>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="eq-table"></div></div>
         <div class="pagination" id="eq-pg"></div>
@@ -1551,33 +1551,33 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <select onchange="filterMf()" id="mf-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Investor</option><option>Prospect</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterMf()" id="mf-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
-          <select onchange="filterMf()" id="mf-followup-filter" style="background:#F8FCFE;border:1px solid #BFE0EC;border-radius:8px;color:#1F2937;font-weight:500;max-width:130px"><option value="">All Follow-ups</option>
+          <select onchange="filterMf()" id="mf-followup-filter" style="background:#F8FCFE;border:1px solid #BFE0EC;border-radius:8px;color:#1F2937;font-weight:500;max-width:145px"><option value="">All Follow-ups</option>
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL NOT CONNECTED">CALL NOT CONNECTED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="COME TO OFFICE">COME TO OFFICE</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
-          <select onchange="filterMf()" id="mf-badge" title="Filter by E (also Equity client) / H (HNI) badge" style="background:#FAF6FE;border:1px solid #E0C6EE;border-radius:8px;color:#1F2937;font-weight:500;max-width:110px"><option value="">🏷️ Badge</option>
+          <select onchange="filterMf()" id="mf-badge" title="Filter by E (also Equity client) / H (HNI) badge" style="background:#FAF6FE;border:1px solid #E0C6EE;border-radius:8px;color:#1F2937;font-weight:500;max-width:125px"><option value="">🏷️ Badge</option>
             <option value="E">🔵 E — Equity Client</option>
             <option value="H">🟣 H — HNI</option>
             <option value="EH">🔵🟣 E+H — Both</option>
             <option value="NONE">⬜ Not Equity Client</option></select>
           <div class="filter-sep"></div>
-          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="max-width:88px;background:#FEFCF7;border:1px solid #EBCB8E;color:#1F2937;font-weight:500">
+          <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="max-width:98px;background:#FEFCF7;border:1px solid #EBCB8E;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
           </select>
-          <button class="btn btn-outline" onclick="resetFilters('mf')" style="padding:4px 9px;font-size:.68rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
+          <button class="btn btn-outline" onclick="resetFilters('mf')" style="padding:6px 11px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="mf-count"></span>
           <div style="flex-basis:100%;height:0"></div>
-          <label style="font-size:.68rem;color:#1F2937;display:flex;align-items:center;gap:3px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:7px;padding:3px 6px;font-weight:500">Last Call:
-            <input type="date" onchange="filterMf()" id="mf-last-call-from" title="From date" style="padding:3px;font-size:.66rem">
-            <span style="font-size:.64rem">to</span>
-            <input type="date" onchange="filterMf()" id="mf-last-call-to" title="To date" style="padding:3px;font-size:.66rem"></label>
-          <label style="font-size:.68rem;color:#1F2937;display:flex;align-items:center;gap:3px;background:#F8FCFA;border:1px solid #BFE0CB;border-radius:7px;padding:3px 6px;font-weight:500">Next Call:
-            <input type="date" onchange="filterMf()" id="mf-next-call-from" title="From date" style="padding:3px;font-size:.66rem">
-            <span style="font-size:.64rem">to</span>
-            <input type="date" onchange="filterMf()" id="mf-next-call-to" title="To date" style="padding:3px;font-size:.66rem"></label>
+          <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:7px;padding:4px 7px;font-weight:500">Last Call:
+            <input type="date" onchange="filterMf()" id="mf-last-call-from" title="From date" style="padding:4px;font-size:.73rem">
+            <span style="font-size:.7rem">to</span>
+            <input type="date" onchange="filterMf()" id="mf-last-call-to" title="To date" style="padding:4px;font-size:.73rem"></label>
+          <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FCFA;border:1px solid #BFE0CB;border-radius:7px;padding:4px 7px;font-weight:500">Next Call:
+            <input type="date" onchange="filterMf()" id="mf-next-call-from" title="From date" style="padding:4px;font-size:.73rem">
+            <span style="font-size:.7rem">to</span>
+            <input type="date" onchange="filterMf()" id="mf-next-call-to" title="To date" style="padding:4px;font-size:.73rem"></label>
           <!-- Last Business date-range removed on request (18-Aug-2026) — kept the
                mf-last-biz-from/to hidden inputs elsewhere untouched isn't needed since
                filterMf() already guards with (||{value:''}) for any missing element. -->
