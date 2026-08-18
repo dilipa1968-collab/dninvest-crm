@@ -949,7 +949,7 @@ function isBackOfficeOrAdmin(){ return !!(CU && (CU.role==='admin' || CU.role===
 // files uploaded together, so one permission covers both.
 function canUploadSquareoff(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.risk_upload===true || CU.backoffice_access===true)); }
 let PG_SIZE = 50;
-let eqPage=1, mfPage=1, leadsPage=1;
+let eqPage=1, mfPage=1, leadsPage=1, mfpPage=1;
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
 // Restore column-sort state after page reload (app auto-reloads every 30 min),
 // so the user's chosen sort (e.g. Name) is not lost on the auto-refresh.
@@ -2015,7 +2015,7 @@ function initApp(){
     if(el) el.style.display=hasEq?'flex':'none';
   });
   if(eqSec) eqSec.style.display=hasEq?'':'none';
-  ['mf-clients','mf-followup','mf-sip','mf-nocall','mf-txns'].forEach(id=>{
+  ['mf-clients','mf-followup','mf-sip','mf-nocall','mf-txns','mf-prospects'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.style.display=hasMf?'flex':'none';
   });
@@ -2332,6 +2332,7 @@ function showPage(id){
   else if(id==='mf-nocall') renderNoCall('mf');
   else if(id==='mf-sip') renderSip();
   else if(id==='mf-txns'){ renderMfTxnPage(); }
+  else if(id==='mf-prospects'){ mfpPage=1; renderMfProspects(); }
   else if(id==='eq-demat'){ renderEqDematPage(); }
   else if(id==='reports') renderReports();
   else if(id==='activity-log') renderActivityLog();
@@ -8485,6 +8486,87 @@ function renderNoCall(seg){
   }
 }
 
+
+// ── MF PROSPECTS — Equity clients not yet an MF investor. Cross-cutting,
+// read-only view into the Equity list: sourced from ALL equity clients
+// (unscoped by Equity RM — an MF RM has no eq_dealers), filtered down to
+// "not already an MF investor" using the same PAN/mobile matching used for
+// the M/E badges elsewhere. Nothing here ever writes to the equity record;
+// "+ Add as MF Investor" only opens the normal Add Investor form, pre-filled,
+// which creates a brand-new independent MF record on save.
+function renderMfProspects(){
+  const eqAll = DB.get('eq_clients')||[];
+  const mfAll = DB.get('mf_clients')||[];
+  const mfPanSet = new Set(mfAll.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
+  const mfMobileSet = new Set(mfAll.map(c=>String(c.mobile||'').trim()).filter(Boolean));
+
+  let data = eqAll.filter(c=>{
+    if(c.do_not_call) return false;
+    if(c.status==='Closed') return false;
+    const isMf = mfPanSet.has(String(c.pan||'').trim().toUpperCase()) || mfMobileSet.has(String(c.mobile||'').trim());
+    return !isMf;
+  });
+
+  const q=(document.getElementById('mfp-search')||{value:''}).value.trim().toLowerCase();
+  if(q){ data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)); }
+
+  data = data.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+  const cont=document.getElementById('mfp-table');
+  const nb=document.getElementById('nb-mfprospects'); if(nb) nb.textContent=data.length;
+  document.getElementById('mfp-count').textContent = data.length+' prospects';
+
+  if(!data.length){
+    cont.innerHTML = `<div style="text-align:center;padding:48px;color:var(--green)">✅ No equity clients left to convert${q?' matching "'+q+'"':''}</div>`;
+    document.getElementById('mfp-pg').innerHTML='';
+    return;
+  }
+
+  const rows = data.slice((mfpPage-1)*PG_SIZE, mfpPage*PG_SIZE);
+  let h=`<table><thead><tr>
+    <th>Name</th><th>Mobile</th><th>Equity RM</th><th>Last Trade</th><th>Actions</th>
+    </tr></thead><tbody>`;
+  rows.forEach(c=>{
+    h+=`<tr>
+      <td style="font-weight:600">${c.name}</td>
+      <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
+      <td>${c.rm||'—'}</td>
+      <td>${fmtDate(c.last_trade_date)||'—'}</td>
+      <td><button class="btn btn-outline" style="font-size:.72rem;padding:5px 10px" onclick="addAsMfInvestor('${c.id}')">➕ Add as MF Investor</button></td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  cont.innerHTML=h;
+
+  const pages=Math.ceil(data.length/PG_SIZE);
+  const pg=document.getElementById('mfp-pg');
+  if(pages<=1){ pg.innerHTML=''; }
+  else{
+    let ph=`<button class="pg-btn" onclick="gpMfp(${mfpPage-1})" ${mfpPage===1?'disabled':''}>‹</button>`;
+    let rng=[];
+    for(let i=1;i<=pages;i++){ if(i===1||i===pages||Math.abs(i-mfpPage)<=2) rng.push(i); else if(rng[rng.length-1]!=='...') rng.push('...'); }
+    rng.forEach(r=>{ if(r==='...') ph+=`<span class="pg-info">…</span>`; else ph+=`<button class="pg-btn ${r===mfpPage?'active':''}" onclick="gpMfp(${r})">${r}</button>`; });
+    ph+=`<button class="pg-btn" onclick="gpMfp(${mfpPage+1})" ${mfpPage===pages?'disabled':''}>›</button>`;
+    ph+=`<span class="pg-info">${mfpPage}/${pages} (${data.length})</span>`;
+    pg.innerHTML=ph;
+  }
+}
+function gpMfp(p){ if(p<1) return; mfpPage=p; renderMfProspects(); }
+
+// Opens the normal "Add MF Investor" form, pre-filled from an equity client's
+// details. currentEditId stays null, so Save creates a brand-new, independent
+// MF record — the equity client (and its RM) is never modified.
+function addAsMfInvestor(eqClientId){
+  const eq = (DB.get('eq_clients')||[]).find(x=>x.id===eqClientId);
+  if(!eq){ toast('Client not found','error'); return; }
+  currentEditId=null;
+  const pseudo = { name:eq.name, mobile:eq.mobile, pan:eq.pan, dob:eq.dob, email:eq.email, status:'Investor' };
+  document.getElementById('clientModalTitle').textContent='Add MF Investor';
+  document.getElementById('clientSaveBtn').textContent='Save Investor';
+  document.getElementById('clientSaveBtn').dataset.seg='mf';
+  document.getElementById('clientModalBody').innerHTML=clientForm('mf', pseudo);
+  document.getElementById('clientModal').classList.add('open');
+}
 
 function renderSip(){
   try{

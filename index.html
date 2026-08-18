@@ -1253,6 +1253,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <span class="icon">💼</span> MF Transactions
         <span class="nav-badge red" id="nb-mftxn-pending" style="display:none">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('mf-prospects')" id="nav-mf-prospects" title="Equity clients who are not yet MF investors — call them and convert if interested">
+        <span class="icon">🎯</span> MF Prospects
+        <span class="nav-badge" id="nb-mfprospects">0</span>
+      </div>
 
       <div class="sidebar-section" id="op-nav-section">Other Products</div>
       <div class="nav-item" onclick="showPage('other-products')" id="nav-other-products">
@@ -1737,6 +1741,25 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <span class="res-count" id="mftxn-count" style="white-space:nowrap;font-size:.68rem"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
+      </div>
+
+      <!-- ── MF PROSPECTS (Equity clients not yet an MF investor) ── -->
+      <div class="page" id="page-mf-prospects">
+        <div class="page-hdr">
+          <div class="page-title">MF Prospects</div>
+        </div>
+        <p style="font-size:.82rem;color:var(--gray);margin:-6px 0 12px;max-width:760px">
+          Equity clients who are not yet MF investors — call them, and if interested,
+          click <b>+ Add as MF Investor</b> to create a fresh MF record with yourself
+          as the MF RM. This is a read-only view into the Equity list — it doesn't
+          change anything on the Equity side, and the Equity RM is untouched.
+        </p>
+        <div class="filters">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="renderMfProspects()" id="mfp-search" autocomplete="off" name="mfp-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <span class="res-count" id="mfp-count"></span>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="mfp-table"></div></div>
+        <div class="pagination" id="mfp-pg"></div>
       </div>
 
       <!-- ── EQUITY: DEMAT ACCOUNT OPENING ── -->
