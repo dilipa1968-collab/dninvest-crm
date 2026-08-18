@@ -8345,11 +8345,19 @@ function renderNoCall(seg){
   try{
   const days = parseInt(seg==='equity'?activeEqncTab:activeMfncTab);
   const clients = seg==='equity'?getActiveEqClients():getMyMfClients();
+  // "No-Call Alert" = client has NEVER been called, full stop — clients who
+  // were called at some point (even 60+/90+/180+ days ago) no longer belong
+  // here; that's follow-up/re-engagement territory, not "never contacted".
+  // Within "never called", the 60+/90+/180+ tabs now tier by how long the
+  // client has existed in the CRM without ever getting a first call (using
+  // c.created), so the tabs still mean something instead of all three
+  // showing the identical "never called" list.
   let data = clients.filter(c=>{
     if(c.do_not_call) return false; // exclude DNC clients
-    const d = daysDiff(c.last_call_date);
-    return d===null || d>=days; // never called, or not called in N+ days
-  }).map(c=>({...c,daysAgo:daysDiff(c.last_call_date)}))
+    if(daysDiff(c.last_call_date)!==null) return false; // has a real last-call date — was called before, not a "never called" case
+    const sinceAdded = daysDiff(c.created);
+    return sinceAdded===null || sinceAdded>=days;
+  }).map(c=>({...c,daysAgo:daysDiff(c.created)}))
     .sort((a,b)=>{
       const av=a.daysAgo===null?Infinity:a.daysAgo, bv=b.daysAgo===null?Infinity:b.daysAgo;
       return bv-av;
@@ -8377,7 +8385,7 @@ function renderNoCall(seg){
   if(countEl) countEl.textContent = data.length ? data.length+' found' : '';
 
   if(!data.length){
-    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No ${seg==='equity'?'clients':'investors'} with ${days}+ days since last call${q?' matching "'+q+'"':''}</div>`;
+    cont.innerHTML=`<div style="text-align:center;padding:48px;color:var(--green)">✅ No ${seg==='equity'?'clients':'investors'} added ${days}+ days ago that are still never-called${q?' matching "'+q+'"':''}</div>`;
     return;
   }
   const label = seg==='equity'?'clients':'investors';
@@ -8388,32 +8396,32 @@ function renderNoCall(seg){
     name:{get:c=>c.name, type:'str'},
     mobile:{get:c=>c.mobile, type:'str'},
     rm:{get:c=>c.rm, type:'str'},
-    last_call_date:{get:c=>c.last_call_date, type:'date'},
+    last_call_date:{get:c=>c.created, type:'date'},
     daysAgo:{get:c=>c.daysAgo, type:'num'},
     next_call:{get:c=>c.next_call, type:'date'},
   });
-  let h=`<p style="margin-bottom:12px;color:var(--gray);font-size:.82rem">${data.length} ${label} with no call in ${days}+ days (or never called)</p>
+  let h=`<p style="margin-bottom:12px;color:var(--gray);font-size:.82rem">${data.length} ${label} never called, added ${days}+ days ago</p>
     <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
     ${sortTh(idLabel,ncKey,'idval','str',`()=>renderNoCall('${seg}')`)}
     ${sortTh('Name',ncKey,'name','str',`()=>renderNoCall('${seg}')`)}
     ${sortTh('Mobile',ncKey,'mobile','str',`()=>renderNoCall('${seg}')`)}
     ${sortTh('RM',ncKey,'rm','str',`()=>renderNoCall('${seg}')`)}
-    ${sortTh('Last Call',ncKey,'last_call_date','date',`()=>renderNoCall('${seg}')`)}
-    ${sortTh('Days Since',ncKey,'daysAgo','num',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Added On',ncKey,'last_call_date','date',`()=>renderNoCall('${seg}')`)}
+    ${sortTh('Days Never-Called',ncKey,'daysAgo','num',`()=>renderNoCall('${seg}')`)}
     ${sortTh('Next Call',ncKey,'next_call','date',`()=>renderNoCall('${seg}')`)}
     <th>Actions</th>
     </tr></thead><tbody>`;
   data.forEach(c=>{
     const d=c.daysAgo;
     const cls = d===null||d>=180 ? 'row-alert' : d>=90 ? 'row-inactive' : '';
-    const dayLabel = d===null ? 'Never' : d+'d';
+    const dayLabel = d===null ? '—' : d+'d';
     const dayColor = d===null||d>=180 ? 'var(--red)' : d>=90 ? 'var(--orange)' : 'var(--gold)';
     h+=`<tr class="${cls}">
       <td>${(seg==='equity'?c.code:c.pan)||'—'}</td>
       <td style="font-weight:600">${c.name}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td>${fmtDate(c.last_call_date)||'Never'}</td>
+      <td>${fmtDate(c.created)||'—'}</td>
       <td style="font-weight:700;color:${dayColor}">${dayLabel}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td>
