@@ -3022,28 +3022,28 @@ function refreshDash(){
   if(hasEq) renderEqActivityTrend(activeEq);
   if(hasMf) renderMfAumTrend();
 
-  // No-call alerts (Equity)
-  const noCallEq = activeEq.map(c=>({...c,days:daysDiff(c.last_call_date)}))
-    .filter(c=>c.days===null||c.days>=60)
+  // No-call alerts (Equity) — "never called" only, same definition as renderNoCall()
+  const noCallEq = activeEq.filter(c=>daysDiff(c.last_call_date)===null)
+    .map(c=>({...c,days:daysDiff(c.created)}))
     .sort((a,b)=>{const av=a.days===null?Infinity:a.days, bv=b.days===null?Infinity:b.days; return bv-av;})
     .slice(0,8);
   document.getElementById('noCallEqAlert').innerHTML = noCallEq.length
     ? noCallEq.map(c=>{
         const cls=c.days===null||c.days>=180?'r180':c.days>=90?'r90':'r60';
-        const label=c.days===null?'Never':c.days+' days';
+        const label=c.days===null?'Never called':c.days+'d never-called';
         return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${label}</span></div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
 
-  // No-call alerts (MF)
-  const noCallMf = mf.map(c=>({...c,days:daysDiff(c.last_call_date)}))
-    .filter(c=>c.days===null||c.days>=60)
+  // No-call alerts (MF) — "never called" only, same definition as renderNoCall()
+  const noCallMf = mf.filter(c=>daysDiff(c.last_call_date)===null)
+    .map(c=>({...c,days:daysDiff(c.created)}))
     .sort((a,b)=>{const av=a.days===null?Infinity:a.days, bv=b.days===null?Infinity:b.days; return bv-av;})
     .slice(0,8);
   document.getElementById('noCallMfAlert').innerHTML = noCallMf.length
     ? noCallMf.map(c=>{
         const cls=c.days===null||c.days>=180?'r180':c.days>=90?'r90':'r60';
-        const label=c.days===null?'Never':c.days+' days';
+        const label=c.days===null?'Never called':c.days+'d never-called';
         return `<div class="alert-row ${cls}"><span>${c.name}</span><span>${label}</span></div>`;
       }).join('')
     : '<p style="color:var(--green);font-size:.82rem;padding:8px 0">✅ No alerts</p>';
@@ -3687,8 +3687,15 @@ function updateBadges(){
   const mnb=document.getElementById('mnav-fu-badge');
   if(mnb){ const t=eqf+mff; mnb.textContent=t>99?'99+':t; mnb.style.display=t>0?'':'none'; }
   document.getElementById('nb-eqnt').textContent=activeEq.filter(c=>daysDiff(c.last_trade_date)>=30).length;
-  document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
-  document.getElementById('nb-mfnc').textContent=mf.filter(c=>{const d=daysDiff(c.last_call_date); return d===null||d>=60;}).length;
+  // "Never called" only — mirrors renderNoCall()'s definition, not last_call_date-based
+  document.getElementById('nb-eqnc').textContent=activeEq.filter(c=>{
+    if(daysDiff(c.last_call_date)!==null) return false;
+    const sinceAdded=daysDiff(c.created); return sinceAdded===null||sinceAdded>=60;
+  }).length;
+  document.getElementById('nb-mfnc').textContent=mf.filter(c=>{
+    if(daysDiff(c.last_call_date)!==null) return false;
+    const sinceAdded=daysDiff(c.created); return sinceAdded===null||sinceAdded>=60;
+  }).length;
   try{ const sqb=document.getElementById('nb-eqsq'); if(sqb){ const n=sqMyRows().length; sqb.textContent=n; sqb.style.display=n>0?'':'none'; } if(typeof sqUpdateBell==='function') sqUpdateBell(); }catch(e){}
 
   // Admin-only: Pending counts for MF Transactions and Demat (nav badge + dashboard card)
