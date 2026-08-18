@@ -1555,9 +1555,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL NOT CONNECTED">CALL NOT CONNECTED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="COME TO OFFICE">COME TO OFFICE</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
-          <select onchange="filterMf()" id="mf-badge" title="Filter by H (HNI, AUM ≥ ₹3L) badge" style="background:#FAF6FE;border:1px solid #E0C6EE;border-radius:8px;color:#1F2937;font-weight:500;max-width:110px"><option value="">🏷️ Badge</option>
+          <select onchange="filterMf()" id="mf-badge" title="Filter by E (also Equity client) / H (HNI) badge" style="background:#FAF6FE;border:1px solid #E0C6EE;border-radius:8px;color:#1F2937;font-weight:500;max-width:110px"><option value="">🏷️ Badge</option>
+            <option value="E">🔵 E — Equity Client</option>
             <option value="H">🟣 H — HNI</option>
-            <option value="NONE">⬜ Not HNI</option></select>
+            <option value="EH">🔵🟣 E+H — Both</option>
+            <option value="NONE">⬜ No Badge</option></select>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="max-width:88px;background:#FEFCF7;border:1px solid #EBCB8E;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>

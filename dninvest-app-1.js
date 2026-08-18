@@ -4134,6 +4134,14 @@ function renderMfTable(){
       if(_ss.mfField!==undefined && _ss.mfField!==null){ mfSortField=_ss.mfField; mfSortDir=_ss.mfDir||1; } }catch(e){}
   }
   let data=getMyMfClients();
+  // Mirror of the Equity page's "M" badge: flag MF investors who are ALSO an
+  // equity client, matched by PAN (reliable) with mobile as fallback. Using
+  // "E" here (not "M") since "M" already means "also an MF investor" on the
+  // Equity page — reusing it here would be confusing on a page that's
+  // already all-MF.
+  const _eqClientsForMatch = getMyEqClients()||[];
+  const _eqPanSet = new Set(_eqClientsForMatch.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
+  const _eqMobileSet = new Set(_eqClientsForMatch.map(c=>String(c.mobile||'').trim()).filter(Boolean));
   const q=(document.getElementById('mf-search')||{value:''}).value.toLowerCase();
   const st=(document.getElementById('mf-status')||{value:''}).value;
   const rm=(document.getElementById('mf-rm')||{value:''}).value;
@@ -4157,8 +4165,17 @@ function renderMfTable(){
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
-  if(badgeFilterMf==='H') data=data.filter(c=>c.aum>=300000);
-  else if(badgeFilterMf==='NONE') data=data.filter(c=>!(c.aum>=300000));
+  if(badgeFilterMf){
+    data=data.filter(c=>{
+      const isE = _eqPanSet.has(String(c.pan||'').trim().toUpperCase()) || _eqMobileSet.has(String(c.mobile||'').trim());
+      const isH = (c.aum>=300000);
+      if(badgeFilterMf==='E') return isE;
+      if(badgeFilterMf==='H') return isH;
+      if(badgeFilterMf==='EH') return isE && isH;
+      if(badgeFilterMf==='NONE') return !isE && !isH;
+      return true;
+    });
+  }
   if(ncFrom||ncTo) data=data.filter(c=>{
     const d=c.next_call; if(!d) return false;
     if(ncFrom && d<ncFrom) return false;
@@ -4233,7 +4250,7 @@ function renderMfTable(){
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar">${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(String(c.mobile||'').trim()))?'<span title="Also an Equity client" style="margin-right:4px;font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">E</span>':''}${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
