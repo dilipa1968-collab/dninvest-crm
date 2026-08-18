@@ -4250,7 +4250,7 @@ function renderMfTable(){
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(String(c.mobile||'').trim()))?'<span title="Also an Equity client" style="margin-right:4px;font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">E</span>':''}${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar"><span style="display:inline-block;width:20px;text-align:left">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(String(c.mobile||'').trim()))?'<span title="Also an Equity client" style="font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">E</span>':''}</span>${c.name}${(c.aum>=300000)?'<span title="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
