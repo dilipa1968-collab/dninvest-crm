@@ -2015,11 +2015,16 @@ function initApp(){
     if(el) el.style.display=hasEq?'flex':'none';
   });
   if(eqSec) eqSec.style.display=hasEq?'':'none';
-  ['mf-clients','mf-followup','mf-sip','mf-nocall','mf-txns','mf-prospects'].forEach(id=>{
+  ['mf-clients','mf-followup','mf-sip','mf-nocall','mf-txns'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.style.display=hasMf?'flex':'none';
   });
   if(mfSec) mfSec.style.display=hasMf?'':'none';
+  // MF Prospects: admin always sees it; a regular RM only sees it if explicitly
+  // granted access (mf_prospects_access) — Admin decides who gets this, same
+  // pattern as risk_upload/backoffice_access/mf_desk_access.
+  const mfpNav=document.getElementById('nav-mf-prospects');
+  if(mfpNav) mfpNav.style.display=(CU.role==='admin' || (hasMf && CU.mf_prospects_access===true))?'flex':'none';
   if(adminSec) adminSec.style.display=CU.role==='admin'?'':'none';
   const adminNav=document.getElementById('nav-admin');
   if(adminNav) adminNav.style.display=CU.role==='admin'?'flex':'none';
@@ -8495,6 +8500,12 @@ function renderNoCall(seg){
 // "+ Add as MF Investor" only opens the normal Add Investor form, pre-filled,
 // which creates a brand-new independent MF record on save.
 function renderMfProspects(){
+  if(!(CU.role==='admin' || CU.mf_prospects_access===true)){
+    document.getElementById('mfp-table').innerHTML = `<div style="text-align:center;padding:48px;color:var(--gray)">🔒 You don't have access to this page. Ask Admin to grant MF Prospects access.</div>`;
+    document.getElementById('mfp-pg').innerHTML='';
+    document.getElementById('mfp-count').textContent='';
+    return;
+  }
   const eqAll = DB.get('eq_clients')||[];
   const mfAll = DB.get('mf_clients')||[];
   const mfPanSet = new Set(mfAll.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
@@ -9477,7 +9488,7 @@ function renderAdmin(){
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
         <div class="user-name">${u.name} ${u.left_company?'<span style="color:#fff;background:#7c2d12;font-size:.72rem;padding:1px 6px;border-radius:6px;margin-left:4px">🚶 LEFT COMPANY</span>':''}${!u.left_company&&!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&!u.left_company&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.left_company&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
-        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}</div>
+        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}${u.role==='rm'&&u.mf_prospects_access?' <span style="color:#2563eb;font-weight:600">+ MF Prospects</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
@@ -9554,6 +9565,12 @@ function userForm(u){
         Also give Back Office access (Equity/MF Import Excel maps to ALL clients office-wide, in addition to their own RM work)
       </label>
     </div>
+    <div class="form-field" id="uf_mfprospects_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
+        <input type="checkbox" id="uf_mfprospects_access" ${u?.mf_prospects_access?'checked':''}>
+        Also give MF Prospects access (see Equity clients who aren't MF investors yet, and convert them)
+      </label>
+    </div>
     <div class="form-field"><label>Segments Access</label>
       <div style="display:flex;gap:12px;margin-top:6px">
         <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;text-transform:none;letter-spacing:0">
@@ -9575,6 +9592,7 @@ async function saveUser(){
   const mfDeskAccess = role==='rm' && !!document.getElementById('uf_mfdesk_access')?.checked;
   const riskUpload = role==='rm' && !!document.getElementById('uf_risk_upload')?.checked;
   const backofficeAccess = role==='rm' && !!document.getElementById('uf_backoffice_access')?.checked;
+  const mfProspectsAccess = role==='rm' && !!document.getElementById('uf_mfprospects_access')?.checked;
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
     toast('PIN must be 4 digits (0-9)','error'); return;
   }
@@ -9592,7 +9610,7 @@ async function saveUser(){
       if(idx>=0){
         const mob=document.getElementById('uf_mobile').value.trim();
         const eml=document.getElementById('uf_email').value.trim();
-        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
+        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess};
         if(pwd) users[idx].password=pwd;
         if(role==='rm' && pinVal) users[idx].pin=pinVal;
       }
@@ -9600,7 +9618,7 @@ async function saveUser(){
       if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return false; }
       const mob2=document.getElementById('uf_mobile').value.trim();
       const eml2=document.getElementById('uf_email').value.trim();
-      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess};
+      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess};
       if(role==='rm' && pinVal) newUser.pin=pinVal;
       users.push(newUser);
     }
