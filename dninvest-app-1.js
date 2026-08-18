@@ -3822,7 +3822,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','comeback','followup-filter','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
+  ['search','status','rm','comeback','followup-filter','badge','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -3947,6 +3947,7 @@ function renderEqTable(){
   const rm=(document.getElementById('eq-rm')||{value:''}).value;
   const comebackFilter=(document.getElementById('eq-comeback')||{value:''}).value;
   const fu=(document.getElementById('eq-followup-filter')||{value:''}).value;
+  const badgeFilter=(document.getElementById('eq-badge')||{value:''}).value;
   const lcFrom=(document.getElementById('eq-last-call-from')||{value:''}).value;
   const lcTo=(document.getElementById('eq-last-call-to')||{value:''}).value;
   const ncFrom=(document.getElementById('eq-next-call-from')||{value:''}).value;
@@ -3966,6 +3967,17 @@ function renderEqTable(){
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
+  if(badgeFilter){
+    data=data.filter(c=>{
+      const isM = _mfPanSet.has(String(c.pan||'').trim().toUpperCase()) || _mfMobileSet.has(String(c.mobile||'').trim());
+      const isH = (c.asset_value>=500000);
+      if(badgeFilter==='M') return isM;
+      if(badgeFilter==='H') return isH;
+      if(badgeFilter==='MH') return isM && isH;
+      if(badgeFilter==='NONE') return !isM && !isH;
+      return true;
+    });
+  }
   if(lcFrom||lcTo) data=data.filter(c=>{
     const d=c.last_call_date; if(!d) return false;
     if(lcFrom && d<lcFrom) return false;
@@ -4126,6 +4138,7 @@ function renderMfTable(){
   const st=(document.getElementById('mf-status')||{value:''}).value;
   const rm=(document.getElementById('mf-rm')||{value:''}).value;
   const fu=(document.getElementById('mf-followup-filter')||{value:''}).value;
+  const badgeFilterMf=(document.getElementById('mf-badge')||{value:''}).value;
   const ncFrom=(document.getElementById('mf-next-call-from')||{value:''}).value;
   const ncTo=(document.getElementById('mf-next-call-to')||{value:''}).value;
   const lcFrom=(document.getElementById('mf-last-call-from')||{value:''}).value;
@@ -4144,6 +4157,8 @@ function renderMfTable(){
   if(fu==='overdue') data=data.filter(c=>c.next_call&&c.next_call<today());
   if(fu==='__BLANK__') data=data.filter(c=>!(c.followup_status||'').trim());
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
+  if(badgeFilterMf==='H') data=data.filter(c=>c.aum>=300000);
+  else if(badgeFilterMf==='NONE') data=data.filter(c=>!(c.aum>=300000));
   if(ncFrom||ncTo) data=data.filter(c=>{
     const d=c.next_call; if(!d) return false;
     if(ncFrom && d<ncFrom) return false;

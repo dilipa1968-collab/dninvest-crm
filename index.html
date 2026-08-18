@@ -1425,6 +1425,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL NOT CONNECTED">CALL NOT CONNECTED</option><option value="CALL LATER">CALL LATER</option><option value="TRADE">TRADE</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="POSITIVE">POSITIVE</option><option value="WRONG NUMBER">WRONG NUMBER</option><option value="OPEN DEMAT ACCOUNT">OPEN DEMAT ACCOUNT</option><option value="COME TO OFFICE">COME TO OFFICE</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
+          <select onchange="filterEq()" id="eq-badge" title="Filter by M (also an MF investor) / H (HNI) badge" style="background:#F6FBF6;border:1px solid #C6E6C6;border-radius:8px;color:#1F2937;font-weight:500"><option value="">🏷️ All Badges</option>
+            <option value="M">🟢 M — Also MF Investor</option>
+            <option value="H">🟣 H — HNI</option>
+            <option value="MH">🟢🟣 M + H — Both</option>
+            <option value="NONE">⬜ No Badge</option></select>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:100px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
@@ -1550,6 +1555,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="__BLANK__">⬜ Blank (No Follow-up)</option>
             <option value="pending">Trade with Follow Up</option><option value="today">Due Today</option><option value="overdue">Overdue</option>
             <option value="NOT INTERESTED">NOT INTERESTED</option><option value="CALL NOT RECEIVED">CALL NOT RECEIVED</option><option value="CALL NOT CONNECTED">CALL NOT CONNECTED</option><option value="CALL LATER">CALL LATER</option><option value="INTERESTED IN SIP">INTERESTED IN SIP</option><option value="INTERESTED IN LUMPSUM">INTERESTED IN LUMPSUM</option><option value="INTERESTED IN OTHER PRODUCT">INTERESTED IN OTHER PRODUCT</option><option value="COME TO OFFICE">COME TO OFFICE</option><option value="FUND PROBLEM">FUND PROBLEM</option><option value="TRANSFER REQUEST">TRANSFER REQUEST</option></select>
+          <select onchange="filterMf()" id="mf-badge" title="Filter by H (HNI, AUM ≥ ₹3L) badge" style="background:#FAF6FE;border:1px solid #E0C6EE;border-radius:8px;color:#1F2937;font-weight:500"><option value="">🏷️ All (H or not)</option>
+            <option value="H">🟣 H — HNI</option>
+            <option value="NONE">⬜ Not HNI</option></select>
           <div class="filter-sep"></div>
           <label style="font-size:.78rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:8px;padding:4px 8px;font-weight:500">Last Call:
             <input type="date" onchange="filterMf()" id="mf-last-call-from" title="From date" style="padding:6px;font-size:.78rem">
