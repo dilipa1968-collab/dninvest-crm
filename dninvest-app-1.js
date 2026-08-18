@@ -4127,10 +4127,12 @@ function sortMfTable(colIndex){
 
 function changePageSize(tab, val){
   PG_SIZE = parseInt(val)||50;
-  const eqSel=document.getElementById('eq-pagesize'), mfSel=document.getElementById('mf-pagesize');
+  const eqSel=document.getElementById('eq-pagesize'), mfSel=document.getElementById('mf-pagesize'), mfpSel=document.getElementById('mfp-pagesize');
   if(eqSel) eqSel.value=val;
   if(mfSel) mfSel.value=val;
+  if(mfpSel) mfpSel.value=val;
   if(tab==='eq'){ eqPage=1; renderEqTable(); }
+  else if(tab==='mfp'){ mfpPage=1; renderMfProspects(); }
   else { mfPage=1; renderMfTable(); }
 }
 
@@ -8506,6 +8508,19 @@ function renderMfProspects(){
     document.getElementById('mfp-count').textContent='';
     return;
   }
+  // Populate the Equity-RM filter dropdown once (cheap, small list) — every
+  // Equity RM name, so Admin (or a restricted RM, within their allowed set)
+  // can narrow the prospect list down to one Equity RM's book.
+  const rmSel=document.getElementById('mfp-rm');
+  if(rmSel && rmSel.options.length<=1){
+    let rmNames = getSegRMs('equity');
+    if(CU.role!=='admin' && Array.isArray(CU.mf_prospects_eq_rms) && CU.mf_prospects_eq_rms.length){
+      const allowed=new Set(CU.mf_prospects_eq_rms.map(r=>r.trim().toUpperCase()));
+      rmNames = rmNames.filter(r=>allowed.has(String(r).trim().toUpperCase()));
+    }
+    rmSel.innerHTML='<option value="">All Equity RMs</option>'+rmNames.map(r=>`<option value="${r}">${r}</option>`).join('');
+  }
+
   const eqAll = DB.get('eq_clients')||[];
   const mfAll = DB.get('mf_clients')||[];
   const mfPanSet = new Set(mfAll.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
@@ -8527,6 +8542,9 @@ function renderMfProspects(){
 
   const q=(document.getElementById('mfp-search')||{value:''}).value.trim().toLowerCase();
   if(q){ data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)); }
+
+  const rmFilter=(document.getElementById('mfp-rm')||{value:''}).value;
+  if(rmFilter){ data=data.filter(c=>String(c.rm||'').trim().toUpperCase()===rmFilter.trim().toUpperCase()); }
 
   data = data.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
 
@@ -8569,7 +8587,14 @@ function renderMfProspects(){
     pg.innerHTML=ph;
   }
 }
+function filterMfp(){ mfpPage=1; renderMfProspects(); }
 function gpMfp(p){ if(p<1) return; mfpPage=p; renderMfProspects(); }
+function resetMfpFilters(){
+  const s=document.getElementById('mfp-search'); if(s) s.value='';
+  const r=document.getElementById('mfp-rm'); if(r) r.value='';
+  mfpPage=1;
+  renderMfProspects();
+}
 
 // Opens the normal "Add MF Investor" form, pre-filled from an equity client's
 // details. currentEditId stays null, so Save creates a brand-new, independent

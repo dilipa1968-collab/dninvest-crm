@@ -1755,7 +1755,15 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           change anything on the Equity side, and the Equity RM is untouched.
         </p>
         <div class="filters">
-          <input type="text" placeholder="🔍 Search name / mobile..." oninput="renderMfProspects()" id="mfp-search" autocomplete="off" name="mfp-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMfp()" id="mfp-search" autocomplete="off" name="mfp-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <select onchange="filterMfp()" id="mfp-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">All Equity RMs</option></select>
+          <select onchange="changePageSize('mfp',this.value)" id="mfp-pagesize" style="max-width:98px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+            <option value="200">200 / page</option>
+            <option value="500">500 / page</option>
+          </select>
+          <button class="btn btn-outline" onclick="resetMfpFilters()" style="padding:6px 11px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="mfp-count"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mfp-table"></div></div>
