@@ -7460,6 +7460,13 @@ function getCrmSchemeNames(){
     c.sip_details.forEach(d=>{
       const scheme = String(d.scheme||'').trim();
       if(!scheme) return;
+      // Some SIP-report imports produced a truncated/mis-parsed "scheme" value
+      // (e.g. just the word "GROWTH" instead of the full scheme name) — a
+      // genuine fund name is always reasonably long and almost always
+      // contains the word "fund", so this filters that garbage out rather
+      // than surfacing it as a suggestion.
+      if(scheme.length < 15) return;
+      if(!/fund/i.test(scheme)) return;
       const key = scheme.toLowerCase();
       if(seen.has(key)) return;
       seen.add(key);
