@@ -11975,32 +11975,32 @@ function showSipDetails(id){
   if(!d.length){ toast('SIP details are not available — please import the Running SIP Report','error'); return; }
   const total = d.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
   const maxAmt = Math.max(1, ...d.map(x=>parseFloat(x.amount)||0));
-  document.getElementById('sipDetailTitle').innerHTML = `📅 SIP Details — ${escapeHtml(c.name||'')} <span style="font-weight:500;opacity:.75;font-size:.85em">(${d.length} SIP${d.length>1?'s':''})</span>`;
-  let h = `<div style="border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">
-    <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.85rem">
+  document.getElementById('sipDetailTitle').innerHTML = `SIP Details — ${escapeHtml(c.name||'')} <span style="font-weight:500;opacity:.75;font-size:.85em">(${d.length} SIP${d.length>1?'s':''})</span>`;
+  let h = `<div style="border:1px solid #eef1f6;border-radius:8px;overflow:hidden">
+    <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.83rem">
     <colgroup><col style="width:60%"><col style="width:22%"><col style="width:18%"></colgroup>
-    <thead><tr style="background:linear-gradient(90deg,var(--teal,#0d9488) 0%,var(--navy3,#1e3a6e) 100%)">
-      <th style="padding:9px 12px;text-align:left;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">SCHEME</th>
-      <th style="padding:9px 12px;text-align:right;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">SIP AMOUNT</th>
-      <th style="padding:9px 12px;text-align:center;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">SIP DATE</th>
+    <thead><tr style="background:#f8fafc;border-bottom:1px solid #eef1f6">
+      <th style="padding:8px 12px;text-align:left;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SCHEME</th>
+      <th style="padding:8px 12px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SIP AMOUNT</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SIP DATE</th>
     </tr></thead><tbody>`;
   d.forEach((x,i)=>{
     const amt = parseFloat(x.amount)||0;
     const share = Math.max(2, Math.round(amt/maxAmt*100));
-    const zebra = i%2===1 ? 'background:#f8fafc' : '';
+    const zebra = i%2===1 ? 'background:#fafbfc' : '';
     h += `<tr style="border-bottom:1px solid #f1f4f8;${zebra}">
-      <td style="padding:9px 12px;text-align:left;overflow-wrap:anywhere">
-        <div style="font-weight:600;color:var(--navy)">${escapeHtml(x.scheme||'—')}</div>
-        ${(x.folio||x.freq||x.trxn)?`<div style="color:#9aa3b2;font-size:.7rem;margin-top:1px;overflow-wrap:anywhere">${[x.folio?'Folio: '+escapeHtml(x.folio):'', x.freq||'', x.trxn?'Trxn: '+escapeHtml(x.trxn):''].filter(Boolean).join(' · ')}</div>`:''}
-        <div style="background:#eef1f6;border-radius:3px;height:4px;margin-top:5px;max-width:100%"><div style="background:var(--teal,#0d9488);height:4px;border-radius:3px;width:${share}%"></div></div>
+      <td style="padding:8px 12px;text-align:left;overflow-wrap:anywhere">
+        <div style="font-weight:500;color:var(--navy)">${escapeHtml(x.scheme||'—')}</div>
+        ${(x.folio||x.freq||x.trxn)?`<div style="color:#aab0bb;font-size:.68rem;margin-top:1px;overflow-wrap:anywhere">${[x.folio?'Folio: '+escapeHtml(x.folio):'', x.freq||'', x.trxn?'Trxn: '+escapeHtml(x.trxn):''].filter(Boolean).join(' · ')}</div>`:''}
+        <div style="background:#f1f4f8;border-radius:2px;height:3px;margin-top:4px;max-width:100%"><div style="background:#cbd5e1;height:3px;border-radius:2px;width:${share}%"></div></div>
       </td>
-      <td style="text-align:right;font-weight:700;color:var(--teal,#0d9488);padding:9px 12px">₹${fmtNum(amt)}</td>
-      <td style="text-align:center;padding:9px 12px;color:var(--gray)">${x.day||'—'}</td>
+      <td style="text-align:right;font-weight:600;color:var(--teal,#0d9488);padding:8px 12px">₹${fmtNum(amt)}</td>
+      <td style="text-align:center;padding:8px 12px;color:var(--gray)">${x.day||'—'}</td>
     </tr>`;
   });
-  h += `</tbody><tfoot><tr style="font-weight:800;background:#eef4f2;border-top:2px solid var(--teal,#0d9488)">
-      <td style="text-align:left;padding:10px 12px;color:var(--navy)">TOTAL (${d.length})</td>
-      <td style="text-align:right;padding:10px 12px;color:var(--teal,#0d9488)">₹${fmtNum(total)}</td>
+  h += `</tbody><tfoot><tr style="font-weight:700;background:#f8fafc;border-top:1px solid #e5e9f0">
+      <td style="text-align:left;padding:9px 12px;color:var(--navy)">TOTAL (${d.length})</td>
+      <td style="text-align:right;padding:9px 12px;color:var(--teal,#0d9488)">₹${fmtNum(total)}</td>
       <td></td>
     </tr></tfoot></table></div>`;
   document.getElementById('sipDetailBody').innerHTML = h;
@@ -13563,12 +13563,12 @@ function openMfAum(id){
     const txt = pct ? Math.abs(Number(n)).toFixed(2)+'%' : '₹'+fmtNum(Math.abs(Number(n)));
     return (pos?'+':'−')+txt;
   };
-  const chip = (color,label,val,valColor) => `<div style="flex:1 1 96px;min-width:0;background:#f8fafc;border-left:3px solid ${color};border-radius:7px;padding:6px 9px">
-    <div style="font-weight:800;font-size:.88rem;color:${valColor||'var(--navy)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
+  const chip = (color,label,val,valColor) => `<div style="flex:1 1 96px;min-width:0;background:#fff;border:1px solid #eef1f6;border-left:3px solid ${color};border-radius:7px;padding:6px 9px">
+    <div style="font-weight:700;font-size:.86rem;color:${valColor||'var(--navy)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
     <div style="font-size:.58rem;color:var(--gray);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;margin-top:1px">${label}</div>
   </div>`;
   const hdr = `<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-    <div><div style="font-weight:800;font-size:1.1rem;color:var(--navy)">${escapeHtml(c.name||'')}</div>
+    <div><div style="font-weight:700;font-size:1.05rem;color:var(--navy)">${escapeHtml(c.name||'')}</div>
     <div style="color:var(--gray);font-size:.78rem;margin-top:1px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div></div>
     ${c.rm?`<span class="badge b-investor">${escapeHtml(c.rm)}</span>`:''}</div>`;
   if(!d){
@@ -13588,8 +13588,8 @@ function openMfAum(id){
         ${d.dr?chip('var(--teal)','Div. ReInv', '₹'+fmtNum(d.dr)):''}
       </div>`;
     const toggleBtn = schemes ?
-      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:9px;border-radius:9px;border:1px solid var(--teal,#0d9488);background:var(--teal2,#e6f7f5);color:var(--teal,#0d9488);font-weight:700;font-size:.83rem;cursor:pointer">📋 View Fund-wise List (${schemes.length})</button>
-       <div class="mf-scheme-list" style="display:none;margin-top:10px;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
+      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:8px;border-radius:8px;border:1px solid #e5e9f0;background:#fafbfc;color:var(--navy);font-weight:600;font-size:.82rem;cursor:pointer">Fund-wise List (${schemes.length}) ▾</button>
+       <div class="mf-scheme-list" style="display:none;margin-top:8px;border:1px solid #eef1f6;border-radius:8px;overflow:hidden">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
     body.innerHTML = hdr + statChips +
       `<div style="margin-top:8px;font-size:.7rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
       toggleBtn;
@@ -13602,31 +13602,29 @@ function openMfAum(id){
 // the last AUM import was in "Folio Split" mode. `totalAum` (passed in) is
 // used to draw each row's share of the total portfolio as a small bar —
 // purely visual, doesn't affect any stored figure.
-// Renders the per-scheme (fund-wise) breakup table used inside the Portfolio
-// Details popup. Only ever called when `d.sc` (schemes[]) is present, i.e.
-// the last AUM import was in "Folio Split" mode. `totalAum` (passed in) is
-// used to draw each row's share of the total portfolio as a small bar —
-// purely visual, doesn't affect any stored figure.
 // table-layout:fixed + a <colgroup> with fixed % widths guarantees the table
 // is NEVER wider than its container (long scheme names wrap instead of
 // pushing the table sideways) — this is what stops the horizontal scrollbar
-// that used to clip the SCHEME/FOLIO columns off-screen.
+// that used to clip the SCHEME/FOLIO columns off-screen. Kept deliberately
+// LIGHT (plain header, thin border, no gradient/bold-heavy look) — 19-Aug-2026
+// feedback was that the earlier teal/navy gradient header felt too heavy for
+// a popup this size.
 function renderMfSchemeList(schemes, totalAum){
   const maxAum = Math.max(1, ...schemes.map(s=>Number(s.aum)||0));
-  const cell = (v,strong,color) => `<td style="padding:9px 8px;text-align:right;overflow:hidden;text-overflow:ellipsis;${strong?'font-weight:700':''}${color?';color:'+color:''}">${v}</td>`;
+  const cell = (v,strong,color) => `<td style="padding:8px;text-align:right;overflow:hidden;text-overflow:ellipsis;${strong?'font-weight:600':''}${color?';color:'+color:''}">${v}</td>`;
   const rows = schemes.map((s,i)=>{
     const gl = Number(s.gl)||0;
     const glCol = gl>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
-    const glTxt = `<b style="color:${glCol}">${gl>=0?'+':'−'}₹${fmtNum(Math.abs(gl))}</b>`;
+    const glTxt = `<span style="color:${glCol};font-weight:600">${gl>=0?'+':'−'}₹${fmtNum(Math.abs(gl))}</span>`;
     const xirr = Number(s.xirr)||0;
     const xirrCol = xirr>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
     const share = Math.max(2, Math.round((Number(s.aum)||0)/maxAum*100));
-    const zebra = i%2===1 ? 'background:#f8fafc' : '';
+    const zebra = i%2===1 ? 'background:#fafbfc' : '';
     return `<tr style="border-bottom:1px solid #f1f4f8;${zebra}">
-      <td style="padding:9px 8px;font-size:.78rem;overflow-wrap:anywhere">
-        <div style="font-weight:600;color:var(--navy);line-height:1.25">${escapeHtml(s.scheme||'—')}</div>
-        ${s.folio?`<div style="color:#9aa3b2;font-size:.68rem;margin-top:2px;overflow-wrap:anywhere">Folio: ${escapeHtml(s.folio)}</div>`:''}
-        <div style="background:#eef1f6;border-radius:3px;height:4px;margin-top:5px;max-width:100%"><div style="background:var(--teal,#0d9488);height:4px;border-radius:3px;width:${share}%"></div></div>
+      <td style="padding:8px;font-size:.77rem;overflow-wrap:anywhere">
+        <div style="font-weight:500;color:var(--navy);line-height:1.25">${escapeHtml(s.scheme||'—')}</div>
+        ${s.folio?`<div style="color:#aab0bb;font-size:.66rem;margin-top:2px;overflow-wrap:anywhere">Folio: ${escapeHtml(s.folio)}</div>`:''}
+        <div style="background:#f1f4f8;border-radius:2px;height:3px;margin-top:4px;max-width:100%"><div style="background:#cbd5e1;height:3px;border-radius:2px;width:${share}%"></div></div>
       </td>
       ${cell('₹'+fmtNum(s.inv||0))}
       ${cell('₹'+fmtNum(s.aum||0), true)}
@@ -13634,14 +13632,14 @@ function renderMfSchemeList(schemes, totalAum){
       ${cell(xirr.toFixed(2)+'%', false, xirrCol)}
     </tr>`;
   }).join('');
-  return `<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.8rem">
+  return `<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem">
     <colgroup><col style="width:38%"><col style="width:16%"><col style="width:16%"><col style="width:17%"><col style="width:13%"></colgroup>
-    <thead><tr style="background:linear-gradient(90deg,var(--teal,#0d9488) 0%,var(--navy3,#1e3a6e) 100%)">
-      <th style="padding:9px 8px;text-align:left;color:#fff;font-weight:700;font-size:.7rem;letter-spacing:.2px">SCHEME</th>
-      <th style="padding:9px 8px;text-align:right;color:#fff;font-weight:700;font-size:.7rem;letter-spacing:.2px">INVESTED</th>
-      <th style="padding:9px 8px;text-align:right;color:#fff;font-weight:700;font-size:.7rem;letter-spacing:.2px">AUM</th>
-      <th style="padding:9px 8px;text-align:right;color:#fff;font-weight:700;font-size:.7rem;letter-spacing:.2px">GAIN/LOSS</th>
-      <th style="padding:9px 8px;text-align:right;color:#fff;font-weight:700;font-size:.7rem;letter-spacing:.2px">XIRR</th>
+    <thead><tr style="background:#f8fafc;border-bottom:1px solid #eef1f6">
+      <th style="padding:8px;text-align:left;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SCHEME</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">INVESTED</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">AUM</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">GAIN/LOSS</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">XIRR</th>
     </tr></thead>
     <tbody>${rows}</tbody></table>`;
 }
@@ -13651,7 +13649,7 @@ function toggleMfSchemeList(btn){
   if(!box) return;
   const willOpen = box.style.display==='none';
   box.style.display = willOpen ? 'block' : 'none';
-  btn.innerHTML = btn.innerHTML.replace(willOpen ? '📋' : '▲', willOpen ? '▲' : '📋');
+  btn.innerHTML = btn.innerHTML.replace(willOpen ? '▾' : '▴', willOpen ? '▴' : '▾');
 }
 
 function openEqRisk(code, name){
