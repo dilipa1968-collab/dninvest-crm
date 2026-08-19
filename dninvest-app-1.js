@@ -12913,6 +12913,9 @@ function openSchemeMerge(){
       +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate Scheme Names — Review & Merge</div>'
       +'<button onclick="document.getElementById(\'schemeMergeOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
       +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ Jaise "Helios Mid Cap", "HELIOS MIDCAP FUND", "Helios Mid Cap Fund - Regular Plan - Growth" — yeh sab ek hi scheme ke alag-alag typed spelling hain. Har group ka "Final Name" chahe to edit kar dein, phir confirm karne par MF Transactions ki har entry (Fund Name / Target Scheme) aur suggestion list me sab jagah yehi final naam set ho jayega. Jo group merge nahi karna, uska checkbox uncheck kar dein.</div>'
+      +'<div style="padding:10px 18px 0;display:flex;gap:8px;justify-content:flex-end">'
+      +'<button type="button" class="btn btn-outline" style="font-size:.78rem;padding:4px 10px" onclick="schemeMergeToggleAll(true)">☑ Select All</button>'
+      +'<button type="button" class="btn btn-outline" style="font-size:.78rem;padding:4px 10px" onclick="schemeMergeToggleAll(false)">☐ Unselect All</button></div>'
       +'<div style="padding:16px 18px">'+rows
       +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
       +'<button class="btn btn-outline" onclick="document.getElementById(\'schemeMergeOverlay\').remove()">Cancel</button>'
@@ -12921,6 +12924,9 @@ function openSchemeMerge(){
   ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
   ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
   document.body.appendChild(ov);
+}
+function schemeMergeToggleAll(checked){
+  document.querySelectorAll('.schememerge-chk').forEach(chk=>{ chk.checked = checked; });
 }
 async function mergeSchemeGroupsSelected(){
   const checks=[...document.querySelectorAll('.schememerge-chk')].filter(x=>x.checked);
