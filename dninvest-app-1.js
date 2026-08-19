@@ -7500,11 +7500,12 @@ function selectFundName(inputId, resultsId, name){
 // element appended straight to <body> sidesteps that entirely: it's
 // positioned relative to the viewport, not any scrolling ancestor, so it can
 // never be clipped no matter where in a table the badge is.
-let _badgeTipEl = null;
+let _badgeTipEl = null, _badgeTipArrowEl = null;
 document.addEventListener('mouseover', e=>{
   const t = e.target.closest && e.target.closest('.badge-tip');
   if(!t || !t.dataset.tip) return;
   if(_badgeTipEl) _badgeTipEl.remove();
+  if(_badgeTipArrowEl) _badgeTipArrowEl.remove();
   const tip = document.createElement('div');
   tip.textContent = t.dataset.tip;
   tip.style.cssText = 'position:fixed;background:#111827;color:#fff;border:1.5px solid #dc2626;'
@@ -7512,20 +7513,40 @@ document.addEventListener('mouseover', e=>{
     + 'z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;';
   document.body.appendChild(tip);
   _badgeTipEl = tip;
+  const arrow = document.createElement('div');
+  arrow.style.cssText = 'position:fixed;width:0;height:0;border-left:5px solid transparent;'
+    + 'border-right:5px solid transparent;z-index:99999;pointer-events:none;';
+  document.body.appendChild(arrow);
+  _badgeTipArrowEl = arrow;
+
   const r = t.getBoundingClientRect();
   const tr = tip.getBoundingClientRect();
-  let top = r.top - tr.height - 8;
-  if(top < 4) top = r.bottom + 8; // not enough room above → flip below
+  const gap = 3; // small, tight gap between badge and tooltip
+  let top = r.top - tr.height - gap - 5; // -5 reserves room for the arrow
+  let flipped = false;
+  if(top < 4){ top = r.bottom + gap + 5; flipped = true; }
   let left = r.left + r.width/2 - tr.width/2;
   if(left < 4) left = 4;
   if(left + tr.width > window.innerWidth - 4) left = window.innerWidth - 4 - tr.width;
   tip.style.top = top+'px';
   tip.style.left = left+'px';
+
+  const arrowLeft = Math.max(left+6, Math.min(r.left + r.width/2 - 5, left+tr.width-16));
+  if(!flipped){
+    arrow.style.top = (top+tr.height)+'px';
+    arrow.style.left = arrowLeft+'px';
+    arrow.style.borderTop = '5px solid #dc2626';
+  } else {
+    arrow.style.top = (top-5)+'px';
+    arrow.style.left = arrowLeft+'px';
+    arrow.style.borderBottom = '5px solid #dc2626';
+  }
 });
 document.addEventListener('mouseout', e=>{
   const t = e.target.closest && e.target.closest('.badge-tip');
   if(!t) return;
   if(_badgeTipEl){ _badgeTipEl.remove(); _badgeTipEl=null; }
+  if(_badgeTipArrowEl){ _badgeTipArrowEl.remove(); _badgeTipArrowEl=null; }
 });
 
 document.addEventListener('click', e=>{
