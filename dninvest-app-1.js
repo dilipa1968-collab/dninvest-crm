@@ -7500,6 +7500,13 @@ function selectFundName(inputId, resultsId, name){
 // element appended straight to <body> sidesteps that entirely: it's
 // positioned relative to the viewport, not any scrolling ancestor, so it can
 // never be clipped no matter where in a table the badge is.
+// Positioned off the mouse cursor (not the badge's own bounding rect) — for
+// a badge in the FIRST couple of table rows, the badge sits close enough to
+// the sticky top bar + table header that "flip below if too close to the
+// viewport edge" never triggered (there was room before the viewport edge,
+// just not before the header), so the tooltip rendered overlapping the
+// header. A generous 60px top margin (not 4px) avoids that regardless of
+// exactly how tall the sticky header is.
 let _badgeTipEl = null, _badgeTipArrowEl = null;
 document.addEventListener('mouseover', e=>{
   const t = e.target.closest && e.target.closest('.badge-tip');
@@ -7519,19 +7526,19 @@ document.addEventListener('mouseover', e=>{
   document.body.appendChild(arrow);
   _badgeTipArrowEl = arrow;
 
-  const r = t.getBoundingClientRect();
   const tr = tip.getBoundingClientRect();
-  const gap = 3; // small, tight gap between badge and tooltip
-  let top = r.top - tr.height - gap - 5; // -5 reserves room for the arrow
+  const mx = e.clientX, my = e.clientY;
+  const gap = 12;
+  let top = my - tr.height - gap;
   let flipped = false;
-  if(top < 4){ top = r.bottom + gap + 5; flipped = true; }
-  let left = r.left + r.width/2 - tr.width/2;
+  if(top < 60){ top = my + gap + 6; flipped = true; } // 60px margin clears the sticky topbar/header, not just the viewport edge
+  let left = mx - tr.width/2;
   if(left < 4) left = 4;
   if(left + tr.width > window.innerWidth - 4) left = window.innerWidth - 4 - tr.width;
   tip.style.top = top+'px';
   tip.style.left = left+'px';
 
-  const arrowLeft = Math.max(left+6, Math.min(r.left + r.width/2 - 5, left+tr.width-16));
+  const arrowLeft = Math.max(left+6, Math.min(mx-5, left+tr.width-16));
   if(!flipped){
     arrow.style.top = (top+tr.height)+'px';
     arrow.style.left = arrowLeft+'px';
