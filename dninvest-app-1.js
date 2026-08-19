@@ -7501,13 +7501,21 @@ function searchFundName(inputId, resultsId){
 
   const matches=allFunds.filter(n=>n.toLowerCase().includes(q)).slice(0,15);
 
+  // onmousedown preventDefault() on each result item, below, stops the browser's
+  // default "mousedown blurs the currently focused element" behavior — without
+  // it, clicking a result briefly blurs the input BEFORE the click/onclick
+  // fires, and since this input re-runs searchFundName() on focus/blur-adjacent
+  // events, the list could re-render (or another closer elsewhere could fire)
+  // and wipe the results out from under the click, making it feel like the
+  // list "closes before I can select anything".
+
   if(matches.length===0){
     out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No match found — type it and it\'ll be remembered for next time</div>';
     out.style.display='block';
     return;
   }
   out.innerHTML=matches.map(name=>`
-    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
       ${escapeHtml(name)}
     </div>`).join('');
   out.style.display='block';
