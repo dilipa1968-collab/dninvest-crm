@@ -7695,59 +7695,65 @@ function getLearnedFundNames(){
   return DB.get('learned_fund_names') || [];
 }
 
-// Every unique scheme name already sitting in the CRM's own MF client SIP
-// records (c.sip_details[].scheme — populated by the SIP report import, see
-// "SIP Details" modal). These are REAL scheme names the RMs already deal
-// with, in the exact spelling/format the SIP import uses — a much better
-// autocomplete source than the generic built-in list for schemes this office
-// actually has live SIPs in. Cached per page-load since mf_clients can be a
-// few thousand records; recomputed if it comes back empty (e.g. data synced
-// in after the first computation).
+// Every unique scheme name already sitting in the CRM's own MF client records —
+// both c.sip_details[].scheme (SIP report import) AND c.aum_detail.sc[].scheme
+// (AUM By Client "Folio Split" import, added 19-Aug-2026 — this one covers
+// EVERY folio type: lumpsum, switch, STP, not just SIPs, so it's the more
+// complete source). These are REAL scheme names the RMs already deal with, in
+// the exact spelling/format the RTA reports use — a much better autocomplete
+// source than the generic built-in list for schemes this office actually
+// holds. Cached per page-load since mf_clients can be a few thousand records;
+// recomputed if it comes back empty (e.g. data synced in after the first
+// computation).
 let _crmSchemeNamesCache = null;
 function getCrmSchemeNames(){
   if(_crmSchemeNamesCache && _crmSchemeNamesCache.length) return _crmSchemeNamesCache;
   const seen = new Set();
   const names = [];
+  const addScheme = raw => {
+    const scheme = String(raw||'').trim();
+    if(!scheme) return;
+    // Some SIP-report imports produced a truncated/mis-parsed "scheme" value
+    // (e.g. just the word "GROWTH" instead of the full scheme name) — a
+    // genuine fund name is always reasonably long and almost always
+    // contains the word "fund", so this filters that garbage out rather
+    // than surfacing it as a suggestion.
+    if(scheme.length < 15) return;
+    if(!/fund/i.test(scheme)) return;
+    const key = scheme.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    names.push(scheme);
+  };
   (DB.get('mf_clients')||[]).forEach(c=>{
-    if(!Array.isArray(c.sip_details)) return;
-    c.sip_details.forEach(d=>{
-      const scheme = String(d.scheme||'').trim();
-      if(!scheme) return;
-      // Some SIP-report imports produced a truncated/mis-parsed "scheme" value
-      // (e.g. just the word "GROWTH" instead of the full scheme name) — a
-      // genuine fund name is always reasonably long and almost always
-      // contains the word "fund", so this filters that garbage out rather
-      // than surfacing it as a suggestion.
-      if(scheme.length < 15) return;
-      if(!/fund/i.test(scheme)) return;
-      const key = scheme.toLowerCase();
-      if(seen.has(key)) return;
-      seen.add(key);
-      names.push(scheme);
-    });
+    if(Array.isArray(c.sip_details)) c.sip_details.forEach(d=>addScheme(d.scheme));
+    if(c.aum_detail && Array.isArray(c.aum_detail.sc)) c.aum_detail.sc.forEach(s=>addScheme(s.scheme));
   });
   _crmSchemeNamesCache = names;
   return names;
 }
 
 // Which schemes THIS specific client already holds (from their own
-// sip_details) — used to put their existing funds at the very top of the
-// Fund Name suggestions when adding a transaction for them, since an
-// "Additional Buy"/"Redemption"/"Switch" almost always targets a fund the
-// client is already in, not some random new scheme.
+// sip_details AND their AUM Folio Split breakup) — used to put their existing
+// funds at the very top of the Fund Name suggestions when adding a
+// transaction for them, since an "Additional Buy"/"Redemption"/"Switch"
+// almost always targets a fund the client is already in, not some random new
+// scheme.
 function getClientSchemeNames(clientId){
   if(!clientId) return [];
   const c = (DB.get('mf_clients')||[]).find(x=>x.id===clientId);
-  if(!c || !Array.isArray(c.sip_details)) return [];
+  if(!c) return [];
   const seen=new Set(), names=[];
-  c.sip_details.forEach(d=>{
-    const scheme=String(d.scheme||'').trim();
+  const addScheme = raw => {
+    const scheme=String(raw||'').trim();
     if(!scheme || scheme.length<15 || !/fund/i.test(scheme)) return;
     const key=scheme.toLowerCase();
     if(seen.has(key)) return;
     seen.add(key);
     names.push(scheme);
-  });
+  };
+  if(Array.isArray(c.sip_details)) c.sip_details.forEach(d=>addScheme(d.scheme));
+  if(c.aum_detail && Array.isArray(c.aum_detail.sc)) c.aum_detail.sc.forEach(s=>addScheme(s.scheme));
   return names;
 }
 // Maps a Fund Name input's id to the currently-selected client's id for that
@@ -7802,8 +7808,12 @@ function searchFundName(inputId, resultsId){
   }
   const r=input.getBoundingClientRect();
   out.style.left=r.left+'px';
-  out.style.width=r.width+'px';
-  const maxH=260;
+  // Compact: capped narrower than the (often wide) input field itself, and a
+  // shorter max-height with a smaller per-row font/padding below — the field
+  // this feeds (MF Transactions → Fund Name) is a wide form column, but a
+  // long scheme-name dropdown that wide felt oversized for what it shows.
+  out.style.width=Math.min(r.width, 340)+'px';
+  const maxH=220;
   if(r.bottom+8+maxH > window.innerHeight){
     out.style.top='';
     out.style.bottom=(window.innerHeight-r.top+4)+'px'; // not enough room below → show above the input
@@ -7842,15 +7852,15 @@ function searchFundName(inputId, resultsId){
   // list "closes before I can select anything".
 
   if(matches.length===0){
-    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No match found — type it and it\'ll be remembered for next time</div>';
+    out.innerHTML='<div style="padding:8px 10px;color:var(--gray);font-size:.78rem">No match found — type it and it\'ll be remembered for next time</div>';
     out.style.display='block';
     return;
   }
   out.innerHTML=matches.map(name=>{
     const isClientFund = clientFundKeys.has(name.toLowerCase());
     return `
-    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem;${isClientFund?'background:#f0fdf4':''}" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='${isClientFund?'#f0fdf4':'#fff'}'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
-      ${isClientFund?'<span style="color:#16a34a;font-weight:700;margin-right:5px" title="Client already holds this">★</span>':''}${escapeHtml(name)}
+    <div style="padding:6px 9px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.78rem;line-height:1.3;${isClientFund?'background:#f0fdf4':''}" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='${isClientFund?'#f0fdf4':'#fff'}'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
+      ${isClientFund?'<span style="color:#16a34a;font-weight:700;margin-right:4px" title="Client already holds this">★</span>':''}${escapeHtml(name)}
     </div>`;
   }).join('');
   out.style.display='block';
@@ -12883,6 +12893,7 @@ async function doImport(){
   // One single transaction for every Invested Amount change detected this
   // import (see addMfChangeLogBatch) — not N separate ones racing each other.
   await DB.addMfChangeLogBatch(mfChangeLogBatch);
+  _crmSchemeNamesCache = null; // AUM/SIP import can introduce new scheme names — refresh the Fund Name autocomplete source
   closeModal('importModal');
   let _imsg = `✅ Import done! ${updated} updated + ${added} new clients`;
   if(importData.sip){
