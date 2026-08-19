@@ -7477,6 +7477,34 @@ function getCrmSchemeNames(){
   return names;
 }
 
+// Which schemes THIS specific client already holds (from their own
+// sip_details) — used to put their existing funds at the very top of the
+// Fund Name suggestions when adding a transaction for them, since an
+// "Additional Buy"/"Redemption"/"Switch" almost always targets a fund the
+// client is already in, not some random new scheme.
+function getClientSchemeNames(clientId){
+  if(!clientId) return [];
+  const c = (DB.get('mf_clients')||[]).find(x=>x.id===clientId);
+  if(!c || !Array.isArray(c.sip_details)) return [];
+  const seen=new Set(), names=[];
+  c.sip_details.forEach(d=>{
+    const scheme=String(d.scheme||'').trim();
+    if(!scheme || scheme.length<15 || !/fund/i.test(scheme)) return;
+    const key=scheme.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    names.push(scheme);
+  });
+  return names;
+}
+// Maps a Fund Name input's id to the currently-selected client's id for that
+// same form, so searchFundName() knows whose funds to prioritize.
+function _clientIdForFundInput(inputId){
+  if(inputId==='mftxn-fund' || inputId==='mftxn-target-fund') return mfTxnSelectedClient?.id || null;
+  if(inputId==='biz_fund' || inputId==='biz_target_fund') return currentBusinessTarget?.id || null;
+  return null;
+}
+
 async function learnFundName(name){
   if(!name) return;
   const trimmed = name.trim();
@@ -7492,7 +7520,15 @@ function searchFundName(inputId, resultsId){
   const out=document.getElementById(resultsId);
   if(!input||!out) return;
   const q=input.value.trim().toLowerCase();
-  if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
+  const clientId = _clientIdForFundInput(inputId);
+  const clientFunds = getClientSchemeNames(clientId);
+  // Normally wait for 2+ characters before searching — but if a client is
+  // already selected on this form, show THEIR existing funds immediately on
+  // focus (empty query), since picking one of those is the common case for
+  // an Additional Buy / Redemption / Switch and shouldn't require typing.
+  if(q.length<2 && !(clientFunds.length && document.activeElement===input)){
+    out.style.display='none'; out.innerHTML=''; return;
+  }
 
   // Escape to <html> (documentElement), same fix as the badge tooltip: the
   // app's own zoom control sets `document.body.style.zoom`, and any
@@ -7523,9 +7559,13 @@ function searchFundName(inputId, resultsId){
     out.style.top=(r.bottom+4)+'px';
   }
 
-  // CRM's own SIP scheme names first (real, exact names already in use here),
-  // then the generic built-in list, then anything manually learned — deduped.
-  const combined = [...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
+  // Client's own existing funds first (they're who this transaction is
+  // for — almost always the right answer), then the rest of the CRM's real
+  // scheme names, then the generic built-in list, then anything manually
+  // learned — deduped, client funds keep priority position even if they'd
+  // otherwise also appear further down one of the other lists.
+  const combined = [...clientFunds, ...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
+  const clientFundKeys = new Set(clientFunds.map(n=>n.toLowerCase()));
   const seen=new Set();
   const allFunds=[];
   for(const n of combined){
@@ -7535,7 +7575,10 @@ function searchFundName(inputId, resultsId){
     allFunds.push(n);
   }
 
-  const matches=allFunds.filter(n=>n.toLowerCase().includes(q)).slice(0,15);
+  const qFiltered = q.length>=2 ? allFunds.filter(n=>n.toLowerCase().includes(q)) : allFunds;
+  // With an empty query, cap the client's-own-funds view to a sane length;
+  // once they start typing, the normal 15-match cap applies as before.
+  const matches = qFiltered.slice(0, q.length>=2 ? 15 : Math.min(clientFunds.length, 15));
 
   // onmousedown preventDefault() on each result item, below, stops the browser's
   // default "mousedown blurs the currently focused element" behavior — without
@@ -7550,10 +7593,13 @@ function searchFundName(inputId, resultsId){
     out.style.display='block';
     return;
   }
-  out.innerHTML=matches.map(name=>`
-    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
-      ${escapeHtml(name)}
-    </div>`).join('');
+  out.innerHTML=matches.map(name=>{
+    const isClientFund = clientFundKeys.has(name.toLowerCase());
+    return `
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem;${isClientFund?'background:#f0fdf4':''}" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='${isClientFund?'#f0fdf4':'#fff'}'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
+      ${isClientFund?'<span style="color:#16a34a;font-weight:700;margin-right:5px" title="Client already holds this">★</span>':''}${escapeHtml(name)}
+    </div>`;
+  }).join('');
   out.style.display='block';
 }
 
