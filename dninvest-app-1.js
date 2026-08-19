@@ -64,6 +64,26 @@ const SHARD_CFG = {
 };
 
 const DB = {
+  // Recursively strips any `undefined` value out of an object/array before
+  // it's sent to Firestore. Firestore's SDK REJECTS the entire write with
+  // "Unsupported field value: undefined" the moment ANY field anywhere in
+  // the payload is undefined — even one bad field on one record blocks the
+  // whole array (mf_clients/eq_clients etc. are one big array in one doc/
+  // shard, so this has repeatedly taken down an entire import). localStorage
+  // already tolerates this silently (JSON.stringify just drops undefined
+  // keys) which is exactly why these slip through testing and only surface
+  // as a Firestore sync error. Every write path below runs data through
+  // this first as a permanent safety net, instead of chasing each new
+  // source of `undefined` (import bugs, future RTA header changes, etc.)
+  // one at a time.
+  _clean(v){
+    if(v===undefined) return null;
+    if(v===null || typeof v!=='object' || v instanceof Date) return v;
+    if(Array.isArray(v)) return v.map(x=>this._clean(x));
+    const o={};
+    for(const k in v){ if(v[k]!==undefined) o[k]=this._clean(v[k]); }
+    return o;
+  },
   // ── shard helpers ──────────────────────────────────────────
   _shardCache: {},   // { key: [shard0Array, shard1Array, ...] }
   _shardSeen: {},    // { key: Set(shardIndex) } — realtime readiness guard
@@ -104,7 +124,7 @@ const DB = {
     const parts = this._splitShards(key,arr);
     const batch = fdb.batch();
     parts.forEach((p,i)=>{
-      batch.set(this._shardRef(key,i), {data:p, updated:new Date().toISOString(), shard:i, count:p.length});
+      batch.set(this._shardRef(key,i), {data:this._clean(p), updated:new Date().toISOString(), shard:i, count:p.length});
     });
     await batch.commit();
     this._shardCache[key] = parts;
@@ -113,6 +133,7 @@ const DB = {
   // One-time migration: if no shard doc exists yet but the legacy oversized
   // document does, copy it into shards. Deterministic + idempotent, so it's
   // safe even if two browsers do it at the same instant. The legacy doc is
+
   // intentionally LEFT IN PLACE as a backup (it is simply never read again).
   async _ensureMigrated(key){
     let parts = await this._readShards(key);
@@ -157,7 +178,7 @@ const DB = {
     }
     try{
       if(typeof fdb!=='undefined'){
-        fdb.collection('crm_data').doc(key).set({data:val,updated:new Date().toISOString()})
+        fdb.collection('crm_data').doc(key).set({data:this._clean(val),updated:new Date().toISOString()})
           .then(()=>console.log('Firebase synced:',key))
           .catch(e=>{ console.log('Firebase error:',e); toast('Sync error: '+e.message,'error'); });
       }
@@ -192,7 +213,7 @@ const DB = {
         if(arrayKey==='entries'){ if(!lEntries.some(e=>e&&e.id===entry.id)) lEntries.push(entry); }
         else { if(!lEq.some(e=>e&&e.id===entry.id)) lEq.push(entry); }
         finalData = {entries:lEntries, eq_entries:lEq};
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){ this.setLocal('mf_business', finalData); }
       return finalData;
@@ -239,7 +260,7 @@ const DB = {
         if(res===false){ aborted=true; return; }
         arr[idx]=fresh;
         finalData = {entries:lEntries, eq_entries:lEq};
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData) this.setLocal('mf_business', finalData);
       return {ok:true, aborted};
@@ -278,7 +299,7 @@ const DB = {
         latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
         entries.forEach(e=>{ if(e&&e.id) byId[e.id]=e; });
         finalData = capSort(Object.values(byId));
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
@@ -315,7 +336,7 @@ const DB = {
         const byId2={}; latest.forEach(x=>{ if(x&&x.date&&x.scope) byId2[x.date+'__'+x.scope]=x; });
         byId2[rowId]=entry;
         finalData = capSort(Object.values(byId2));
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_eq_activity_snapshots',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
@@ -370,7 +391,7 @@ const DB = {
         const byId2={}; latest.forEach(x=>{ if(x&&x.date&&x.scope) byId2[x.date+'__'+x.scope]=x; });
         byId2[rowId]=entry;
         finalData = capSort(Object.values(byId2));
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_aum_snapshots',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
@@ -433,7 +454,7 @@ const DB = {
         const byId2={}; latest.forEach(x=>{ if(x&&x.id) byId2[x.id]=x; });
         entries.forEach(entry=>{ byId2[entry.id]=entry; });
         finalData = DB._pruneCallLogs(Object.values(byId2), 850000); // same date-priority pruning as call_logs
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
@@ -475,7 +496,7 @@ const DB = {
         const doc = await tx.get(docRef);
         let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
         finalData = latest.filter(x=>!(x&&idSet.has(x.id)));
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
@@ -518,7 +539,7 @@ const DB = {
         finalData = Object.values(byId);
         // Trim oldest logs so the document stays under Firestore's 1 MiB cap
         finalData = DB._pruneCallLogs(finalData, 850000);
-        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){
         try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
@@ -551,7 +572,7 @@ const DB = {
                    : ((this._shardCache[key]||[])[si] || []);
         const lidx = latest.findIndex(c=>c.id===rec.id);
         if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
-        tx.set(ref, {data:latest, updated:new Date().toISOString(), shard:si, count:latest.length});
+        tx.set(ref, {data:this._clean(latest), updated:new Date().toISOString(), shard:si, count:latest.length});
         if(this._shardCache[key]) this._shardCache[key][si] = latest;
       });
       console.log('Firebase shard-synced:',key,'s'+si,rec.id);
@@ -585,7 +606,7 @@ const DB = {
         let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
         const lidx = latest.findIndex(c=>c.id===rec.id);
         if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
-        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
         finalData = latest;
       });
       // adopt the merged result locally too, in case other records changed
@@ -635,7 +656,7 @@ const DB = {
         if(res===false){ aborted=true; return; }
         latest = latest.slice();
         latest[idx] = sem;
-        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
         finalData = latest;
       });
       if(finalData) this.setLocal('seminars', finalData);
@@ -674,7 +695,7 @@ const DB = {
         latest = JSON.parse(JSON.stringify(latest));
         const res = mutate(latest);
         if(res===false){ aborted=true; return; }
-        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+        tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
         finalData = latest;
       });
       if(finalData) this.setLocal('users', finalData);
@@ -701,7 +722,7 @@ const DB = {
                      ? doc.data().data
                      : ((this._shardCache[key]||[])[si] || []);
           latest = latest.filter(c=>c.id!==id);
-          tx.set(ref, {data:latest, updated:new Date().toISOString(), shard:si, count:latest.length});
+          tx.set(ref, {data:this._clean(latest), updated:new Date().toISOString(), shard:si, count:latest.length});
           if(this._shardCache[key]) this._shardCache[key][si] = latest;
         });
       }catch(e){ console.log('deleteClient(shard) error:',e); toast('Sync error: '+e.message,'error'); }
@@ -718,7 +739,7 @@ const DB = {
           const doc = await tx.get(docRef);
           let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
           latest = latest.filter(c=>c.id!==id);
-          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
           finalData = latest;
         });
         if(finalData) this.setLocal(key, finalData);
@@ -745,7 +766,7 @@ const DB = {
           const m = {}; latest.forEach(c=>{ if(c) m[c.id]=c; });
           groups[i].forEach(r=>m[r.id]=r);
           const out = Object.values(m);
-          tx.set(refs[k], {data:out, updated:new Date().toISOString(), shard:i, count:out.length});
+          tx.set(refs[k], {data:this._clean(out), updated:new Date().toISOString(), shard:i, count:out.length});
           if(this._shardCache[key]) this._shardCache[key][i] = out;
         });
       });
@@ -774,7 +795,7 @@ const DB = {
             const d = docs[k];
             let latest = (d.exists && d.data() && Array.isArray(d.data().data)) ? d.data().data : [];
             const out = latest.filter(c=>!groups[i].has(c.id));
-            tx.set(refs[k], {data:out, updated:new Date().toISOString(), shard:i, count:out.length});
+            tx.set(refs[k], {data:this._clean(out), updated:new Date().toISOString(), shard:i, count:out.length});
             if(this._shardCache[key]) this._shardCache[key][i] = out;
           });
         });
@@ -790,7 +811,7 @@ const DB = {
         const doc = await tx.get(ref);
         let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
         latest = latest.filter(c=>!idSet.has(c.id));
-        tx.set(ref, {data:latest, updated:new Date().toISOString()});
+        tx.set(ref, {data:this._clean(latest), updated:new Date().toISOString()});
         this.setLocal(key, latest);
       });
     }catch(e){ toast('Delete sync error: '+(e.message||e),'error'); }
@@ -819,7 +840,7 @@ const DB = {
           let lmap = {}; latest.forEach(c=>lmap[c.id]=c);
           records.forEach(r=>lmap[r.id]=r);
           latest = Object.values(lmap);
-          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
           finalData = latest;
         });
         if(finalData) this.setLocal(key, finalData);
@@ -1184,7 +1205,7 @@ async function sendCrmHeartbeat(){
       const doc=await tx.get(docRef);
       let latest=(doc.exists && doc.data() && doc.data().data)?doc.data().data:{};
       latest[_crmHbName]={date:today(), time:hhmm};
-      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+      tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
     });
     // LIVE OUT-TIME: RMs poora din CRM me rehte hain, isliye out-time yahin se live
     // save karo — HR portal ya kisi device ke 6:15 PM par khule hone par depend na kare.
@@ -1210,7 +1231,7 @@ async function crmLiveOutTime(hhmm){
       if(rec.out && !(hhmm>rec.out)) return; // same/earlier — no write needed
       arr[idx]={...rec, out:hhmm};
       latest[_crmHbName]=arr;
-      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+      tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
     });
   }catch(e){ console.log('[HB] out-time update failed:', e); }
 }
@@ -1279,7 +1300,7 @@ async function recordHrAttendanceOnCrmLogin(user){
             if(!latest[name]) latest[name]=[];
             const idx = latest[name].findIndex(r=>r.date===td);
             if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
-            tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+            tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
           });
           console.log('[ATT] ✅ Late flip saved (attempt '+attempt+')');
           break;
@@ -1325,7 +1346,7 @@ async function recordHrAttendanceOnCrmLogin(user){
               let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
               const idx = (latest[name]||[]).findIndex(r=>r.date===td);
               if(idx>=0) latest[name][idx]={...latest[name][idx], out:'', status:st2};
-              tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+              tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
             });
             console.log('[ATT] ✅ healed premature Half day → '+st2);
           }catch(e){ console.log('[ATT] heal attempt failed:', e.message); }
@@ -1366,7 +1387,7 @@ async function recordHrAttendanceOnCrmLogin(user){
           if(!latest[name]) latest[name]=[];
           const idx = latest[name].findIndex(r=>r.date===td);
           if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
-          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
+          tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
         });
         console.log('[ATT] ✅ saved successfully for '+name+' (attempt '+attempt+')');
         saved = true;
@@ -9920,7 +9941,7 @@ async function forceLogoutUser(userId){
       const idx = latest[hrName].findIndex(r=>r.date===td);
       if(idx>=0) latest[hrName][idx].out = outTime;
       else latest[hrName].push({date:td, in:'', out:outTime, status:'Present'});
-      tx.set(attRef, {data:latest, updated:new Date().toISOString()});
+      tx.set(attRef, {data:DB._clean(latest), updated:new Date().toISOString()});
     });
   }catch(e){ console.log('[FORCE LOGOUT] HR out-time save error:', e.message); }
 
@@ -10431,7 +10452,7 @@ async function runLateAbsentCheck(){
           const aidx = latest[hrName].findIndex(r=>r.date===td);
           const record = {date:td, in:'', out:'', status:'Absent'};
           if(aidx>=0) latest[hrName][aidx]=record; else latest[hrName].push(record);
-          tx.set(attDocRef, {data:latest, updated:new Date().toISOString()});
+          tx.set(attDocRef, {data:DB._clean(latest), updated:new Date().toISOString()});
         });
       }catch(e){ console.log('Late-absent attendance write error:', hrName, e); }
     }
@@ -12485,15 +12506,22 @@ async function doImport(){
   // Compact performance snapshot kept on the MF client so the AUM cell can be
   // clicked open. Short keys on purpose — this rides along in the mf_clients
   // blob doc, which every open tab re-downloads on change.
-  const _aumDetail = row => ({
-    inv: row.inv_amt||0, dp: row.div_paid||0, dr: row.div_reinv||0,
-    ad: row.avg_days||0, gl: row.gain_loss||0, ar: row.abs_rtn||0,
-    xirr: row.xirr||0, on: today(),
+  const _aumDetail = row => {
+    const d = {
+      inv: row.inv_amt||0, dp: row.div_paid||0, dr: row.div_reinv||0,
+      ad: row.avg_days||0, gl: row.gain_loss||0, ar: row.abs_rtn||0,
+      xirr: row.xirr||0, on: today()
+    };
     // Fund-wise breakup — only present when the uploaded AUM report was in
     // "Folio Split" mode (one row per scheme). Powers the "View fund-wise
     // list" option in the Portfolio Details popup (openMfAum below).
-    sc: (row.schemes && row.schemes.length) ? row.schemes : undefined
-  });
+    // IMPORTANT: key is only added when there's real data — Firestore
+    // rejects `undefined` field values outright ("Unsupported field value:
+    // undefined"), so setting `sc: undefined` here breaks every AUM import,
+    // not just Folio Split ones.
+    if(row.schemes && row.schemes.length) d.sc = row.schemes;
+    return d;
+  };
 
   let updated = 0, added = 0;
   const sipApplied = new Set();   // client ids that got fresh SIP data this import
