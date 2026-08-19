@@ -7518,12 +7518,22 @@ document.addEventListener('mouseover', e=>{
   tip.style.cssText = 'position:fixed;background:#111827;color:#fff;border:1.5px solid #dc2626;'
     + 'padding:5px 9px;border-radius:6px;font-size:.72rem;font-weight:700;white-space:nowrap;'
     + 'z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;';
-  document.body.appendChild(tip);
+  // Appended to <html> (documentElement), NOT <body> — the app's own zoom
+  // control (dnAppZoom, see dninvest-app-2.js) sets `document.body.style.zoom`
+  // to fit more columns on screen. Chrome's `zoom` CSS property applies to
+  // everything inside body INCLUDING position:fixed children — so a tooltip
+  // appended to body gets its top/left values reinterpreted in the zoomed
+  // coordinate space, while mouse coordinates (e.clientX/clientY) stay in
+  // real, unzoomed viewport pixels. That mismatch is exactly why the tooltip
+  // kept landing far from the cursor at zoom levels other than 100%. <html>
+  // itself is never zoomed, so anything appended there positions correctly
+  // regardless of the current zoom level.
+  document.documentElement.appendChild(tip);
   _badgeTipEl = tip;
   const arrow = document.createElement('div');
   arrow.style.cssText = 'position:fixed;width:0;height:0;border-left:5px solid transparent;'
     + 'border-right:5px solid transparent;z-index:99999;pointer-events:none;';
-  document.body.appendChild(arrow);
+  document.documentElement.appendChild(arrow);
   _badgeTipArrowEl = arrow;
 
   const tr = tip.getBoundingClientRect();
