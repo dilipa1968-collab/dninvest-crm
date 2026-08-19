@@ -13600,7 +13600,7 @@ function openMfAum(id){
       </div>`;
     const toggleBtn = schemes ?
       `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:8px;border-radius:8px;border:1px solid #e5e9f0;background:#fafbfc;color:var(--navy);font-weight:600;font-size:.82rem;cursor:pointer">Fund-wise List (${schemes.length}) ▾</button>
-       <div class="mf-scheme-list" style="display:none;margin-top:8px;border:1px solid #eef1f6;border-radius:8px;overflow:hidden">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
+       <div class="mf-scheme-list" style="display:none;margin-top:8px;border:1px solid #eef1f6;border-radius:8px;max-height:380px;overflow-y:auto;overflow-x:hidden">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
     body.innerHTML = hdr + statChips +
       `<div style="margin-top:8px;font-size:.7rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
       toggleBtn;
@@ -13645,30 +13645,35 @@ function renderMfSchemeList(schemes, totalAum){
   }).join('');
   // TOTAL row — sums are real (Inv/AUM/Gain-Loss are additive money figures);
   // XIRR is deliberately left blank here rather than averaged/summed, same
-  // reasoning as the chips above (portfolio XIRR isn't a simple sum). First
-  // cell starts with "TOTAL" so the app's generic click-to-sort (any table
-  // with a <thead>) recognizes and pins this row at the bottom on sort.
+  // reasoning as the chips above (portfolio XIRR isn't a simple sum). Lives
+  // in a <tfoot> (not <tbody>) for two reasons: the app's generic click-to-
+  // sort only ever reorders table.tBodies[0] rows, so a tfoot row is safe
+  // from ever getting sorted into the middle of the list; and position:sticky
+  // on the tfoot keeps it pinned to the bottom of the scrolling list
+  // container (see openMfAum's max-height:380px;overflow-y:auto wrapper) the
+  // same way the <thead> stays pinned to the top — so the total never
+  // scrolls out of view no matter how many schemes there are.
   const totInv = schemes.reduce((s,x)=>s+(Number(x.inv)||0),0);
   const totAumSum = schemes.reduce((s,x)=>s+(Number(x.aum)||0),0);
   const totGl = schemes.reduce((s,x)=>s+(Number(x.gl)||0),0);
   const totGlCol = totGl>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
-  const totRow = `<tr style="font-weight:700;background:#f8fafc;border-top:1px solid #e5e9f0">
-      <td style="padding:8px;color:var(--navy)">TOTAL (${schemes.length})</td>
-      <td style="padding:8px;text-align:right;color:var(--navy)">₹${fmtNum(totInv)}</td>
-      <td style="padding:8px;text-align:right;color:var(--navy)">₹${fmtNum(totAumSum)}</td>
-      <td style="padding:8px;text-align:right;color:${totGlCol}">${totGl>=0?'+':'−'}₹${fmtNum(Math.abs(totGl))}</td>
-      <td></td>
-    </tr>`;
+  const totRow = `<tfoot><tr style="font-weight:700;position:sticky;bottom:0">
+      <td style="padding:8px;color:var(--navy);background:#f1f4f8">TOTAL (${schemes.length})</td>
+      <td style="padding:8px;text-align:right;color:var(--navy);background:#f1f4f8">₹${fmtNum(totInv)}</td>
+      <td style="padding:8px;text-align:right;color:var(--navy);background:#f1f4f8">₹${fmtNum(totAumSum)}</td>
+      <td style="padding:8px;text-align:right;color:${totGlCol};background:#f1f4f8">${totGl>=0?'+':'−'}₹${fmtNum(Math.abs(totGl))}</td>
+      <td style="background:#f1f4f8"></td>
+    </tr></tfoot>`;
   return `<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem">
     <colgroup><col style="width:38%"><col style="width:16%"><col style="width:16%"><col style="width:17%"><col style="width:13%"></colgroup>
     <thead><tr style="background:#f8fafc;border-bottom:1px solid #eef1f6">
-      <th style="padding:8px;text-align:left;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SCHEME</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">INVESTED</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">AUM</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">GAIN/LOSS</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">XIRR</th>
+      <th style="padding:8px;text-align:left;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">SCHEME</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">INVESTED</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">AUM</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">GAIN/LOSS</th>
+      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">XIRR</th>
     </tr></thead>
-    <tbody>${rows}${totRow}</tbody></table>`;
+    <tbody>${rows}</tbody>${totRow.replace('<tfoot><tr', '<tfoot><tr style="position:sticky;bottom:0" data-x="')}</table>`;
 }
 
 function toggleMfSchemeList(btn){
