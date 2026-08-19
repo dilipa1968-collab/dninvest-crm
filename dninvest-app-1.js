@@ -3941,9 +3941,19 @@ function renderEqTable(){
   // fallback for records where PAN is missing on one side, since some
   // clients have a different mobile number saved against their MF account
   // vs their Equity account (updated one side but not the other).
+  // Also build a PAN/mobile → MF RM lookup so the "M" badge tooltip can show
+  // WHICH RM handles that client's MF account, not just "yes, they're an MF
+  // investor" — genuinely useful for an Equity RM wondering who to loop in.
   const _mfClientsForMatch = getMyMfClients()||[];
   const _mfPanSet = new Set(_mfClientsForMatch.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
   const _mfMobileSet = new Set(_mfClientsForMatch.map(c=>String(c.mobile||'').trim()).filter(Boolean));
+  const _mfRmByPan = {}, _mfRmByMobile = {};
+  _mfClientsForMatch.forEach(c=>{
+    const pan=String(c.pan||'').trim().toUpperCase(), mob=String(c.mobile||'').trim();
+    if(pan && !_mfRmByPan[pan]) _mfRmByPan[pan]=c.rm||'—';
+    if(mob && !_mfRmByMobile[mob]) _mfRmByMobile[mob]=c.rm||'—';
+  });
+  const _mfRmFor = c => _mfRmByPan[String(c.pan||'').trim().toUpperCase()] || _mfRmByMobile[String(c.mobile||'').trim()] || '—';
   // Parse the RMS risk map ONCE per render (was being re-parsed per comparison
   // during sort → tens of thousands of JSON.parse of a 2700-entry object → hang).
   const _riskMap = (getEqRisk().code) || {};
@@ -4082,7 +4092,7 @@ function renderEqTable(){
     const rowStyle = comebackBg ? ` style="background:${comebackBg}"` : '';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}"${rowStyle}${comebackTag?` title="Comeback trade — ${comebackTag==='blue'?'~1':comebackTag==='green'?'~3':'~6'}+ month gap"`:''}>${BULK.td('eq',c.id)}
-      <td><span style="display:inline-block;min-width:60px">${c.code||'—'}</span>${(_mfPanSet.has(String(c.pan||'').trim().toUpperCase())||_mfMobileSet.has(String(c.mobile||'').trim()))?'<span title="Also an MF investor" style="font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">M</span>':''}</td>
+      <td><span style="display:inline-block;min-width:60px">${c.code||'—'}</span>${(_mfPanSet.has(String(c.pan||'').trim().toUpperCase())||_mfMobileSet.has(String(c.mobile||'').trim()))?`<span title="MF RM: ${escapeHtml(_mfRmFor(c))}" style="font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">M</span>`:''}</td>
       <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span title="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
