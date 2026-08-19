@@ -9861,6 +9861,26 @@ function rmShiftReport(){
 // ══════════════════════════════════════════
 // EXPORT
 // ══════════════════════════════════════════
+// Tiered money-color helper for Excel exports (via dnXlsxBook's per-column
+// `color` fn) — highlights higher-value clients in green/amber, same visual
+// language as dnStatusColor. thresholds checked high→low, first match wins.
+function dnMoneyTierColor(thresholds){
+  return v => {
+    const n = Number(String(v||'').replace(/[₹,]/g,'')) || 0;
+    for(const [min,color] of thresholds){ if(n>=min) return color; }
+    return null;
+  };
+}
+const AUM_TIER_COLOR = dnMoneyTierColor([
+  [5000000, {bg:'FFC6EFCE', font:'FF006100'}],  // ≥₹50L — green
+  [1000000, {bg:'FFFFEB9C', font:'FF9C6500'}]   // ≥₹10L — amber
+]);
+const SIP_TIER_COLOR = dnMoneyTierColor([
+  [25000, {bg:'FFC6EFCE', font:'FF006100'}],    // ≥₹25K/mo — green
+  [10000, {bg:'FFFFEB9C', font:'FF9C6500'}]     // ≥₹10K/mo — amber
+]);
+const SIP_COUNT_COLOR = v => (Number(v)||0)>0 ? {bg:'FFE0F7FC', font:'FF0891B2'} : null;
+
 function exportCSV(seg){
   const bseg = seg==='equity' ? 'eq' : 'mf';
   const key  = seg==='equity' ? 'eq_clients' : 'mf_clients';
@@ -9889,7 +9909,9 @@ function exportCSV(seg){
     cols=[
       {header:'Name',width:22},{header:'Mobile',width:13},{header:'Email',width:24},
       {header:'RM',width:14},{header:'Status',width:12,align:'center',color:dnStatusColor},
-      {header:'AUM',width:14,money:true},{header:'SIP Amount',width:13,money:true},{header:'SIP Count',width:10,num:true},
+      {header:'AUM',width:14,money:true,color:AUM_TIER_COLOR},
+      {header:'SIP Amount',width:13,money:true,color:SIP_TIER_COLOR},
+      {header:'SIP Count',width:10,num:true,align:'center',color:SIP_COUNT_COLOR},
       {header:'Last Invest Date',width:14},{header:'Last Call Date',width:14},
       {header:'Next Call Date',width:14},{header:'Follow-up Status',width:16},{header:'Remarks',width:26}
     ];
@@ -9898,6 +9920,50 @@ function exportCSV(seg){
   }
   dnXlsx(fname+today()+'.xlsx', title+' — '+today(), cols, rows);
   toast(onlySel?`Exported ${clients.length} selected`:'Export done!','success');
+}
+
+// SIP Tracker → colorful multi-sheet Excel export (dnXlsxBook, same styled
+// engine as everything else — navy title bar, teal header, zebra rows).
+// Sheet 1: one row per SIP client (AUM/SIP-amount tier-colored, same as the
+// MF Investors export above). Sheet 2: every individual SIP (scheme-wise),
+// flattened from each client's sip_details — the full Running SIP Report
+// view without needing to re-open that upload.
+function exportSipTracker(){
+  const mf = getMyMfClients();
+  const sipClients = mf.filter(c=>c.sip_amount>0);
+  if(!sipClients.length){ toast('No SIP clients to export','error'); return; }
+  const sorted = sipClients.slice().sort((a,b)=>(b.sip_amount||0)-(a.sip_amount||0));
+
+  const summaryCols = [
+    {header:'Name',width:22},{header:'Mobile',width:13},{header:'RM',width:14},
+    {header:'Status',width:12,align:'center',color:dnStatusColor},
+    {header:'AUM',width:14,money:true,color:AUM_TIER_COLOR},
+    {header:'SIP/mo',width:13,money:true,color:SIP_TIER_COLOR},
+    {header:'SIP Count',width:10,num:true,align:'center',color:SIP_COUNT_COLOR}
+  ];
+  const summaryRows = sorted.map(c=>[c.name,c.mobile||'',c.rm||'',c.status||'',c.aum||0,c.sip_amount||0,c.sip_count||0]);
+  const totalRow = ['TOTAL ('+sorted.length+')','','','',
+    sorted.reduce((s,c)=>s+(parseFloat(c.aum)||0),0),
+    sorted.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0),
+    sorted.reduce((s,c)=>s+(parseInt(c.sip_count)||0),0)];
+
+  const detailCols = [
+    {header:'Name',width:22},{header:'RM',width:14},{header:'Scheme',width:34},
+    {header:'Folio',width:16},{header:'SIP Amount',width:13,money:true,color:SIP_TIER_COLOR},
+    {header:'SIP Date',width:10,align:'center'},{header:'Frequency',width:12}
+  ];
+  const detailRows=[];
+  sorted.forEach(c=>{
+    (Array.isArray(c.sip_details)?c.sip_details:[]).forEach(x=>{
+      detailRows.push([c.name, c.rm||'', x.scheme||'', x.folio||'', parseFloat(x.amount)||0, x.day||'', x.freq||'']);
+    });
+  });
+
+  dnXlsxBook('sip_tracker_'+today()+'.xlsx',[
+    { name:'SIP Summary', title:'SIP Tracker Summary — '+today(), columns:summaryCols, rows:summaryRows, totalRow },
+    { name:'Scheme-wise', title:'SIP Scheme-wise Breakup — '+today(), columns:detailCols, rows:detailRows }
+  ]);
+  toast('Export done! '+sorted.length+' SIP clients','success');
 }
 
 // ══════════════════════════════════════════
@@ -11880,25 +11946,34 @@ function showSipDetails(id){
   const d = Array.isArray(c.sip_details)?c.sip_details:[];
   if(!d.length){ toast('SIP details are not available — please import the Running SIP Report','error'); return; }
   const total = d.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
-  document.getElementById('sipDetailTitle').innerHTML = `SIP Details — ${c.name} <span style="font-weight:500;opacity:.7">(${d.length} SIP${d.length>1?'s':''})</span>`;
-  let h = `<div style="overflow:auto"><table class="tbl" style="width:100%;font-size:.85rem">
-    <thead><tr>
-      <th style="text-align:left">Scheme</th>
-      <th style="text-align:right;white-space:nowrap">SIP Amount</th>
-      <th style="text-align:center;white-space:nowrap">SIP Date</th>
+  const maxAmt = Math.max(1, ...d.map(x=>parseFloat(x.amount)||0));
+  document.getElementById('sipDetailTitle').innerHTML = `📅 SIP Details — ${escapeHtml(c.name||'')} <span style="font-weight:500;opacity:.75;font-size:.85em">(${d.length} SIP${d.length>1?'s':''})</span>`;
+  let h = `<div style="border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">
+    <div style="overflow:auto;max-height:420px"><table style="width:100%;border-collapse:collapse;font-size:.85rem">
+    <thead><tr style="background:linear-gradient(90deg,var(--teal,#0d9488) 0%,var(--navy3,#1e3a6e) 100%)">
+      <th style="padding:9px 12px;text-align:left;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">SCHEME</th>
+      <th style="padding:9px 12px;text-align:right;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px;white-space:nowrap">SIP AMOUNT</th>
+      <th style="padding:9px 12px;text-align:center;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px;white-space:nowrap">SIP DATE</th>
     </tr></thead><tbody>`;
-  d.forEach(x=>{
-    h += `<tr>
-      <td style="text-align:left">${x.scheme||'—'}${(x.folio||x.freq||x.trxn)?`<div style="font-size:.7rem;opacity:.6">${[x.folio?'Folio: '+x.folio:'', x.freq||'', x.trxn?'Trxn: '+x.trxn:''].filter(Boolean).join(' · ')}</div>`:''}</td>
-      <td style="text-align:right;font-weight:700;color:var(--teal,#0d9488);white-space:nowrap">₹${fmtNum(x.amount||0)}</td>
-      <td style="text-align:center;white-space:nowrap">${x.day||'—'}</td>
+  d.forEach((x,i)=>{
+    const amt = parseFloat(x.amount)||0;
+    const share = Math.max(2, Math.round(amt/maxAmt*100));
+    const zebra = i%2===1 ? 'background:#f8fafc' : '';
+    h += `<tr style="border-bottom:1px solid #f1f4f8;${zebra}">
+      <td style="padding:9px 12px;text-align:left">
+        <div style="font-weight:600;color:var(--navy)">${escapeHtml(x.scheme||'—')}</div>
+        ${(x.folio||x.freq||x.trxn)?`<div style="color:#9aa3b2;font-size:.7rem;margin-top:1px">${[x.folio?'Folio: '+escapeHtml(x.folio):'', x.freq||'', x.trxn?'Trxn: '+escapeHtml(x.trxn):''].filter(Boolean).join(' · ')}</div>`:''}
+        <div style="background:#eef1f6;border-radius:3px;height:4px;margin-top:5px;max-width:160px"><div style="background:var(--teal,#0d9488);height:4px;border-radius:3px;width:${share}%"></div></div>
+      </td>
+      <td style="text-align:right;font-weight:700;color:var(--teal,#0d9488);white-space:nowrap;padding:9px 12px">₹${fmtNum(amt)}</td>
+      <td style="text-align:center;white-space:nowrap;padding:9px 12px;color:var(--gray)">${x.day||'—'}</td>
     </tr>`;
   });
-  h += `</tbody><tfoot><tr style="font-weight:800;border-top:2px solid var(--teal,#0d9488)">
-      <td style="text-align:left">TOTAL (${d.length})</td>
-      <td style="text-align:right;white-space:nowrap">₹${fmtNum(total)}</td>
+  h += `</tbody><tfoot><tr style="font-weight:800;background:#eef4f2;border-top:2px solid var(--teal,#0d9488)">
+      <td style="text-align:left;padding:10px 12px;color:var(--navy)">TOTAL (${d.length})</td>
+      <td style="text-align:right;white-space:nowrap;padding:10px 12px;color:var(--teal,#0d9488)">₹${fmtNum(total)}</td>
       <td></td>
-    </tr></tfoot></table></div>`;
+    </tr></tfoot></table></div></div>`;
   document.getElementById('sipDetailBody').innerHTML = h;
   document.getElementById('sipDetailModal').classList.add('open');
 }
@@ -13442,39 +13517,46 @@ function fmtRiskMoney(n){
 }
 // MF AUM cell -> portfolio breakdown. Same idea as openEqRisk() on the equity
 // side. Data comes from the AUM By Client import (aum_detail).
+// Popup widened to `.modal.wide` (900px, see index.html) 19-Aug-2026 so the
+// fund-wise breakup table has room to breathe — summary now renders as a
+// stat-card grid (reusing the app's existing .stats-row/.stat-card look,
+// same as the SIP Tracker/Dashboard cards) instead of a cramped stacked list.
 function openMfAum(id){
   const c = (DB.get('mf_clients')||[]).find(x=>x.id===id);
   const body = document.getElementById('mfAumModalBody');
   if(!c){ return; }
   const d = c.aum_detail;
-  const row = (label,val) => `<div style="display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid #eef1f6">
-    <span style="color:var(--gray);font-size:.86rem">${label}</span><span style="font-size:.95rem">${val}</span></div>`;
-  const signed = (n,pct) => {
+  const signedTxt = (n,pct) => {
     if(n===null || n===undefined || n==='') return '—';
     const pos = Number(n) >= 0;
-    const col = pos ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
     const txt = pct ? Math.abs(Number(n)).toFixed(2)+'%' : '₹'+fmtNum(Math.abs(Number(n)));
-    return `<b style="color:${col}">${pos?'+':'−'}${txt}</b>`;
+    return (pos?'+':'−')+txt;
   };
-  const hdr = `<div style="font-weight:700;font-size:1.05rem;margin-bottom:4px">${escapeHtml(c.name||'')}</div>
-    <div style="color:var(--gray);font-size:.78rem;margin-bottom:10px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div>`;
+  const card = (cls,label,val) => `<div class="stat-card ${cls}"><div class="stat-n stat-n-md">${val}</div><div class="stat-l">${label}</div></div>`;
+  const hdr = `<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+    <div><div style="font-weight:800;font-size:1.15rem;color:var(--navy)">${escapeHtml(c.name||'')}</div>
+    <div style="color:var(--gray);font-size:.8rem;margin-top:2px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div></div>
+    ${c.rm?`<span class="badge b-investor">${escapeHtml(c.rm)}</span>`:''}</div>`;
   if(!d){
-    body.innerHTML = hdr + `${row('AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—')}
-      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
+    body.innerHTML = hdr + `<div class="stats-row">${card('purple','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}</div>
+      <div style="margin-top:14px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
   } else {
     const schemes = Array.isArray(d.sc) ? d.sc : null;
+    const glCls = Number(d.gl)>=0 ? 'green' : 'red';
+    const statCards = `<div class="stats-row">
+        ${card('teal','Invested', d.inv?'₹'+fmtNum(d.inv):'—')}
+        ${card('purple','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}
+        ${card(glCls,'Gain / Loss', signedTxt(d.gl))}
+        ${card(glCls,'Abs. Return', signedTxt(d.ar,true))}
+        ${card('gold','XIRR', signedTxt(d.xirr,true))}
+        ${d.ad?card('','Avg. Days', fmtNum(d.ad)):''}
+        ${d.dp?card('','Dividend Paid', '₹'+fmtNum(d.dp)):''}
+        ${d.dr?card('','Dividend Re-Inv', '₹'+fmtNum(d.dr)):''}
+      </div>`;
     const toggleBtn = schemes ?
-      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:9px;border-radius:8px;border:1px solid var(--teal,#0d9488);background:transparent;color:var(--teal,#0d9488);font-weight:600;font-size:.84rem;cursor:pointer">📋 View Fund-wise List (${schemes.length})</button>
-       <div class="mf-scheme-list" style="display:none;margin-top:10px;max-height:340px;overflow:auto;border:1px solid #eef1f6;border-radius:8px">${renderMfSchemeList(schemes)}</div>` : '';
-    body.innerHTML = hdr +
-      row('Invested', d.inv?'₹'+fmtNum(d.inv):'—') +
-      row('Current AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—') +
-      row('Gain / Loss', signed(d.gl)) +
-      row('Abs. Return', signed(d.ar, true)) +
-      row('XIRR', signed(d.xirr, true)) +
-      (d.dp ? row('Dividend Paid', '₹'+fmtNum(d.dp)) : '') +
-      (d.dr ? row('Dividend Re-Inv', '₹'+fmtNum(d.dr)) : '') +
-      (d.ad ? row('Avg. Days', fmtNum(d.ad)) : '') +
+      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:14px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--teal,#0d9488);background:var(--teal2,#e6f7f5);color:var(--teal,#0d9488);font-weight:700;font-size:.85rem;cursor:pointer">📋 View Fund-wise List (${schemes.length})</button>
+       <div class="mf-scheme-list" style="display:none;margin-top:10px;max-height:420px;overflow:auto;border:1px solid #e5e9f0;border-radius:10px">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
+    body.innerHTML = hdr + statCards +
       `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
       toggleBtn;
   }
@@ -13483,27 +13565,39 @@ function openMfAum(id){
 
 // Renders the per-scheme (fund-wise) breakup table used inside the Portfolio
 // Details popup. Only ever called when `d.sc` (schemes[]) is present, i.e.
-// the last AUM import was in "Folio Split" mode.
-function renderMfSchemeList(schemes){
-  const cell = (v,strong) => `<td style="padding:7px 8px;text-align:right;white-space:nowrap;${strong?'font-weight:700':''}">${v}</td>`;
-  const rows = schemes.map(s=>{
+// the last AUM import was in "Folio Split" mode. `totalAum` (passed in) is
+// used to draw each row's share of the total portfolio as a small bar —
+// purely visual, doesn't affect any stored figure.
+function renderMfSchemeList(schemes, totalAum){
+  const maxAum = Math.max(1, ...schemes.map(s=>Number(s.aum)||0));
+  const cell = (v,strong,color) => `<td style="padding:9px 10px;text-align:right;white-space:nowrap;${strong?'font-weight:700':''}${color?';color:'+color:''}">${v}</td>`;
+  const rows = schemes.map((s,i)=>{
     const gl = Number(s.gl)||0;
-    const glTxt = `<span style="color:${gl>=0?'var(--green,#16a34a)':'var(--red,#dc2626)'};font-weight:600">${gl>=0?'+':'−'}₹${fmtNum(Math.abs(gl))}</span>`;
-    return `<tr style="border-bottom:1px solid #f3f4f6">
-      <td style="padding:7px 8px;font-size:.8rem">${escapeHtml(s.scheme||'—')}${s.folio?`<div style="color:#999;font-size:.7rem">Folio: ${escapeHtml(s.folio)}</div>`:''}</td>
+    const glCol = gl>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
+    const glTxt = `<b style="color:${glCol}">${gl>=0?'+':'−'}₹${fmtNum(Math.abs(gl))}</b>`;
+    const xirr = Number(s.xirr)||0;
+    const xirrCol = xirr>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
+    const share = Math.max(2, Math.round((Number(s.aum)||0)/maxAum*100));
+    const zebra = i%2===1 ? 'background:#f8fafc' : '';
+    return `<tr style="border-bottom:1px solid #f1f4f8;${zebra}">
+      <td style="padding:9px 10px;font-size:.82rem;min-width:200px">
+        <div style="font-weight:600;color:var(--navy)">${escapeHtml(s.scheme||'—')}</div>
+        ${s.folio?`<div style="color:#9aa3b2;font-size:.7rem;margin-top:1px">Folio: ${escapeHtml(s.folio)}</div>`:''}
+        <div style="background:#eef1f6;border-radius:3px;height:4px;margin-top:5px;max-width:140px"><div style="background:var(--teal,#0d9488);height:4px;border-radius:3px;width:${share}%"></div></div>
+      </td>
       ${cell('₹'+fmtNum(s.inv||0))}
       ${cell('₹'+fmtNum(s.aum||0), true)}
       ${cell(glTxt)}
-      ${cell((Number(s.xirr)||0).toFixed(2)+'%')}
+      ${cell(xirr.toFixed(2)+'%', false, xirrCol)}
     </tr>`;
   }).join('');
   return `<table style="width:100%;border-collapse:collapse;font-size:.8rem">
-    <thead><tr style="background:#f8fafc;position:sticky;top:0">
-      <th style="padding:7px 8px;text-align:left">Scheme</th>
-      <th style="padding:7px 8px;text-align:right">Invested</th>
-      <th style="padding:7px 8px;text-align:right">AUM</th>
-      <th style="padding:7px 8px;text-align:right">Gain/Loss</th>
-      <th style="padding:7px 8px;text-align:right">XIRR</th>
+    <thead><tr style="background:linear-gradient(90deg,var(--teal,#0d9488) 0%,var(--navy3,#1e3a6e) 100%)">
+      <th style="padding:9px 10px;text-align:left;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">SCHEME</th>
+      <th style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">INVESTED</th>
+      <th style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">AUM</th>
+      <th style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">GAIN/LOSS</th>
+      <th style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.3px">XIRR</th>
     </tr></thead>
     <tbody>${rows}</tbody></table>`;
 }

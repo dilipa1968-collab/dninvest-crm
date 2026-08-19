@@ -1619,6 +1619,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="page" id="page-mf-sip">
         <div class="page-hdr">
           <div class="page-title">SIP Tracker</div>
+          <button class="btn btn-outline" onclick="exportSipTracker()">⬇️ Export</button>
         </div>
         <div class="stats-row" id="sipStats"></div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="sip-table"></div></div>
@@ -3007,7 +3008,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <!-- Equity Risk Detail Modal (RMS file data) -->
 <div class="modal-overlay" id="mfAumModal" onclick="if(event.target===this)closeModal('mfAumModal')">
-  <div class="modal" style="width:440px;max-width:94vw">
+  <div class="modal wide" style="max-width:94vw">
     <div class="modal-hdr">
       <h3>📈 Portfolio Details</h3>
       <button class="modal-close" onclick="closeModal('mfAumModal')">×</button>
