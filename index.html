@@ -347,26 +347,10 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .filters input:focus,.filters select:focus{border-color:var(--navy);background:#fff;}
 .filters input[type=text]{min-width:170px;}
 .filter-sep{width:1px;height:22px;background:var(--border);}
-/* Custom badge tooltip (M/H/E badges) — native title="" tooltips can't be
-   styled, so this replaces them with a dark, red-bordered box on hover. */
+/* Custom badge tooltip (M/H/E badges) — the actual tooltip box is rendered
+   by JS (position:fixed, appended to <body>) so it can never get clipped by
+   a scrolling table container; this just marks which elements trigger it. */
 .badge-tip{position:relative;}
-.badge-tip:hover::after{
-  content:attr(data-tip);
-  position:absolute;
-  bottom:130%;left:50%;transform:translateX(-50%);
-  background:#111827;color:#fff;
-  border:1.5px solid #dc2626;
-  padding:5px 9px;border-radius:6px;
-  font-size:.72rem;font-weight:700;white-space:nowrap;
-  z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.35);
-  pointer-events:none;
-}
-.badge-tip:hover::before{
-  content:'';position:absolute;
-  bottom:115%;left:50%;transform:translateX(-50%);
-  border:5px solid transparent;border-top-color:#dc2626;
-  z-index:9999;pointer-events:none;
-}
 .res-count{font-size:.8rem;color:var(--gray);margin-left:auto;white-space:nowrap;}
 
 /* ── TABLE ── */

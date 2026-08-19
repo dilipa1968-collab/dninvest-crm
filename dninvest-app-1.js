@@ -7492,6 +7492,42 @@ function selectFundName(inputId, resultsId, name){
 }
 
 // Close fund-search dropdowns when clicking elsewhere
+// ── Global badge tooltip (M/H/E badges) ──────────────────────────────────
+// A CSS-only ::after tooltip gets silently clipped whenever the badge sits
+// inside a scrolling container (tbl-scroll) — the tooltip box tries to render
+// outside the container's bounds and the container's own overflow just cuts
+// it off, so it never becomes visible. Rendering it as a position:fixed
+// element appended straight to <body> sidesteps that entirely: it's
+// positioned relative to the viewport, not any scrolling ancestor, so it can
+// never be clipped no matter where in a table the badge is.
+let _badgeTipEl = null;
+document.addEventListener('mouseover', e=>{
+  const t = e.target.closest && e.target.closest('.badge-tip');
+  if(!t || !t.dataset.tip) return;
+  if(_badgeTipEl) _badgeTipEl.remove();
+  const tip = document.createElement('div');
+  tip.textContent = t.dataset.tip;
+  tip.style.cssText = 'position:fixed;background:#111827;color:#fff;border:1.5px solid #dc2626;'
+    + 'padding:5px 9px;border-radius:6px;font-size:.72rem;font-weight:700;white-space:nowrap;'
+    + 'z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;';
+  document.body.appendChild(tip);
+  _badgeTipEl = tip;
+  const r = t.getBoundingClientRect();
+  const tr = tip.getBoundingClientRect();
+  let top = r.top - tr.height - 8;
+  if(top < 4) top = r.bottom + 8; // not enough room above → flip below
+  let left = r.left + r.width/2 - tr.width/2;
+  if(left < 4) left = 4;
+  if(left + tr.width > window.innerWidth - 4) left = window.innerWidth - 4 - tr.width;
+  tip.style.top = top+'px';
+  tip.style.left = left+'px';
+});
+document.addEventListener('mouseout', e=>{
+  const t = e.target.closest && e.target.closest('.badge-tip');
+  if(!t) return;
+  if(_badgeTipEl){ _badgeTipEl.remove(); _badgeTipEl=null; }
+});
+
 document.addEventListener('click', e=>{
   [['mftxn-fund','mftxn-fund-results'], ['mftxn-target-fund','mftxn-target-fund-results'], ['biz_fund','biz-fund-results'], ['biz_target_fund','biz-target-fund-results']].forEach(([inputId,resultsId])=>{
     const wrap=document.getElementById(inputId);
