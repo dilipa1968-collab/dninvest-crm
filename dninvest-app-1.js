@@ -7040,14 +7040,11 @@ function hasMfDeskAccess(user){
 //  - Logged by someone else on this RM's behalf → the actual owning RM can
 //    leave a remark (e.g. confirm/dispute it).
 // Admin can always remark on anything.
+// Cross-check remark: open to every logged-in user on every entry (RMs can
+// flag/cross-check any transaction, not just their own client's), per admin
+// request — no longer gated to admin/self-RM only.
 function canAddCrossRemark(e){
-  if(!CU) return false;
-  if(CU.role==='admin') return true;
-  const selfEntered = (e.rm||'').trim().toLowerCase() === (e.created_by||'').trim().toLowerCase();
-  if(selfEntered){
-    return hasMfDeskAccess(CU) && CU.name!==e.created_by;
-  }
-  return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
+  return !!CU;
 }
 
 function addCrossRemark(id){
