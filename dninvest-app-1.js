@@ -13643,6 +13643,22 @@ function renderMfSchemeList(schemes, totalAum){
       ${cell(xirr.toFixed(2)+'%', false, xirrCol)}
     </tr>`;
   }).join('');
+  // TOTAL row — sums are real (Inv/AUM/Gain-Loss are additive money figures);
+  // XIRR is deliberately left blank here rather than averaged/summed, same
+  // reasoning as the chips above (portfolio XIRR isn't a simple sum). First
+  // cell starts with "TOTAL" so the app's generic click-to-sort (any table
+  // with a <thead>) recognizes and pins this row at the bottom on sort.
+  const totInv = schemes.reduce((s,x)=>s+(Number(x.inv)||0),0);
+  const totAumSum = schemes.reduce((s,x)=>s+(Number(x.aum)||0),0);
+  const totGl = schemes.reduce((s,x)=>s+(Number(x.gl)||0),0);
+  const totGlCol = totGl>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
+  const totRow = `<tr style="font-weight:700;background:#f8fafc;border-top:1px solid #e5e9f0">
+      <td style="padding:8px;color:var(--navy)">TOTAL (${schemes.length})</td>
+      <td style="padding:8px;text-align:right;color:var(--navy)">₹${fmtNum(totInv)}</td>
+      <td style="padding:8px;text-align:right;color:var(--navy)">₹${fmtNum(totAumSum)}</td>
+      <td style="padding:8px;text-align:right;color:${totGlCol}">${totGl>=0?'+':'−'}₹${fmtNum(Math.abs(totGl))}</td>
+      <td></td>
+    </tr>`;
   return `<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem">
     <colgroup><col style="width:38%"><col style="width:16%"><col style="width:16%"><col style="width:17%"><col style="width:13%"></colgroup>
     <thead><tr style="background:#f8fafc;border-bottom:1px solid #eef1f6">
@@ -13652,7 +13668,7 @@ function renderMfSchemeList(schemes, totalAum){
       <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">GAIN/LOSS</th>
       <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">XIRR</th>
     </tr></thead>
-    <tbody>${rows}</tbody></table>`;
+    <tbody>${rows}${totRow}</tbody></table>`;
 }
 
 function toggleMfSchemeList(btn){
