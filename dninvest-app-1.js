@@ -11956,7 +11956,17 @@ function parseAumExcel(rows){
     abs_rtn:   ['absrtn','absreturn','absolutereturn'],
     xirr:      ['xirr','xirrpct'],
     rm:      ['rm','relationshipmanager','dealer','dealername','employeename'],
-    sno:     ['sno','srno','serialno','slno']
+    sno:     ['sno','srno','serialno','slno'],
+    // "Folio Split" mode (an RTA report option): one row PER SCHEME/FOLIO
+    // instead of one row per client — the same client's Client ID repeats
+    // across several rows, each with a different Scheme Name/Folio No and
+    // its own slice of Inv Amt/AUM/Gain-Loss. A Scheme Name column is how we
+    // detect this and switch to the per-client aggregation below (see
+    // aggregateAumFolioRows) — otherwise every re-upload would silently
+    // overwrite a client's true total with just their LAST scheme row.
+    scheme:  ['schemename','scheme','fundname','fund'],
+    folio:   ['folio','foliono','folionumber'],
+    last_inv_date: ['lastinvdate','lastinvestmentdate','lastinvdt']
   };
   let hdrIdx=-1, colMap={};
   for(let i=0; i<Math.min(rows.length,15); i++){
@@ -12005,12 +12015,73 @@ function parseAumExcel(rows){
       gain_loss: num(at(r,'gain_loss')),
       abs_rtn:   num(at(r,'abs_rtn')),
       xirr:      num(at(r,'xirr')),
-      rm: String(at(r,'rm')||'').trim()
+      rm: String(at(r,'rm')||'').trim(),
+      scheme: String(at(r,'scheme')||'').trim(),
+      folio:  String(at(r,'folio')||'').trim(),
+      last_inv_date: String(at(r,'last_inv_date')||'').trim()
     };
   }).filter(r=>r.name);
 
-  out._badPan = data.length - out.filter(r=>r.pan).length;
+  // "Folio Split" report layout doesn't carry a PAN column at all (only
+  // Client ID) — that's fine, matching falls back to Client ID/Name, so it's
+  // not a "bad PAN" situation worth warning about. Only count/warn when a
+  // PAN column genuinely exists in the file but some values in it are junk.
+  out._badPan = colMap.pan!==undefined ? (data.length - out.filter(r=>r.pan).length) : 0;
+
+  // Folio Split mode: fold every scheme-row for the same client into one
+  // aggregated client record (summed Inv/AUM/Gain-Loss etc.), carrying the
+  // per-scheme breakdown along as `schemes[]` so the UI can still show the
+  // full fund-wise list on request. Old-format files (no Scheme Name column)
+  // are untouched — colMap.scheme is undefined, so this is a no-op for them.
+  if(colMap.scheme!==undefined){
+    const grouped = aggregateAumFolioRows(out);
+    grouped._badPan = out._badPan;
+    return grouped;
+  }
   return out;
+}
+
+// Folds "Folio Split" AUM rows (one row per scheme/folio) into one row per
+// client. Money fields (Inv Amt/AUM/Div Paid/Div ReInv/Gain-Loss) are simply
+// summed — they're real slices of the same total. Abs. Return % is
+// RECOMPUTED from the summed Gain/Loss ÷ summed Inv Amt (never averaged —
+// averaging % across schemes of very different sizes would be meaningless).
+// Avg. Days and XIRR aren't strictly additive across schemes with different
+// cash-flow histories, so they're shown as an AUM/Inv-weighted approximation
+// (clearly good enough for a dashboard glance; the exact per-scheme XIRR is
+// still available in the `schemes[]` breakup).
+function aggregateAumFolioRows(rows){
+  const groups = {}, order = [];
+  rows.forEach(r=>{
+    const key = r.client_id ? 'CID:'+r.client_id : (r.pan ? 'PAN:'+r.pan : 'NAME:'+r.name.toUpperCase());
+    if(!groups[key]){ groups[key]=[]; order.push(key); }
+    groups[key].push(r);
+  });
+  return order.map(key=>{
+    const g = groups[key];
+    const sum = f => Math.round(g.reduce((s,x)=>s+(parseFloat(x[f])||0),0)*100)/100;
+    const inv = sum('inv_amt'), aum = sum('aum'), gl = sum('gain_loss');
+    const pick = f => (g.find(x=>x[f])||{})[f] || '';
+    const avgDaysW = aum>0 ? Math.round(g.reduce((s,x)=>s+(parseFloat(x.avg_days)||0)*(parseFloat(x.aum)||0),0)/aum) : 0;
+    const xirrW = inv>0 ? Math.round((g.reduce((s,x)=>s+(parseFloat(x.xirr)||0)*(parseFloat(x.inv_amt)||0),0)/inv)*100)/100 : 0;
+    const lastInv = g.reduce((m,x)=> x.last_inv_date>m ? x.last_inv_date : m, '');
+    return {
+      sno: g[0].sno, name: g[0].name,
+      pan: pick('pan'), client_id: pick('client_id'),
+      inv_amt: inv, aum: aum,
+      div_paid: sum('div_paid'), div_reinv: sum('div_reinv'),
+      avg_days: avgDaysW, gain_loss: gl,
+      abs_rtn: inv>0 ? Math.round((gl/inv*100)*100)/100 : 0,
+      xirr: xirrW,
+      rm: pick('rm'),
+      last_inv_date: lastInv,
+      schemes: g.map(x=>({
+        scheme: x.scheme, folio: x.folio, inv: x.inv_amt, aum: x.aum,
+        gl: x.gain_loss, ar: x.abs_rtn, xirr: x.xirr, ad: x.avg_days,
+        dp: x.div_paid, dr: x.div_reinv, li: x.last_inv_date
+      }))
+    };
+  });
 }
 
 // Parse the "Running SIP Report".
@@ -12417,7 +12488,11 @@ async function doImport(){
   const _aumDetail = row => ({
     inv: row.inv_amt||0, dp: row.div_paid||0, dr: row.div_reinv||0,
     ad: row.avg_days||0, gl: row.gain_loss||0, ar: row.abs_rtn||0,
-    xirr: row.xirr||0, on: today()
+    xirr: row.xirr||0, on: today(),
+    // Fund-wise breakup — only present when the uploaded AUM report was in
+    // "Folio Split" mode (one row per scheme). Powers the "View fund-wise
+    // list" option in the Portfolio Details popup (openMfAum below).
+    sc: (row.schemes && row.schemes.length) ? row.schemes : undefined
   });
 
   let updated = 0, added = 0;
@@ -13359,6 +13434,10 @@ function openMfAum(id){
     body.innerHTML = hdr + `${row('AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—')}
       <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
   } else {
+    const schemes = Array.isArray(d.sc) ? d.sc : null;
+    const toggleBtn = schemes ?
+      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:9px;border-radius:8px;border:1px solid var(--teal,#0d9488);background:transparent;color:var(--teal,#0d9488);font-weight:600;font-size:.84rem;cursor:pointer">📋 View Fund-wise List (${schemes.length})</button>
+       <div class="mf-scheme-list" style="display:none;margin-top:10px;max-height:340px;overflow:auto;border:1px solid #eef1f6;border-radius:8px">${renderMfSchemeList(schemes)}</div>` : '';
     body.innerHTML = hdr +
       row('Invested', d.inv?'₹'+fmtNum(d.inv):'—') +
       row('Current AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—') +
@@ -13368,9 +13447,45 @@ function openMfAum(id){
       (d.dp ? row('Dividend Paid', '₹'+fmtNum(d.dp)) : '') +
       (d.dr ? row('Dividend Re-Inv', '₹'+fmtNum(d.dr)) : '') +
       (d.ad ? row('Avg. Days', fmtNum(d.ad)) : '') +
-      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}</div>`;
+      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
+      toggleBtn;
   }
   document.getElementById('mfAumModal').classList.add('open');
+}
+
+// Renders the per-scheme (fund-wise) breakup table used inside the Portfolio
+// Details popup. Only ever called when `d.sc` (schemes[]) is present, i.e.
+// the last AUM import was in "Folio Split" mode.
+function renderMfSchemeList(schemes){
+  const cell = (v,strong) => `<td style="padding:7px 8px;text-align:right;white-space:nowrap;${strong?'font-weight:700':''}">${v}</td>`;
+  const rows = schemes.map(s=>{
+    const gl = Number(s.gl)||0;
+    const glTxt = `<span style="color:${gl>=0?'var(--green,#16a34a)':'var(--red,#dc2626)'};font-weight:600">${gl>=0?'+':'−'}₹${fmtNum(Math.abs(gl))}</span>`;
+    return `<tr style="border-bottom:1px solid #f3f4f6">
+      <td style="padding:7px 8px;font-size:.8rem">${escapeHtml(s.scheme||'—')}${s.folio?`<div style="color:#999;font-size:.7rem">Folio: ${escapeHtml(s.folio)}</div>`:''}</td>
+      ${cell('₹'+fmtNum(s.inv||0))}
+      ${cell('₹'+fmtNum(s.aum||0), true)}
+      ${cell(glTxt)}
+      ${cell((Number(s.xirr)||0).toFixed(2)+'%')}
+    </tr>`;
+  }).join('');
+  return `<table style="width:100%;border-collapse:collapse;font-size:.8rem">
+    <thead><tr style="background:#f8fafc;position:sticky;top:0">
+      <th style="padding:7px 8px;text-align:left">Scheme</th>
+      <th style="padding:7px 8px;text-align:right">Invested</th>
+      <th style="padding:7px 8px;text-align:right">AUM</th>
+      <th style="padding:7px 8px;text-align:right">Gain/Loss</th>
+      <th style="padding:7px 8px;text-align:right">XIRR</th>
+    </tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function toggleMfSchemeList(btn){
+  const box = btn.nextElementSibling;
+  if(!box) return;
+  const willOpen = box.style.display==='none';
+  box.style.display = willOpen ? 'block' : 'none';
+  btn.innerHTML = btn.innerHTML.replace(willOpen ? '📋' : '▲', willOpen ? '▲' : '📋');
 }
 
 function openEqRisk(code, name){
