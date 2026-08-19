@@ -1692,12 +1692,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <div class="form-field" style="min-width:200px;position:relative">
               <label>Fund Name *</label>
               <input type="text" id="mftxn-fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('mftxn-fund','mftxn-fund-results')" onfocus="searchFundName('mftxn-fund','mftxn-fund-results')">
-              <div id="mftxn-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+              <div id="mftxn-fund-results" style="display:none;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:99999;margin-top:4px"></div>
             </div>
             <div class="form-field" id="mftxn-target-wrap" style="min-width:200px;position:relative;display:none">
               <label id="mftxn-fund-label-hint" style="font-size:.74rem;color:var(--gray)">Target Scheme *</label>
               <input type="text" id="mftxn-target-fund" placeholder="Switch / STP into..." autocomplete="off" oninput="searchFundName('mftxn-target-fund','mftxn-target-fund-results')" onfocus="searchFundName('mftxn-target-fund','mftxn-target-fund-results')">
-              <div id="mftxn-target-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+              <div id="mftxn-target-fund-results" style="display:none;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:99999;margin-top:4px"></div>
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Date *</label>
@@ -2642,14 +2642,14 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="form-row">
         <div class="form-field" style="position:relative"><label>Fund Name *</label>
           <input id="biz_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_fund','biz-fund-results')" onfocus="searchFundName('biz_fund','biz-fund-results')">
-          <div id="biz-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+          <div id="biz-fund-results" style="display:none;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:99999;margin-top:4px"></div>
         </div>
         <div class="form-field"><label>Date *</label><input id="biz_date" type="date"></div>
       </div>
       <div class="form-row" id="biz_target_wrap" style="display:none">
         <div class="form-field" style="position:relative"><label>Target Scheme (Switch / STP into) *</label>
           <input id="biz_target_fund" placeholder="Type to search (Regular Plan)..." autocomplete="off" oninput="searchFundName('biz_target_fund','biz-target-fund-results')" onfocus="searchFundName('biz_target_fund','biz-target-fund-results')">
-          <div id="biz-target-fund-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+          <div id="biz-target-fund-results" style="display:none;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:99999;margin-top:4px"></div>
         </div>
       </div>
     </div>

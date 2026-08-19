@@ -7494,6 +7494,35 @@ function searchFundName(inputId, resultsId){
   const q=input.value.trim().toLowerCase();
   if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
 
+  // Escape to <html> (documentElement), same fix as the badge tooltip: the
+  // app's own zoom control sets `document.body.style.zoom`, and any
+  // position:fixed element left as a body DESCENDANT still inherits that
+  // zoomed coordinate space (mismatched against real mouse/viewport pixels)
+  // — AND being nested inside the page's normal flow, it can still get
+  // visually squeezed/clipped by whatever sits below it (like this table),
+  // which is why mouse-wheel scrolling over the list was landing on the
+  // table underneath instead of the dropdown itself. Moving it out to
+  // <html> once (first time it's shown) sidesteps both problems — real
+  // fixed positioning, and a genuinely top-level element for scroll/click
+  // hit-testing.
+  if(out.parentElement !== document.documentElement){
+    document.documentElement.appendChild(out);
+    out.style.position='fixed';
+    out.style.margin='0';
+    out.dataset.anchorInput=inputId;
+  }
+  const r=input.getBoundingClientRect();
+  out.style.left=r.left+'px';
+  out.style.width=r.width+'px';
+  const maxH=260;
+  if(r.bottom+8+maxH > window.innerHeight){
+    out.style.top='';
+    out.style.bottom=(window.innerHeight-r.top+4)+'px'; // not enough room below → show above the input
+  } else {
+    out.style.bottom='';
+    out.style.top=(r.bottom+4)+'px';
+  }
+
   // CRM's own SIP scheme names first (real, exact names already in use here),
   // then the generic built-in list, then anything manually learned — deduped.
   const combined = [...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
