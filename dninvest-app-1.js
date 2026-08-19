@@ -12828,6 +12828,181 @@ async function mergeMfDupsSelected(){
 }
 
 // ══════════════════════════════════════════
+// SCHEME NAME MERGE — review-based (admin/backoffice)
+// RMs free-type the scheme name in MF Transactions (Fund Name / Target Scheme),
+// so the SAME scheme ends up saved under several different spellings/formats —
+// e.g. "Helios Mid Cap", "HELIOS MIDCAP FUND", "Helios Mid Cap Fund - Regular
+// Plan - Growth" all mean the same scheme but are 3 different strings in the
+// data. This groups those look-alike variants together (fuzzy match — case,
+// spacing, punctuation, and generic words like Fund/Plan/Regular/Growth are
+// ignored) and lets admin pick ONE final name per group. Confirming rewrites
+// that final name across every MF Transaction entry (fund_name/target_scheme)
+// AND the shared scheme-name autocomplete list, so future typing/searching
+// only ever surfaces the one canonical spelling.
+// ══════════════════════════════════════════
+function normSchemeKeyForMerge(name){
+  return String(name||'')
+    .toLowerCase()
+    .replace(/\(.*?\)/g,' ')
+    .replace(/[-_.,/]/g,' ')
+    .replace(/\b(fund|scheme|plan|regular|direct|growth|dividend|idcw|payout|reinvestment|option|of|the|mf)\b/g,' ')
+    .replace(/[^a-z0-9]+/g,'');
+}
+// Groups scheme-name strings pulled from MF Transaction entries + the learned
+// fund-name list. Exact same text (any case/spacing) is first collapsed into
+// one "variant" with a usage count; variants are then grouped by their fuzzy
+// key. Only keys with 2+ distinct variants are real merge candidates.
+function findSchemeMergeGroups(){
+  const exact = {}; // lowercased+trimmed -> {display, count}
+  const bumpExact = raw=>{
+    const r = String(raw||'').trim();
+    if(!r || r.length<4) return;
+    const lk = r.toLowerCase().replace(/\s+/g,' ');
+    if(!exact[lk]) exact[lk] = {display:r, count:0};
+    exact[lk].count++;
+    // Prefer the longest/most descriptive spelling as the display form when
+    // several exact-case variants collapse to the same lk (shouldn't really
+    // differ, but harmless safety).
+    if(r.length > exact[lk].display.length) exact[lk].display = r;
+  };
+  getMfBizEntries().forEach(e=>{ bumpExact(e.fund_name); bumpExact(e.target_scheme); });
+  getLearnedFundNames().forEach(n=>bumpExact(n));
+
+  const groups = {};
+  Object.values(exact).forEach(v=>{
+    const k = normSchemeKeyForMerge(v.display);
+    if(!k || k.length<4) return;
+    (groups[k]=groups[k]||[]).push(v);
+  });
+  return Object.entries(groups)
+    .filter(([,vs])=>vs.length>1)
+    .map(([key,vs])=>({key, variants:vs.sort((a,b)=>b.count-a.count)}));
+}
+// Best default final-name suggestion for a group: prefer a variant that
+// exactly matches the curated FUND_NAME_LIST (a "correct" official spelling),
+// else fall back to whichever variant is used most often.
+function _schemeSuggestCanonical(variants){
+  const listLower = new Set(FUND_NAME_LIST.map(n=>n.toLowerCase()));
+  const inList = variants.find(v=>listLower.has(v.display.toLowerCase()));
+  return inList ? inList.display : variants[0].display;
+}
+function openSchemeMerge(){
+  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('Yeh tool sirf admin ke liye hai','error'); return; }
+  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const groups = findSchemeMergeGroups();
+  const ov=document.createElement('div');
+  ov.id='schemeMergeOverlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
+  let body;
+  if(!groups.length){
+    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Koi Duplicate Scheme Name Nahi Mila</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">MF Transactions me abhi sabhi scheme names alag-alag spelling wale nahi hain.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'schemeMergeOverlay\').remove()">Band Karein</button></div></div>';
+  } else {
+    let rows='';
+    groups.forEach((g,gi)=>{
+      const canon = _schemeSuggestCanonical(g.variants);
+      const list = g.variants.map(v=>'<div style="padding:2px 0;font-size:.8rem;color:#334155">• '+esc(v.display)+' <span style="color:#94a3b8">('+v.count+'x)</span></div>').join('');
+      rows += '<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">'
+        +'<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">'
+        +'<input type="checkbox" class="schememerge-chk" data-key="'+esc(g.key)+'" checked> Group '+(gi+1)+' — '+g.variants.length+' variants — merge</label>'
+        +'<div style="padding:10px 12px">'+list
+        +'<div style="margin-top:8px"><label style="font-size:.72rem;color:#64748b;font-weight:700;letter-spacing:.02em">FINAL NAME (jo save hoga)</label>'
+        +'<input type="text" class="schememerge-canon" data-key="'+esc(g.key)+'" value="'+esc(canon)+'" style="width:100%;margin-top:4px;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:.82rem;box-sizing:border-box"></div>'
+        +'</div></div>';
+    });
+    body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate Scheme Names — Review & Merge</div>'
+      +'<button onclick="document.getElementById(\'schemeMergeOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
+      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ Jaise "Helios Mid Cap", "HELIOS MIDCAP FUND", "Helios Mid Cap Fund - Regular Plan - Growth" — yeh sab ek hi scheme ke alag-alag typed spelling hain. Har group ka "Final Name" chahe to edit kar dein, phir confirm karne par MF Transactions ki har entry (Fund Name / Target Scheme) aur suggestion list me sab jagah yehi final naam set ho jayega. Jo group merge nahi karna, uska checkbox uncheck kar dein.</div>'
+      +'<div style="padding:16px 18px">'+rows
+      +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
+      +'<button class="btn btn-outline" onclick="document.getElementById(\'schemeMergeOverlay\').remove()">Cancel</button>'
+      +'<button class="btn btn-teal" onclick="mergeSchemeGroupsSelected()">✔ Merge Selected</button></div></div>';
+  }
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+async function mergeSchemeGroupsSelected(){
+  const checks=[...document.querySelectorAll('.schememerge-chk')].filter(x=>x.checked);
+  if(!checks.length){ toast('Koi group select nahi hai','error'); return; }
+  const groups = findSchemeMergeGroups();
+  const chosen=[];
+  for(const chk of checks){
+    const key = chk.getAttribute('data-key');
+    const g = groups.find(x=>x.key===key);
+    if(!g) continue;
+    const canonInput = document.querySelector('.schememerge-canon[data-key="'+key.replace(/"/g,'\\"')+'"]');
+    const canon = (canonInput?.value||'').trim();
+    if(!canon){ toast('Har checked group ke liye final naam bharna zaroori hai','error'); return; }
+    chosen.push({key, canon, variantsLower:new Set(g.variants.map(v=>v.display.trim().toLowerCase()))});
+  }
+  if(!chosen.length){ toast('Nothing found','error'); return; }
+
+  const totalVariants = chosen.reduce((s,c)=>s+c.variantsLower.size,0);
+  if(!confirm('Confirm: '+chosen.length+' group(s) merge honge — '+totalVariants+' scheme-naam-spelling ek final naam me badal jayenge. Proceed?')) return;
+
+  const lookup = new Map();
+  chosen.forEach(c=>c.variantsLower.forEach(v=>lookup.set(v, c.canon)));
+  const mapName = raw=>{
+    const lk = String(raw||'').trim().toLowerCase();
+    return lookup.has(lk) ? lookup.get(lk) : raw;
+  };
+
+  try{
+    // 1) MF Transactions — rewrite fund_name / target_scheme wherever they match a merged variant
+    const entries = getMfBizEntries();
+    let changed = 0;
+    entries.forEach(e=>{
+      const nf = mapName(e.fund_name); if(nf!==e.fund_name){ e.fund_name=nf; changed++; }
+      const nt = mapName(e.target_scheme); if(nt!==e.target_scheme){ e.target_scheme=nt; changed++; }
+    });
+    if(changed) setMfBizEntries(entries);
+
+    // 2) Shared "learned" scheme-name suggestion list — dedupe onto the final names
+    const learnedSet = new Set();
+    getLearnedFundNames().forEach(n=>learnedSet.add(mapName(n)));
+    chosen.forEach(c=>learnedSet.add(c.canon));
+    await DB.set('learned_fund_names', [...learnedSet]);
+
+    _crmSchemeNamesCache = null; // autocomplete cache stale after rename
+
+    const ovx=document.getElementById('schemeMergeOverlay'); if(ovx) ovx.remove();
+    toast('✅ '+chosen.length+' scheme group(s) merged'+(changed?', '+changed+' transaction field(s) updated':''),'success');
+    if(typeof renderMfTxnTable==='function') renderMfTxnTable();
+    if(typeof populateMfTxnMonths==='function') populateMfTxnMonths();
+  }catch(e){ toast('Merge failed: '+(e&&e.message||e),'error'); }
+}
+// Self-contained trigger: adds a "Merge Scheme Names" button on the MF
+// Transactions page for admin/backoffice, without needing any HTML change.
+// (Mirrors how the rest of this app's one-off admin tools get surfaced.)
+(function(){
+  function ensureSchemeMergeBtn(){
+    if(typeof CU==='undefined' || !CU) return;
+    if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) return;
+    const page = document.getElementById('page-mf-txns');
+    if(!page || document.getElementById('schemeMergeBtn')) return;
+    const anchor = document.getElementById('mftxn-rm-filter') || document.getElementById('mftxn-month-filter');
+    const btn = document.createElement('button');
+    btn.id='schemeMergeBtn';
+    btn.type='button';
+    btn.className='btn btn-outline';
+    btn.style.cssText='margin:6px 0 6px 6px';
+    btn.textContent='🔀 Merge Scheme Names';
+    btn.onclick=openSchemeMerge;
+    if(anchor && anchor.parentElement){ anchor.parentElement.insertBefore(btn, anchor.nextSibling); }
+    else { page.insertBefore(btn, page.firstChild); }
+  }
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(ensureSchemeMergeBtn,1200));
+  const _origShowPage = window.showPage;
+  if(typeof _origShowPage==='function'){
+    window.showPage = function(id){
+      _origShowPage(id);
+      if(id==='mf-txns') setTimeout(ensureSchemeMergeBtn,50);
+    };
+  }
+})();
+
+// ══════════════════════════════════════════
 // EQUITY BAD-IMPORT REVIEW — review-based (admin only)
 // Finds equity clients that look like they came from a wrongly-uploaded
 // MF AUM file (Client ID/Client Name/AUM columns get auto-mapped to
