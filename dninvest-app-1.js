@@ -13525,10 +13525,12 @@ function fmtRiskMoney(n){
 }
 // MF AUM cell -> portfolio breakdown. Same idea as openEqRisk() on the equity
 // side. Data comes from the AUM By Client import (aum_detail).
-// Popup widened to `.modal.wide` (900px, see index.html) 19-Aug-2026 so the
-// fund-wise breakup table has room to breathe — summary now renders as a
-// stat-card grid (reusing the app's existing .stats-row/.stat-card look,
-// same as the SIP Tracker/Dashboard cards) instead of a cramped stacked list.
+// Popup widened to `.modal.wide` (900px, see index.html) 19-Aug-2026. Summary
+// figures render as small single-row "chips" (compact, left-accent color,
+// value+label stacked tight) rather than the app's big .stat-card — those
+// are sized for the Dashboard, not a popup, and wrapped onto 2 lines here.
+// Chips flex-wrap only as a narrow-screen fallback; at the modal's normal
+// 900px width all of them sit on one line.
 function openMfAum(id){
   const c = (DB.get('mf_clients')||[]).find(x=>x.id===id);
   const body = document.getElementById('mfAumModalBody');
@@ -13540,32 +13542,35 @@ function openMfAum(id){
     const txt = pct ? Math.abs(Number(n)).toFixed(2)+'%' : '₹'+fmtNum(Math.abs(Number(n)));
     return (pos?'+':'−')+txt;
   };
-  const card = (cls,label,val) => `<div class="stat-card ${cls}"><div class="stat-n stat-n-md">${val}</div><div class="stat-l">${label}</div></div>`;
-  const hdr = `<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-    <div><div style="font-weight:800;font-size:1.15rem;color:var(--navy)">${escapeHtml(c.name||'')}</div>
-    <div style="color:var(--gray);font-size:.8rem;margin-top:2px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div></div>
+  const chip = (color,label,val,valColor) => `<div style="flex:1 1 96px;min-width:0;background:#f8fafc;border-left:3px solid ${color};border-radius:7px;padding:6px 9px">
+    <div style="font-weight:800;font-size:.88rem;color:${valColor||'var(--navy)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
+    <div style="font-size:.58rem;color:var(--gray);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;margin-top:1px">${label}</div>
+  </div>`;
+  const hdr = `<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+    <div><div style="font-weight:800;font-size:1.1rem;color:var(--navy)">${escapeHtml(c.name||'')}</div>
+    <div style="color:var(--gray);font-size:.78rem;margin-top:1px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div></div>
     ${c.rm?`<span class="badge b-investor">${escapeHtml(c.rm)}</span>`:''}</div>`;
   if(!d){
-    body.innerHTML = hdr + `<div class="stats-row">${card('purple','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}</div>
-      <div style="margin-top:14px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
+    body.innerHTML = hdr + `<div style="display:flex;flex-wrap:wrap;gap:6px">${chip('var(--purple)','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}</div>
+      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
   } else {
     const schemes = Array.isArray(d.sc) ? d.sc : null;
-    const glCls = Number(d.gl)>=0 ? 'green' : 'red';
-    const statCards = `<div class="stats-row">
-        ${card('teal','Invested', d.inv?'₹'+fmtNum(d.inv):'—')}
-        ${card('purple','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}
-        ${card(glCls,'Gain / Loss', signedTxt(d.gl))}
-        ${card(glCls,'Abs. Return', signedTxt(d.ar,true))}
-        ${card('gold','XIRR', signedTxt(d.xirr,true))}
-        ${d.ad?card('','Avg. Days', fmtNum(d.ad)):''}
-        ${d.dp?card('','Dividend Paid', '₹'+fmtNum(d.dp)):''}
-        ${d.dr?card('','Dividend Re-Inv', '₹'+fmtNum(d.dr)):''}
+    const glColor = Number(d.gl)>=0 ? 'var(--green)' : 'var(--red)';
+    const statChips = `<div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${chip('var(--teal)','Invested', d.inv?'₹'+fmtNum(d.inv):'—')}
+        ${chip('var(--purple)','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}
+        ${chip(glColor,'Gain/Loss', signedTxt(d.gl), glColor)}
+        ${chip(glColor,'Abs. Return', signedTxt(d.ar,true), glColor)}
+        ${chip('var(--gold)','XIRR', signedTxt(d.xirr,true), 'var(--gold)')}
+        ${d.ad?chip('#94a3b8','Avg. Days', fmtNum(d.ad)):''}
+        ${d.dp?chip('var(--teal)','Div. Paid', '₹'+fmtNum(d.dp)):''}
+        ${d.dr?chip('var(--teal)','Div. ReInv', '₹'+fmtNum(d.dr)):''}
       </div>`;
     const toggleBtn = schemes ?
-      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:14px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--teal,#0d9488);background:var(--teal2,#e6f7f5);color:var(--teal,#0d9488);font-weight:700;font-size:.85rem;cursor:pointer">📋 View Fund-wise List (${schemes.length})</button>
+      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:9px;border-radius:9px;border:1px solid var(--teal,#0d9488);background:var(--teal2,#e6f7f5);color:var(--teal,#0d9488);font-weight:700;font-size:.83rem;cursor:pointer">📋 View Fund-wise List (${schemes.length})</button>
        <div class="mf-scheme-list" style="display:none;margin-top:10px;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
-    body.innerHTML = hdr + statCards +
-      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
+    body.innerHTML = hdr + statChips +
+      `<div style="margin-top:8px;font-size:.7rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
       toggleBtn;
   }
   document.getElementById('mfAumModal').classList.add('open');
