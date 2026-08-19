@@ -61,6 +61,13 @@ const PER_DOC_COLLECTIONS = {}; // no longer used, kept for compatibility
 // the number and delete the old crm_data/<key>__sN docs first.
 const SHARD_CFG = {
   eq_clients: 8,   // ~3400 clients → ~425/shard → ~130 KB/shard (lots of headroom)
+  // mf_clients crossed 1 MiB on 19-Aug-2026 (1,524,389 bytes) after the
+  // Folio Split AUM import started storing each client's full fund-wise
+  // breakup (aum_detail.sc[]) — a handful of clients hold 20-35 schemes,
+  // and that adds up fast across ~930 investors. Sharded the same way as
+  // eq_clients: 4 shards → ~380 KB/shard today, room to grow well past
+  // 2,000 investors with full scheme breakups before hitting the limit again.
+  mf_clients: 4,
 };
 
 const DB = {
