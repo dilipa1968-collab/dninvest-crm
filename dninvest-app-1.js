@@ -7442,12 +7442,40 @@ function getLearnedFundNames(){
   return DB.get('learned_fund_names') || [];
 }
 
+// Every unique scheme name already sitting in the CRM's own MF client SIP
+// records (c.sip_details[].scheme — populated by the SIP report import, see
+// "SIP Details" modal). These are REAL scheme names the RMs already deal
+// with, in the exact spelling/format the SIP import uses — a much better
+// autocomplete source than the generic built-in list for schemes this office
+// actually has live SIPs in. Cached per page-load since mf_clients can be a
+// few thousand records; recomputed if it comes back empty (e.g. data synced
+// in after the first computation).
+let _crmSchemeNamesCache = null;
+function getCrmSchemeNames(){
+  if(_crmSchemeNamesCache && _crmSchemeNamesCache.length) return _crmSchemeNamesCache;
+  const seen = new Set();
+  const names = [];
+  (DB.get('mf_clients')||[]).forEach(c=>{
+    if(!Array.isArray(c.sip_details)) return;
+    c.sip_details.forEach(d=>{
+      const scheme = String(d.scheme||'').trim();
+      if(!scheme) return;
+      const key = scheme.toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      names.push(scheme);
+    });
+  });
+  _crmSchemeNamesCache = names;
+  return names;
+}
+
 async function learnFundName(name){
   if(!name) return;
   const trimmed = name.trim();
   if(!trimmed) return;
   const existing = getLearnedFundNames();
-  const knownLower = new Set([...FUND_NAME_LIST, ...existing].map(n=>n.toLowerCase()));
+  const knownLower = new Set([...FUND_NAME_LIST, ...existing, ...getCrmSchemeNames()].map(n=>n.toLowerCase()));
   if(knownLower.has(trimmed.toLowerCase())) return; // already known — nothing new to learn
   await DB.set('learned_fund_names', [...existing, trimmed]);
 }
@@ -7459,8 +7487,9 @@ function searchFundName(inputId, resultsId){
   const q=input.value.trim().toLowerCase();
   if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
 
-  // Built-in list + anything learned from earlier manual entries, deduped
-  const combined = [...FUND_NAME_LIST, ...getLearnedFundNames()];
+  // CRM's own SIP scheme names first (real, exact names already in use here),
+  // then the generic built-in list, then anything manually learned — deduped.
+  const combined = [...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
   const seen=new Set();
   const allFunds=[];
   for(const n of combined){
