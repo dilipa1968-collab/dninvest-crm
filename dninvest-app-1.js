@@ -12905,8 +12905,8 @@ function openSchemeMerge(){
         +'<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">'
         +'<input type="checkbox" class="schememerge-chk" data-key="'+esc(g.key)+'" checked> Group '+(gi+1)+' — '+g.variants.length+' variants — merge</label>'
         +'<div style="padding:10px 12px">'+list
-        +'<div style="margin-top:8px"><label style="font-size:.72rem;color:#64748b;font-weight:700;letter-spacing:.02em">FINAL NAME (jo save hoga)</label>'
-        +'<input type="text" class="schememerge-canon" data-key="'+esc(g.key)+'" value="'+esc(canon)+'" style="width:100%;margin-top:4px;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:.82rem;box-sizing:border-box"></div>'
+        +'<div style="margin-top:8px;position:relative"><label style="font-size:.72rem;color:#64748b;font-weight:700;letter-spacing:.02em">FINAL NAME (jo save hoga)</label>'
+        +'<input type="text" class="schememerge-canon" data-key="'+esc(g.key)+'" value="'+esc(canon)+'" autocomplete="off" oninput="schemeMergeCanonSearch(this)" onfocus="schemeMergeCanonSearch(this)" style="width:100%;margin-top:4px;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:.82rem;box-sizing:border-box"></div>'
         +'</div></div>';
     });
     body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
@@ -12972,6 +12972,60 @@ async function mergeSchemeGroupsSelected(){
     if(typeof populateMfTxnMonths==='function') populateMfTxnMonths();
   }catch(e){ toast('Merge failed: '+(e&&e.message||e),'error'); }
 }
+// CRM's own known-scheme-name autocomplete for the "Final Name" box in the
+// merge modal — same source list used everywhere else (getCrmSchemeNames +
+// FUND_NAME_LIST + getLearnedFundNames), so the name admin picks as "final"
+// is a name the CRM already recognizes rather than yet another free-typed
+// variant. One shared floating results box, repositioned under whichever
+// canon input is currently focused/typed in.
+function schemeMergeCanonSearch(inputEl){
+  if(!inputEl) return;
+  let out = document.getElementById('schemeMergeCanonResults');
+  if(!out){
+    out = document.createElement('div');
+    out.id = 'schemeMergeCanonResults';
+    out.style.cssText='position:fixed;display:none;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:240px;overflow:auto;z-index:100000';
+    document.documentElement.appendChild(out);
+  }
+  out.dataset.forInput = inputEl.dataset.key || '';
+  out._targetEl = inputEl;
+
+  const q = inputEl.value.trim().toLowerCase();
+  const combined = [...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
+  const seen=new Set(); const allFunds=[];
+  for(const n of combined){ const k=n.toLowerCase(); if(seen.has(k)) continue; seen.add(k); allFunds.push(n); }
+  const matches = (q.length>=1 ? allFunds.filter(n=>n.toLowerCase().includes(q)) : allFunds).slice(0,15);
+
+  const r = inputEl.getBoundingClientRect();
+  out.style.left=r.left+'px';
+  out.style.width=r.width+'px';
+  const maxH=240;
+  if(r.bottom+8+maxH > window.innerHeight){ out.style.top=''; out.style.bottom=(window.innerHeight-r.top+4)+'px'; }
+  else { out.style.bottom=''; out.style.top=(r.bottom+4)+'px'; }
+
+  if(!matches.length){
+    out.innerHTML='<div style="padding:9px 12px;color:var(--gray,#94a3b8);font-size:.8rem">No match — jo type kiya wahi use hoga</div>';
+    out.style.display='block';
+    return;
+  }
+  out.innerHTML = matches.map(name=>
+    `<div style="padding:7px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.82rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onmousedown="event.preventDefault()" onclick="schemeMergeCanonPick(this.dataset.name)" data-name="${escapeHtml(name)}">${escapeHtml(name)}</div>`
+  ).join('');
+  out.style.display='block';
+}
+function schemeMergeCanonPick(name){
+  const out = document.getElementById('schemeMergeCanonResults');
+  if(out && out._targetEl){ out._targetEl.value = name; }
+  if(out){ out.style.display='none'; }
+}
+document.addEventListener('click', e=>{
+  const out = document.getElementById('schemeMergeCanonResults');
+  if(!out || out.style.display==='none') return;
+  if(e.target.closest && e.target.closest('.schememerge-canon')) return;
+  if(out.contains(e.target)) return;
+  out.style.display='none';
+});
+
 // Self-contained trigger: adds a "Merge Scheme Names" button on the MF
 // Transactions page for admin/backoffice, without needing any HTML change.
 // (Mirrors how the rest of this app's one-off admin tools get surfaced.)
