@@ -868,6 +868,19 @@ const DB = {
     // login, page refresh, and the 30-min auto-reload, so a sequential for-loop here
     // directly adds up to slow login/page-open times (each collection = one network
     // round-trip; sequential = sum of all of them, parallel = the slowest single one).
+    //
+    // IMPORTANT (bug found+fixed 19-Aug-2026): every branch below now goes through
+    // `this.setLocal(key, value)` instead of a raw `localStorage.setItem(...)`.
+    // DB.get() serves from an in-memory cache (`this._mem`) FIRST and only ever
+    // falls back to localStorage the very first time a key is read — a raw
+    // localStorage write updates the file on disk but NOT that in-memory cache,
+    // so DB.get() kept returning whatever was cached from BEFORE this sync ran.
+    // This was invisible after the 30-min auto-reload (a real `location.reload()`
+    // wipes `_mem` clean, masking the bug) but broke logout→login IN THE SAME TAB
+    // (no page reload, `_mem` survives) — freshly-imported data (e.g. AUM fund-wise
+    // breakup) would sync correctly into localStorage yet the UI kept showing the
+    // stale pre-sync snapshot from `_mem` until a hard refresh. setLocal() updates
+    // both, so this class of staleness can't happen again for any key.
     await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'].map(async (key)=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
@@ -877,7 +890,7 @@ const DB = {
           this._shardSeen[key]  = new Set(parts.map((_,i)=>i));   // all shards known
           const merged = this._mergeShards(key);
           if(merged.length){
-            localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+            this.setLocal(key, merged);
             console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
                         this._shardCache[key].map(p=>p.length));
           }
@@ -895,7 +908,7 @@ const DB = {
             if(d && typeof d.codeJson==='string'){ try{ codeObj=JSON.parse(d.codeJson)||{}; }catch(_){ codeObj={}; } }
             else if(d && d.code && typeof d.code==='object'){ codeObj=d.code; }
             const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
-            localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
+            this.setLocal('eq_risk', norm);
             console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
             return;
           }
@@ -907,7 +920,7 @@ const DB = {
               const byId={};
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-              localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
+              this.setLocal('call_logs', Object.values(byId));
               console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
             } else if(key==='activity_logs'){
               let existing=[];
@@ -916,14 +929,14 @@ const DB = {
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               const merged=Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
-              localStorage.setItem('dninvest_activity_logs', JSON.stringify(merged));
+              this.setLocal('activity_logs', merged);
               console.log('Loaded+merged from Firebase: activity_logs', merged.length);
             } else if(d.length>0){
-              localStorage.setItem('dninvest_'+key,JSON.stringify(d));
+              this.setLocal(key, d);
               console.log('Loaded from Firebase:',key, d.length,'records');
             }
           } else {
-            localStorage.setItem('dninvest_'+key,JSON.stringify(d));
+            this.setLocal(key, d);
             console.log('Loaded from Firebase:',key, 'object');
           }
         }
@@ -1441,6 +1454,14 @@ function openHrPortal(){
 
 function doLogout(){
   CU=null;
+  // Defensive: also drop the in-memory DB cache (DB._mem) on logout, not just
+  // the session token. Without this, logging back in in the SAME browser tab
+  // (no full page reload) would keep serving whatever was cached from BEFORE
+  // logout — the real fix is that syncFromFirebase() now updates this cache
+  // correctly on every sync (see DB.setLocal usage there), but clearing it
+  // here too means a stray future write that bypasses setLocal can't cause
+  // the same stale-after-relogin bug again.
+  if(typeof DB!=='undefined') DB._mem = {};
   localStorage.removeItem('dninvest_session');
   sessionStorage.removeItem('dninvest_session'); // clean up old-style sessions too
   document.getElementById('loginScreen').style.display='flex';
