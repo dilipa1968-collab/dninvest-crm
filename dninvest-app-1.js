@@ -7662,23 +7662,24 @@ function getCrmSchemeNames(){
   if(_crmSchemeNamesCache && _crmSchemeNamesCache.length) return _crmSchemeNamesCache;
   const seen = new Set();
   const names = [];
+  const scanList = (list) => (Array.isArray(list)?list:[]).forEach(d=>{
+    const scheme = String(d.scheme||'').trim();
+    if(!scheme) return;
+    // Some SIP/AUM-report imports produced a truncated/mis-parsed "scheme"
+    // value (e.g. just the word "GROWTH" instead of the full scheme name) —
+    // a genuine fund name is always reasonably long and almost always
+    // contains the word "fund", so this filters that garbage out rather
+    // than surfacing it as a suggestion.
+    if(scheme.length < 15) return;
+    if(!/fund/i.test(scheme)) return;
+    const key = scheme.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    names.push(scheme);
+  });
   (DB.get('mf_clients')||[]).forEach(c=>{
-    if(!Array.isArray(c.sip_details)) return;
-    c.sip_details.forEach(d=>{
-      const scheme = String(d.scheme||'').trim();
-      if(!scheme) return;
-      // Some SIP-report imports produced a truncated/mis-parsed "scheme" value
-      // (e.g. just the word "GROWTH" instead of the full scheme name) — a
-      // genuine fund name is always reasonably long and almost always
-      // contains the word "fund", so this filters that garbage out rather
-      // than surfacing it as a suggestion.
-      if(scheme.length < 15) return;
-      if(!/fund/i.test(scheme)) return;
-      const key = scheme.toLowerCase();
-      if(seen.has(key)) return;
-      seen.add(key);
-      names.push(scheme);
-    });
+    scanList(c.sip_details);
+    scanList(c.aum_schemes); // lumpsum/non-SIP holdings, from a per-scheme AUM import
   });
   _crmSchemeNamesCache = names;
   return names;
@@ -7692,9 +7693,9 @@ function getCrmSchemeNames(){
 function getClientSchemeNames(clientId){
   if(!clientId) return [];
   const c = (DB.get('mf_clients')||[]).find(x=>x.id===clientId);
-  if(!c || !Array.isArray(c.sip_details)) return [];
+  if(!c) return [];
   const seen=new Set(), names=[];
-  c.sip_details.forEach(d=>{
+  const addFrom = list => (Array.isArray(list)?list:[]).forEach(d=>{
     const scheme=String(d.scheme||'').trim();
     if(!scheme || scheme.length<15 || !/fund/i.test(scheme)) return;
     const key=scheme.toLowerCase();
@@ -7702,6 +7703,8 @@ function getClientSchemeNames(clientId){
     seen.add(key);
     names.push(scheme);
   });
+  addFrom(c.sip_details);
+  addFrom(c.aum_schemes); // lumpsum/non-SIP holdings, from a per-scheme AUM import
   return names;
 }
 // Maps a Fund Name input's id to the currently-selected client's id for that
@@ -12130,6 +12133,8 @@ function parseAumExcel(rows){
     name:    ['clientname','name','investorname','clientnames'],
     pan:     ['pan','pannumber','pancard','panno','pancardno'],
     client_id: ['clientid','clientcode','clientno','clientidno'],
+    scheme:  ['schemename','scheme','fundname','fund'],
+    folio:   ['foliono','folio','folionumber'],
     aum:     ['aum','currentvalue','marketvalue','closingbalance','currentamt'],
     inv_amt: ['invamt','invamount','investmentamount','investedamount','purchaseamount','investment'],
     // Performance columns, shown when the AUM cell is clicked.
@@ -12164,6 +12169,7 @@ function parseAumExcel(rows){
   const isPan = v => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(v||'').trim().toUpperCase());
   const num = v => Math.round((parseFloat(String(v==null?'':v).replace(/[,\s₹]/g,''))||0)*100)/100;
   const at = (r,f) => colMap[f]!==undefined ? r[colMap[f]] : '';
+  const nmKey = s => String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
 
   const data = rows.slice(hdrIdx+1).filter(r=>{
     if(!r || !r.some(c=>c!=='' && c!=null)) return false;
@@ -12172,7 +12178,7 @@ function parseAumExcel(rows){
     return String(at(r,'name')||'').trim() !== '';
   });
 
-  const out = data.map(r=>{
+  const flatRows = data.map(r=>{
     const rawPan = String(at(r,'pan')||'').trim().toUpperCase();
     return {
       sno: colMap.sno!==undefined ? r[colMap.sno] : '',
@@ -12184,6 +12190,8 @@ function parseAumExcel(rows){
       // field that survives name changes — and because the wrong-column bug
       // wrote these very IDs into the PAN field, it's how we find those records.
       client_id: String(at(r,'client_id')||'').trim(),
+      scheme: String(at(r,'scheme')||'').trim(),
+      folio:  String(at(r,'folio')||'').trim(),
       inv_amt: num(at(r,'inv_amt')),
       aum: num(at(r,'aum')),
       div_paid:  num(at(r,'div_paid')),
@@ -12196,7 +12204,56 @@ function parseAumExcel(rows){
     };
   }).filter(r=>r.name);
 
-  out._badPan = data.length - out.filter(r=>r.pan).length;
+  // ── GROUP multi-scheme rows into one entry per client ──────────────────
+  // Some AUM reports ("AUM By Client", per-holding) give ONE ROW PER SCHEME,
+  // so the same client appears on several consecutive rows (different Scheme
+  // Name/Folio each time). The rest of the app (the CRM-merge step right
+  // after this, and every mf_clients record) expects ONE entry per client
+  // with their TOTAL aum/inv_amt/etc — without this grouping, only the first
+  // scheme-row of a multi-scheme client actually reached the merge step
+  // (the merge's own "claimed" guard silently dropped every OTHER scheme-row
+  // of that same client into the ambiguous pile), so a client's imported AUM
+  // silently reflected just ONE of their several holdings, not their total.
+  // Reports with only one row per client (no scheme-name column at all) are
+  // completely unaffected — each becomes its own single-row "group".
+  const grouped = {};
+  const order = [];
+  const seenKeys = new Set();
+  flatRows.forEach(r=>{
+    const key = r.client_id ? ('CID:'+r.client_id) : (r.pan || nmKey(r.name));
+    const isFirst = !seenKeys.has(key);
+    if(isFirst){
+      seenKeys.add(key);
+      grouped[key] = {...r, aum_schemes:[], _maxSchemeAum: r.aum};
+      order.push(key);
+    } else {
+      const g = grouped[key];
+      // Second+ row for this client — accumulate totals, keep the first row's
+      // "current snapshot" fields (avg_days/abs_rtn/xirr are ratios, not
+      // additive — represented by whichever holding is largest, updated below).
+      g.inv_amt   += r.inv_amt;
+      g.aum       += r.aum;
+      g.div_paid  += r.div_paid;
+      g.div_reinv += r.div_reinv;
+      g.gain_loss += r.gain_loss;
+      if(!g.pan && r.pan) g.pan = r.pan;
+      if(!g.rm && r.rm) g.rm = r.rm;
+      if(r.aum > g._maxSchemeAum){
+        g.avg_days = r.avg_days; g.abs_rtn = r.abs_rtn; g.xirr = r.xirr;
+        g._maxSchemeAum = r.aum;
+      }
+    }
+    if(r.scheme) grouped[key].aum_schemes.push({scheme:r.scheme, folio:r.folio, aum:r.aum});
+  });
+  const out = order.map(k=>{ const g=grouped[k]; delete g._maxSchemeAum; return g; });
+
+  out._badPan = out.length - out.filter(r=>r.pan).length;
+  // If the file never had a PAN column at all (as opposed to individual
+  // blank/invalid PAN cells), say so plainly — that's a report-format fact,
+  // not a per-row data-quality problem, and the old wording ("rows have no
+  // valid PAN") read as an alarming data-quality warning either way.
+  out._noPanColumn = colMap.pan===undefined;
+  out._rowCount = flatRows.length;
   return out;
 }
 
@@ -12299,10 +12356,17 @@ function handleAumFile(input){
       checkImportReady(); return;
     }
     importData.aum = parsed;
-    const warn = parsed._badPan ? `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ ${parsed._badPan} rows have no valid PAN — those clients' PAN will be left untouched</div>` : '';
+    const multiScheme = parsed.reduce((s,r)=>s+(r.aum_schemes&&r.aum_schemes.length>1?1:0),0);
+    let warn = '';
+    if(parsed._noPanColumn){
+      warn = `<div style="color:var(--gray,#666);font-size:.8rem;margin-top:4px">ℹ️ This report doesn't include a PAN column — clients will be matched by Client ID / Name instead, and PAN won't be changed.</div>`;
+    } else if(parsed._badPan){
+      warn = `<div style="color:var(--orange,#c60);font-size:.8rem;font-weight:600;margin-top:4px">⚠️ ${parsed._badPan} clients have no valid PAN — those clients' PAN will be left untouched</div>`;
+    }
+    const schemeNote = multiScheme ? `<div style="color:var(--gray,#666);font-size:.8rem;margin-top:4px">📋 ${multiScheme} client(s) hold multiple schemes — their AUM/Invested figures are summed across all of them (was: only their first scheme's number, before this fix).</div>` : '';
     document.getElementById('aum-preview').innerHTML = 
       `<div style="background:var(--green2);color:var(--green);padding:10px;border-radius:8px;font-size:.85rem;font-weight:600">
-       ✅ ${parsed.length} clients found in AUM file</div>${warn}`;
+       ✅ ${parsed.length} clients found in AUM file${parsed._rowCount>parsed.length?` (from ${parsed._rowCount} scheme-level rows)`:''}</div>${warn}${schemeNote}`;
     checkImportReady();
   });
 }
@@ -12345,8 +12409,9 @@ function handleBothFile(type, input){
         checkImportReady(); return;
       }
       importData.aum = parsedB;
+      const panNoteB = parsedB._noPanColumn ? ' (no PAN column in this report — matched by Client ID/Name)' : (parsedB._badPan?' (⚠️ '+parsedB._badPan+' without a valid PAN)':'');
       document.getElementById('both-preview').innerHTML += 
-        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${parsedB.length} clients${parsedB._badPan?' (⚠️ '+parsedB._badPan+' without a valid PAN)':''}</div>`;
+        `<div style="color:var(--green);font-size:.82rem;font-weight:600">✅ AUM: ${parsedB.length} clients${panNoteB}</div>`;
     } else {
       const parsedSB = parseSipExcel(rows);
       if(!parsedSB || !Object.keys(parsedSB).length){
@@ -12656,6 +12721,10 @@ async function doImport(){
         ex.pan = row.pan || ex.pan;                     // parser only ever returns a valid PAN or ''
         if(row.mobile && !ex.mobile) ex.mobile = mob10(row.mobile); // mobile mile aur khaali ho to bhar do
         if(row.client_id) ex.client_id = row.client_id; // lock in the stable key
+        // Per-scheme breakdown (from a report that had a Scheme Name column) —
+        // this is what feeds the "client already holds this fund" (★) hint in
+        // the Fund Name autocomplete when adding a transaction for them.
+        if(row.aum_schemes && row.aum_schemes.length) ex.aum_schemes = row.aum_schemes;
         {
           const hadAumDetail = !!ex.aum_detail;
           const newInv = parseFloat(row.inv_amt)||0;
@@ -12724,6 +12793,7 @@ async function doImport(){
           status: 'Investor',
           aum: row.aum,
           aum_detail: _aumDetail(row),
+          aum_schemes: row.aum_schemes && row.aum_schemes.length ? row.aum_schemes : null,
           // New investor's first invested amount counts as a "win" too — mark it
           // so today's Win/Loss card (mfWins) picks it up as "+MF New" on add day.
           prev_invested: 0,
