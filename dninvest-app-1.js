@@ -13108,7 +13108,21 @@ function _mfPrimary(recs){
     + (String(c.mobile||'').replace(/\D/g,'').length>=10?2:0)
     + (Number(c.aum)>0?1:0)
   );
-  return recs.slice().sort((a,b)=> score(b)-score(a) || String(a.created||'').localeCompare(String(b.created||'')) )[0];
+  // Prefer whichever duplicate carries the MOST RECENT AUM By Client import
+  // date (aum_detail.on) as the survivor — that's the record holding the
+  // freshest Invested/Gain-Loss/XIRR figures AND, since 19-Aug-2026, the
+  // freshest per-scheme Fund-wise Breakup (aum_schemes). Previously this
+  // sorted on completeness-score first and earliest `created` as the
+  // tiebreak — for two records with an otherwise-identical PAN/client_id/
+  // mobile (a genuine same-client duplicate), that tiebreak kept the OLDER
+  // record and silently discarded the newer one's fund-wise breakup. Falls
+  // back to the completeness score, then earliest `created`, only when
+  // neither record has an aum_detail.on date to compare.
+  return recs.slice().sort((a,b)=>
+    String((b.aum_detail&&b.aum_detail.on)||'').localeCompare(String((a.aum_detail&&a.aum_detail.on)||''))
+    || score(b)-score(a)
+    || String(a.created||'').localeCompare(String(b.created||''))
+  )[0];
 }
 function openMfDupMerge(){
   if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('This tool is for admin only','error'); return; }
@@ -13171,7 +13185,7 @@ async function mergeMfDupsSelected(){
     let maxAum=Number(prim.aum)||0, maxSipAmt=Number(prim.sip_amount)||0, maxSipCnt=Number(prim.sip_count)||0;
     g.recs.forEach(c=>{
       if(c.id===prim.id) return;
-      ['pan','client_id','mobile','email','rm','remarks','followup_status','next_call','last_call_date','last_invest_date','sip_details','aum_detail'].forEach(f=>{
+      ['pan','client_id','mobile','email','rm','remarks','followup_status','next_call','last_call_date','last_invest_date','sip_details','aum_detail','aum_schemes'].forEach(f=>{
         if(!val(survivor[f]) && val(c[f])) survivor[f]=c[f];
       });
       maxAum=Math.max(maxAum, Number(c.aum)||0);
