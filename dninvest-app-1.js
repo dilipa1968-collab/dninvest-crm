@@ -8019,16 +8019,24 @@ function findFundNameDupGroups(){
   const groups=[];
   Object.values(clusters).forEach(members=>{
     if(members.length<2) return;
-    const refs = members.filter(m=>m.isRef);
-    // Safety guard: if a cluster somehow pulled in 2+ DIFFERENT reference
-    // names, that's a sign of a false-positive fuzzy match (two genuinely
-    // different funds) — skip it rather than risk merging real schemes.
-    const distinctRefNames = new Set(refs.map(r=>r.name.toLowerCase()));
-    if(distinctRefNames.size>1) return;
-    const learnedMembers = members.filter(m=>!m.isRef);
-    if(!learnedMembers.length) return; // nothing to merge if it's reference-only
-    const canonical = refs.length ? refs[0].name
-      : learnedMembers.slice().sort((a,b)=> b.name.length - a.name.length)[0].name;
+    // No longer requires at least one "learned" (actually-typed/saved) member
+    // — a cluster made entirely of reference-list spellings (built-in
+    // FUND_NAME_LIST + real scheme names pulled from client SIP/AUM data)
+    // is just as real a duplicate for the dropdown's purposes, even if no
+    // transaction happens to have used one of these exact spellings yet
+    // (20-Aug-2026: e.g. "Abakkus Small Cap Fund - Regular Plan - Growth" /
+    // "ABAKKUS SMALL CAP FUND - Regular Growth" / two Flexi Cap variants —
+    // all reference-only, all clearly the same funds). Similarly no longer
+    // blocks on 2+ distinct reference spellings in one cluster — that used
+    // to be a safety guard against two genuinely different funds fuzzy-
+    // matching together, but the clustering step above (3-char bucket +
+    // length-gated Levenshtein ≤2 on noise-stripped loose keys) is already
+    // conservative enough to make that rare, and the review screen now lets
+    // admin see every member and either uncheck a wrong group entirely or
+    // pick a different survivor via radio button — a second layer of safety
+    // that makes this guard's cost (silently hiding real reference-only
+    // duplicates like the Abakkus case) no longer worth paying.
+    const canonical = members.slice().sort((a,b)=> b.name.length - a.name.length)[0].name;
     const variants = members.filter(m=>m.name.toLowerCase()!==canonical.toLowerCase()).map(m=>m.name);
     if(!variants.length) return;
     groups.push({ canonical, variants: [...new Set(variants)] });
