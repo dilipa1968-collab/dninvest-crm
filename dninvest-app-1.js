@@ -239,6 +239,15 @@ const DB = {
   setLocal(key,val){
     if(this._mem) this._mem[key] = val;   // keep cache in sync
     try{ localStorage.setItem('dninvest_'+key,JSON.stringify(val)); }catch(e){}
+    // getCrmSchemeNames() (fund-name dropdown source) caches its scan of
+    // every mf_clients[].sip_details[]/aum_schemes[] scheme name, since
+    // scanning ~1000+ clients on every keystroke would be slow — but that
+    // means a fresh AUM/SIP import's newly-added scheme names (e.g. found
+    // 20-Aug-2026: "Abakkus Large and Mid Cap Fund" missing from the
+    // dropdown right after import) silently didn't show up until a full
+    // page reload recomputed the cache from scratch. Invalidating here
+    // catches every mf_clients write path that goes through setLocal.
+    if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
   },
   // ── mf_business: transactional append (avoids the classic race where two
   // RMs save around the same moment and the second write's blind full-array
@@ -980,6 +989,7 @@ const DB = {
             // Firestore this session.)
             if(!this._mem) this._mem = {};
             this._mem[key] = merged;
+            if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
             try{
               localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
               console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
@@ -2137,6 +2147,7 @@ function initApp(){
               // silently threw the freshly-synced data away completely.)
               if(!DB._mem) DB._mem = {};
               DB._mem[key] = merged;
+              if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
               try{
                 localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
               }catch(e){
