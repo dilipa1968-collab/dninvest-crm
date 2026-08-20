@@ -7045,12 +7045,16 @@ function hasMfDeskAccess(user){
 }
 
 // ── Cross-check remarks ──
-// A light two-way check between the RM and MF Desk on the same entry, without
-// either side needing approve/decline authority (that's Admin-only).
+// A light note-taking check on an entry, without approve/decline authority
+// (that's Admin-only).
 //  - MF-Desk-capable user (pure MF Desk role, or an RM granted MF Desk
-//    access) can see every RM's entries (see getFilteredMfTxns) — so they can
-//    leave a remark on ANY entry they can see, except one they personally
-//    entered themselves (no point "cross-checking" your own data entry).
+//    access) can see every RM's entries (see getFilteredMfTxns) — so they get
+//    the same blanket ability as Admin to leave a remark on ANY entry,
+//    including their own data entry. (Previously self-entered rows were
+//    excluded "no point cross-checking your own entry", but that produced an
+//    inconsistent, hard-to-explain pattern — RMK showing on some rows and not
+//    others depending on who happened to key it in. Treating MF Desk like
+//    Admin here removes that inconsistency.)
 //  - A plain RM (no desk access) can only remark on entries logged by
 //    someone else on their behalf (e.g. MF Desk backfilled it for them) — a
 //    chance to confirm/dispute it. They can't remark on their own self-logged
@@ -7059,9 +7063,7 @@ function hasMfDeskAccess(user){
 function canAddCrossRemark(e){
   if(!CU) return false;
   if(CU.role==='admin') return true;
-  if(hasMfDeskAccess(CU)){
-    return (e.created_by||'').trim().toLowerCase() !== (CU.name||'').trim().toLowerCase();
-  }
+  if(hasMfDeskAccess(CU)) return true;
   const selfEntered = (e.rm||'').trim().toLowerCase() === (e.created_by||'').trim().toLowerCase();
   if(selfEntered) return false;
   return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
