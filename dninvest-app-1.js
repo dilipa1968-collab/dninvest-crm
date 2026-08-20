@@ -12858,8 +12858,20 @@ async function doImport(){
       if(!ex){
         if(nameCount[upName] === 1 && fileNameCount[upName] === 1){
           ex = nameMap[upName];                       // unique on both sides — safe
+        } else if(row.client_id){
+          // This row carries its own Client ID — the RTA's authoritative key
+          // — so a same-name collision (another person in the DB, or another
+          // row in this same file, happens to share this exact name) is no
+          // longer a real ambiguity: we know precisely which account this
+          // row is, we just don't have it filed under this Client ID yet.
+          // Falls through to "add as new" below instead of being silently
+          // skipped. If this genuinely is the same person as one of the
+          // same-named existing records (their Client ID was simply never
+          // captured before), Merge Duplicates — which now treats Client ID
+          // as authoritative, 20-Aug-2026 — will correctly fold the two
+          // back together once both carry a Client ID to compare.
         } else if(nameCount[upName] > 1 || fileNameCount[upName] > 1){
-          ambigRows.push(row); return;                // several people share this name
+          ambigRows.push(row); return;                // several people share this name, no Client ID to break the tie
         }
         // else: nobody by this name -> genuinely new client, fall through to add
       }
