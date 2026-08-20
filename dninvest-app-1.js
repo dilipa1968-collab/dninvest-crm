@@ -61,36 +61,9 @@ const PER_DOC_COLLECTIONS = {}; // no longer used, kept for compatibility
 // the number and delete the old crm_data/<key>__sN docs first.
 const SHARD_CFG = {
   eq_clients: 8,   // ~3400 clients → ~425/shard → ~130 KB/shard (lots of headroom)
-  // mf_clients crossed 1 MiB on 19-Aug-2026 (1,524,389 bytes) after the
-  // Folio Split AUM import started storing each client's full fund-wise
-  // breakup (aum_detail.sc[]) — a handful of clients hold 20-35 schemes,
-  // and that adds up fast across ~930 investors. Sharded the same way as
-  // eq_clients: 4 shards → ~380 KB/shard today, room to grow well past
-  // 2,000 investors with full scheme breakups before hitting the limit again.
-  mf_clients: 4,
 };
 
 const DB = {
-  // Recursively strips any `undefined` value out of an object/array before
-  // it's sent to Firestore. Firestore's SDK REJECTS the entire write with
-  // "Unsupported field value: undefined" the moment ANY field anywhere in
-  // the payload is undefined — even one bad field on one record blocks the
-  // whole array (mf_clients/eq_clients etc. are one big array in one doc/
-  // shard, so this has repeatedly taken down an entire import). localStorage
-  // already tolerates this silently (JSON.stringify just drops undefined
-  // keys) which is exactly why these slip through testing and only surface
-  // as a Firestore sync error. Every write path below runs data through
-  // this first as a permanent safety net, instead of chasing each new
-  // source of `undefined` (import bugs, future RTA header changes, etc.)
-  // one at a time.
-  _clean(v){
-    if(v===undefined) return null;
-    if(v===null || typeof v!=='object' || v instanceof Date) return v;
-    if(Array.isArray(v)) return v.map(x=>this._clean(x));
-    const o={};
-    for(const k in v){ if(v[k]!==undefined) o[k]=this._clean(v[k]); }
-    return o;
-  },
   // ── shard helpers ──────────────────────────────────────────
   _shardCache: {},   // { key: [shard0Array, shard1Array, ...] }
   _shardSeen: {},    // { key: Set(shardIndex) } — realtime readiness guard
@@ -131,7 +104,7 @@ const DB = {
     const parts = this._splitShards(key,arr);
     const batch = fdb.batch();
     parts.forEach((p,i)=>{
-      batch.set(this._shardRef(key,i), {data:this._clean(p), updated:new Date().toISOString(), shard:i, count:p.length});
+      batch.set(this._shardRef(key,i), {data:p, updated:new Date().toISOString(), shard:i, count:p.length});
     });
     await batch.commit();
     this._shardCache[key] = parts;
@@ -140,7 +113,6 @@ const DB = {
   // One-time migration: if no shard doc exists yet but the legacy oversized
   // document does, copy it into shards. Deterministic + idempotent, so it's
   // safe even if two browsers do it at the same instant. The legacy doc is
-
   // intentionally LEFT IN PLACE as a backup (it is simply never read again).
   async _ensureMigrated(key){
     let parts = await this._readShards(key);
@@ -185,7 +157,7 @@ const DB = {
     }
     try{
       if(typeof fdb!=='undefined'){
-        fdb.collection('crm_data').doc(key).set({data:this._clean(val),updated:new Date().toISOString()})
+        fdb.collection('crm_data').doc(key).set({data:val,updated:new Date().toISOString()})
           .then(()=>console.log('Firebase synced:',key))
           .catch(e=>{ console.log('Firebase error:',e); toast('Sync error: '+e.message,'error'); });
       }
@@ -220,7 +192,7 @@ const DB = {
         if(arrayKey==='entries'){ if(!lEntries.some(e=>e&&e.id===entry.id)) lEntries.push(entry); }
         else { if(!lEq.some(e=>e&&e.id===entry.id)) lEq.push(entry); }
         finalData = {entries:lEntries, eq_entries:lEq};
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ this.setLocal('mf_business', finalData); }
       return finalData;
@@ -267,7 +239,7 @@ const DB = {
         if(res===false){ aborted=true; return; }
         arr[idx]=fresh;
         finalData = {entries:lEntries, eq_entries:lEq};
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData) this.setLocal('mf_business', finalData);
       return {ok:true, aborted};
@@ -306,7 +278,7 @@ const DB = {
         latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
         entries.forEach(e=>{ if(e&&e.id) byId[e.id]=e; });
         finalData = capSort(Object.values(byId));
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
@@ -343,7 +315,7 @@ const DB = {
         const byId2={}; latest.forEach(x=>{ if(x&&x.date&&x.scope) byId2[x.date+'__'+x.scope]=x; });
         byId2[rowId]=entry;
         finalData = capSort(Object.values(byId2));
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_eq_activity_snapshots',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
@@ -398,7 +370,7 @@ const DB = {
         const byId2={}; latest.forEach(x=>{ if(x&&x.date&&x.scope) byId2[x.date+'__'+x.scope]=x; });
         byId2[rowId]=entry;
         finalData = capSort(Object.values(byId2));
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_aum_snapshots',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
@@ -461,7 +433,7 @@ const DB = {
         const byId2={}; latest.forEach(x=>{ if(x&&x.id) byId2[x.id]=x; });
         entries.forEach(entry=>{ byId2[entry.id]=entry; });
         finalData = DB._pruneCallLogs(Object.values(byId2), 850000); // same date-priority pruning as call_logs
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
@@ -503,7 +475,7 @@ const DB = {
         const doc = await tx.get(docRef);
         let latest = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
         finalData = latest.filter(x=>!(x&&idSet.has(x.id)));
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
@@ -546,7 +518,7 @@ const DB = {
         finalData = Object.values(byId);
         // Trim oldest logs so the document stays under Firestore's 1 MiB cap
         finalData = DB._pruneCallLogs(finalData, 850000);
-        tx.set(docRef, {data:this._clean(finalData), updated:new Date().toISOString()});
+        tx.set(docRef, {data:finalData, updated:new Date().toISOString()});
       });
       if(finalData){
         try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
@@ -579,7 +551,7 @@ const DB = {
                    : ((this._shardCache[key]||[])[si] || []);
         const lidx = latest.findIndex(c=>c.id===rec.id);
         if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
-        tx.set(ref, {data:this._clean(latest), updated:new Date().toISOString(), shard:si, count:latest.length});
+        tx.set(ref, {data:latest, updated:new Date().toISOString(), shard:si, count:latest.length});
         if(this._shardCache[key]) this._shardCache[key][si] = latest;
       });
       console.log('Firebase shard-synced:',key,'s'+si,rec.id);
@@ -613,7 +585,7 @@ const DB = {
         let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
         const lidx = latest.findIndex(c=>c.id===rec.id);
         if(lidx>=0) latest[lidx]=rec; else latest.push(rec);
-        tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
         finalData = latest;
       });
       // adopt the merged result locally too, in case other records changed
@@ -663,7 +635,7 @@ const DB = {
         if(res===false){ aborted=true; return; }
         latest = latest.slice();
         latest[idx] = sem;
-        tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
         finalData = latest;
       });
       if(finalData) this.setLocal('seminars', finalData);
@@ -702,7 +674,7 @@ const DB = {
         latest = JSON.parse(JSON.stringify(latest));
         const res = mutate(latest);
         if(res===false){ aborted=true; return; }
-        tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
+        tx.set(docRef, {data:latest, updated:new Date().toISOString()});
         finalData = latest;
       });
       if(finalData) this.setLocal('users', finalData);
@@ -729,7 +701,7 @@ const DB = {
                      ? doc.data().data
                      : ((this._shardCache[key]||[])[si] || []);
           latest = latest.filter(c=>c.id!==id);
-          tx.set(ref, {data:this._clean(latest), updated:new Date().toISOString(), shard:si, count:latest.length});
+          tx.set(ref, {data:latest, updated:new Date().toISOString(), shard:si, count:latest.length});
           if(this._shardCache[key]) this._shardCache[key][si] = latest;
         });
       }catch(e){ console.log('deleteClient(shard) error:',e); toast('Sync error: '+e.message,'error'); }
@@ -746,7 +718,7 @@ const DB = {
           const doc = await tx.get(docRef);
           let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
           latest = latest.filter(c=>c.id!==id);
-          tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
           finalData = latest;
         });
         if(finalData) this.setLocal(key, finalData);
@@ -773,7 +745,7 @@ const DB = {
           const m = {}; latest.forEach(c=>{ if(c) m[c.id]=c; });
           groups[i].forEach(r=>m[r.id]=r);
           const out = Object.values(m);
-          tx.set(refs[k], {data:this._clean(out), updated:new Date().toISOString(), shard:i, count:out.length});
+          tx.set(refs[k], {data:out, updated:new Date().toISOString(), shard:i, count:out.length});
           if(this._shardCache[key]) this._shardCache[key][i] = out;
         });
       });
@@ -802,7 +774,7 @@ const DB = {
             const d = docs[k];
             let latest = (d.exists && d.data() && Array.isArray(d.data().data)) ? d.data().data : [];
             const out = latest.filter(c=>!groups[i].has(c.id));
-            tx.set(refs[k], {data:this._clean(out), updated:new Date().toISOString(), shard:i, count:out.length});
+            tx.set(refs[k], {data:out, updated:new Date().toISOString(), shard:i, count:out.length});
             if(this._shardCache[key]) this._shardCache[key][i] = out;
           });
         });
@@ -818,7 +790,7 @@ const DB = {
         const doc = await tx.get(ref);
         let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : arr;
         latest = latest.filter(c=>!idSet.has(c.id));
-        tx.set(ref, {data:this._clean(latest), updated:new Date().toISOString()});
+        tx.set(ref, {data:latest, updated:new Date().toISOString()});
         this.setLocal(key, latest);
       });
     }catch(e){ toast('Delete sync error: '+(e.message||e),'error'); }
@@ -847,7 +819,7 @@ const DB = {
           let lmap = {}; latest.forEach(c=>lmap[c.id]=c);
           records.forEach(r=>lmap[r.id]=r);
           latest = Object.values(lmap);
-          tx.set(docRef, {data:this._clean(latest), updated:new Date().toISOString()});
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
           finalData = latest;
         });
         if(finalData) this.setLocal(key, finalData);
@@ -868,19 +840,6 @@ const DB = {
     // login, page refresh, and the 30-min auto-reload, so a sequential for-loop here
     // directly adds up to slow login/page-open times (each collection = one network
     // round-trip; sequential = sum of all of them, parallel = the slowest single one).
-    //
-    // IMPORTANT (bug found+fixed 19-Aug-2026): every branch below now goes through
-    // `this.setLocal(key, value)` instead of a raw `localStorage.setItem(...)`.
-    // DB.get() serves from an in-memory cache (`this._mem`) FIRST and only ever
-    // falls back to localStorage the very first time a key is read — a raw
-    // localStorage write updates the file on disk but NOT that in-memory cache,
-    // so DB.get() kept returning whatever was cached from BEFORE this sync ran.
-    // This was invisible after the 30-min auto-reload (a real `location.reload()`
-    // wipes `_mem` clean, masking the bug) but broke logout→login IN THE SAME TAB
-    // (no page reload, `_mem` survives) — freshly-imported data (e.g. AUM fund-wise
-    // breakup) would sync correctly into localStorage yet the UI kept showing the
-    // stale pre-sync snapshot from `_mem` until a hard refresh. setLocal() updates
-    // both, so this class of staleness can't happen again for any key.
     await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'].map(async (key)=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
@@ -890,7 +849,7 @@ const DB = {
           this._shardSeen[key]  = new Set(parts.map((_,i)=>i));   // all shards known
           const merged = this._mergeShards(key);
           if(merged.length){
-            this.setLocal(key, merged);
+            localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
             console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
                         this._shardCache[key].map(p=>p.length));
           }
@@ -908,7 +867,7 @@ const DB = {
             if(d && typeof d.codeJson==='string'){ try{ codeObj=JSON.parse(d.codeJson)||{}; }catch(_){ codeObj={}; } }
             else if(d && d.code && typeof d.code==='object'){ codeObj=d.code; }
             const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
-            this.setLocal('eq_risk', norm);
+            localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
             console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
             return;
           }
@@ -920,7 +879,7 @@ const DB = {
               const byId={};
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-              this.setLocal('call_logs', Object.values(byId));
+              localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
               console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
             } else if(key==='activity_logs'){
               let existing=[];
@@ -929,14 +888,14 @@ const DB = {
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               const merged=Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
-              this.setLocal('activity_logs', merged);
+              localStorage.setItem('dninvest_activity_logs', JSON.stringify(merged));
               console.log('Loaded+merged from Firebase: activity_logs', merged.length);
             } else if(d.length>0){
-              this.setLocal(key, d);
+              localStorage.setItem('dninvest_'+key,JSON.stringify(d));
               console.log('Loaded from Firebase:',key, d.length,'records');
             }
           } else {
-            this.setLocal(key, d);
+            localStorage.setItem('dninvest_'+key,JSON.stringify(d));
             console.log('Loaded from Firebase:',key, 'object');
           }
         }
@@ -1225,7 +1184,7 @@ async function sendCrmHeartbeat(){
       const doc=await tx.get(docRef);
       let latest=(doc.exists && doc.data() && doc.data().data)?doc.data().data:{};
       latest[_crmHbName]={date:today(), time:hhmm};
-      tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
     });
     // LIVE OUT-TIME: RMs poora din CRM me rehte hain, isliye out-time yahin se live
     // save karo — HR portal ya kisi device ke 6:15 PM par khule hone par depend na kare.
@@ -1251,7 +1210,7 @@ async function crmLiveOutTime(hhmm){
       if(rec.out && !(hhmm>rec.out)) return; // same/earlier — no write needed
       arr[idx]={...rec, out:hhmm};
       latest[_crmHbName]=arr;
-      tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+      tx.set(docRef, {data:latest, updated:new Date().toISOString()});
     });
   }catch(e){ console.log('[HB] out-time update failed:', e); }
 }
@@ -1320,7 +1279,7 @@ async function recordHrAttendanceOnCrmLogin(user){
             if(!latest[name]) latest[name]=[];
             const idx = latest[name].findIndex(r=>r.date===td);
             if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
-            tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+            tx.set(docRef, {data:latest, updated:new Date().toISOString()});
           });
           console.log('[ATT] ✅ Late flip saved (attempt '+attempt+')');
           break;
@@ -1366,7 +1325,7 @@ async function recordHrAttendanceOnCrmLogin(user){
               let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : {};
               const idx = (latest[name]||[]).findIndex(r=>r.date===td);
               if(idx>=0) latest[name][idx]={...latest[name][idx], out:'', status:st2};
-              tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+              tx.set(docRef, {data:latest, updated:new Date().toISOString()});
             });
             console.log('[ATT] ✅ healed premature Half day → '+st2);
           }catch(e){ console.log('[ATT] heal attempt failed:', e.message); }
@@ -1407,7 +1366,7 @@ async function recordHrAttendanceOnCrmLogin(user){
           if(!latest[name]) latest[name]=[];
           const idx = latest[name].findIndex(r=>r.date===td);
           if(idx>=0) latest[name][idx]=record; else latest[name].push(record);
-          tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+          tx.set(docRef, {data:latest, updated:new Date().toISOString()});
         });
         console.log('[ATT] ✅ saved successfully for '+name+' (attempt '+attempt+')');
         saved = true;
@@ -1454,14 +1413,6 @@ function openHrPortal(){
 
 function doLogout(){
   CU=null;
-  // Defensive: also drop the in-memory DB cache (DB._mem) on logout, not just
-  // the session token. Without this, logging back in in the SAME browser tab
-  // (no full page reload) would keep serving whatever was cached from BEFORE
-  // logout — the real fix is that syncFromFirebase() now updates this cache
-  // correctly on every sync (see DB.setLocal usage there), but clearing it
-  // here too means a stray future write that bypasses setLocal can't cause
-  // the same stale-after-relogin bug again.
-  if(typeof DB!=='undefined') DB._mem = {};
   localStorage.removeItem('dninvest_session');
   sessionStorage.removeItem('dninvest_session'); // clean up old-style sessions too
   document.getElementById('loginScreen').style.display='flex';
@@ -7089,11 +7040,14 @@ function hasMfDeskAccess(user){
 //  - Logged by someone else on this RM's behalf → the actual owning RM can
 //    leave a remark (e.g. confirm/dispute it).
 // Admin can always remark on anything.
-// Cross-check remark: open to every logged-in user on every entry (RMs can
-// flag/cross-check any transaction, not just their own client's), per admin
-// request — no longer gated to admin/self-RM only.
 function canAddCrossRemark(e){
-  return !!CU;
+  if(!CU) return false;
+  if(CU.role==='admin') return true;
+  const selfEntered = (e.rm||'').trim().toLowerCase() === (e.created_by||'').trim().toLowerCase();
+  if(selfEntered){
+    return hasMfDeskAccess(CU) && CU.name!==e.created_by;
+  }
+  return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
 }
 
 function addCrossRemark(id){
@@ -7695,65 +7649,59 @@ function getLearnedFundNames(){
   return DB.get('learned_fund_names') || [];
 }
 
-// Every unique scheme name already sitting in the CRM's own MF client records —
-// both c.sip_details[].scheme (SIP report import) AND c.aum_detail.sc[].scheme
-// (AUM By Client "Folio Split" import, added 19-Aug-2026 — this one covers
-// EVERY folio type: lumpsum, switch, STP, not just SIPs, so it's the more
-// complete source). These are REAL scheme names the RMs already deal with, in
-// the exact spelling/format the RTA reports use — a much better autocomplete
-// source than the generic built-in list for schemes this office actually
-// holds. Cached per page-load since mf_clients can be a few thousand records;
-// recomputed if it comes back empty (e.g. data synced in after the first
-// computation).
+// Every unique scheme name already sitting in the CRM's own MF client SIP
+// records (c.sip_details[].scheme — populated by the SIP report import, see
+// "SIP Details" modal). These are REAL scheme names the RMs already deal
+// with, in the exact spelling/format the SIP import uses — a much better
+// autocomplete source than the generic built-in list for schemes this office
+// actually has live SIPs in. Cached per page-load since mf_clients can be a
+// few thousand records; recomputed if it comes back empty (e.g. data synced
+// in after the first computation).
 let _crmSchemeNamesCache = null;
 function getCrmSchemeNames(){
   if(_crmSchemeNamesCache && _crmSchemeNamesCache.length) return _crmSchemeNamesCache;
   const seen = new Set();
   const names = [];
-  const addScheme = raw => {
-    const scheme = String(raw||'').trim();
-    if(!scheme) return;
-    // Some SIP-report imports produced a truncated/mis-parsed "scheme" value
-    // (e.g. just the word "GROWTH" instead of the full scheme name) — a
-    // genuine fund name is always reasonably long and almost always
-    // contains the word "fund", so this filters that garbage out rather
-    // than surfacing it as a suggestion.
-    if(scheme.length < 15) return;
-    if(!/fund/i.test(scheme)) return;
-    const key = scheme.toLowerCase();
-    if(seen.has(key)) return;
-    seen.add(key);
-    names.push(scheme);
-  };
   (DB.get('mf_clients')||[]).forEach(c=>{
-    if(Array.isArray(c.sip_details)) c.sip_details.forEach(d=>addScheme(d.scheme));
-    if(c.aum_detail && Array.isArray(c.aum_detail.sc)) c.aum_detail.sc.forEach(s=>addScheme(s.scheme));
+    if(!Array.isArray(c.sip_details)) return;
+    c.sip_details.forEach(d=>{
+      const scheme = String(d.scheme||'').trim();
+      if(!scheme) return;
+      // Some SIP-report imports produced a truncated/mis-parsed "scheme" value
+      // (e.g. just the word "GROWTH" instead of the full scheme name) — a
+      // genuine fund name is always reasonably long and almost always
+      // contains the word "fund", so this filters that garbage out rather
+      // than surfacing it as a suggestion.
+      if(scheme.length < 15) return;
+      if(!/fund/i.test(scheme)) return;
+      const key = scheme.toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      names.push(scheme);
+    });
   });
   _crmSchemeNamesCache = names;
   return names;
 }
 
 // Which schemes THIS specific client already holds (from their own
-// sip_details AND their AUM Folio Split breakup) — used to put their existing
-// funds at the very top of the Fund Name suggestions when adding a
-// transaction for them, since an "Additional Buy"/"Redemption"/"Switch"
-// almost always targets a fund the client is already in, not some random new
-// scheme.
+// sip_details) — used to put their existing funds at the very top of the
+// Fund Name suggestions when adding a transaction for them, since an
+// "Additional Buy"/"Redemption"/"Switch" almost always targets a fund the
+// client is already in, not some random new scheme.
 function getClientSchemeNames(clientId){
   if(!clientId) return [];
   const c = (DB.get('mf_clients')||[]).find(x=>x.id===clientId);
-  if(!c) return [];
+  if(!c || !Array.isArray(c.sip_details)) return [];
   const seen=new Set(), names=[];
-  const addScheme = raw => {
-    const scheme=String(raw||'').trim();
+  c.sip_details.forEach(d=>{
+    const scheme=String(d.scheme||'').trim();
     if(!scheme || scheme.length<15 || !/fund/i.test(scheme)) return;
     const key=scheme.toLowerCase();
     if(seen.has(key)) return;
     seen.add(key);
     names.push(scheme);
-  };
-  if(Array.isArray(c.sip_details)) c.sip_details.forEach(d=>addScheme(d.scheme));
-  if(c.aum_detail && Array.isArray(c.aum_detail.sc)) c.aum_detail.sc.forEach(s=>addScheme(s.scheme));
+  });
   return names;
 }
 // Maps a Fund Name input's id to the currently-selected client's id for that
@@ -7772,6 +7720,190 @@ async function learnFundName(name){
   const knownLower = new Set([...FUND_NAME_LIST, ...existing, ...getCrmSchemeNames()].map(n=>n.toLowerCase()));
   if(knownLower.has(trimmed.toLowerCase())) return; // already known — nothing new to learn
   await DB.set('learned_fund_names', [...existing, trimmed]);
+}
+
+// ── FUND NAME DUPLICATE MERGE ──────────────────────────────────────────────
+// RMs typing free-text over months produce spelling/casing drift on the SAME
+// real fund ("helio mid cap fund" / "helios mid cap fund" / "HELIOS SMALL
+// CAP" vs "...FUND") — this finds those clusters and lets Admin merge them:
+// picks one canonical spelling, removes the rest from learned_fund_names, and
+// rewrites any past mf_business transaction that used a variant so
+// historical records/reports stay consistent too.
+
+function _levenshtein(a, b){
+  const m=a.length, n=b.length;
+  if(m===0) return n; if(n===0) return m;
+  let prev=new Array(n+1); for(let j=0;j<=n;j++) prev[j]=j;
+  for(let i=1;i<=m;i++){
+    const cur=[i];
+    for(let j=1;j<=n;j++){
+      cur[j] = a[i-1]===b[j-1] ? prev[j-1] : 1+Math.min(prev[j-1], prev[j], cur[j-1]);
+    }
+    prev=cur;
+  }
+  return prev[n];
+}
+// Strips punctuation/spaces and common filler words (Fund/Plan/Growth/etc.)
+// so two spellings of the same scheme collapse to (near-)identical keys,
+// while genuinely different schemes (different cap-size, different AMC)
+// stay distinct.
+function _fundLooseKey(name){
+  const noise = new Set(['fund','regular','plan','direct','growth','option','reinvestment','reinvest','payout','idcw','dividend','scheme','the','of','and']);
+  return String(name||'').toLowerCase().split(/[^a-z0-9]+/).filter(t=>t && !noise.has(t)).join('');
+}
+function findFundNameDupGroups(){
+  const learned = getLearnedFundNames();
+  const referenceSeen = new Set();
+  const reference = [];
+  [...FUND_NAME_LIST, ...getCrmSchemeNames()].forEach(n=>{
+    const k=n.toLowerCase(); if(referenceSeen.has(k)) return; referenceSeen.add(k); reference.push(n);
+  });
+  if(!learned.length) return [];
+
+  const all = [
+    ...reference.map(name=>({name, isRef:true})),
+    ...learned.map(name=>({name, isRef:false})),
+  ];
+  all.forEach(e=>{ e.key=_fundLooseKey(e.name); });
+
+  // Bucket by first 3 chars of the loose key so we only Levenshtein-compare
+  // plausible neighbours (n could be 600-1000+, full O(n²) would be slow).
+  const buckets={};
+  all.forEach((e,i)=>{
+    const b=e.key.slice(0,3)||'~';
+    (buckets[b] ||= []).push(i);
+  });
+
+  const parent=all.map((_,i)=>i);
+  const find=x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const union=(a,b)=>{ const ra=find(a), rb=find(b); if(ra!==rb) parent[ra]=rb; };
+
+  Object.values(buckets).forEach(idxs=>{
+    for(let i=0;i<idxs.length;i++){
+      for(let j=i+1;j<idxs.length;j++){
+        const ei=all[idxs[i]], ej=all[idxs[j]];
+        if(!ei.key || !ej.key) continue;
+        if(ei.key===ej.key){ union(idxs[i],idxs[j]); continue; }
+        if(Math.abs(ei.key.length-ej.key.length)<=2 && ei.key.length>=6 && ej.key.length>=6){
+          if(_levenshtein(ei.key, ej.key)<=2) union(idxs[i],idxs[j]);
+        }
+      }
+    }
+  });
+
+  const clusters={};
+  all.forEach((e,i)=>{ const r=find(i); (clusters[r] ||= []).push(e); });
+
+  const groups=[];
+  Object.values(clusters).forEach(members=>{
+    if(members.length<2) return;
+    const refs = members.filter(m=>m.isRef);
+    // Safety guard: if a cluster somehow pulled in 2+ DIFFERENT reference
+    // names, that's a sign of a false-positive fuzzy match (two genuinely
+    // different funds) — skip it rather than risk merging real schemes.
+    const distinctRefNames = new Set(refs.map(r=>r.name.toLowerCase()));
+    if(distinctRefNames.size>1) return;
+    const learnedMembers = members.filter(m=>!m.isRef);
+    if(!learnedMembers.length) return; // nothing to merge if it's reference-only
+    const canonical = refs.length ? refs[0].name
+      : learnedMembers.slice().sort((a,b)=> b.name.length - a.name.length)[0].name;
+    const variants = members.filter(m=>m.name.toLowerCase()!==canonical.toLowerCase()).map(m=>m.name);
+    if(!variants.length) return;
+    groups.push({ canonical, variants: [...new Set(variants)] });
+  });
+  return groups;
+}
+
+function openFundDupMerge(){
+  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('This tool is for admin only','error'); return; }
+  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const groups = findFundNameDupGroups();
+  const ov=document.createElement('div');
+  ov.id='fundDupOverlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
+  let body;
+  if(!groups.length){
+    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">No Duplicate Fund Names Found</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">All typed-in fund names look distinct.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Close</button></div></div>';
+  } else {
+    let rows='';
+    groups.forEach((g,gi)=>{
+      let variantRows = g.variants.map(v=>`<div style="padding:4px 0;color:#b91c1c;font-size:.82rem">✕ ${esc(v)}</div>`).join('');
+      rows+=`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">
+          <input type="checkbox" class="funddup-chk" data-idx="${gi}" checked> Group ${gi+1} — ${g.variants.length} variant(s) → merge into one
+        </label>
+        <div style="padding:10px 14px">
+          <div style="font-size:.72rem;color:#64748b;margin-bottom:2px">KEEP (canonical name):</div>
+          <input type="text" class="funddup-canonical" data-idx="${gi}" value="${esc(g.canonical)}" style="width:100%;padding:6px 9px;border:1px solid #16a34a;border-radius:6px;font-size:.85rem;color:#166534;font-weight:600;background:#f0fdf4">
+          <div style="font-size:.72rem;color:#64748b;margin:8px 0 2px">WILL BE REMOVED/REWRITTEN TO ABOVE:</div>
+          ${variantRows}
+        </div>
+      </div>`;
+    });
+    body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate Fund Names — Review & Merge</div>'
+      +'<button onclick="document.getElementById(\'fundDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
+      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ You can edit the "KEEP" name in any group before merging. Merging removes the variants from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used a variant, so historical records stay consistent. Uncheck any group you don\'t want merged.</div>'
+      +'<div style="padding:16px 18px">'+rows
+      +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
+      +'<button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Cancel</button>'
+      +'<button class="btn btn-teal" onclick="mergeFundDupsSelected()">✔ Merge Selected</button></div></div>';
+  }
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
+async function mergeFundDupsSelected(){
+  const groups = findFundNameDupGroups();
+  const checked = [...document.querySelectorAll('.funddup-chk')].filter(x=>x.checked).map(x=>parseInt(x.dataset.idx));
+  if(!checked.length){ toast('No group selected','error'); return; }
+
+  // Build the final list of {canonical, variants} using any edits the admin
+  // made to the canonical-name text boxes.
+  const selectedGroups = checked.map(idx=>{
+    const canonicalInput = document.querySelector(`.funddup-canonical[data-idx="${idx}"]`);
+    const canonical = canonicalInput ? canonicalInput.value.trim() : groups[idx].canonical;
+    return { canonical, variants: groups[idx].variants };
+  }).filter(g=>g.canonical);
+
+  const totalVariants = selectedGroups.reduce((s,g)=>s+g.variants.length,0);
+  if(!confirm(`Confirm: ${selectedGroups.length} group(s), ${totalVariants} variant name(s) will be merged into their canonical spelling — including rewriting any past transactions that used them. Proceed?`)) return;
+
+  // Build one lowercase-variant → canonical map across all selected groups.
+  const rewriteMap = {};
+  selectedGroups.forEach(g=>{
+    g.variants.forEach(v=>{ rewriteMap[v.toLowerCase()] = g.canonical; });
+  });
+
+  // 1) Clean learned_fund_names — drop every variant; keep canonical only if
+  // it isn't already covered by the built-in/CRM-scheme reference list.
+  const existingLearned = getLearnedFundNames();
+  const referenceLower = new Set([...FUND_NAME_LIST, ...getCrmSchemeNames()].map(n=>n.toLowerCase()));
+  let newLearned = existingLearned.filter(n=>!(n.toLowerCase() in rewriteMap));
+  selectedGroups.forEach(g=>{
+    if(!referenceLower.has(g.canonical.toLowerCase()) && !newLearned.some(n=>n.toLowerCase()===g.canonical.toLowerCase())){
+      newLearned.push(g.canonical);
+    }
+  });
+  await DB.set('learned_fund_names', newLearned);
+
+  // 2) Rewrite past mf_business transactions using a variant name.
+  const biz = DB.get('mf_business') || {entries:[], eq_entries:[]};
+  let fixedCount = 0;
+  const newEntries = (biz.entries||[]).map(e=>{
+    let changed=false;
+    const ne = {...e};
+    if(ne.fund_name && rewriteMap[ne.fund_name.toLowerCase()]){ ne.fund_name = rewriteMap[ne.fund_name.toLowerCase()]; changed=true; }
+    if(ne.target_scheme && rewriteMap[ne.target_scheme.toLowerCase()]){ ne.target_scheme = rewriteMap[ne.target_scheme.toLowerCase()]; changed=true; }
+    if(changed) fixedCount++;
+    return ne;
+  });
+  await DB.set('mf_business', {entries:newEntries, eq_entries: biz.eq_entries||[]});
+
+  _crmSchemeNamesCache = null; // stale after this — force recompute next lookup
+  document.getElementById('fundDupOverlay')?.remove();
+  toast(`✅ Merged ${totalVariants} variant name(s) across ${selectedGroups.length} group(s) — ${fixedCount} past transaction(s) updated`, 'success');
 }
 
 function searchFundName(inputId, resultsId){
@@ -7808,12 +7940,8 @@ function searchFundName(inputId, resultsId){
   }
   const r=input.getBoundingClientRect();
   out.style.left=r.left+'px';
-  // Compact: capped narrower than the (often wide) input field itself, and a
-  // shorter max-height with a smaller per-row font/padding below — the field
-  // this feeds (MF Transactions → Fund Name) is a wide form column, but a
-  // long scheme-name dropdown that wide felt oversized for what it shows.
-  out.style.width=Math.min(r.width, 340)+'px';
-  const maxH=220;
+  out.style.width=r.width+'px';
+  const maxH=260;
   if(r.bottom+8+maxH > window.innerHeight){
     out.style.top='';
     out.style.bottom=(window.innerHeight-r.top+4)+'px'; // not enough room below → show above the input
@@ -7852,15 +7980,15 @@ function searchFundName(inputId, resultsId){
   // list "closes before I can select anything".
 
   if(matches.length===0){
-    out.innerHTML='<div style="padding:8px 10px;color:var(--gray);font-size:.78rem">No match found — type it and it\'ll be remembered for next time</div>';
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No match found — type it and it\'ll be remembered for next time</div>';
     out.style.display='block';
     return;
   }
   out.innerHTML=matches.map(name=>{
     const isClientFund = clientFundKeys.has(name.toLowerCase());
     return `
-    <div style="padding:6px 9px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.78rem;line-height:1.3;${isClientFund?'background:#f0fdf4':''}" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='${isClientFund?'#f0fdf4':'#fff'}'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
-      ${isClientFund?'<span style="color:#16a34a;font-weight:700;margin-right:4px" title="Client already holds this">★</span>':''}${escapeHtml(name)}
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem;${isClientFund?'background:#f0fdf4':''}" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='${isClientFund?'#f0fdf4':'#fff'}'" onmousedown="event.preventDefault()" onclick="selectFundName('${inputId}','${resultsId}', this.dataset.name)" data-name="${escapeHtml(name)}">
+      ${isClientFund?'<span style="color:#16a34a;font-weight:700;margin-right:5px" title="Client already holds this">★</span>':''}${escapeHtml(name)}
     </div>`;
   }).join('');
   out.style.display='block';
@@ -9899,26 +10027,6 @@ function rmShiftReport(){
 // ══════════════════════════════════════════
 // EXPORT
 // ══════════════════════════════════════════
-// Tiered money-color helper for Excel exports (via dnXlsxBook's per-column
-// `color` fn) — highlights higher-value clients in green/amber, same visual
-// language as dnStatusColor. thresholds checked high→low, first match wins.
-function dnMoneyTierColor(thresholds){
-  return v => {
-    const n = Number(String(v||'').replace(/[₹,]/g,'')) || 0;
-    for(const [min,color] of thresholds){ if(n>=min) return color; }
-    return null;
-  };
-}
-const AUM_TIER_COLOR = dnMoneyTierColor([
-  [5000000, {bg:'FFC6EFCE', font:'FF006100'}],  // ≥₹50L — green
-  [1000000, {bg:'FFFFEB9C', font:'FF9C6500'}]   // ≥₹10L — amber
-]);
-const SIP_TIER_COLOR = dnMoneyTierColor([
-  [25000, {bg:'FFC6EFCE', font:'FF006100'}],    // ≥₹25K/mo — green
-  [10000, {bg:'FFFFEB9C', font:'FF9C6500'}]     // ≥₹10K/mo — amber
-]);
-const SIP_COUNT_COLOR = v => (Number(v)||0)>0 ? {bg:'FFE0F7FC', font:'FF0891B2'} : null;
-
 function exportCSV(seg){
   const bseg = seg==='equity' ? 'eq' : 'mf';
   const key  = seg==='equity' ? 'eq_clients' : 'mf_clients';
@@ -9947,9 +10055,7 @@ function exportCSV(seg){
     cols=[
       {header:'Name',width:22},{header:'Mobile',width:13},{header:'Email',width:24},
       {header:'RM',width:14},{header:'Status',width:12,align:'center',color:dnStatusColor},
-      {header:'AUM',width:14,money:true,color:AUM_TIER_COLOR},
-      {header:'SIP Amount',width:13,money:true,color:SIP_TIER_COLOR},
-      {header:'SIP Count',width:10,num:true,align:'center',color:SIP_COUNT_COLOR},
+      {header:'AUM',width:14,money:true},{header:'SIP Amount',width:13,money:true},{header:'SIP Count',width:10,num:true},
       {header:'Last Invest Date',width:14},{header:'Last Call Date',width:14},
       {header:'Next Call Date',width:14},{header:'Follow-up Status',width:16},{header:'Remarks',width:26}
     ];
@@ -9958,50 +10064,6 @@ function exportCSV(seg){
   }
   dnXlsx(fname+today()+'.xlsx', title+' — '+today(), cols, rows);
   toast(onlySel?`Exported ${clients.length} selected`:'Export done!','success');
-}
-
-// SIP Tracker → colorful multi-sheet Excel export (dnXlsxBook, same styled
-// engine as everything else — navy title bar, teal header, zebra rows).
-// Sheet 1: one row per SIP client (AUM/SIP-amount tier-colored, same as the
-// MF Investors export above). Sheet 2: every individual SIP (scheme-wise),
-// flattened from each client's sip_details — the full Running SIP Report
-// view without needing to re-open that upload.
-function exportSipTracker(){
-  const mf = getMyMfClients();
-  const sipClients = mf.filter(c=>c.sip_amount>0);
-  if(!sipClients.length){ toast('No SIP clients to export','error'); return; }
-  const sorted = sipClients.slice().sort((a,b)=>(b.sip_amount||0)-(a.sip_amount||0));
-
-  const summaryCols = [
-    {header:'Name',width:22},{header:'Mobile',width:13},{header:'RM',width:14},
-    {header:'Status',width:12,align:'center',color:dnStatusColor},
-    {header:'AUM',width:14,money:true,color:AUM_TIER_COLOR},
-    {header:'SIP/mo',width:13,money:true,color:SIP_TIER_COLOR},
-    {header:'SIP Count',width:10,num:true,align:'center',color:SIP_COUNT_COLOR}
-  ];
-  const summaryRows = sorted.map(c=>[c.name,c.mobile||'',c.rm||'',c.status||'',c.aum||0,c.sip_amount||0,c.sip_count||0]);
-  const totalRow = ['TOTAL ('+sorted.length+')','','','',
-    sorted.reduce((s,c)=>s+(parseFloat(c.aum)||0),0),
-    sorted.reduce((s,c)=>s+(parseFloat(c.sip_amount)||0),0),
-    sorted.reduce((s,c)=>s+(parseInt(c.sip_count)||0),0)];
-
-  const detailCols = [
-    {header:'Name',width:22},{header:'RM',width:14},{header:'Scheme',width:34},
-    {header:'Folio',width:16},{header:'SIP Amount',width:13,money:true,color:SIP_TIER_COLOR},
-    {header:'SIP Date',width:10,align:'center'},{header:'Frequency',width:12}
-  ];
-  const detailRows=[];
-  sorted.forEach(c=>{
-    (Array.isArray(c.sip_details)?c.sip_details:[]).forEach(x=>{
-      detailRows.push([c.name, c.rm||'', x.scheme||'', x.folio||'', parseFloat(x.amount)||0, x.day||'', x.freq||'']);
-    });
-  });
-
-  dnXlsxBook('sip_tracker_'+today()+'.xlsx',[
-    { name:'SIP Summary', title:'SIP Tracker Summary — '+today(), columns:summaryCols, rows:summaryRows, totalRow },
-    { name:'Scheme-wise', title:'SIP Scheme-wise Breakup — '+today(), columns:detailCols, rows:detailRows }
-  ]);
-  toast('Export done! '+sorted.length+' SIP clients','success');
 }
 
 // ══════════════════════════════════════════
@@ -10045,7 +10107,7 @@ async function forceLogoutUser(userId){
       const idx = latest[hrName].findIndex(r=>r.date===td);
       if(idx>=0) latest[hrName][idx].out = outTime;
       else latest[hrName].push({date:td, in:'', out:outTime, status:'Present'});
-      tx.set(attRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+      tx.set(attRef, {data:latest, updated:new Date().toISOString()});
     });
   }catch(e){ console.log('[FORCE LOGOUT] HR out-time save error:', e.message); }
 
@@ -10556,7 +10618,7 @@ async function runLateAbsentCheck(){
           const aidx = latest[hrName].findIndex(r=>r.date===td);
           const record = {date:td, in:'', out:'', status:'Absent'};
           if(aidx>=0) latest[hrName][aidx]=record; else latest[hrName].push(record);
-          tx.set(attDocRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+          tx.set(attDocRef, {data:latest, updated:new Date().toISOString()});
         });
       }catch(e){ console.log('Late-absent attendance write error:', hrName, e); }
     }
@@ -11984,33 +12046,23 @@ function showSipDetails(id){
   const d = Array.isArray(c.sip_details)?c.sip_details:[];
   if(!d.length){ toast('SIP details are not available — please import the Running SIP Report','error'); return; }
   const total = d.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
-  const maxAmt = Math.max(1, ...d.map(x=>parseFloat(x.amount)||0));
-  document.getElementById('sipDetailTitle').innerHTML = `SIP Details — ${escapeHtml(c.name||'')} <span style="font-weight:500;opacity:.75;font-size:.85em">(${d.length} SIP${d.length>1?'s':''})</span>`;
-  let h = `<div style="border:1px solid #eef1f6;border-radius:8px;overflow:hidden">
-    <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.83rem">
-    <colgroup><col style="width:60%"><col style="width:22%"><col style="width:18%"></colgroup>
-    <thead><tr style="background:#f8fafc;border-bottom:1px solid #eef1f6">
-      <th style="padding:8px 12px;text-align:left;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SCHEME</th>
-      <th style="padding:8px 12px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SIP AMOUNT</th>
-      <th style="padding:8px 12px;text-align:center;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px">SIP DATE</th>
+  document.getElementById('sipDetailTitle').innerHTML = `SIP Details — ${c.name} <span style="font-weight:500;opacity:.7">(${d.length} SIP${d.length>1?'s':''})</span>`;
+  let h = `<div style="overflow:auto"><table class="tbl" style="width:100%;font-size:.85rem">
+    <thead><tr>
+      <th style="text-align:left">Scheme</th>
+      <th style="text-align:right;white-space:nowrap">SIP Amount</th>
+      <th style="text-align:center;white-space:nowrap">SIP Date</th>
     </tr></thead><tbody>`;
-  d.forEach((x,i)=>{
-    const amt = parseFloat(x.amount)||0;
-    const share = Math.max(2, Math.round(amt/maxAmt*100));
-    const zebra = i%2===1 ? 'background:#fafbfc' : '';
-    h += `<tr style="border-bottom:1px solid #f1f4f8;${zebra}">
-      <td style="padding:8px 12px;text-align:left;overflow-wrap:anywhere">
-        <div style="font-weight:500;color:var(--navy)">${escapeHtml(x.scheme||'—')}</div>
-        ${(x.folio||x.freq||x.trxn)?`<div style="color:#aab0bb;font-size:.68rem;margin-top:1px;overflow-wrap:anywhere">${[x.folio?'Folio: '+escapeHtml(x.folio):'', x.freq||'', x.trxn?'Trxn: '+escapeHtml(x.trxn):''].filter(Boolean).join(' · ')}</div>`:''}
-        <div style="background:#f1f4f8;border-radius:2px;height:3px;margin-top:4px;max-width:100%"><div style="background:#cbd5e1;height:3px;border-radius:2px;width:${share}%"></div></div>
-      </td>
-      <td style="text-align:right;font-weight:600;color:var(--teal,#0d9488);padding:8px 12px">₹${fmtNum(amt)}</td>
-      <td style="text-align:center;padding:8px 12px;color:var(--gray)">${x.day||'—'}</td>
+  d.forEach(x=>{
+    h += `<tr>
+      <td style="text-align:left">${x.scheme||'—'}${(x.folio||x.freq||x.trxn)?`<div style="font-size:.7rem;opacity:.6">${[x.folio?'Folio: '+x.folio:'', x.freq||'', x.trxn?'Trxn: '+x.trxn:''].filter(Boolean).join(' · ')}</div>`:''}</td>
+      <td style="text-align:right;font-weight:700;color:var(--teal,#0d9488);white-space:nowrap">₹${fmtNum(x.amount||0)}</td>
+      <td style="text-align:center;white-space:nowrap">${x.day||'—'}</td>
     </tr>`;
   });
-  h += `</tbody><tfoot><tr style="font-weight:700;background:#f8fafc;border-top:1px solid #e5e9f0">
-      <td style="text-align:left;padding:9px 12px;color:var(--navy)">TOTAL (${d.length})</td>
-      <td style="text-align:right;padding:9px 12px;color:var(--teal,#0d9488)">₹${fmtNum(total)}</td>
+  h += `</tbody><tfoot><tr style="font-weight:800;border-top:2px solid var(--teal,#0d9488)">
+      <td style="text-align:left">TOTAL (${d.length})</td>
+      <td style="text-align:right;white-space:nowrap">₹${fmtNum(total)}</td>
       <td></td>
     </tr></tfoot></table></div>`;
   document.getElementById('sipDetailBody').innerHTML = h;
@@ -12091,17 +12143,7 @@ function parseAumExcel(rows){
     abs_rtn:   ['absrtn','absreturn','absolutereturn'],
     xirr:      ['xirr','xirrpct'],
     rm:      ['rm','relationshipmanager','dealer','dealername','employeename'],
-    sno:     ['sno','srno','serialno','slno'],
-    // "Folio Split" mode (an RTA report option): one row PER SCHEME/FOLIO
-    // instead of one row per client — the same client's Client ID repeats
-    // across several rows, each with a different Scheme Name/Folio No and
-    // its own slice of Inv Amt/AUM/Gain-Loss. A Scheme Name column is how we
-    // detect this and switch to the per-client aggregation below (see
-    // aggregateAumFolioRows) — otherwise every re-upload would silently
-    // overwrite a client's true total with just their LAST scheme row.
-    scheme:  ['schemename','scheme','fundname','fund'],
-    folio:   ['folio','foliono','folionumber'],
-    last_inv_date: ['lastinvdate','lastinvestmentdate','lastinvdt']
+    sno:     ['sno','srno','serialno','slno']
   };
   let hdrIdx=-1, colMap={};
   for(let i=0; i<Math.min(rows.length,15); i++){
@@ -12150,73 +12192,12 @@ function parseAumExcel(rows){
       gain_loss: num(at(r,'gain_loss')),
       abs_rtn:   num(at(r,'abs_rtn')),
       xirr:      num(at(r,'xirr')),
-      rm: String(at(r,'rm')||'').trim(),
-      scheme: String(at(r,'scheme')||'').trim(),
-      folio:  String(at(r,'folio')||'').trim(),
-      last_inv_date: String(at(r,'last_inv_date')||'').trim()
+      rm: String(at(r,'rm')||'').trim()
     };
   }).filter(r=>r.name);
 
-  // "Folio Split" report layout doesn't carry a PAN column at all (only
-  // Client ID) — that's fine, matching falls back to Client ID/Name, so it's
-  // not a "bad PAN" situation worth warning about. Only count/warn when a
-  // PAN column genuinely exists in the file but some values in it are junk.
-  out._badPan = colMap.pan!==undefined ? (data.length - out.filter(r=>r.pan).length) : 0;
-
-  // Folio Split mode: fold every scheme-row for the same client into one
-  // aggregated client record (summed Inv/AUM/Gain-Loss etc.), carrying the
-  // per-scheme breakdown along as `schemes[]` so the UI can still show the
-  // full fund-wise list on request. Old-format files (no Scheme Name column)
-  // are untouched — colMap.scheme is undefined, so this is a no-op for them.
-  if(colMap.scheme!==undefined){
-    const grouped = aggregateAumFolioRows(out);
-    grouped._badPan = out._badPan;
-    return grouped;
-  }
+  out._badPan = data.length - out.filter(r=>r.pan).length;
   return out;
-}
-
-// Folds "Folio Split" AUM rows (one row per scheme/folio) into one row per
-// client. Money fields (Inv Amt/AUM/Div Paid/Div ReInv/Gain-Loss) are simply
-// summed — they're real slices of the same total. Abs. Return % is
-// RECOMPUTED from the summed Gain/Loss ÷ summed Inv Amt (never averaged —
-// averaging % across schemes of very different sizes would be meaningless).
-// Avg. Days and XIRR aren't strictly additive across schemes with different
-// cash-flow histories, so they're shown as an AUM/Inv-weighted approximation
-// (clearly good enough for a dashboard glance; the exact per-scheme XIRR is
-// still available in the `schemes[]` breakup).
-function aggregateAumFolioRows(rows){
-  const groups = {}, order = [];
-  rows.forEach(r=>{
-    const key = r.client_id ? 'CID:'+r.client_id : (r.pan ? 'PAN:'+r.pan : 'NAME:'+r.name.toUpperCase());
-    if(!groups[key]){ groups[key]=[]; order.push(key); }
-    groups[key].push(r);
-  });
-  return order.map(key=>{
-    const g = groups[key];
-    const sum = f => Math.round(g.reduce((s,x)=>s+(parseFloat(x[f])||0),0)*100)/100;
-    const inv = sum('inv_amt'), aum = sum('aum'), gl = sum('gain_loss');
-    const pick = f => (g.find(x=>x[f])||{})[f] || '';
-    const avgDaysW = aum>0 ? Math.round(g.reduce((s,x)=>s+(parseFloat(x.avg_days)||0)*(parseFloat(x.aum)||0),0)/aum) : 0;
-    const xirrW = inv>0 ? Math.round((g.reduce((s,x)=>s+(parseFloat(x.xirr)||0)*(parseFloat(x.inv_amt)||0),0)/inv)*100)/100 : 0;
-    const lastInv = g.reduce((m,x)=> x.last_inv_date>m ? x.last_inv_date : m, '');
-    return {
-      sno: g[0].sno, name: g[0].name,
-      pan: pick('pan'), client_id: pick('client_id'),
-      inv_amt: inv, aum: aum,
-      div_paid: sum('div_paid'), div_reinv: sum('div_reinv'),
-      avg_days: avgDaysW, gain_loss: gl,
-      abs_rtn: inv>0 ? Math.round((gl/inv*100)*100)/100 : 0,
-      xirr: xirrW,
-      rm: pick('rm'),
-      last_inv_date: lastInv,
-      schemes: g.map(x=>({
-        scheme: x.scheme, folio: x.folio, inv: x.inv_amt, aum: x.aum,
-        gl: x.gain_loss, ar: x.abs_rtn, xirr: x.xirr, ad: x.avg_days,
-        dp: x.div_paid, dr: x.div_reinv, li: x.last_inv_date
-      }))
-    };
-  });
 }
 
 // Parse the "Running SIP Report".
@@ -12620,22 +12601,11 @@ async function doImport(){
   // Compact performance snapshot kept on the MF client so the AUM cell can be
   // clicked open. Short keys on purpose — this rides along in the mf_clients
   // blob doc, which every open tab re-downloads on change.
-  const _aumDetail = row => {
-    const d = {
-      inv: row.inv_amt||0, dp: row.div_paid||0, dr: row.div_reinv||0,
-      ad: row.avg_days||0, gl: row.gain_loss||0, ar: row.abs_rtn||0,
-      xirr: row.xirr||0, on: today()
-    };
-    // Fund-wise breakup — only present when the uploaded AUM report was in
-    // "Folio Split" mode (one row per scheme). Powers the "View fund-wise
-    // list" option in the Portfolio Details popup (openMfAum below).
-    // IMPORTANT: key is only added when there's real data — Firestore
-    // rejects `undefined` field values outright ("Unsupported field value:
-    // undefined"), so setting `sc: undefined` here breaks every AUM import,
-    // not just Folio Split ones.
-    if(row.schemes && row.schemes.length) d.sc = row.schemes;
-    return d;
-  };
+  const _aumDetail = row => ({
+    inv: row.inv_amt||0, dp: row.div_paid||0, dr: row.div_reinv||0,
+    ad: row.avg_days||0, gl: row.gain_loss||0, ar: row.abs_rtn||0,
+    xirr: row.xirr||0, on: today()
+  });
 
   let updated = 0, added = 0;
   const sipApplied = new Set();   // client ids that got fresh SIP data this import
@@ -12893,7 +12863,6 @@ async function doImport(){
   // One single transaction for every Invested Amount change detected this
   // import (see addMfChangeLogBatch) — not N separate ones racing each other.
   await DB.addMfChangeLogBatch(mfChangeLogBatch);
-  _crmSchemeNamesCache = null; // AUM/SIP import can introduce new scheme names — refresh the Fund Name autocomplete source
   closeModal('importModal');
   let _imsg = `✅ Import done! ${updated} updated + ${added} new clients`;
   if(importData.sip){
@@ -13041,241 +13010,6 @@ async function mergeMfDupsSelected(){
     renderMfTable(); refreshDash(); updateBadges();
   }catch(e){ toast('Merge failed: '+(e&&e.message||e),'error'); }
 }
-
-// ══════════════════════════════════════════
-// SCHEME NAME MERGE — review-based (admin/backoffice)
-// RMs free-type the scheme name in MF Transactions (Fund Name / Target Scheme),
-// so the SAME scheme ends up saved under several different spellings/formats —
-// e.g. "Helios Mid Cap", "HELIOS MIDCAP FUND", "Helios Mid Cap Fund - Regular
-// Plan - Growth" all mean the same scheme but are 3 different strings in the
-// data. This groups those look-alike variants together (fuzzy match — case,
-// spacing, punctuation, and generic words like Fund/Plan/Regular/Growth are
-// ignored) and lets admin pick ONE final name per group. Confirming rewrites
-// that final name across every MF Transaction entry (fund_name/target_scheme)
-// AND the shared scheme-name autocomplete list, so future typing/searching
-// only ever surfaces the one canonical spelling.
-// ══════════════════════════════════════════
-function normSchemeKeyForMerge(name){
-  return String(name||'')
-    .toLowerCase()
-    .replace(/\(.*?\)/g,' ')
-    .replace(/[-_.,/]/g,' ')
-    .replace(/\b(fund|scheme|plan|regular|direct|growth|dividend|idcw|payout|reinvestment|option|of|the|mf)\b/g,' ')
-    .replace(/[^a-z0-9]+/g,'');
-}
-// Groups scheme-name strings pulled from MF Transaction entries + the learned
-// fund-name list. Exact same text (any case/spacing) is first collapsed into
-// one "variant" with a usage count; variants are then grouped by their fuzzy
-// key. Only keys with 2+ distinct variants are real merge candidates.
-function findSchemeMergeGroups(){
-  const exact = {}; // lowercased+trimmed -> {display, count}
-  const bumpExact = raw=>{
-    const r = String(raw||'').trim();
-    if(!r || r.length<4) return;
-    const lk = r.toLowerCase().replace(/\s+/g,' ');
-    if(!exact[lk]) exact[lk] = {display:r, count:0};
-    exact[lk].count++;
-    // Prefer the longest/most descriptive spelling as the display form when
-    // several exact-case variants collapse to the same lk (shouldn't really
-    // differ, but harmless safety).
-    if(r.length > exact[lk].display.length) exact[lk].display = r;
-  };
-  getMfBizEntries().forEach(e=>{ bumpExact(e.fund_name); bumpExact(e.target_scheme); });
-  getLearnedFundNames().forEach(n=>bumpExact(n));
-
-  const groups = {};
-  Object.values(exact).forEach(v=>{
-    const k = normSchemeKeyForMerge(v.display);
-    if(!k || k.length<4) return;
-    (groups[k]=groups[k]||[]).push(v);
-  });
-  return Object.entries(groups)
-    .filter(([,vs])=>vs.length>1)
-    .map(([key,vs])=>({key, variants:vs.sort((a,b)=>b.count-a.count)}));
-}
-// Best default final-name suggestion for a group: prefer a variant that
-// exactly matches the curated FUND_NAME_LIST (a "correct" official spelling),
-// else fall back to whichever variant is used most often.
-function _schemeSuggestCanonical(variants){
-  const listLower = new Set(FUND_NAME_LIST.map(n=>n.toLowerCase()));
-  const inList = variants.find(v=>listLower.has(v.display.toLowerCase()));
-  return inList ? inList.display : variants[0].display;
-}
-function openSchemeMerge(){
-  if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('Yeh tool sirf admin ke liye hai','error'); return; }
-  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const groups = findSchemeMergeGroups();
-  const ov=document.createElement('div');
-  ov.id='schemeMergeOverlay';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
-  let body;
-  if(!groups.length){
-    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">Koi Duplicate Scheme Name Nahi Mila</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">MF Transactions me abhi sabhi scheme names alag-alag spelling wale nahi hain.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'schemeMergeOverlay\').remove()">Band Karein</button></div></div>';
-  } else {
-    let rows='';
-    groups.forEach((g,gi)=>{
-      const canon = _schemeSuggestCanonical(g.variants);
-      const list = g.variants.map(v=>'<div style="padding:2px 0;font-size:.8rem;color:#334155">• '+esc(v.display)+' <span style="color:#94a3b8">('+v.count+'x)</span></div>').join('');
-      rows += '<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">'
-        +'<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">'
-        +'<input type="checkbox" class="schememerge-chk" data-key="'+esc(g.key)+'" checked> Group '+(gi+1)+' — '+g.variants.length+' variants — merge</label>'
-        +'<div style="padding:10px 12px">'+list
-        +'<div style="margin-top:8px;position:relative"><label style="font-size:.72rem;color:#64748b;font-weight:700;letter-spacing:.02em">FINAL NAME (jo save hoga)</label>'
-        +'<input type="text" class="schememerge-canon" data-key="'+esc(g.key)+'" value="'+esc(canon)+'" autocomplete="off" oninput="schemeMergeCanonSearch(this)" onfocus="schemeMergeCanonSearch(this)" style="width:100%;margin-top:4px;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:.82rem;box-sizing:border-box"></div>'
-        +'</div></div>';
-    });
-    body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
-      +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate Scheme Names — Review & Merge</div>'
-      +'<button onclick="document.getElementById(\'schemeMergeOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
-      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ Jaise "Helios Mid Cap", "HELIOS MIDCAP FUND", "Helios Mid Cap Fund - Regular Plan - Growth" — yeh sab ek hi scheme ke alag-alag typed spelling hain. Har group ka "Final Name" chahe to edit kar dein, phir confirm karne par MF Transactions ki har entry (Fund Name / Target Scheme) aur suggestion list me sab jagah yehi final naam set ho jayega. Jo group merge nahi karna, uska checkbox uncheck kar dein.</div>'
-      +'<div style="padding:10px 18px 0;display:flex;gap:8px;justify-content:flex-end">'
-      +'<button type="button" class="btn btn-outline" style="font-size:.78rem;padding:4px 10px" onclick="schemeMergeToggleAll(true)">☑ Select All</button>'
-      +'<button type="button" class="btn btn-outline" style="font-size:.78rem;padding:4px 10px" onclick="schemeMergeToggleAll(false)">☐ Unselect All</button></div>'
-      +'<div style="padding:16px 18px">'+rows
-      +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
-      +'<button class="btn btn-outline" onclick="document.getElementById(\'schemeMergeOverlay\').remove()">Cancel</button>'
-      +'<button class="btn btn-teal" onclick="mergeSchemeGroupsSelected()">✔ Merge Selected</button></div></div>';
-  }
-  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
-  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
-  document.body.appendChild(ov);
-}
-function schemeMergeToggleAll(checked){
-  document.querySelectorAll('.schememerge-chk').forEach(chk=>{ chk.checked = checked; });
-}
-async function mergeSchemeGroupsSelected(){
-  const checks=[...document.querySelectorAll('.schememerge-chk')].filter(x=>x.checked);
-  if(!checks.length){ toast('Koi group select nahi hai','error'); return; }
-  const groups = findSchemeMergeGroups();
-  const chosen=[];
-  for(const chk of checks){
-    const key = chk.getAttribute('data-key');
-    const g = groups.find(x=>x.key===key);
-    if(!g) continue;
-    const canonInput = document.querySelector('.schememerge-canon[data-key="'+key.replace(/"/g,'\\"')+'"]');
-    const canon = (canonInput?.value||'').trim();
-    if(!canon){ toast('Har checked group ke liye final naam bharna zaroori hai','error'); return; }
-    chosen.push({key, canon, variantsLower:new Set(g.variants.map(v=>v.display.trim().toLowerCase()))});
-  }
-  if(!chosen.length){ toast('Nothing found','error'); return; }
-
-  const totalVariants = chosen.reduce((s,c)=>s+c.variantsLower.size,0);
-  if(!confirm('Confirm: '+chosen.length+' group(s) merge honge — '+totalVariants+' scheme-naam-spelling ek final naam me badal jayenge. Proceed?')) return;
-
-  const lookup = new Map();
-  chosen.forEach(c=>c.variantsLower.forEach(v=>lookup.set(v, c.canon)));
-  const mapName = raw=>{
-    const lk = String(raw||'').trim().toLowerCase();
-    return lookup.has(lk) ? lookup.get(lk) : raw;
-  };
-
-  try{
-    // 1) MF Transactions — rewrite fund_name / target_scheme wherever they match a merged variant
-    const entries = getMfBizEntries();
-    let changed = 0;
-    entries.forEach(e=>{
-      const nf = mapName(e.fund_name); if(nf!==e.fund_name){ e.fund_name=nf; changed++; }
-      const nt = mapName(e.target_scheme); if(nt!==e.target_scheme){ e.target_scheme=nt; changed++; }
-    });
-    if(changed) setMfBizEntries(entries);
-
-    // 2) Shared "learned" scheme-name suggestion list — dedupe onto the final names
-    const learnedSet = new Set();
-    getLearnedFundNames().forEach(n=>learnedSet.add(mapName(n)));
-    chosen.forEach(c=>learnedSet.add(c.canon));
-    await DB.set('learned_fund_names', [...learnedSet]);
-
-    _crmSchemeNamesCache = null; // autocomplete cache stale after rename
-
-    const ovx=document.getElementById('schemeMergeOverlay'); if(ovx) ovx.remove();
-    toast('✅ '+chosen.length+' scheme group(s) merged'+(changed?', '+changed+' transaction field(s) updated':''),'success');
-    if(typeof renderMfTxnTable==='function') renderMfTxnTable();
-    if(typeof populateMfTxnMonths==='function') populateMfTxnMonths();
-  }catch(e){ toast('Merge failed: '+(e&&e.message||e),'error'); }
-}
-// CRM's own known-scheme-name autocomplete for the "Final Name" box in the
-// merge modal — same source list used everywhere else (getCrmSchemeNames +
-// FUND_NAME_LIST + getLearnedFundNames), so the name admin picks as "final"
-// is a name the CRM already recognizes rather than yet another free-typed
-// variant. One shared floating results box, repositioned under whichever
-// canon input is currently focused/typed in.
-function schemeMergeCanonSearch(inputEl){
-  if(!inputEl) return;
-  let out = document.getElementById('schemeMergeCanonResults');
-  if(!out){
-    out = document.createElement('div');
-    out.id = 'schemeMergeCanonResults';
-    out.style.cssText='position:fixed;display:none;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:240px;overflow:auto;z-index:100000';
-    document.documentElement.appendChild(out);
-  }
-  out.dataset.forInput = inputEl.dataset.key || '';
-  out._targetEl = inputEl;
-
-  const q = inputEl.value.trim().toLowerCase();
-  const combined = [...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
-  const seen=new Set(); const allFunds=[];
-  for(const n of combined){ const k=n.toLowerCase(); if(seen.has(k)) continue; seen.add(k); allFunds.push(n); }
-  const matches = (q.length>=1 ? allFunds.filter(n=>n.toLowerCase().includes(q)) : allFunds).slice(0,15);
-
-  const r = inputEl.getBoundingClientRect();
-  out.style.left=r.left+'px';
-  out.style.width=r.width+'px';
-  const maxH=240;
-  if(r.bottom+8+maxH > window.innerHeight){ out.style.top=''; out.style.bottom=(window.innerHeight-r.top+4)+'px'; }
-  else { out.style.bottom=''; out.style.top=(r.bottom+4)+'px'; }
-
-  if(!matches.length){
-    out.innerHTML='<div style="padding:9px 12px;color:var(--gray,#94a3b8);font-size:.8rem">No match — jo type kiya wahi use hoga</div>';
-    out.style.display='block';
-    return;
-  }
-  out.innerHTML = matches.map(name=>
-    `<div style="padding:7px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.82rem" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onmousedown="event.preventDefault()" onclick="schemeMergeCanonPick(this.dataset.name)" data-name="${escapeHtml(name)}">${escapeHtml(name)}</div>`
-  ).join('');
-  out.style.display='block';
-}
-function schemeMergeCanonPick(name){
-  const out = document.getElementById('schemeMergeCanonResults');
-  if(out && out._targetEl){ out._targetEl.value = name; }
-  if(out){ out.style.display='none'; }
-}
-document.addEventListener('click', e=>{
-  const out = document.getElementById('schemeMergeCanonResults');
-  if(!out || out.style.display==='none') return;
-  if(e.target.closest && e.target.closest('.schememerge-canon')) return;
-  if(out.contains(e.target)) return;
-  out.style.display='none';
-});
-
-// Self-contained trigger: adds a "Merge Scheme Names" button on the MF
-// Transactions page for admin/backoffice, without needing any HTML change.
-// (Mirrors how the rest of this app's one-off admin tools get surfaced.)
-(function(){
-  function ensureSchemeMergeBtn(){
-    if(typeof CU==='undefined' || !CU) return;
-    if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access) return;
-    const page = document.getElementById('page-mf-txns');
-    if(!page || document.getElementById('schemeMergeBtn')) return;
-    const anchor = document.getElementById('mftxn-rm-filter') || document.getElementById('mftxn-month-filter');
-    const btn = document.createElement('button');
-    btn.id='schemeMergeBtn';
-    btn.type='button';
-    btn.className='btn btn-outline';
-    btn.style.cssText='margin:6px 0 6px 6px';
-    btn.textContent='🔀 Merge Scheme Names';
-    btn.onclick=openSchemeMerge;
-    if(anchor && anchor.parentElement){ anchor.parentElement.insertBefore(btn, anchor.nextSibling); }
-    else { page.insertBefore(btn, page.firstChild); }
-  }
-  document.addEventListener('DOMContentLoaded', ()=>setTimeout(ensureSchemeMergeBtn,1200));
-  const _origShowPage = window.showPage;
-  if(typeof _origShowPage==='function'){
-    window.showPage = function(id){
-      _origShowPage(id);
-      if(id==='mf-txns') setTimeout(ensureSchemeMergeBtn,50);
-    };
-  }
-})();
 
 // ══════════════════════════════════════════
 // EQUITY BAD-IMPORT REVIEW — review-based (admin only)
@@ -13557,131 +13291,38 @@ function fmtRiskMoney(n){
 }
 // MF AUM cell -> portfolio breakdown. Same idea as openEqRisk() on the equity
 // side. Data comes from the AUM By Client import (aum_detail).
-// Popup widened to `.modal.wide` (900px, see index.html) 19-Aug-2026. Summary
-// figures render as small single-row "chips" (compact, left-accent color,
-// value+label stacked tight) rather than the app's big .stat-card — those
-// are sized for the Dashboard, not a popup, and wrapped onto 2 lines here.
-// Chips flex-wrap only as a narrow-screen fallback; at the modal's normal
-// 900px width all of them sit on one line.
 function openMfAum(id){
   const c = (DB.get('mf_clients')||[]).find(x=>x.id===id);
   const body = document.getElementById('mfAumModalBody');
   if(!c){ return; }
   const d = c.aum_detail;
-  const signedTxt = (n,pct) => {
+  const row = (label,val) => `<div style="display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid #eef1f6">
+    <span style="color:var(--gray);font-size:.86rem">${label}</span><span style="font-size:.95rem">${val}</span></div>`;
+  const signed = (n,pct) => {
     if(n===null || n===undefined || n==='') return '—';
     const pos = Number(n) >= 0;
+    const col = pos ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
     const txt = pct ? Math.abs(Number(n)).toFixed(2)+'%' : '₹'+fmtNum(Math.abs(Number(n)));
-    return (pos?'+':'−')+txt;
+    return `<b style="color:${col}">${pos?'+':'−'}${txt}</b>`;
   };
-  const chip = (color,label,val,valColor) => `<div style="flex:1 1 96px;min-width:0;background:#fff;border:1px solid #eef1f6;border-left:3px solid ${color};border-radius:7px;padding:6px 9px">
-    <div style="font-weight:700;font-size:.86rem;color:${valColor||'var(--navy)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
-    <div style="font-size:.58rem;color:var(--gray);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;margin-top:1px">${label}</div>
-  </div>`;
-  const hdr = `<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-    <div><div style="font-weight:700;font-size:1.05rem;color:var(--navy)">${escapeHtml(c.name||'')}</div>
-    <div style="color:var(--gray);font-size:.78rem;margin-top:1px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div></div>
-    ${c.rm?`<span class="badge b-investor">${escapeHtml(c.rm)}</span>`:''}</div>`;
+  const hdr = `<div style="font-weight:700;font-size:1.05rem;margin-bottom:4px">${escapeHtml(c.name||'')}</div>
+    <div style="color:var(--gray);font-size:.78rem;margin-bottom:10px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div>`;
   if(!d){
-    body.innerHTML = hdr + `<div style="display:flex;flex-wrap:wrap;gap:6px">${chip('var(--purple)','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}</div>
+    body.innerHTML = hdr + `${row('AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—')}
       <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
   } else {
-    const schemes = Array.isArray(d.sc) ? d.sc : null;
-    const glColor = Number(d.gl)>=0 ? 'var(--green)' : 'var(--red)';
-    const statChips = `<div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${chip('var(--teal)','Invested', d.inv?'₹'+fmtNum(d.inv):'—')}
-        ${chip('var(--purple)','Current AUM', c.aum?'₹'+fmtNum(c.aum):'—')}
-        ${chip(glColor,'Gain/Loss', signedTxt(d.gl), glColor)}
-        ${chip(glColor,'Abs. Return', signedTxt(d.ar,true), glColor)}
-        ${chip('var(--gold)','XIRR', signedTxt(d.xirr,true), 'var(--gold)')}
-        ${d.ad?chip('#94a3b8','Avg. Days', fmtNum(d.ad)):''}
-        ${d.dp?chip('var(--teal)','Div. Paid', '₹'+fmtNum(d.dp)):''}
-        ${d.dr?chip('var(--teal)','Div. ReInv', '₹'+fmtNum(d.dr)):''}
-      </div>`;
-    const toggleBtn = schemes ?
-      `<button type="button" onclick="toggleMfSchemeList(this)" style="margin-top:12px;width:100%;padding:8px;border-radius:8px;border:1px solid #e5e9f0;background:#fafbfc;color:var(--navy);font-weight:600;font-size:.82rem;cursor:pointer">Fund-wise List (${schemes.length}) ▾</button>
-       <div class="mf-scheme-list" style="display:none;margin-top:8px;border:1px solid #eef1f6;border-radius:8px;max-height:380px;overflow-y:auto;overflow-x:hidden">${renderMfSchemeList(schemes, c.aum)}</div>` : '';
-    body.innerHTML = hdr + statChips +
-      `<div style="margin-top:8px;font-size:.7rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}${schemes?' • XIRR/Avg. Days above are a weighted approximation across funds':''}</div>` +
-      toggleBtn;
+    body.innerHTML = hdr +
+      row('Invested', d.inv?'₹'+fmtNum(d.inv):'—') +
+      row('Current AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—') +
+      row('Gain / Loss', signed(d.gl)) +
+      row('Abs. Return', signed(d.ar, true)) +
+      row('XIRR', signed(d.xirr, true)) +
+      (d.dp ? row('Dividend Paid', '₹'+fmtNum(d.dp)) : '') +
+      (d.dr ? row('Dividend Re-Inv', '₹'+fmtNum(d.dr)) : '') +
+      (d.ad ? row('Avg. Days', fmtNum(d.ad)) : '') +
+      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}</div>`;
   }
   document.getElementById('mfAumModal').classList.add('open');
-}
-
-// Renders the per-scheme (fund-wise) breakup table used inside the Portfolio
-// Details popup. Only ever called when `d.sc` (schemes[]) is present, i.e.
-// the last AUM import was in "Folio Split" mode. `totalAum` (passed in) is
-// used to draw each row's share of the total portfolio as a small bar —
-// purely visual, doesn't affect any stored figure.
-// table-layout:fixed + a <colgroup> with fixed % widths guarantees the table
-// is NEVER wider than its container (long scheme names wrap instead of
-// pushing the table sideways) — this is what stops the horizontal scrollbar
-// that used to clip the SCHEME/FOLIO columns off-screen. Kept deliberately
-// LIGHT (plain header, thin border, no gradient/bold-heavy look) — 19-Aug-2026
-// feedback was that the earlier teal/navy gradient header felt too heavy for
-// a popup this size.
-function renderMfSchemeList(schemes, totalAum){
-  const maxAum = Math.max(1, ...schemes.map(s=>Number(s.aum)||0));
-  const cell = (v,strong,color) => `<td style="padding:8px;text-align:right;overflow:hidden;text-overflow:ellipsis;${strong?'font-weight:600':''}${color?';color:'+color:''}">${v}</td>`;
-  const rows = schemes.map((s,i)=>{
-    const gl = Number(s.gl)||0;
-    const glCol = gl>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
-    const glTxt = `<span style="color:${glCol};font-weight:600">${gl>=0?'+':'−'}₹${fmtNum(Math.abs(gl))}</span>`;
-    const xirr = Number(s.xirr)||0;
-    const xirrCol = xirr>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
-    const share = Math.max(2, Math.round((Number(s.aum)||0)/maxAum*100));
-    const zebra = i%2===1 ? 'background:#fafbfc' : '';
-    return `<tr style="border-bottom:1px solid #f1f4f8;${zebra}">
-      <td style="padding:8px;font-size:.77rem;overflow-wrap:anywhere">
-        <div style="font-weight:500;color:var(--navy);line-height:1.25">${escapeHtml(s.scheme||'—')}</div>
-        ${s.folio?`<div style="color:#aab0bb;font-size:.66rem;margin-top:2px;overflow-wrap:anywhere">Folio: ${escapeHtml(s.folio)}</div>`:''}
-        <div style="background:#f1f4f8;border-radius:2px;height:3px;margin-top:4px;max-width:100%"><div style="background:#cbd5e1;height:3px;border-radius:2px;width:${share}%"></div></div>
-      </td>
-      ${cell('₹'+fmtNum(s.inv||0))}
-      ${cell('₹'+fmtNum(s.aum||0), true)}
-      ${cell(glTxt)}
-      ${cell(xirr.toFixed(2)+'%', false, xirrCol)}
-    </tr>`;
-  }).join('');
-  // TOTAL row — sums are real (Inv/AUM/Gain-Loss are additive money figures);
-  // XIRR is deliberately left blank here rather than averaged/summed, same
-  // reasoning as the chips above (portfolio XIRR isn't a simple sum). Lives
-  // in a <tfoot> (not <tbody>) for two reasons: the app's generic click-to-
-  // sort only ever reorders table.tBodies[0] rows, so a tfoot row is safe
-  // from ever getting sorted into the middle of the list; and position:sticky
-  // on the tfoot keeps it pinned to the bottom of the scrolling list
-  // container (see openMfAum's max-height:380px;overflow-y:auto wrapper) the
-  // same way the <thead> stays pinned to the top — so the total never
-  // scrolls out of view no matter how many schemes there are.
-  const totInv = schemes.reduce((s,x)=>s+(Number(x.inv)||0),0);
-  const totAumSum = schemes.reduce((s,x)=>s+(Number(x.aum)||0),0);
-  const totGl = schemes.reduce((s,x)=>s+(Number(x.gl)||0),0);
-  const totGlCol = totGl>=0 ? 'var(--green,#16a34a)' : 'var(--red,#dc2626)';
-  const totRow = `<tfoot><tr style="font-weight:700;position:sticky;bottom:0">
-      <td style="padding:8px;color:var(--navy);background:#f1f4f8">TOTAL (${schemes.length})</td>
-      <td style="padding:8px;text-align:right;color:var(--navy);background:#f1f4f8">₹${fmtNum(totInv)}</td>
-      <td style="padding:8px;text-align:right;color:var(--navy);background:#f1f4f8">₹${fmtNum(totAumSum)}</td>
-      <td style="padding:8px;text-align:right;color:${totGlCol};background:#f1f4f8">${totGl>=0?'+':'−'}₹${fmtNum(Math.abs(totGl))}</td>
-      <td style="background:#f1f4f8"></td>
-    </tr></tfoot>`;
-  return `<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem">
-    <colgroup><col style="width:38%"><col style="width:16%"><col style="width:16%"><col style="width:17%"><col style="width:13%"></colgroup>
-    <thead><tr style="background:#f8fafc;border-bottom:1px solid #eef1f6">
-      <th style="padding:8px;text-align:left;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">SCHEME</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">INVESTED</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">AUM</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">GAIN/LOSS</th>
-      <th style="padding:8px;text-align:right;color:var(--gray);font-weight:600;font-size:.66rem;letter-spacing:.2px;position:sticky;top:0;background:#f8fafc">XIRR</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>${totRow.replace('<tfoot><tr', '<tfoot><tr style="position:sticky;bottom:0" data-x="')}</table>`;
-}
-
-function toggleMfSchemeList(btn){
-  const box = btn.nextElementSibling;
-  if(!box) return;
-  const willOpen = box.style.display==='none';
-  box.style.display = willOpen ? 'block' : 'none';
-  btn.innerHTML = btn.innerHTML.replace(willOpen ? '▾' : '▴', willOpen ? '▴' : '▾');
 }
 
 function openEqRisk(code, name){
