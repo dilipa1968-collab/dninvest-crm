@@ -7985,10 +7985,24 @@ function getTxnFundNames(){
   return names;
 }
 function findFundNameDupGroups(){
-  const learned = [...new Set([...getLearnedFundNames(), ...getTxnFundNames()])];
+  // Fold every candidate through the fund-name alias table BEFORE clustering
+  // — same logic searchFundName() already uses for the dropdown. Without
+  // this, a name already merged/deleted by a prior "Merge Fund Names" pass
+  // still physically exists inside client records (sip_details/aum_schemes
+  // are never rewritten in place — see mergeFundDupsSelected comments) or
+  // inside FUND_NAME_LIST, so the very next scan pulled it back in raw and
+  // re-clustered it as a "new" duplicate — the merge looked like it silently
+  // undid itself. Folding through aliasMap here makes the scanner respect
+  // its own past merges/deletes, same as the dropdown already does.
+  const aliasMap = {};
+  (DB.get('fund_name_aliases')||[]).forEach(a=>{ if(a && a.v) aliasMap[a.v]=a.c; });
+  const isDeleted = n => aliasMap[String(n||'').toLowerCase()] === '';
+  const canon = n => aliasMap[String(n||'').toLowerCase()] || n;
+
+  const learned = [...new Set([...getLearnedFundNames(), ...getTxnFundNames()].filter(n=>!isDeleted(n)).map(canon))];
   const referenceSeen = new Set();
   const reference = [];
-  [...FUND_NAME_LIST, ...getCrmSchemeNames()].forEach(n=>{
+  [...FUND_NAME_LIST, ...getCrmSchemeNames()].filter(n=>!isDeleted(n)).map(canon).forEach(n=>{
     const k=n.toLowerCase(); if(referenceSeen.has(k)) return; referenceSeen.add(k); reference.push(n);
   });
   if(!learned.length) return [];
