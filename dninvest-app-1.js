@@ -8131,10 +8131,24 @@ function openFundDupMerge(){
       + '<div style="display:flex;justify-content:flex-end;margin-top:8px">'
       + '<button class="btn" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca" onclick="deleteFundNameSuggestionsBulk()">🗑 Delete Selected</button></div>';
 
+  // Everything currently merged-away or deleted — a way back if a genuinely
+  // still-in-use scheme name got caught by a merge/delete (20-Aug-2026: e.g.
+  // "Abakkus Large and Mid Cap Fund" removed while testing, even though a
+  // client actually holds it).
+  const aliasList = (DB.get('fund_name_aliases')||[]).slice().sort((a,b)=>a.v.localeCompare(b.v));
+  const restoreSection = !aliasList.length ? '' :
+    '<div style="font-weight:700;font-size:.9rem;margin:20px 0 8px">Previously merged/deleted names — restore if needed</div>'
+    + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:220px;overflow:auto">'
+    + aliasList.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
+        <span style="flex:1">${esc(a.v)} ${a.c==='' ? '<span style="color:#b91c1c">— deleted</span>' : `<span style="color:#64748b">→ merged into "${esc(a.c)}"</span>`}</span>
+        <button title="Restore — show this in the dropdown again" onclick="restoreFundNameAlias('${esc(a.v).replace(/'/g,"\\'")}')" style="border:none;background:#f0fdf4;color:#166534;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.78rem;flex-shrink:0;white-space:nowrap">↩ Restore</button>
+      </div>`).join('')
+    + '</div>';
+
   const body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
     +'<div style="font-weight:800;font-size:1.05rem">🔀 Fund Names — Merge Duplicates / Delete</div>'
     +'<button onclick="document.getElementById(\'fundDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
-    +'<div style="padding:16px 18px">'+groupsSection+delSection
+    +'<div style="padding:16px 18px">'+groupsSection+delSection+restoreSection
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Close</button></div></div>';
   ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
@@ -8182,6 +8196,25 @@ async function deleteFundNameSuggestionsBulk(){
   if(!confirm(`Delete ${names.length} fund name(s) from suggestions? This won't change any past transaction that already used them.`)) return;
   await _deleteFundNameSuggestions(names);
   toast(`Deleted ${names.length} fund name(s) from suggestions`,'success');
+  document.getElementById('fundDupOverlay')?.remove();
+  openFundDupMerge();
+}
+
+// Undo one entry from fund_name_aliases — a variant that got merged into a
+// canonical, or deleted outright (c==='' sentinel). Found 20-Aug-2026: an
+// admin merging/deleting during testing can catch a genuinely still-in-use
+// scheme name (e.g. "Abakkus Large and Mid Cap Fund", which a client
+// actually holds) in the same sweep as real duplicates — since the alias
+// table is what makes a merge/delete "stick" for the dropdown regardless of
+// source, removing the entry here is the only way to bring that name back.
+async function restoreFundNameAlias(variantLower){
+  await DB.mutateArray('fund_name_aliases', arr=>{
+    const idx = arr.findIndex(a=>a.v===variantLower);
+    if(idx<0) return false;
+    arr.splice(idx,1);
+  });
+  _crmSchemeNamesCache = null;
+  toast('Restored — it will show in the dropdown again','success');
   document.getElementById('fundDupOverlay')?.remove();
   openFundDupMerge();
 }
