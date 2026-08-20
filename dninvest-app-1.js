@@ -1073,6 +1073,18 @@ function daysBetween(d1,d2){
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().split('T')[0]; }
 let _uidCounter=0;
 function uid(){ _uidCounter=(_uidCounter+1)%1000; return Date.now().toString(36)+'_'+_uidCounter.toString(36)+Math.random().toString(36).substr(2,6); }
+// Normalizes a Client ID for matching (RTA imports, MF client records).
+// Strips whitespace, a trailing ".0"/".00" (SheetJS sometimes reads a
+// numeric-looking Excel cell as a float), and leading zeros (Excel/SheetJS
+// silently drops them from a General/Number-formatted cell, e.g. a source
+// file with "0004708417" becomes the number 4708417 on read) — so an ID
+// stored one way in an existing client record still matches the same ID
+// read a different way from a fresh import file, instead of silently
+// failing to match and creating a duplicate client.
+function normCid(v){
+  return String(v==null?'':v).trim().replace(/\.0+$/,'').replace(/^0+(?=\d)/,'');
+}
+
 function v(x){ return (x!=null&&x!=='')?x:'—'; }
 
 // ══════════════════════════════════════════
@@ -12303,7 +12315,7 @@ function parseAumExcel(rows){
       // Client ID is the RTA's own stable key. We keep it because it's the only
       // field that survives name changes — and because the wrong-column bug
       // wrote these very IDs into the PAN field, it's how we find those records.
-      client_id: String(at(r,'client_id')||'').trim(),
+      client_id: normCid(at(r,'client_id')),
       scheme: String(at(r,'scheme')||'').trim(),
       folio:  String(at(r,'folio')||'').trim(),
       inv_amt: num(at(r,'inv_amt')),
@@ -12429,7 +12441,7 @@ function parseSipExcel(rows){
     const panMatch = nameRaw.match(/\[([A-Z]{5}\d{4}[A-Z])\]/);
     const pan = panMatch ? panMatch[1] : '';        // minors: empty bracket -> ''
     const cidMatch = nameRaw.match(/\[(\d{4,})\]/);   // 2nd bracket = Client ID
-    const clientId = cidMatch ? cidMatch[1] : '';
+    const clientId = cidMatch ? normCid(cidMatch[1]) : '';
     const amt = num(r[amtCol]);
     const cnt = parseInt(at(r,'count'))||0;
     // Bucket by Client ID first — it is unique per person. A minor can carry the
@@ -12760,7 +12772,7 @@ async function doImport(){
       panOwnerCount[p] = (panOwnerCount[p]||0)+1;
       if(!c.is_minor) existingMap[p] = c;
     }
-    if(c.client_id) byClientId[String(c.client_id).trim()] = c;
+    if(c.client_id) byClientId[normCid(c.client_id)] = c;
     if(/^\d{4,}$/.test(p) && !c.is_minor) byClientId[p] = c;      // legacy: Client ID stuck in the PAN field
     const m = mob10(c.mobile); if(m.length===10) byMobile[m] = c;
     const n = nmKey(c.name);
@@ -12813,7 +12825,7 @@ async function doImport(){
         ? (importData.sip['CID:'+row.client_id] || (panIsUnambiguous && importData.sip[row.pan]) || importData.sip[upName] || {})
         : {};
 
-      let ex = (row.client_id && byClientId[String(row.client_id).trim()])
+      let ex = (row.client_id && byClientId[normCid(row.client_id)])
             || (panIsUnambiguous && existingMap[row.pan])
             || (row.mobile && byMobile[mob10(row.mobile)])
             || null;
@@ -12941,7 +12953,7 @@ async function doImport(){
       // Same guardian+minor PAN-sharing guard as the AUM import above — don't
       // fall back to a shared PAN without a Client ID to disambiguate.
       const panIsUnambiguous = rowPan && (panOwnerCount[rowPan]||0) <= 1;
-      let ex = (row.client_id && byClientId[String(row.client_id).trim()])
+      let ex = (row.client_id && byClientId[normCid(row.client_id)])
             || (panIsUnambiguous && existingMap[rowPan])
             || null;
       if(!ex){
@@ -12994,7 +13006,7 @@ async function doImport(){
     // (1) Apply-or-close for clients the loops above didn't already handle
     existing.forEach(c=>{
       if(sipApplied.has(c.id)) return;
-      const s = (c.client_id && sm['CID:'+String(c.client_id).trim()])
+      const s = (c.client_id && sm['CID:'+normCid(c.client_id)])
              || (validPan(c.pan) && sm[String(c.pan).trim().toUpperCase()])
              || null;
       const hadSips = (oldSipById[c.id]||[]).length>0 || Number(c.sip_count)>0;
@@ -13097,32 +13109,58 @@ function findMfDupGroups(){
   // this exclusion a minor's own investor record could get permanently
   // deleted as a false "duplicate" of their parent.
   const arr = (DB.get('mf_clients')||[]).filter(c=>!c.is_minor);
-  // Union-find across ALL of a record's keys (PAN, mobile, exact name) —
-  // not a single "first available" key per record. Two duplicates don't
-  // always share every signal: the "AUM By Client — Folio Split" report
-  // (added 19-Aug-2026) has no PAN or mobile column at all, only Client ID,
-  // so a duplicate created from a failed Client-ID match on that file only
-  // shares NAME with the original (PAN-bearing) record. The old approach —
-  // pick PAN if valid, else mobile, else name, first match wins, one key
-  // per record — put a PAN-keyed original and a name-keyed duplicate into
-  // two different buckets, so this exact case (found 20-Aug-2026) was
-  // silently invisible to "Merge Duplicates" no matter how many times it
-  // ran. Union-find via every key a record has means ANY shared signal —
-  // even just an exact name match — links two records into the same group.
+  const validPan = c => { const p=String(c.pan||'').trim().toUpperCase(); return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p) ? p : ''; };
+  const cid      = c => String(c.client_id||'').trim();
+  const mob      = c => String(c.mobile||'').replace(/\D/g,'').slice(-10);
+  const nm       = c => String(c.name||'').toUpperCase().replace(/\s+/g,' ').trim();
+
   const parent = arr.map((_,i)=>i);
   const find = i => { while(parent[i]!==i){ parent[i]=parent[parent[i]]; i=parent[i]; } return i; };
-  const union = (i,j) => { const ri=find(i), rj=find(j); if(ri!==rj) parent[ri]=rj; };
-  const firstSeen = {};
+  // safeUnion refuses to link two records whose Client ID OR PAN are BOTH
+  // present and DIFFER — those are the two most authoritative identifiers
+  // a real-world RTA record carries, so two different (present, valid)
+  // values on either one is conclusive proof these are two different real
+  // people, no matter what weaker signal (shared mobile / same name) is
+  // trying to link them. Found 20-Aug-2026: a first version of this
+  // function unioned on ANY shared key including mobile/name alone, which
+  // grouped genuinely different family members sharing one household phone
+  // number (e.g. "AKHILESH KUMAR" PAN AMSPM6908R + "POONAM KUMARI SAH" PAN
+  // ARCPP8357Q, same mobile) as if they were the same duplicated client —
+  // "Merge Selected" would have deleted one real person's entire investment
+  // record. This guard makes that impossible.
+  const conflicts = (i,j) => {
+    const ci=cid(arr[i]), cj=cid(arr[j]);
+    if(ci && cj && ci!==cj) return true;
+    const pi=validPan(arr[i]), pj=validPan(arr[j]);
+    if(pi && pj && pi!==pj) return true;
+    return false;
+  };
+  const union = (i,j) => { if(conflicts(i,j)) return; const ri=find(i), rj=find(j); if(ri!==rj) parent[ri]=rj; };
+
+  // Pass 1 — Client ID: the single most authoritative, RTA-assigned key.
+  // Two records sharing a non-empty Client ID are certainly the same
+  // investor account; union unconditionally (conflicts() only exists to
+  // guard weaker signals below, not this one).
+  const byCid = {};
+  arr.forEach((c,i)=>{ const k=cid(c); if(!k) return; if(byCid[k]===undefined) byCid[k]=i; else { const ri=find(i),rj=find(byCid[k]); if(ri!==rj) parent[ri]=rj; } });
+  // Pass 2 — valid PAN, same guard rule (safe: PAN vs PAN never conflicts
+  // with itself, and Client ID mismatches are already blocked by conflicts()).
+  const byPan = {};
+  arr.forEach((c,i)=>{ const k=validPan(c); if(!k) return; if(byPan[k]===undefined) byPan[k]=i; else union(i, byPan[k]); });
+  // Pass 3 — mobile AND exact name BOTH matching together. Mobile alone is
+  // unsafe (household/family sharing one number); name alone is unsafe (two
+  // unrelated people can share a common name). Requiring both at once is a
+  // much stronger signal that this is genuinely the same person recorded
+  // twice, and conflicts() still blocks it if either side's Client ID/PAN
+  // proves otherwise.
+  const byMobName = {};
   arr.forEach((c,i)=>{
-    const keys=[];
-    const p=String(c.pan||'').trim().toUpperCase();
-    if(/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) keys.push('P:'+p);
-    const m=String(c.mobile||'').replace(/\D/g,'').slice(-10);
-    if(m.length===10) keys.push('M:'+m);
-    const n=String(c.name||'').toUpperCase().replace(/\s+/g,' ').trim();
-    if(n) keys.push('N:'+n);
-    keys.forEach(k=>{ if(firstSeen[k]===undefined) firstSeen[k]=i; else union(i, firstSeen[k]); });
+    const m=mob(c), n=nm(c);
+    if(m.length!==10 || !n) return;
+    const k=m+'|'+n;
+    if(byMobName[k]===undefined) byMobName[k]=i; else union(i, byMobName[k]);
   });
+
   const groups = {};
   arr.forEach((c,i)=>{ const r=find(i); (groups[r]=groups[r]||[]).push(c); });
   return Object.keys(groups).filter(k=>groups[k].length>1).map(k=>({key:'G'+k, recs:groups[k]}));
@@ -13169,10 +13207,10 @@ function openMfDupMerge(){
       // actually common across every record in this group, not a single
       // fixed label derived from the internal group key.
       const pans=new Set(g.recs.map(c=>String(c.pan||'').trim().toUpperCase()).filter(p=>/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)));
-      const mobs=new Set(g.recs.map(c=>String(c.mobile||'').replace(/\D/g,'').slice(-10)).filter(m=>m.length===10));
-      const kind = (pans.size===1 && g.recs.every(c=>/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(c.pan||'').trim().toUpperCase()))) ? 'PAN'
-                 : (mobs.size===1 && g.recs.every(c=>String(c.mobile||'').replace(/\D/g,'').slice(-10).length===10)) ? 'Mobile'
-                 : 'Naam';
+      const cids=new Set(g.recs.map(c=>String(c.client_id||'').trim()).filter(Boolean));
+      const kind = (cids.size===1 && g.recs.every(c=>String(c.client_id||'').trim())) ? 'Client ID'
+                 : (pans.size===1 && g.recs.every(c=>/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(c.pan||'').trim().toUpperCase()))) ? 'PAN'
+                 : 'Mobile + Naam';
       let cards='';
       g.recs.forEach(c=>{
         const isP=c.id===prim.id;
@@ -14222,7 +14260,7 @@ function parseMfDobFile(rows){
     const panMatch = nameRaw.match(/\[([A-Z]{5}\d{4}[A-Z])\]/);
     const pan = panMatch ? panMatch[1] : '';
     const cidMatch = nameRaw.match(/\[(\d{4,})\]/);
-    const clientId = cidMatch ? cidMatch[1] : '';
+    const clientId = cidMatch ? normCid(cidMatch[1]) : '';
     if(!pan && !clientId){ bad.push([name||'—', '—', 'No PAN/Client Code in name — cannot match']); return; }
 
     const rawDob = String(r[colMap.dob]==null?'':r[colMap.dob]).trim();
@@ -14284,7 +14322,7 @@ async function doMfBulkDobUpdate(){
   const existing = DB.get('mf_clients')||[];
   const byClientId = {}, byPan = {};
   existing.forEach(c=>{
-    if(c.client_id) byClientId[String(c.client_id).trim()] = c;
+    if(c.client_id) byClientId[normCid(c.client_id)] = c;
     const p = String(c.pan||'').trim().toUpperCase();
     if(p && !c.is_minor) byPan[p] = c;   // minors can carry a guardian's PAN — never match on it
   });
@@ -14293,7 +14331,7 @@ async function doMfBulkDobUpdate(){
   const touched=[], newLogs=[], notFoundRows=[];
 
   mfBulkDobData.forEach(row=>{
-    const ex = (row.client_id && byClientId[row.client_id]) || (row.pan && byPan[row.pan]) || null;
+    const ex = (row.client_id && byClientId[normCid(row.client_id)]) || (row.pan && byPan[row.pan]) || null;
     if(!ex){ notFoundRows.push([row.name, row.client_id||row.pan||'—', fmtDate(row.dob)]); return; }
     const oldDob = (ex.dob||'').trim();
     if(oldDob===row.dob){ unchanged++; return; }
