@@ -908,9 +908,30 @@ const DB = {
           this._shardSeen[key]  = new Set(parts.map((_,i)=>i));   // all shards known
           const merged = this._mergeShards(key);
           if(merged.length){
-            localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
-            console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
-                        this._shardCache[key].map(p=>p.length));
+            // Update the in-memory cache FIRST, unconditionally — this is what
+            // DB.get() actually reads from within a session, so correctness
+            // must never depend on the localStorage cache below succeeding.
+            // (Root-caused 20-Aug-2026: eq_clients/mf_clients — especially
+            // mf_clients once per-scheme aum_schemes/sip_details were added —
+            // can be big enough that JSON.stringify(merged) blows past the
+            // browser's ~5-10MB localStorage-per-origin quota. That threw an
+            // uncaught QuotaExceededError right here, which — because _mem
+            // was never touched in this branch at all — meant the correctly-
+            // fetched, complete Firestore data was thrown away entirely, and
+            // DB.get() kept serving whatever smaller/older snapshot was still
+            // sitting in localStorage from before the quota was breached.
+            // localStorage is now best-effort only: a fast warm-start cache,
+            // never the source of truth for a key that's already synced from
+            // Firestore this session.)
+            if(!this._mem) this._mem = {};
+            this._mem[key] = merged;
+            try{
+              localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+              console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
+                          this._shardCache[key].map(p=>p.length));
+            }catch(e){
+              console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e);
+            }
           }
           return;
         }
@@ -1921,7 +1942,9 @@ function initApp(){
               let merged=Object.values(byId);
               if(key==='activity_logs') merged=merged.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
               if(JSON.stringify(merged)!==JSON.stringify(existing)){
-                localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+                if(!DB._mem) DB._mem={};
+                DB._mem[key]=merged;
+                try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded):',e); }
                 console.log('Real-time merge:', key);
                 if(key==='call_logs' && getCurrentPageId()==='leads') renderLeadsTable();
                 if(getCurrentPageId()==='activity-log') renderActivityLog();
@@ -1930,7 +1953,9 @@ function initApp(){
               return;
             }
             if(JSON.stringify(newData) !== JSON.stringify(existing)){
-              localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
+              if(!DB._mem) DB._mem={};
+              DB._mem[key]=newData;
+              try{ localStorage.setItem('dninvest_'+key, JSON.stringify(newData)); }catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded):',e); }
               console.log('Real-time update:', key);
               if(key==='users'){
                 populateRmDropdowns();
@@ -2037,8 +2062,19 @@ function initApp(){
                 const ex=existingArr;
                 if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
               }
-              localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
-              if(DB._mem) DB._mem[key] = merged;
+              // _mem is the source of truth DB.get() actually reads within a
+              // session — update it FIRST, unconditionally, then treat
+              // localStorage as a best-effort cache only. (Same
+              // QuotaExceededError class as the syncFromFirebase sharded
+              // branch above: without this ordering, a quota failure here
+              // silently threw the freshly-synced data away completely.)
+              if(!DB._mem) DB._mem = {};
+              DB._mem[key] = merged;
+              try{
+                localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+              }catch(e){
+                console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e);
+              }
               _afterRealtime(key);
             });
           }
