@@ -9784,7 +9784,12 @@ function renderSquareoff(){
     'PUJA':'#0369A1',    // deep sky
     'KOMAL':'#7E22CE',   // plum
     'MEGHA':'#B45309',   // bronze
-    'ANJALI':'#475569'   // slate
+    'ANJALI':'#475569',  // slate
+    'SHYAM':'#C2410C'    // burnt orange — added 20-Aug-2026, user reported his
+                          // name wasn't getting its own highlight color like the
+                          // original 9 RMs (he joined later, 17-Aug-2026, and was
+                          // never added to this map, so he fell back to the
+                          // generic hashed palette instead of a dedicated shade)
   };
   const rmFallback=['#334155','#1E4620','#4C1D95','#831843','#155E75','#7C2D12','#365314','#5B21B6','#134E4A','#701A75'];
   const rmColor={};
