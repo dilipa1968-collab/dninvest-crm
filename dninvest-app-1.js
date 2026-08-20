@@ -7046,22 +7046,24 @@ function hasMfDeskAccess(user){
 
 // ── Cross-check remarks ──
 // A light two-way check between the RM and MF Desk on the same entry, without
-// either side needing approve/decline authority (that's Admin-only). Based on
-// whether the entry was self-logged by its own RM or logged by someone else
-// on that RM's behalf — this works correctly whether the "someone else" is a
-// pure MF Desk user or an RM who also has MF Desk access:
-//  - Self-logged (rm === created_by) → any other MF-Desk-capable user can
-//    leave a remark (e.g. flag that it looks like a duplicate).
-//  - Logged by someone else on this RM's behalf → the actual owning RM can
-//    leave a remark (e.g. confirm/dispute it).
+// either side needing approve/decline authority (that's Admin-only).
+//  - MF-Desk-capable user (pure MF Desk role, or an RM granted MF Desk
+//    access) can see every RM's entries (see getFilteredMfTxns) — so they can
+//    leave a remark on ANY entry they can see, except one they personally
+//    entered themselves (no point "cross-checking" your own data entry).
+//  - A plain RM (no desk access) can only remark on entries logged by
+//    someone else on their behalf (e.g. MF Desk backfilled it for them) — a
+//    chance to confirm/dispute it. They can't remark on their own self-logged
+//    entries, and can't see/remark on other RMs' entries at all.
 // Admin can always remark on anything.
 function canAddCrossRemark(e){
   if(!CU) return false;
   if(CU.role==='admin') return true;
-  const selfEntered = (e.rm||'').trim().toLowerCase() === (e.created_by||'').trim().toLowerCase();
-  if(selfEntered){
-    return hasMfDeskAccess(CU) && CU.name!==e.created_by;
+  if(hasMfDeskAccess(CU)){
+    return (e.created_by||'').trim().toLowerCase() !== (CU.name||'').trim().toLowerCase();
   }
+  const selfEntered = (e.rm||'').trim().toLowerCase() === (e.created_by||'').trim().toLowerCase();
+  if(selfEntered) return false;
   return (e.rm||'').trim().toLowerCase() === (CU.name||'').trim().toLowerCase();
 }
 
