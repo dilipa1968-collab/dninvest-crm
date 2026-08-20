@@ -2151,6 +2151,15 @@ function initApp(){
     if(el) el.style.display=hasMf?'flex':'none';
   });
   if(mfSec) mfSec.style.display=hasMf?'':'none';
+  // SIP Tracker — removed from the sidebar entirely (20-Aug-2026, user
+  // request: "sip tracker ki jarurat nahi hai pura hata de left menu se
+  // bhi"). Forced hidden unconditionally, overriding the hasMf-based show
+  // logic above — the underlying nav link and page markup still live in
+  // index.html (not touched this session, only app-1.js was uploaded), so
+  // if a full code-level removal from index.html is wanted later, that file
+  // needs to be shared too. For now this makes the item disappear for every
+  // role, with no route to reach the page.
+  { const sipNav=document.getElementById('nav-mf-sip'); if(sipNav) sipNav.style.display='none'; }
   // MF Prospects: admin always sees it; a regular RM only sees it if explicitly
   // granted access (mf_prospects_access) — Admin decides who gets this, same
   // pattern as risk_upload/backoffice_access/mf_desk_access.
