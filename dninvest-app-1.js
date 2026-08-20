@@ -8036,6 +8036,16 @@ function findFundNameDupGroups(){
   return groups;
 }
 
+function _fundDupRadioChanged(gi){
+  document.querySelectorAll(`input[name="funddup-radio-${gi}"]`).forEach(r=>{
+    const label = r.closest('label');
+    const span = label ? label.querySelector('span') : null;
+    if(!label || !span) return;
+    if(r.checked){ label.style.background='#f0fdf4'; span.style.color='#166534'; span.style.fontWeight='700'; }
+    else { label.style.background=''; span.style.color='#b91c1c'; span.style.fontWeight='400'; }
+  });
+}
+
 function openFundDupMerge(){
   if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('This tool is for admin only','error'); return; }
   const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -8056,23 +8066,28 @@ function openFundDupMerge(){
   let rows='';
   if(groups.length){
     groups.forEach((g,gi)=>{
-      let variantRows = g.variants.map(v=>`<div style="padding:4px 0;color:#b91c1c;font-size:.82rem">✕ ${esc(v)}</div>`).join('');
+      const allMembers = [g.canonical, ...g.variants];
+      const memberRows = allMembers.map((m,mi)=>{
+        const isCanon = m===g.canonical;
+        return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:.83rem;${isCanon?'background:#f0fdf4':''}">
+          <input type="radio" name="funddup-radio-${gi}" class="funddup-radio" data-idx="${gi}" value="${esc(m)}" ${isCanon?'checked':''} onchange="_fundDupRadioChanged(${gi})">
+          <span style="${isCanon?'color:#166534;font-weight:700':'color:#b91c1c'}">${esc(m)}</span>
+        </label>`;
+      }).join('');
       rows+=`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
         <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;cursor:pointer;font-weight:600;font-size:.85rem">
-          <input type="checkbox" class="funddup-chk" data-idx="${gi}" checked> Group ${gi+1} — ${g.variants.length} variant(s) → merge into one
+          <input type="checkbox" class="funddup-chk" data-idx="${gi}" checked> Group ${gi+1} — ${allMembers.length} name(s), pick which one to keep
         </label>
         <div style="padding:10px 14px">
-          <div style="font-size:.72rem;color:#64748b;margin-bottom:2px">KEEP (canonical name):</div>
-          <input type="text" class="funddup-canonical" data-idx="${gi}" value="${esc(g.canonical)}" style="width:100%;padding:6px 9px;border:1px solid #16a34a;border-radius:6px;font-size:.85rem;color:#166534;font-weight:600;background:#f0fdf4">
-          <div style="font-size:.72rem;color:#64748b;margin:8px 0 2px">WILL BE REMOVED/REWRITTEN TO ABOVE:</div>
-          ${variantRows}
+          <div style="font-size:.72rem;color:#64748b;margin-bottom:4px">Choose which spelling survives — the rest merge into it (past transactions using them get rewritten too):</div>
+          ${memberRows}
         </div>
       </div>`;
     });
   }
   const groupsSection = groups.length
     ? '<div style="font-weight:700;font-size:.9rem;margin-bottom:8px">Duplicate groups found</div>'
-      +'<div style="padding:8px 12px;font-size:.78rem;color:#7c5e10;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:12px">✅ You can edit the "KEEP" name in any group before merging. Merging removes the variants from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used a variant, so historical records stay consistent. Uncheck any group you don\'t want merged.</div>'
+      +'<div style="padding:8px 12px;font-size:.78rem;color:#7c5e10;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:12px">✅ Click a name in any group to pick it as the one that survives — green = currently selected to KEEP, red = will be merged into it. Merging removes the others from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used them, so historical records stay consistent. Uncheck a group\'s checkbox to skip merging it.</div>'
       + rows
       + '<div style="display:flex;gap:10px;justify-content:flex-end;margin:4px 0 20px">'
       + '<button class="btn btn-teal" onclick="mergeFundDupsSelected()">✔ Merge Selected</button></div>'
@@ -8157,13 +8172,16 @@ async function mergeFundDupsSelected(){
   const checked = [...document.querySelectorAll('.funddup-chk')].filter(x=>x.checked).map(x=>parseInt(x.dataset.idx));
   if(!checked.length){ toast('No group selected','error'); return; }
 
-  // Build the final list of {canonical, variants} using any edits the admin
-  // made to the canonical-name text boxes.
+  // Build the final list of {canonical, variants} from whichever radio the
+  // admin picked as the survivor in each group (defaults to the
+  // auto-suggested canonical if nothing was changed).
   const selectedGroups = checked.map(idx=>{
-    const canonicalInput = document.querySelector(`.funddup-canonical[data-idx="${idx}"]`);
-    const canonical = canonicalInput ? canonicalInput.value.trim() : groups[idx].canonical;
-    return { canonical, variants: groups[idx].variants };
-  }).filter(g=>g.canonical);
+    const picked = document.querySelector(`input[name="funddup-radio-${idx}"]:checked`);
+    const canonical = picked ? picked.value : groups[idx].canonical;
+    const allMembers = [groups[idx].canonical, ...groups[idx].variants];
+    const variants = allMembers.filter(m=>m!==canonical);
+    return { canonical, variants };
+  }).filter(g=>g.canonical && g.variants.length);
 
   const totalVariants = selectedGroups.reduce((s,g)=>s+g.variants.length,0);
   if(!confirm(`Confirm: ${selectedGroups.length} group(s), ${totalVariants} variant name(s) will be merged into their canonical spelling — including rewriting any past transactions that used them. Proceed?`)) return;
