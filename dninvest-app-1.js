@@ -4164,7 +4164,15 @@ function renderMfTable(){
   // "E" here (not "M") since "M" already means "also an MF investor" on the
   // Equity page — reusing it here would be confusing on a page that's
   // already all-MF.
-  const _eqClientsForMatch = getMyEqClients()||[];
+  // NOTE: match against ALL equity clients (DB.get), not getMyEqClients().
+  // getMyEqClients() is scoped to the logged-in RM's own equity book, but the
+  // whole point of this badge is to flag a cross-sell / already-has-equity
+  // case even when that equity account sits with a DIFFERENT RM (that's what
+  // the "Equity RM: ..." tooltip is for). Scoping it to "my" clients made the
+  // badge invisible to every non-admin RM whenever the match was on someone
+  // else's book — admin only saw it because getMyEqClients() happens to
+  // return everyone for role==='admin'.
+  const _eqClientsForMatch = DB.get('eq_clients')||[];
   const _eqPanSet = new Set(_eqClientsForMatch.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
   const _eqMobileSet = new Set(_eqClientsForMatch.map(c=>String(c.mobile||'').trim()).filter(Boolean));
   const _eqRmByPan = {}, _eqRmByMobile = {};
