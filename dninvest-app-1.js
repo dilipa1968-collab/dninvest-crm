@@ -13384,9 +13384,36 @@ function openMfAum(id){
   };
   const hdr = `<div style="font-weight:700;font-size:1.05rem;margin-bottom:4px">${escapeHtml(c.name||'')}</div>
     <div style="color:var(--gray);font-size:.78rem;margin-bottom:10px">PAN: ${escapeHtml(c.pan||'—')}${c.client_id?' • Client ID: '+escapeHtml(String(c.client_id)):''}</div>`;
+  // ── Fund-wise (scheme-wise) AUM breakup ──
+  // Populated during AUM import whenever the source report had a per-scheme
+  // row (see aum_schemes in the import routine). Shown here as its own table
+  // so RMs can see exactly which funds make up a client's total AUM, same as
+  // the scheme-wise SIP breakup shown in showSipDetails().
+  const schemes = Array.isArray(c.aum_schemes) ? c.aum_schemes.filter(x=>x && x.scheme) : [];
+  let schemeHtml = '';
+  if(schemes.length){
+    const sorted = schemes.slice().sort((a,b)=>(parseFloat(b.aum)||0)-(parseFloat(a.aum)||0));
+    const totalScheme = sorted.reduce((s,x)=>s+(parseFloat(x.aum)||0),0);
+    schemeHtml = `<div style="margin-top:14px;font-weight:700;font-size:.88rem">Fund-wise Breakup (${sorted.length})</div>
+      <div style="overflow:auto;margin-top:4px"><table class="tbl" style="width:100%;font-size:.85rem">
+        <thead><tr>
+          <th style="text-align:left">Scheme</th>
+          <th style="text-align:right;white-space:nowrap">AUM</th>
+        </tr></thead><tbody>`;
+    sorted.forEach(x=>{
+      schemeHtml += `<tr>
+        <td style="text-align:left">${escapeHtml(x.scheme||'—')}${x.folio?`<div style="font-size:.7rem;opacity:.6">Folio: ${escapeHtml(String(x.folio))}</div>`:''}</td>
+        <td style="text-align:right;font-weight:700;white-space:nowrap">₹${fmtNum(x.aum||0)}</td>
+      </tr>`;
+    });
+    schemeHtml += `</tbody><tfoot><tr style="font-weight:800;border-top:2px solid var(--teal,#0d9488)">
+        <td style="text-align:left">TOTAL (${sorted.length})</td>
+        <td style="text-align:right;white-space:nowrap">₹${fmtNum(totalScheme)}</td>
+      </tr></tfoot></table></div>`;
+  }
   if(!d){
     body.innerHTML = hdr + `${row('AUM', c.aum?'<b>₹'+fmtNum(c.aum)+'</b>':'—')}
-      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>`;
+      <div style="margin-top:12px;color:var(--gray);font-size:.84rem">For more detail (Invested, Gain/Loss, XIRR), upload the AUM By Client report via MF → Import Excel.</div>` + schemeHtml;
   } else {
     body.innerHTML = hdr +
       row('Invested', d.inv?'₹'+fmtNum(d.inv):'—') +
@@ -13397,7 +13424,8 @@ function openMfAum(id){
       (d.dp ? row('Dividend Paid', '₹'+fmtNum(d.dp)) : '') +
       (d.dr ? row('Dividend Re-Inv', '₹'+fmtNum(d.dr)) : '') +
       (d.ad ? row('Avg. Days', fmtNum(d.ad)) : '') +
-      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}</div>`;
+      `<div style="margin-top:10px;font-size:.72rem;color:#999">As per last uploaded AUM By Client report${d.on?' • '+fmtDate(d.on):''}</div>` +
+      schemeHtml;
   }
   document.getElementById('mfAumModal').classList.add('open');
 }
