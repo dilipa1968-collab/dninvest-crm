@@ -121,20 +121,40 @@ const DB = {
   // document does, copy it into shards. Deterministic + idempotent, so it's
   // safe even if two browsers do it at the same instant. The legacy doc is
   // intentionally LEFT IN PLACE as a backup (it is simply never read again).
+  //
+  // _migratePromise cache (added 20-Aug-2026): the OLD version of this check
+  // — "does at least one shard doc already have data?" — had a dangerous
+  // race. A single targeted write (_setClientSharded/_setBulkSharded/
+  // deleteClient, all of which touch only ONE shard) could create/populate
+  // just that one shard doc BEFORE the full legacy→shards migration ever
+  // ran. The next _ensureMigrated call would then see "a shard has data" and
+  // conclude migration was already done — permanently skipping the real
+  // migration, so every OTHER client (everyone not in that one narrow write)
+  // would silently vanish from every shard-backed read from then on. Fix:
+  // every sharded write path below now awaits _ensureMigrated(key) FIRST,
+  // and this function caches its in-flight/completed promise per key so the
+  // real migration is guaranteed to run to completion before any targeted
+  // shard write is allowed to happen, no matter which caller gets there
+  // first or how many call it concurrently.
+  _migratePromise: {},
   async _ensureMigrated(key){
-    let parts = await this._readShards(key);
-    if(parts.some(p=>p!==null)) return parts.map(p=>p||[]);   // already sharded
-    let legacy = [];
-    try{
-      const d = await fdb.collection('crm_data').doc(key).get();
-      if(d.exists && d.data() && Array.isArray(d.data().data)) legacy = d.data().data;
-    }catch(e){ console.log('legacy read failed for',key,e); }
-    if(!legacy.length) return parts.map(()=>[]);
-    parts = await this._writeAllShards(key, legacy);
-    console.log('✅ MIGRATED',key,'→',legacy.length,'records across',SHARD_CFG[key],'shards',
-                parts.map(p=>p.length));
-    try{ toast('Storage upgraded: '+legacy.length+' records split into '+SHARD_CFG[key]+' shards','success'); }catch(e){}
-    return parts;
+    if(this._migratePromise[key]) return this._migratePromise[key];
+    this._migratePromise[key] = (async ()=>{
+      let parts = await this._readShards(key);
+      if(parts.some(p=>p!==null)) return parts.map(p=>p||[]);   // already sharded
+      let legacy = [];
+      try{
+        const d = await fdb.collection('crm_data').doc(key).get();
+        if(d.exists && d.data() && Array.isArray(d.data().data)) legacy = d.data().data;
+      }catch(e){ console.log('legacy read failed for',key,e); }
+      if(!legacy.length) return parts.map(()=>[]);
+      parts = await this._writeAllShards(key, legacy);
+      console.log('✅ MIGRATED',key,'→',legacy.length,'records across',SHARD_CFG[key],'shards',
+                  parts.map(p=>p.length));
+      try{ toast('Storage upgraded: '+legacy.length+' records split into '+SHARD_CFG[key]+' shards','success'); }catch(e){}
+      return parts;
+    })();
+    return this._migratePromise[key];
   },
   get(key){
     // In-memory cache — avoid JSON.parse on every call for large datasets.
@@ -547,6 +567,7 @@ const DB = {
   _writing: {},
   // Sharded variant: touches ONLY the one shard this record hashes to.
   async _setClientSharded(key, rec){
+    await this._ensureMigrated(key);   // guarantee full migration before a targeted write
     const si  = this._shardOf(key, rec.id);
     const ref = this._shardRef(key, si);
     this._writing[key] = (this._writing[key]||0) + 1;
@@ -698,6 +719,7 @@ const DB = {
     this.setLocal(key, arr);
 
     if(this._isSharded(key) && typeof fdb!=='undefined'){
+      await this._ensureMigrated(key);   // guarantee full migration before a targeted write
       const si  = this._shardOf(key, id);
       const ref = this._shardRef(key, si);
       this._writing[key] = (this._writing[key]||0) + 1;
@@ -737,6 +759,7 @@ const DB = {
   // shards, then writes them back in ONE transaction (all reads before all
   // writes, as Firestore requires).
   async _setBulkSharded(key, records){
+    await this._ensureMigrated(key);   // guarantee full migration before a targeted write
     const groups = {};
     records.forEach(r=>{ const i=this._shardOf(key,r.id); (groups[i]=groups[i]||[]).push(r); });
     const idxs = Object.keys(groups).map(Number);
@@ -768,6 +791,7 @@ const DB = {
     if(typeof fdb==='undefined') return;
 
     if(this._isSharded(key)){
+      await this._ensureMigrated(key);   // guarantee full migration before a targeted write
       const groups = {};
       ids.forEach(id=>{ const i=this._shardOf(key,id); (groups[i]=groups[i]||new Set()).add(id); });
       const idxs = Object.keys(groups).map(Number);
