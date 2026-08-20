@@ -758,6 +758,44 @@ const DB = {
       return {ok:false, error:e.message};
     } finally{ this._writing['users'] = Math.max(0,(this._writing['users']||1)-1); }
   },
+  // Generic version of mutateSeminar/mutateUsers above, for any OTHER simple
+  // flat array stored as a single crm_data/<key> doc (no per-record id, not
+  // sharded) — added 20-Aug-2026 for learned_fund_names, whose writes were
+  // still using the old unsafe "read local copy, then blind DB.set(whole
+  // array)" pattern. Two RMs saving transactions with different new fund-
+  // name spellings close together would race: whichever save's write landed
+  // second silently discarded the first RM's newly-learned name entirely
+  // (classic lost-update — the exact bug class the 6/7-Aug fix addressed for
+  // seminars/users/mf_business, this call site just wasn't converted at the
+  // time). `mutate(arr)` gets a deep-cloned copy to modify in place; return
+  // `false` to abort without writing (e.g. "nothing changed").
+  async mutateArray(key, mutate){
+    let localArr = this.get(key)||[];
+    const clone = JSON.parse(JSON.stringify(localArr));
+    if(mutate(clone)!==false) this.setLocal(key, clone);
+
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    const docRef = fdb.collection('crm_data').doc(key);
+    let finalData=null, aborted=false;
+    this._writing[key] = (this._writing[key]||0) + 1;
+    try{
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        let latest = (doc.exists && doc.data() && doc.data().data) ? doc.data().data : (this.get(key)||[]);
+        latest = JSON.parse(JSON.stringify(latest));
+        const res = mutate(latest);
+        if(res===false){ aborted=true; return; }
+        tx.set(docRef, {data:DB._clean(latest), updated:new Date().toISOString()});
+        finalData = latest;
+      });
+      if(finalData) this.setLocal(key, finalData);
+      return {ok:true, aborted};
+    }catch(e){
+      console.log('mutateArray error ('+key+'):', e);
+      toast('Sync error: '+e.message,'error');
+      return {ok:false, error:e.message};
+    } finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+  },
   // Delete a single client record (merge-on-write delete)
   async deleteClient(key, id){
     let arr = (this.get(key)||[]).filter(c=>c.id!==id);
@@ -7871,10 +7909,19 @@ async function learnFundName(name){
   if(!name) return;
   const trimmed = name.trim();
   if(!trimmed) return;
-  const existing = getLearnedFundNames();
-  const knownLower = new Set([...FUND_NAME_LIST, ...existing, ...getCrmSchemeNames()].map(n=>n.toLowerCase()));
-  if(knownLower.has(trimmed.toLowerCase())) return; // already known — nothing new to learn
-  await DB.set('learned_fund_names', [...existing, trimmed]);
+  // Transaction-safe (20-Aug-2026, see DB.mutateArray above for why): this
+  // used to read the local cache and blind-overwrite the whole array — if
+  // two RMs saved a transaction with a different NEW fund-name spelling
+  // around the same time, the second write silently erased the first RM's
+  // learned name. That's why "Merge Fund Names" was reporting no duplicates
+  // even with genuinely different-spelled saved transactions on record —
+  // several of the actually-typed variants had never survived into
+  // learned_fund_names at all.
+  await DB.mutateArray('learned_fund_names', arr=>{
+    const knownLower = new Set([...FUND_NAME_LIST, ...arr, ...getCrmSchemeNames()].map(n=>n.toLowerCase()));
+    if(knownLower.has(trimmed.toLowerCase())) return false; // already known — nothing new to learn, abort write
+    arr.push(trimmed);
+  });
 }
 
 // ── FUND NAME DUPLICATE MERGE ──────────────────────────────────────────────
@@ -7906,8 +7953,28 @@ function _fundLooseKey(name){
   const noise = new Set(['fund','regular','plan','direct','growth','option','reinvestment','reinvest','payout','idcw','dividend','scheme','the','of','and']);
   return String(name||'').toLowerCase().split(/[^a-z0-9]+/).filter(t=>t && !noise.has(t)).join('');
 }
+// Every distinct fund name/target-scheme actually sitting in saved
+// mf_business transactions — the real ground truth of what's been typed and
+// saved, independent of learned_fund_names (whose writes had a lost-update
+// race bug until 20-Aug-2026; see DB.mutateArray/learnFundName above — some
+// genuinely-saved spelling variants never made it into that list at all).
+// Used only for duplicate-detection below, not as an autocomplete source.
+function getTxnFundNames(){
+  const seen = new Set(); const names = [];
+  const biz = DB.get('mf_business') || {entries:[]};
+  (biz.entries||[]).forEach(e=>{
+    [e.fund_name, e.target_scheme].forEach(v=>{
+      const s = String(v||'').trim();
+      if(!s) return;
+      const k = s.toLowerCase();
+      if(seen.has(k)) return;
+      seen.add(k); names.push(s);
+    });
+  });
+  return names;
+}
 function findFundNameDupGroups(){
-  const learned = getLearnedFundNames();
+  const learned = [...new Set([...getLearnedFundNames(), ...getTxnFundNames()])];
   const referenceSeen = new Set();
   const reference = [];
   [...FUND_NAME_LIST, ...getCrmSchemeNames()].forEach(n=>{
