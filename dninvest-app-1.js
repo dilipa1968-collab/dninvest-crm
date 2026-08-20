@@ -8040,14 +8040,21 @@ function openFundDupMerge(){
   if(CU.role!=='admin' && CU.role!=='backoffice' && !CU.backoffice_access){ toast('This tool is for admin only','error'); return; }
   const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const groups = findFundNameDupGroups();
+  // Every custom-typed fund name currently reachable from the suggestion
+  // dropdown (learned_fund_names ∪ names actually saved on a transaction) —
+  // listed here so Admin can delete a genuinely wrong/garbage entry outright
+  // (a typo nobody should keep, not a real duplicate of anything to merge
+  // into). Excludes anything already hidden via a prior delete.
+  const aliasMap = {};
+  (DB.get('fund_name_aliases')||[]).forEach(a=>{ if(a && a.v) aliasMap[a.v]=a.c; });
+  const allCustom = [...new Set([...getLearnedFundNames(), ...getTxnFundNames()])]
+    .filter(n=>aliasMap[n.toLowerCase()]!=='')   // '' = already deleted
+    .sort((a,b)=>a.localeCompare(b));
   const ov=document.createElement('div');
   ov.id='fundDupOverlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
-  let body;
-  if(!groups.length){
-    body='<div style="padding:34px;text-align:center"><div style="font-size:2rem">✅</div><div style="font-size:1.05rem;font-weight:700;margin-top:8px">No Duplicate Fund Names Found</div><div style="color:#64748b;font-size:.85rem;margin-top:6px">All typed-in fund names look distinct.</div><div style="margin-top:16px"><button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Close</button></div></div>';
-  } else {
-    let rows='';
+  let rows='';
+  if(groups.length){
     groups.forEach((g,gi)=>{
       let variantRows = g.variants.map(v=>`<div style="padding:4px 0;color:#b91c1c;font-size:.82rem">✕ ${esc(v)}</div>`).join('');
       rows+=`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
@@ -8062,18 +8069,63 @@ function openFundDupMerge(){
         </div>
       </div>`;
     });
-    body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
-      +'<div style="font-weight:800;font-size:1.05rem">🔀 Duplicate Fund Names — Review & Merge</div>'
-      +'<button onclick="document.getElementById(\'fundDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
-      +'<div style="padding:10px 18px;font-size:.8rem;color:#7c5e10;background:#fffbeb;border-bottom:1px solid #fde68a">✅ You can edit the "KEEP" name in any group before merging. Merging removes the variants from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used a variant, so historical records stay consistent. Uncheck any group you don\'t want merged.</div>'
-      +'<div style="padding:16px 18px">'+rows
-      +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">'
-      +'<button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Cancel</button>'
-      +'<button class="btn btn-teal" onclick="mergeFundDupsSelected()">✔ Merge Selected</button></div></div>';
   }
+  const groupsSection = groups.length
+    ? '<div style="font-weight:700;font-size:.9rem;margin-bottom:8px">Duplicate groups found</div>'
+      +'<div style="padding:8px 12px;font-size:.78rem;color:#7c5e10;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:12px">✅ You can edit the "KEEP" name in any group before merging. Merging removes the variants from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used a variant, so historical records stay consistent. Uncheck any group you don\'t want merged.</div>'
+      + rows
+      + '<div style="display:flex;gap:10px;justify-content:flex-end;margin:4px 0 20px">'
+      + '<button class="btn btn-teal" onclick="mergeFundDupsSelected()">✔ Merge Selected</button></div>'
+    : '<div style="padding:16px;text-align:center;background:#f0fdf4;border-radius:10px;margin-bottom:20px"><div style="font-size:1.5rem">✅</div><div style="font-weight:700;font-size:.92rem;margin-top:4px">No Duplicate Fund Names Found</div><div style="color:#64748b;font-size:.8rem;margin-top:2px">All typed-in fund names look distinct.</div></div>';
+
+  // Standalone delete list — every custom-typed name, one row each, always
+  // shown regardless of whether any duplicate groups exist.
+  const delSection = !allCustom.length ? ''
+    : '<div style="font-weight:700;font-size:.9rem;margin-bottom:8px">All custom-typed fund names — delete a wrong one</div>'
+      + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:260px;overflow:auto">'
+      + allCustom.map(n=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
+          <span>${esc(n)}</span>
+          <button title="Delete this fund name from suggestions" onclick="deleteFundNameSuggestion('${esc(n).replace(/'/g,"\\'")}')" style="border:none;background:#fef2f2;color:#b91c1c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.9rem;flex-shrink:0">✕</button>
+        </div>`).join('')
+      + '</div>';
+
+  const body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
+    +'<div style="font-weight:800;font-size:1.05rem">🔀 Fund Names — Merge Duplicates / Delete</div>'
+    +'<button onclick="document.getElementById(\'fundDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
+    +'<div style="padding:16px 18px">'+groupsSection+delSection
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Close</button></div></div>';
   ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
   ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
   document.body.appendChild(ov);
+}
+
+// Deletes one fund name outright from every suggestion source — not a merge
+// (nothing takes its place), for a genuinely wrong/garbage typed name that
+// shouldn't be remembered at all. Removes it from learned_fund_names, and
+// records a '' (hide) sentinel in fund_name_aliases so searchFundName()
+// filters it out even if it also lives inside some client's own
+// sip_details/aum_schemes scheme data (getCrmSchemeNames) — that underlying
+// client record is left untouched, only the suggestion-dropdown visibility
+// is affected. Does NOT touch past mf_business transactions that already
+// used this name (deleting a suggestion isn't the same as saying those
+// historical entries were wrong).
+async function deleteFundNameSuggestion(name){
+  if(!confirm(`Delete "${name}" from fund-name suggestions? This won't change any past transaction that already used it.`)) return;
+  const key = name.toLowerCase();
+  await DB.mutateArray('learned_fund_names', arr=>{
+    const idx = arr.findIndex(n=>n.toLowerCase()===key);
+    if(idx<0) return false;
+    arr.splice(idx,1);
+  });
+  await DB.mutateArray('fund_name_aliases', arr=>{
+    const existing = arr.find(a=>a.v===key);
+    if(existing){ if(existing.c===''){ return false; } existing.c=''; }
+    else { arr.push({v:key, c:''}); }
+  });
+  toast(`Deleted "${name}" from suggestions`,'success');
+  document.getElementById('fundDupOverlay')?.remove();
+  openFundDupMerge();
 }
 
 async function mergeFundDupsSelected(){
@@ -8207,9 +8259,14 @@ function searchFundName(inputId, resultsId){
   // rewritten in place, so without this the dropdown would keep resurfacing
   // it forever even after an admin merged it away.
   const aliasMap = {};
-  (DB.get('fund_name_aliases')||[]).forEach(a=>{ if(a && a.v && a.c) aliasMap[a.v]=a.c; });
+  (DB.get('fund_name_aliases')||[]).forEach(a=>{ if(a && a.v) aliasMap[a.v]=a.c; });
+  // c==='' is the delete sentinel (deleteFundNameSuggestion) — drop those
+  // entirely rather than mapping through canon(), which would just return
+  // the original name unchanged for a falsy/empty alias value.
+  const isDeleted = n => aliasMap[String(n||'').toLowerCase()] === '';
   const canon = n => aliasMap[String(n||'').toLowerCase()] || n;
-  const combined = [...clientFunds, ...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()].map(canon);
+  const combined = [...clientFunds, ...getCrmSchemeNames().filter(n=>!isDeleted(n)), ...FUND_NAME_LIST.filter(n=>!isDeleted(n)), ...getLearnedFundNames().filter(n=>!isDeleted(n))]
+    .map(canon);
   const clientFundKeys = new Set(clientFunds.map(n=>canon(n).toLowerCase()));
   const seen=new Set();
   const allFunds=[];
