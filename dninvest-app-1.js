@@ -1967,16 +1967,23 @@ function initApp(){
               // has reported in at least once.
               if(DB._shardSeen[key].size < n) return;
               const merged   = DB._mergeShards(key);
-              // Fast change check: compare count first, then spot-check a few items.
-              // Full JSON.stringify of 3000 clients is expensive — avoid it.
-              const existingRaw = localStorage.getItem('dninvest_'+key)||'[]';
-              const existingLen = (existingRaw.match(/\{/g)||[]).length;
-              if(existingLen === merged.length){
-                // Same count — spot-check first and last item ids
-                try{
-                  const ex = JSON.parse(existingRaw);
-                  if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
-                }catch(e){}
+              // Fast change check: compare record count first, then spot-check
+              // a few items, before falling back to a full JSON.stringify
+              // comparison (expensive for 3000+ clients with rich nested
+              // fields like aum_schemes/sip_details).
+              // NOTE: this used to count '{' characters in the raw JSON via
+              // regex as a stand-in for "how many records", but that counts
+              // EVERY nested object too (aum_detail, each aum_schemes/
+              // sip_details entry, etc.) — comparing that against merged's
+              // plain record count was comparing two different units, so the
+              // "same count" shortcut essentially never matched and this
+              // fired a full localStorage overwrite + re-render on nearly
+              // every snapshot, whether or not anything actually changed.
+              let existingArr = null;
+              try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
+              if(Array.isArray(existingArr) && existingArr.length===merged.length){
+                const ex=existingArr;
+                if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
               }
               localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
               if(DB._mem) DB._mem[key] = merged;
