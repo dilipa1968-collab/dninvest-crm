@@ -8082,6 +8082,8 @@ function openFundDupMerge(){
   const ov=document.createElement('div');
   ov.id='fundDupOverlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px';
+
+  // ── Section 1: duplicate groups (merge, pick survivor via radio) ──
   let rows='';
   if(groups.length){
     groups.forEach((g,gi)=>{
@@ -8105,53 +8107,63 @@ function openFundDupMerge(){
     });
   }
   const groupsSection = groups.length
-    ? '<div style="font-weight:700;font-size:.9rem;margin-bottom:8px">Duplicate groups found</div>'
-      +'<div style="padding:8px 12px;font-size:.78rem;color:#7c5e10;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:12px">✅ Click a name in any group to pick it as the one that survives — green = currently selected to KEEP, red = will be merged into it. Merging removes the others from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used them, so historical records stay consistent. Uncheck a group\'s checkbox to skip merging it.</div>'
-      + rows
-      + '<div style="display:flex;gap:10px;justify-content:flex-end;margin:4px 0 20px">'
+    ? '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      +   '<div style="font-weight:700;font-size:.9rem">Duplicate groups found ('+groups.length+')</div>'
+      +   '<label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:#64748b;cursor:pointer;font-weight:400"><input type="checkbox" id="funddup-all" checked onchange="document.querySelectorAll(\'.funddup-chk\').forEach(c=>c.checked=this.checked)"> Select all groups</label>'
+      + '</div>'
+      +'<div style="padding:8px 12px;font-size:.78rem;color:#7c5e10;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:12px">✅ Click a name in any group to pick it as the one that survives — green = currently selected to KEEP, red = will be merged into it. Merging removes the others from the suggestion list AND rewrites any past transaction (Fund Name / Switch target) that used them, so historical records stay consistent. Uncheck a group to skip merging it.</div>'
+      + '<div style="max-height:320px;overflow:auto;padding-right:4px">' + rows + '</div>'
+      + '<div style="display:flex;gap:10px;justify-content:flex-end;margin:10px 0 24px">'
       + '<button class="btn btn-teal" onclick="mergeFundDupsSelected()">✔ Merge Selected</button></div>'
-    : '<div style="padding:16px;text-align:center;background:#f0fdf4;border-radius:10px;margin-bottom:20px"><div style="font-size:1.5rem">✅</div><div style="font-weight:700;font-size:.92rem;margin-top:4px">No Duplicate Fund Names Found</div><div style="color:#64748b;font-size:.8rem;margin-top:2px">All typed-in fund names look distinct.</div></div>';
+    : '<div style="padding:16px;text-align:center;background:#f0fdf4;border-radius:10px;margin-bottom:24px"><div style="font-size:1.5rem">✅</div><div style="font-weight:700;font-size:.92rem;margin-top:4px">No Duplicate Fund Names Found</div><div style="color:#64748b;font-size:.8rem;margin-top:2px">All typed-in fund names look distinct.</div></div>';
 
-  // Standalone delete list — every custom-typed name, one row each, always
-  // shown regardless of whether any duplicate groups exist. Checkbox per row
-  // + "Delete Selected" for bulk cleanup, plus per-row ✕ for a quick single
-  // delete without needing to check anything first.
-  const delSection = !allCustom.length ? ''
-    : '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-      +   '<div style="font-weight:700;font-size:.9rem">All custom-typed fund names — delete wrong ones</div>'
-      +   '<label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:#64748b;cursor:pointer;font-weight:400"><input type="checkbox" id="funddel-all" onchange="document.querySelectorAll(\'.funddel-chk\').forEach(c=>c.checked=this.checked)"> Select all</label>'
-      + '</div>'
-      + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:260px;overflow:auto">'
-      + allCustom.map(n=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
-          <input type="checkbox" class="funddel-chk" value="${esc(n)}">
-          <span style="flex:1">${esc(n)}</span>
-          <button title="Delete this fund name from suggestions" onclick="deleteFundNameSuggestion('${esc(n).replace(/'/g,"\\'")}')" style="border:none;background:#fef2f2;color:#b91c1c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.9rem;flex-shrink:0">✕</button>
-        </div>`).join('')
-      + '</div>'
-      + '<div style="display:flex;justify-content:flex-end;margin-top:8px">'
-      + '<button class="btn" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca" onclick="deleteFundNameSuggestionsBulk()">🗑 Delete Selected</button></div>';
+  // ── Section 2: delete wrong/garbage names outright ──
+  const delSection = !allCustom.length ? '' :
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +   '<div style="font-weight:700;font-size:.9rem">All custom-typed fund names ('+allCustom.length+') — delete wrong ones</div>'
+    +   '<label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:#64748b;cursor:pointer;font-weight:400"><input type="checkbox" id="funddel-all" onchange="document.querySelectorAll(\'.funddel-chk\').forEach(c=>c.checked=this.checked)"> Select all</label>'
+    + '</div>'
+    + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:260px;overflow:auto">'
+    + allCustom.map(n=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
+        <input type="checkbox" class="funddel-chk" value="${esc(n)}">
+        <span style="flex:1">${esc(n)}</span>
+        <button title="Delete this fund name from suggestions" onclick="deleteFundNameSuggestion('${esc(n).replace(/'/g,"\\'")}')" style="border:none;background:#fef2f2;color:#b91c1c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.9rem;flex-shrink:0">✕</button>
+      </div>`).join('')
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;margin:8px 0 24px">'
+    + '<button class="btn" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca" onclick="deleteFundNameSuggestionsBulk()">🗑 Delete Selected</button></div>';
 
-  // Everything currently merged-away or deleted — a way back if a genuinely
-  // still-in-use scheme name got caught by a merge/delete (20-Aug-2026: e.g.
-  // "Abakkus Large and Mid Cap Fund" removed while testing, even though a
-  // client actually holds it).
+  // ── Section 3: restore anything previously merged-away or deleted ──
   const aliasList = (DB.get('fund_name_aliases')||[]).slice().sort((a,b)=>a.v.localeCompare(b.v));
   const restoreSection = !aliasList.length ? '' :
-    '<div style="font-weight:700;font-size:.9rem;margin:20px 0 8px">Previously merged/deleted names — restore if needed</div>'
-    + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:220px;overflow:auto">'
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +   '<div style="font-weight:700;font-size:.9rem">Previously merged/deleted names ('+aliasList.length+') — restore if needed</div>'
+    +   '<label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:#64748b;cursor:pointer;font-weight:400"><input type="checkbox" id="fundrestore-all" onchange="document.querySelectorAll(\'.fundrestore-chk\').forEach(c=>c.checked=this.checked)"> Select all</label>'
+    + '</div>'
+    + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:260px;overflow:auto">'
     + aliasList.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
+        <input type="checkbox" class="fundrestore-chk" value="${esc(a.v)}">
         <span style="flex:1">${esc(a.v)} ${a.c==='' ? '<span style="color:#b91c1c">— deleted</span>' : `<span style="color:#64748b">→ merged into "${esc(a.c)}"</span>`}</span>
         <button title="Restore — show this in the dropdown again" onclick="restoreFundNameAlias('${esc(a.v).replace(/'/g,"\\'")}')" style="border:none;background:#f0fdf4;color:#166534;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.78rem;flex-shrink:0;white-space:nowrap">↩ Restore</button>
       </div>`).join('')
-    + '</div>';
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;margin-top:8px">'
+    + '<button class="btn" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="restoreFundNameAliasesBulk()">↩ Restore Selected</button></div>';
 
-  const body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
+  const header='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'
     +'<div style="font-weight:800;font-size:1.05rem">🔀 Fund Names — Merge Duplicates / Delete</div>'
-    +'<button onclick="document.getElementById(\'fundDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>'
-    +'<div style="padding:16px 18px">'+groupsSection+delSection+restoreSection
-    +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">'
-    +'<button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Close</button></div></div>';
-  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+body+'</div>';
+    +'<button onclick="document.getElementById(\'fundDupOverlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem">✕</button></div>';
+  const footer='<div style="padding:12px 18px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'fundDupOverlay\').remove()">Close</button></div>';
+  // Header and footer stay pinned; only the middle (all three sections)
+  // scrolls as one — each section also keeps its own internal scroll cap
+  // (see max-height above) so a long list within a section doesn't force
+  // the whole modal to grow past the screen.
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;width:min(760px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()">'
+    + header
+    + '<div style="padding:16px 18px;overflow:auto;flex:1">'+groupsSection+delSection+restoreSection+'</div>'
+    + footer
+    + '</div>';
   ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
   document.body.appendChild(ov);
 }
@@ -8215,6 +8227,19 @@ async function restoreFundNameAlias(variantLower){
   });
   _crmSchemeNamesCache = null;
   toast('Restored — it will show in the dropdown again','success');
+  document.getElementById('fundDupOverlay')?.remove();
+  openFundDupMerge();
+}
+async function restoreFundNameAliasesBulk(){
+  const vals = [...document.querySelectorAll('.fundrestore-chk:checked')].map(c=>c.value);
+  if(!vals.length){ toast('No names selected','error'); return; }
+  await DB.mutateArray('fund_name_aliases', arr=>{
+    const before = arr.length;
+    for(let i=arr.length-1;i>=0;i--){ if(vals.includes(arr[i].v)) arr.splice(i,1); }
+    if(arr.length===before) return false;
+  });
+  _crmSchemeNamesCache = null;
+  toast(`Restored ${vals.length} fund name(s)`,'success');
   document.getElementById('fundDupOverlay')?.remove();
   openFundDupMerge();
 }
