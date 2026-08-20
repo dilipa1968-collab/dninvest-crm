@@ -85,17 +85,34 @@ const DB = {
     for(let i=0;i<s.length;i++){ h = (Math.imul(h,31) + s.charCodeAt(i)) | 0; }
     return Math.abs(h) % n;
   },
-  // Split a full array into per-shard arrays
+  // Split a full array into per-shard arrays. Dedupes by id first — same id
+  // always hashes to the same shard, so if the source array already had two
+  // entries with the identical id (e.g. baked into the legacy pre-shard doc
+  // from some earlier double-save), splitting it blindly would faithfully
+  // carry that duplication into the shard doc, where it would then persist
+  // forever (every subsequent read/merge would keep serving 2 copies of the
+  // same client). Last one in the source array wins — for a genuine exact
+  // duplicate the two copies are identical anyway, so which one survives
+  // doesn't matter; for anything else this is a strict superset of what a
+  // plain array-to-shards copy would have produced.
   _splitShards(key,arr){
     const n = SHARD_CFG[key];
     const parts = Array.from({length:n},()=>[]);
-    (arr||[]).forEach(r=>{ if(r) parts[this._shardOf(key,r.id)].push(r); });
+    const byId = {}; const order = [];
+    (arr||[]).forEach(r=>{ if(!r) return; if(byId[r.id]===undefined) order.push(r.id); byId[r.id]=r; });
+    order.forEach(id=>{ const r=byId[id]; parts[this._shardOf(key,r.id)].push(r); });
     return parts;
   },
-  // Flatten the in-memory shard cache back into one array
+  // Flatten the in-memory shard cache back into one array. Also dedupes by
+  // id as a read-side safety net — see _splitShards above for why an id
+  // could in principle repeat, and _readShards below for how an already-
+  // corrupted shard doc gets silently cleaned up the next time it's written.
   _mergeShards(key){
     const parts = this._shardCache[key]||[];
-    return [].concat(...parts.map(p=>p||[]));
+    const flat = [].concat(...parts.map(p=>p||[]));
+    const byId = {}; const order = [];
+    flat.forEach(r=>{ if(!r) return; if(byId[r.id]===undefined) order.push(r.id); byId[r.id]=r; });
+    return order.map(id=>byId[id]);
   },
   // Read every shard doc in parallel. Returns array of arrays, or null per
   // shard where the doc doesn't exist yet.
