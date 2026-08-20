@@ -8110,6 +8110,29 @@ async function mergeFundDupsSelected(){
   });
   await DB.set('learned_fund_names', newLearned);
 
+  // 1b) Persist the variant→canonical mapping permanently (20-Aug-2026).
+  // Some variants live only inside mf_clients[].sip_details[]/aum_schemes[]
+  // (real scheme-name spellings straight from RTA SIP/AUM report imports,
+  // NOT learned_fund_names) — the fund-name search box's dropdown
+  // (searchFundName) also pulls candidates from there via getCrmSchemeNames(),
+  // so removing a variant from learned_fund_names alone doesn't stop it
+  // reappearing in the dropdown. Rewriting every client's stored scheme
+  // records directly is riskier (touches thousands of records, and those
+  // exact strings are also displayed elsewhere as historical portfolio
+  // data), so instead every future dropdown build consults this alias table
+  // and folds any variant into its canonical spelling before dedup —
+  // regardless of which source it came from.
+  await DB.mutateArray('fund_name_aliases', arr=>{
+    let changed=false;
+    Object.keys(rewriteMap).forEach(v=>{
+      const c = rewriteMap[v];
+      const existing = arr.find(a=>a.v===v);
+      if(existing){ if(existing.c!==c){ existing.c=c; changed=true; } }
+      else { arr.push({v, c}); changed=true; }
+    });
+    if(!changed) return false;
+  });
+
   // 2) Rewrite past mf_business transactions using a variant name.
   const biz = DB.get('mf_business') || {entries:[], eq_entries:[]};
   let fixedCount = 0;
@@ -8177,8 +8200,17 @@ function searchFundName(inputId, resultsId){
   // scheme names, then the generic built-in list, then anything manually
   // learned — deduped, client funds keep priority position even if they'd
   // otherwise also appear further down one of the other lists.
-  const combined = [...clientFunds, ...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()];
-  const clientFundKeys = new Set(clientFunds.map(n=>n.toLowerCase()));
+  //
+  // Every candidate is folded through the fund-name alias table (built by
+  // "Merge Fund Names", 20-Aug-2026) BEFORE dedup — a variant spelling
+  // sitting inside a client's own SIP/AUM records (getCrmSchemeNames) isn't
+  // rewritten in place, so without this the dropdown would keep resurfacing
+  // it forever even after an admin merged it away.
+  const aliasMap = {};
+  (DB.get('fund_name_aliases')||[]).forEach(a=>{ if(a && a.v && a.c) aliasMap[a.v]=a.c; });
+  const canon = n => aliasMap[String(n||'').toLowerCase()] || n;
+  const combined = [...clientFunds, ...getCrmSchemeNames(), ...FUND_NAME_LIST, ...getLearnedFundNames()].map(canon);
+  const clientFundKeys = new Set(clientFunds.map(n=>canon(n).toLowerCase()));
   const seen=new Set();
   const allFunds=[];
   for(const n of combined){
