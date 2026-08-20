@@ -61,6 +61,13 @@ const PER_DOC_COLLECTIONS = {}; // no longer used, kept for compatibility
 // the number and delete the old crm_data/<key>__sN docs first.
 const SHARD_CFG = {
   eq_clients: 8,   // ~3400 clients → ~425/shard → ~130 KB/shard (lots of headroom)
+  // mf_clients hit Firestore's 1,048,576-byte single-document hard limit
+  // (1,183,867 bytes) on 20-Aug-2026, right after adding per-scheme AUM
+  // breakdown (aum_schemes) — that extra data pushed a doc that was already
+  // close to the ceiling over it. 8 shards mirrors eq_clients' safety margin:
+  // ~918 clients today → ~115/shard → well under 200 KB/shard even as
+  // aum_schemes/sip_details keep growing.
+  mf_clients: 8,
 };
 
 const DB = {
