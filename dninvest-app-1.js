@@ -8079,15 +8079,23 @@ function openFundDupMerge(){
     : '<div style="padding:16px;text-align:center;background:#f0fdf4;border-radius:10px;margin-bottom:20px"><div style="font-size:1.5rem">✅</div><div style="font-weight:700;font-size:.92rem;margin-top:4px">No Duplicate Fund Names Found</div><div style="color:#64748b;font-size:.8rem;margin-top:2px">All typed-in fund names look distinct.</div></div>';
 
   // Standalone delete list — every custom-typed name, one row each, always
-  // shown regardless of whether any duplicate groups exist.
+  // shown regardless of whether any duplicate groups exist. Checkbox per row
+  // + "Delete Selected" for bulk cleanup, plus per-row ✕ for a quick single
+  // delete without needing to check anything first.
   const delSection = !allCustom.length ? ''
-    : '<div style="font-weight:700;font-size:.9rem;margin-bottom:8px">All custom-typed fund names — delete a wrong one</div>'
+    : '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      +   '<div style="font-weight:700;font-size:.9rem">All custom-typed fund names — delete wrong ones</div>'
+      +   '<label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:#64748b;cursor:pointer;font-weight:400"><input type="checkbox" id="funddel-all" onchange="document.querySelectorAll(\'.funddel-chk\').forEach(c=>c.checked=this.checked)"> Select all</label>'
+      + '</div>'
       + '<div style="border:1px solid #e5e7eb;border-radius:10px;max-height:260px;overflow:auto">'
-      + allCustom.map(n=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
-          <span>${esc(n)}</span>
+      + allCustom.map(n=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:.83rem">
+          <input type="checkbox" class="funddel-chk" value="${esc(n)}">
+          <span style="flex:1">${esc(n)}</span>
           <button title="Delete this fund name from suggestions" onclick="deleteFundNameSuggestion('${esc(n).replace(/'/g,"\\'")}')" style="border:none;background:#fef2f2;color:#b91c1c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.9rem;flex-shrink:0">✕</button>
         </div>`).join('')
-      + '</div>';
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;margin-top:8px">'
+      + '<button class="btn" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca" onclick="deleteFundNameSuggestionsBulk()">🗑 Delete Selected</button></div>';
 
   const body='<div style="padding:16px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">'
     +'<div style="font-weight:800;font-size:1.05rem">🔀 Fund Names — Merge Duplicates / Delete</div>'
@@ -8110,20 +8118,36 @@ function openFundDupMerge(){
 // is affected. Does NOT touch past mf_business transactions that already
 // used this name (deleting a suggestion isn't the same as saying those
 // historical entries were wrong).
-async function deleteFundNameSuggestion(name){
-  if(!confirm(`Delete "${name}" from fund-name suggestions? This won't change any past transaction that already used it.`)) return;
-  const key = name.toLowerCase();
+async function _deleteFundNameSuggestions(names){
+  const keys = names.map(n=>n.toLowerCase());
   await DB.mutateArray('learned_fund_names', arr=>{
-    const idx = arr.findIndex(n=>n.toLowerCase()===key);
-    if(idx<0) return false;
-    arr.splice(idx,1);
+    const before = arr.length;
+    for(let i=arr.length-1;i>=0;i--){ if(keys.includes(arr[i].toLowerCase())) arr.splice(i,1); }
+    if(arr.length===before) return false;
   });
   await DB.mutateArray('fund_name_aliases', arr=>{
-    const existing = arr.find(a=>a.v===key);
-    if(existing){ if(existing.c===''){ return false; } existing.c=''; }
-    else { arr.push({v:key, c:''}); }
+    let changed=false;
+    keys.forEach(key=>{
+      const existing = arr.find(a=>a.v===key);
+      if(existing){ if(existing.c!==''){ existing.c=''; changed=true; } }
+      else { arr.push({v:key, c:''}); changed=true; }
+    });
+    if(!changed) return false;
   });
+}
+async function deleteFundNameSuggestion(name){
+  if(!confirm(`Delete "${name}" from fund-name suggestions? This won't change any past transaction that already used it.`)) return;
+  await _deleteFundNameSuggestions([name]);
   toast(`Deleted "${name}" from suggestions`,'success');
+  document.getElementById('fundDupOverlay')?.remove();
+  openFundDupMerge();
+}
+async function deleteFundNameSuggestionsBulk(){
+  const names = [...document.querySelectorAll('.funddel-chk:checked')].map(c=>c.value);
+  if(!names.length){ toast('No fund names selected','error'); return; }
+  if(!confirm(`Delete ${names.length} fund name(s) from suggestions? This won't change any past transaction that already used them.`)) return;
+  await _deleteFundNameSuggestions(names);
+  toast(`Deleted ${names.length} fund name(s) from suggestions`,'success');
   document.getElementById('fundDupOverlay')?.remove();
   openFundDupMerge();
 }
