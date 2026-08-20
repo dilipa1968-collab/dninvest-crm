@@ -13097,9 +13097,35 @@ function findMfDupGroups(){
   // this exclusion a minor's own investor record could get permanently
   // deleted as a false "duplicate" of their parent.
   const arr = (DB.get('mf_clients')||[]).filter(c=>!c.is_minor);
-  const map = {};
-  arr.forEach(c=>{ const k=_mfDupKey(c); if(!k) return; (map[k]=map[k]||[]).push(c); });
-  return Object.keys(map).filter(k=>map[k].length>1).map(k=>({key:k, recs:map[k]}));
+  // Union-find across ALL of a record's keys (PAN, mobile, exact name) —
+  // not a single "first available" key per record. Two duplicates don't
+  // always share every signal: the "AUM By Client — Folio Split" report
+  // (added 19-Aug-2026) has no PAN or mobile column at all, only Client ID,
+  // so a duplicate created from a failed Client-ID match on that file only
+  // shares NAME with the original (PAN-bearing) record. The old approach —
+  // pick PAN if valid, else mobile, else name, first match wins, one key
+  // per record — put a PAN-keyed original and a name-keyed duplicate into
+  // two different buckets, so this exact case (found 20-Aug-2026) was
+  // silently invisible to "Merge Duplicates" no matter how many times it
+  // ran. Union-find via every key a record has means ANY shared signal —
+  // even just an exact name match — links two records into the same group.
+  const parent = arr.map((_,i)=>i);
+  const find = i => { while(parent[i]!==i){ parent[i]=parent[parent[i]]; i=parent[i]; } return i; };
+  const union = (i,j) => { const ri=find(i), rj=find(j); if(ri!==rj) parent[ri]=rj; };
+  const firstSeen = {};
+  arr.forEach((c,i)=>{
+    const keys=[];
+    const p=String(c.pan||'').trim().toUpperCase();
+    if(/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) keys.push('P:'+p);
+    const m=String(c.mobile||'').replace(/\D/g,'').slice(-10);
+    if(m.length===10) keys.push('M:'+m);
+    const n=String(c.name||'').toUpperCase().replace(/\s+/g,' ').trim();
+    if(n) keys.push('N:'+n);
+    keys.forEach(k=>{ if(firstSeen[k]===undefined) firstSeen[k]=i; else union(i, firstSeen[k]); });
+  });
+  const groups = {};
+  arr.forEach((c,i)=>{ const r=find(i); (groups[r]=groups[r]||[]).push(c); });
+  return Object.keys(groups).filter(k=>groups[k].length>1).map(k=>({key:'G'+k, recs:groups[k]}));
 }
 function _mfPrimary(recs){
   const score=c=>(
@@ -13138,7 +13164,15 @@ function openMfDupMerge(){
     let rows='';
     groups.forEach((g,gi)=>{
       const prim=_mfPrimary(g.recs);
-      const kind = g.key[0]==='P'?'PAN':(g.key[0]==='M'?'Mobile':'Naam');
+      // Groups can now be linked by more than one shared signal at once
+      // (union-find, see findMfDupGroups) — show whichever signal(s) are
+      // actually common across every record in this group, not a single
+      // fixed label derived from the internal group key.
+      const pans=new Set(g.recs.map(c=>String(c.pan||'').trim().toUpperCase()).filter(p=>/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)));
+      const mobs=new Set(g.recs.map(c=>String(c.mobile||'').replace(/\D/g,'').slice(-10)).filter(m=>m.length===10));
+      const kind = (pans.size===1 && g.recs.every(c=>/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(c.pan||'').trim().toUpperCase()))) ? 'PAN'
+                 : (mobs.size===1 && g.recs.every(c=>String(c.mobile||'').replace(/\D/g,'').slice(-10).length===10)) ? 'Mobile'
+                 : 'Naam';
       let cards='';
       g.recs.forEach(c=>{
         const isP=c.id===prim.id;
