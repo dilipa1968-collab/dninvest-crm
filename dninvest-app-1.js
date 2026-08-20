@@ -11853,8 +11853,12 @@ function checkAnnouncement(){
   if(!CU) return;
   // Special offer popup — shows on every login/refresh while any offer is live
   try{ showOfferPopupIfAny(false); }catch(e){}
-  // Request browser notification permission on first check (RM side)
-  if(CU.role !== 'admin') requestNotifPermission();
+  // Request browser notification permission on first check. Was RM-only
+  // before 20-Aug-2026 — Admin's browser never even asked for permission,
+  // so an incoming RM message could only ever show the in-page popup
+  // (invisible if Admin has the CRM tab in the background, which is the
+  // common case — see showAdminMsgNotif below). Now requested for everyone.
+  requestNotifPermission();
   const ann = DB.get('announcement');
   if(!ann || (!ann.text && !ann.image)) return;
   if(!announcementAppliesToMe(ann)) return;
@@ -12182,6 +12186,12 @@ function checkRmReply(){
 }
 
 function showAdminMsgNotif(msg){
+  // OS-level browser notification (20-Aug-2026 fix) — works even if the CRM
+  // tab is in the background/minimized. Before this, an incoming RM message
+  // only showed an in-page popup, which Admin never saw if focused on
+  // another tab — RM would send a message and Admin had no way of knowing
+  // until told separately (e.g. on call/WhatsApp).
+  sendBrowserNotif('✉️ ' + (msg.rmName||'RM') + ' sent a message', msg.text ? msg.text.substring(0,100) : '');
   const body = document.getElementById('announcementPopupBody');
   const popup = document.getElementById('announcementPopup');
   body.innerHTML = `<div style="text-align:left">
