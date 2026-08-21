@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Disc Team Maker</title>
+
+<!-- Mobile "app" behaviour: lets people Add to Home Screen and it opens full-screen like an app -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Disc Teams">
+<meta name="theme-color" content="#1F4B33">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231F4B33'/%3E%3Cellipse cx='50' cy='50' rx='34' ry='34' fill='%23FF6B35'/%3E%3Cellipse cx='50' cy='50' rx='34' ry='12' fill='%23FF8C5A'/%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Disc%20Team%20Maker%22%2C%22short_name%22%3A%22Disc%20Teams%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F5F1E6%22%2C%22theme_color%22%3A%22%231F4B33%22%2C%22start_url%22%3A%22.%22%7D">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --green-deep: #1F4B33;
+    --green-mid: #2D5F3F;
+    --orange: #FF6B35;
+    --orange-soft: #FFE3D6;
+    --cream: #F5F1E6;
+    --card: #FFFFFF;
+    --line: #E9E4D6;
+    --ink: #1A1F1C;
+    --muted: #8B8A80;
+    --gold: #E0A62B;
+    --gold-soft: #FBEBC9;
+    --red: #D14545;
+    --red-soft: #FBE0E0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    padding: env(safe-area-inset-top, 0) 0 40px;
+  }
+  .hero {
+    background: radial-gradient(120% 140% at 15% 0%, #2E6B45 0%, var(--green-deep) 55%, #123424 100%);
+    padding: 30px 20px 34px;
+    border-radius: 0 0 28px 28px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(20,40,25,0.18);
+  }
+  .hero::after {
+    content: "🥏";
+    position: absolute;
+    font-size: 130px;
+    opacity: 0.10;
+    right: -20px;
+    top: -22px;
+    transform: rotate(15deg);
+  }
+  .tag {
+    color: var(--orange);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 30px;
+    font-weight: 800;
+    color: #fff;
+    margin: 4px 0 0;
+    letter-spacing: -0.5px;
+  }
+  .sub { color: #C9DACB; font-size: 13.5px; margin-top: 6px; }
+
+  .wrap { max-width: 480px; margin: -18px auto 0; padding: 0 16px; position: relative; z-index: 2; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px;
+    margin-top: 16px;
+    box-shadow: 0 2px 10px rgba(30,30,20,0.05);
+  }
+  .card h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    margin: 0 0 12px;
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .addRow { display: flex; gap: 8px; }
+  .addRow input {
+    flex: 1;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #FCFBF7;
+  }
+  .addRow input:focus { outline: none; border-color: var(--green-mid); background: #fff; }
+  .addRow button {
+    width: auto;
+    padding: 0 18px;
+    margin: 0;
+    background: var(--green-mid);
+    border-radius: 12px;
+    font-weight: 700;
+  }
+
+  ul.plist { list-style: none; margin: 14px 0 0; padding: 0; }
+  ul.plist li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 0;
+    border-bottom: 1px solid #F2EFE4;
+  }
+  ul.plist li:last-child { border-bottom: none; }
+  .pname { flex: 1; font-size: 14.5px; font-weight: 600; }
+  .pname.absent { color: #C4C2B6; text-decoration: line-through; font-weight: 500; }
+
+  .rating {
+    width: 42px;
+    text-align: center;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 7px 2px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    color: var(--green-deep);
+    background: #FBFAF4;
+  }
+  .rating:focus { outline: none; border-color: var(--gold); }
+
+  .chip {
+    border: 1.5px solid var(--line);
+    background: #fff;
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 6px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .chip.absent.on { background: var(--red-soft); border-color: var(--red); color: #8C2E2E; }
+
+  .del {
+    background: none;
+    border: none;
+    color: #C4C2B6;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    margin: 0;
+    width: auto;
+  }
+  .del:hover { color: var(--red); }
+
+  button {
+    margin-top: 12px;
+    width: 100%;
+    padding: 15px;
+    font-size: 15.5px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    border: none;
+    border-radius: 13px;
+    background: var(--orange);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(255,107,53,0.28);
+    transition: transform 0.1s ease;
+  }
+  button:active { transform: scale(0.98); }
+  button.secondary {
+    background: #fff;
+    color: var(--green-deep);
+    border: 1.5px solid var(--green-mid);
+    box-shadow: none;
+  }
+
+  .legend { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .err {
+    color: #8C2E2E;
+    background: var(--red-soft);
+    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-top: 10px;
+    display: none;
+  }
+
+  .teams { display: flex; gap: 12px; margin-top: 16px; }
+  .team {
+    flex: 1;
+    background: linear-gradient(180deg, #EEF6E7 0%, #E4F0DA 100%);
+    border-radius: 16px;
+    padding: 16px 14px;
+    border: 1px solid #D8E9CC;
+  }
+  .team.b {
+    background: linear-gradient(180deg, #FDECE1 0%, #FCE1D2 100%);
+    border: 1px solid #F5CBAE;
+  }
+  .team h3 {
+    font-family: 'Outfit', sans-serif;
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .team.b h3 { color: #A0451F; }
+  .team ol { margin: 0; padding-left: 20px; font-size: 13.8px; line-height: 2; font-weight: 600; }
+  .team li span { color: var(--muted); font-size: 11.5px; font-weight: 500; }
+
+  .status {
+    font-size: 13px;
+    color: var(--green-deep);
+    font-weight: 700;
+    margin-top: 14px;
+    text-align: center;
+    background: var(--gold-soft);
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  .install-hint {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 18px;
+    line-height: 1.6;
+    padding: 0 10px;
+  }
+  .install-hint b { color: var(--green-deep); }
+
+  .saved-msg {
+    display: none;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #2E7D42;
+    background: #E4F5E7;
+    padding: 7px 10px;
+    border-radius: 8px;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .sortRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .sortLabel { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .sortBtn {
+    width: auto;
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    border-radius: 20px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    color: var(--muted);
+    box-shadow: none;
+  }
+  .sortBtn.active {
+    background: var(--green-mid);
+    border-color: var(--green-mid);
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="tag">Daily flying disc</div>
+  <h1>Team Maker</h1>
+  <div class="sub">Add names, set skill numbers, and teams get made automatically 🥏</div>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>➕ Add a player</h2>
+    <div class="addRow">
+      <input id="nameInput" placeholder="Player name" />
+      <button id="addBtn">Add</button>
+    </div>
+    <div class="sortRow">
+      <span class="sortLabel">Sort:</span>
+      <button class="sortBtn" id="sortNameBtn" data-mode="name">Name <span id="nameArrow">↑</span></button>
+      <button class="sortBtn" id="sortNumBtn" data-mode="number">Number <span id="numArrow">↕</span></button>
+    </div>
+    <ul class="plist" id="plist"></ul>
+    <button class="secondary" id="saveBtn" style="margin-top:14px;">💾 Save</button>
+    <div class="saved-msg" id="savedMsg">Saved ✅</div>
+    <div class="legend">Number = skill level (higher = better) · <b>absent</b> = not playing today</div>
+    <div class="err" id="err">You need at least 2 present players to make teams.</div>
+  </div>
+
+  <div class="card">
+    <button id="makeBtn">🏆 Make Teams</button>
+    <button class="secondary" id="reshuffleBtn" style="display:none;">🔀 Reshuffle</button>
+    <button class="secondary" id="resetBtn">↺ Reset to Default Numbers</button>
+    <div class="status" id="status" style="display:none;"></div>
+  </div>
+
+  <div class="teams" id="teamsOut" style="display:none;">
+    <div class="team a"><h3>🟢 Team A</h3><ol id="teamA"></ol></div>
+    <div class="team b"><h3>🟠 Team B</h3><ol id="teamB"></ol></div>
+  </div>
+
+  <div class="install-hint">
+    📲 To use this like an app on your phone: open your browser menu and tap <b>"Add to Home Screen"</b> or <b>"Install App"</b>.
+  </div>
+
+</div>
+
+<script>
+const DEFAULT_NAMES = [
+  ['DEVENDRA', 2], ['DINESH', 5], ['DIPPU', 6], ['KAMLESH', 5],
+  ['MAHAVIR', 2], ['MOHAN BABU', 5], ['NAVIN', 2], ['PAWAN', 2],
+  ['PRAMOD', 2], ['RAJENDRA', 2], ['RAJESH', 3], ['SANJAY', 1],
+  ['SHANKAR', 6], ['SUBHASH', 3], ['SURESH', 5], ['VIBHAW', 4],
+  ['VISHAL', 4], ['VISHNU', 1]
+];
+
+let players = DEFAULT_NAMES.map(([name, rating]) => ({ name, rating, absent: false }));
+const plistEl = document.getElementById('plist');
+const nameInput = document.getElementById('nameInput');
+const errEl = document.getElementById('err');
+const teamsOut = document.getElementById('teamsOut');
+const teamAEl = document.getElementById('teamA');
+const teamBEl = document.getElementById('teamB');
+const statusEl = document.getElementById('status');
+const reshuffleBtn = document.getElementById('reshuffleBtn');
+
+let sortMode = 'name';
+let sortDir = 1; // 1 = ascending, -1 = descending
+
+function sortPlayers() {
+  players.sort((a, b) => {
+    let cmp;
+    if (sortMode === 'name') cmp = a.name.localeCompare(b.name);
+    else cmp = a.rating - b.rating;
+    return cmp * sortDir;
+  });
+}
+
+function updateSortButtons() {
+  const nameBtn = document.getElementById('sortNameBtn');
+  const numBtn = document.getElementById('sortNumBtn');
+  nameBtn.classList.toggle('active', sortMode === 'name');
+  numBtn.classList.toggle('active', sortMode === 'number');
+  document.getElementById('nameArrow').textContent = sortMode === 'name' ? (sortDir === 1 ? '↑' : '↓') : '↕';
+  document.getElementById('numArrow').textContent = sortMode === 'number' ? (sortDir === 1 ? '↑' : '↓') : '↕';
+}
+
+function setSort(mode) {
+  if (sortMode === mode) sortDir *= -1;
+  else { sortMode = mode; sortDir = 1; }
+  render();
+}
+
+document.getElementById('sortNameBtn').addEventListener('click', () => setSort('name'));
+document.getElementById('sortNumBtn').addEventListener('click', () => setSort('number'));
+
+function render() {
+  sortPlayers();
+  updateSortButtons();
+  plistEl.innerHTML = players.map((p, i) => `
+    <li>
+      <span class="pname ${p.absent ? 'absent' : ''}">${p.name}</span>
+      <input class="rating" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="9" value="${p.rating}" data-i="${i}" />
+      <button class="chip absent ${p.absent ? 'on' : ''}" data-i="${i}" data-act="absent">absent</button>
+      <button class="del" data-i="${i}" data-act="del">&times;</button>
+    </li>
+  `).join('');
+}
+
+plistEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const i = Number(btn.dataset.i);
+  const act = btn.dataset.act;
+  if (act === 'absent') players[i].absent = !players[i].absent;
+  if (act === 'del') players.splice(i, 1);
+  render();
+  save();
+});
+
+plistEl.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('rating')) return;
+  const i = Number(e.target.dataset.i);
+  let val = parseInt(e.target.value, 10);
+  if (isNaN(val) || val < 1) val = 1;
+  players[i].rating = val;
+  save();
+});
+
+function addPlayer() {
+  const name = nameInput.value.trim();
+  if (!name) return;
+  players.push({ name, rating: 1, absent: false });
+  nameInput.value = '';
+  render();
+  save();
+}
+
+document.getElementById('addBtn').addEventListener('click', addPlayer);
+nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPlayer(); });
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeTeams() {
+  const present = players.filter(p => !p.absent);
+  if (present.length < 2) {
+    errEl.style.display = 'block';
+    teamsOut.style.display = 'none';
+    reshuffleBtn.style.display = 'none';
+    statusEl.style.display = 'none';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const sorted = shuffle(present).sort((a, b) => b.rating - a.rating);
+  const teamA = [], teamB = [];
+  let turn = 0;
+  sorted.forEach(p => {
+    if (turn === 0) teamA.push(p); else teamB.push(p);
+    turn = 1 - turn;
+  });
+
+  teamAEl.innerHTML = teamA.map(p => `<li>${p.name} <span>(${p.rating})</span></li>`).join('');
+  teamBEl.innerHTML = teamB.map(p => `<li>${p.name} <span>(${p.rating})</span></li>`).join('');
+  teamsOut.style.display = 'flex';
+  reshuffleBtn.style.display = 'block';
+  statusEl.style.display = 'block';
+  statusEl.textContent = teamA.length === teamB.length
+    ? teamA.length + ' vs ' + teamB.length + ' — even ✅'
+    : teamA.length + ' vs ' + teamB.length + ' (odd count, 1 extra)';
+}
+
+document.getElementById('makeBtn').addEventListener('click', makeTeams);
+reshuffleBtn.addEventListener('click', makeTeams);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  players = DEFAULT_NAMES.map(([name, rating]) => ({ name, rating, absent: false }));
+  render();
+  save();
+});
+
+function save() {
+  try {
+    localStorage.setItem('disc-team-players', JSON.stringify(players));
+    showSaved();
+  } catch (e) {
+    console.error('Save failed', e);
+  }
+}
+
+let savedTimer;
+function showSaved() {
+  const el = document.getElementById('savedMsg');
+  el.style.display = 'block';
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => { el.style.display = 'none'; }, 1500);
+}
+
+document.getElementById('saveBtn').addEventListener('click', save);
+
+function load() {
+  try {
+    const raw = localStorage.getItem('disc-team-players');
+    if (raw) {
+      players = JSON.parse(raw);
+    }
+  } catch (e) {
+    save();
+  }
+  render();
+}
+
+render();
+load();
+</script>
+</body>
+</html>
