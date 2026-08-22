@@ -918,6 +918,18 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .page-hdr{margin-bottom:6px}
 #page-brokerage-calc .bc-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;
   box-shadow:0 1px 2px rgba(16,30,60,.05)}
+
+/* ═══ MY LEDGER — colourful navy-gradient header + compact rows, sortable ═══ */
+#page-ledger .ledger-sheet-card{padding:14px 16px}
+#page-ledger .ledger-table{font-size:.72rem}
+#page-ledger .ledger-table thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;
+  padding:6px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:1;
+  user-select:none;font-size:.66rem;letter-spacing:.3px;text-transform:uppercase;}
+#page-ledger .ledger-table thead th:hover{background:var(--navy2)}
+#page-ledger .ledger-table tbody tr{border-bottom:1px solid var(--border);transition:background .12s ease}
+#page-ledger .ledger-table tbody tr:nth-child(even){background:#f8faff}
+#page-ledger .ledger-table tbody tr:hover{background:var(--blue2)!important}
+#page-ledger .ledger-table td{padding:4px 8px;white-space:nowrap}
 #page-brokerage-calc .bc-card h2{font-size:.9rem;font-weight:800;color:var(--navy);margin-bottom:6px;display:flex;align-items:center;gap:6px}
 #page-brokerage-calc .bc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 #page-brokerage-calc .bc-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase;

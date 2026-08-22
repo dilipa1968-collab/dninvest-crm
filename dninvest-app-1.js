@@ -1624,24 +1624,46 @@ function renderLedgerPage(){
   }
   if(line) line.textContent = 'Last updated: '+fmtDate(data.updated)+' · by '+escapeHtml(data.uploadedBy||'');
   const LEDGER_ROWS_COLLAPSED = 10; // default view — "More" reveals the rest
+  if(!window._ledgerSort) window._ledgerSort = {};       // { sheetName: {col, dir} } — click-to-sort state, per sheet
+  if(!window._ledgerDateFilter) window._ledgerDateFilter = {}; // { sheetName: 'YYYY-MM-DD' } — date-picker filter, per sheet
+  const esc = s => String(s==null?'':s).replace(/'/g,"\\'").replace(/"/g,'&quot;'); // for onclick-attribute string args below
   let html='';
   Object.keys(data.sheets).forEach(sheetName=>{
     let rows = data.sheets[sheetName].slice();
     if(!rows.length) return;
     const cols = Object.keys(rows[0]);
-    // Latest-first: sort by a "Date" column if this sheet has one (every one
-    // of Social/Assets/Work/Cash does), so the default 10-row view is the
-    // most recent 10 days, not whatever order the sheet happened to be in.
     const dateCol = cols.find(c=>String(c).trim().toLowerCase()==='date');
-    if(dateCol){
+    const safeId = 'ledger-'+sheetName.replace(/[^a-zA-Z0-9]/g,'');
+    const sortState = window._ledgerSort[sheetName];
+    const dateFilterVal = window._ledgerDateFilter[sheetName]||'';
+
+    // Sort: whatever column was last clicked (any sheet, any column — e.g.
+    // Assets sheet's "Month" then "Date" headers), defaulting to Date desc
+    // (latest day first) when nothing's been clicked yet.
+    const sortCol = sortState ? sortState.col : dateCol;
+    const sortDir = sortState ? sortState.dir : -1; // -1 = desc (latest first), 1 = asc
+    if(sortCol){
       rows.sort((a,b)=>{
-        const da=new Date(a[dateCol]), db=new Date(b[dateCol]);
-        const ta=isNaN(da)?-Infinity:da.getTime(), tb=isNaN(db)?-Infinity:db.getTime();
-        return tb-ta;
+        let va=a[sortCol], vb=b[sortCol];
+        const da=new Date(va), db=new Date(vb);
+        const bothDates = !isNaN(da) && !isNaN(db) && (va instanceof Date || vb instanceof Date || /^\d{4}-\d{2}-\d{2}/.test(String(va)) || /^\d{4}-\d{2}-\d{2}/.test(String(vb)));
+        if(bothDates) return sortDir*((isNaN(da)?-8.64e15:da.getTime())-(isNaN(db)?-8.64e15:db.getTime()));
+        const na=parseFloat(va), nb=parseFloat(vb);
+        if(!isNaN(na) && !isNaN(nb) && String(va).trim()!=='' && String(vb).trim()!=='') return sortDir*(na-nb);
+        return sortDir*String(va||'').localeCompare(String(vb||''));
       });
     } else {
-      rows.reverse(); // no date column (e.g. running-balance sheets) — assume last-added-first
+      rows.reverse(); // no date column and nothing clicked — assume last-added-first
     }
+
+    // Date-picker filter (per sheet, only offered when the sheet has a Date
+    // column) — "on or after" the chosen day, e.g. jump straight to a
+    // specific date in Cash instead of paging through "More" repeatedly.
+    if(dateCol && dateFilterVal){
+      const from = new Date(dateFilterVal);
+      rows = rows.filter(r=>{ const d=new Date(r[dateCol]); return !isNaN(d) && d.getTime()>=from.getTime(); });
+    }
+
     const total = rows.length;
     const rowHtml = r => '<tr>'+cols.map(c=>{
         let v = r[c];
@@ -1650,10 +1672,21 @@ function renderLedgerPage(){
       }).join('')+'</tr>';
     const visibleRows = rows.slice(0, LEDGER_ROWS_COLLAPSED).map(rowHtml).join('');
     const hiddenRows = rows.slice(LEDGER_ROWS_COLLAPSED).map(rowHtml).join('');
-    const safeId = 'ledger-'+sheetName.replace(/[^a-zA-Z0-9]/g,'');
-    html += `<div class="dash-card" style="margin-bottom:16px">
-      <h3>${escapeHtml(sheetName)} <span style="font-weight:400;color:var(--gray)">(latest ${Math.min(LEDGER_ROWS_COLLAPSED,total)} of ${total})</span></h3>
-      <div style="overflow-x:auto"><table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+    const theadCells = cols.map(c=>{
+      const active = sortCol===c;
+      const arrow = active ? (sortDir===1?' ▲':' ▼') : '';
+      return `<th onclick="ledgerSortClick('${esc(sheetName)}','${esc(c)}')" style="cursor:pointer;white-space:nowrap">${escapeHtml(c)}${arrow}</th>`;
+    }).join('');
+    html += `<div class="dash-card ledger-sheet-card" style="margin-bottom:16px">
+      <h3 style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;justify-content:space-between">
+        <span>${escapeHtml(sheetName)} <span style="font-weight:400;color:var(--gray)">(${dateFilterVal?'filtered — ':''}showing ${Math.min(LEDGER_ROWS_COLLAPSED,total)} of ${total})</span></span>
+        ${dateCol?`<span style="display:flex;align-items:center;gap:6px;font-weight:400">
+            <label style="font-size:.7rem;color:var(--gray)">From date:</label>
+            <input type="date" value="${esc(dateFilterVal)}" style="padding:4px 6px;font-size:.75rem;border:1px solid var(--border);border-radius:6px" onchange="ledgerDateFilterChange('${esc(sheetName)}',this.value)">
+            ${dateFilterVal?`<button class="btn-icon" onclick="ledgerDateFilterChange('${esc(sheetName)}','')" title="Clear filter">✖ Clear</button>`:''}
+          </span>`:''}
+      </h3>
+      <div style="overflow-x:auto"><table class="ledger-table"><thead><tr>${theadCells}</tr></thead>
       <tbody>${visibleRows}</tbody>
       <tbody id="${safeId}-more" style="display:none">${hiddenRows}</tbody>
       </table></div>
@@ -1661,6 +1694,17 @@ function renderLedgerPage(){
       </div>`;
   });
   box.innerHTML = html;
+}
+function ledgerSortClick(sheetName, col){
+  const cur = window._ledgerSort[sheetName];
+  const newDir = (cur && cur.col===col) ? -cur.dir : -1; // first click = latest/desc, click again = flip
+  window._ledgerSort[sheetName] = {col, dir:newDir};
+  renderLedgerPage();
+}
+function ledgerDateFilterChange(sheetName, value){
+  if(value) window._ledgerDateFilter[sheetName] = value;
+  else delete window._ledgerDateFilter[sheetName];
+  renderLedgerPage();
 }
 function toggleLedgerMore(safeId){
   const more = document.getElementById(safeId+'-more');
