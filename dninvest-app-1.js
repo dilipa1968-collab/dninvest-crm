@@ -2104,51 +2104,104 @@ function initApp(){
         updateBadges();
       };
 
-      // ── mf_clients/eq_clients/leads/seminars: PERIODIC POLL, not a standing
-      // realtime listener (billing fix, 20-Aug-2026, "aggressive" option).
-      // Before this, one onSnapshot per shard stayed open in every RM's +
-      // Admin's browser tab all day. A single client edit anywhere then
-      // re-delivered that whole shard doc to every other open tab, and
-      // Firestore bills every one of those deliveries as a document read —
-      // with 9 RMs + Admin routinely leaving a tab open, that adds up fast
-      // over a full working day. Polling every 3 min instead means at most
-      // one read per shard per tab per 3-min window, no matter how many
-      // edits happen in between. Trade-off (explicitly chosen over staying
-      // realtime while the tab is active): another RM/Admin's edit now shows
-      // up within ~3 min instead of instantly. rm_messages/announcement/
-      // comm_history/force_logout/call_limits are untouched below — those
-      // are small single docs and/or need to stay instant (security
-      // kill-switch, RM↔Admin messaging), so they keep onSnapshot as before.
-      async function _pollShardedClientData(){
-        for(const key of ['eq_clients','mf_clients','leads','seminars']){
-          if(!DB._isSharded(key)) continue;
-          try{
-            const parts = await DB._ensureMigrated(key);
-            DB._shardCache[key] = parts.map(p=>p||[]);
-            const merged = DB._mergeShards(key);
-            // Same fast change-check as the old listener used, to avoid an
-            // unnecessary localStorage write + re-render when nothing changed.
-            let existingArr = null;
-            try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
-            if(Array.isArray(existingArr) && existingArr.length===merged.length){
-              const ex=existingArr;
-              if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) continue;
-            }
-            if(!DB._mem) DB._mem = {};
-            DB._mem[key] = merged;
-            if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
-            try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }
-            catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
-            _afterRealtime(key);
-          }catch(e){ console.log('poll failed for',key,e); }
+      // ── mf_clients/eq_clients/leads/seminars: BALANCED sync (21-Aug-2026,
+      // replaces the "everyone always instant" version above). Realtime
+      // onSnapshot listeners are only kept attached while THIS tab is the
+      // visible/foreground tab (Page Visibility API) — a tab minimized or
+      // sitting behind another window detaches them entirely, so it stops
+      // generating billed Firestore reads for edits happening elsewhere.
+      // A background tab instead falls back to a plain poll every 4 min.
+      // The moment the tab is switched back to / brought to front, it
+      // re-attaches realtime AND does one immediate catch-up poll, so
+      // whatever happened while it was hidden shows up right away — not
+      // after waiting out the rest of the 4-min window.
+      // rm_messages/announcement/comm_history/force_logout/call_limits are
+      // untouched below — small single docs and/or need to stay instant
+      // (security kill-switch, RM↔Admin messaging) regardless of tab
+      // visibility, so they keep their own onSnapshot as before.
+      {
+        const SHARD_KEYS = ['eq_clients','mf_clients','leads','seminars'].filter(k=>DB._isSharded(k));
+        window._shardUnsubs = window._shardUnsubs || [];
+        window._shardBgTimer = window._shardBgTimer || null;
+
+        async function _pollShardedClientData(){
+          for(const key of SHARD_KEYS){
+            try{
+              const parts = await DB._ensureMigrated(key);
+              DB._shardCache[key] = parts.map(p=>p||[]);
+              const merged = DB._mergeShards(key);
+              let existingArr = null;
+              try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
+              if(Array.isArray(existingArr) && existingArr.length===merged.length){
+                const ex=existingArr;
+                if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) continue;
+              }
+              if(!DB._mem) DB._mem = {};
+              DB._mem[key] = merged;
+              if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
+              try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }
+              catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
+              _afterRealtime(key);
+            }catch(e){ console.log('poll failed for',key,e); }
+          }
         }
-      }
-      if(!window._shardPollTimer){
-        window._shardPollTimer = setInterval(_pollShardedClientData, 3*60000); // every 3 min
+
+        function _attachShardedRealtime(){
+          if(window._shardUnsubs.length) return;   // already attached
+          SHARD_KEYS.forEach(key=>{
+            const n = SHARD_CFG[key];
+            if(!DB._shardCache[key]) DB._shardCache[key] = Array.from({length:n},()=>[]);
+            if(!DB._shardSeen[key])  DB._shardSeen[key]  = new Set();
+            for(let i=0;i<n;i++){
+              const unsub = DB._shardRef(key,i).onSnapshot(doc=>{
+                if(doc.metadata.hasPendingWrites) return;
+                if(DB._writing[key]>0) return;
+                if(!(doc.exists && doc.data() && Array.isArray(doc.data().data))) return;
+                DB._shardCache[key][i] = doc.data().data;
+                DB._shardSeen[key].add(i);
+                if(DB._shardSeen[key].size < n) return;   // wait for every shard to report in once
+                const merged = DB._mergeShards(key);
+                let existingArr = null;
+                try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
+                if(Array.isArray(existingArr) && existingArr.length===merged.length){
+                  const ex=existingArr;
+                  if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
+                }
+                if(!DB._mem) DB._mem = {};
+                DB._mem[key] = merged;
+                if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
+                try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }
+                catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
+                _afterRealtime(key);
+              });
+              window._shardUnsubs.push(unsub);
+            }
+          });
+        }
+
+        function _detachShardedRealtime(){
+          window._shardUnsubs.forEach(u=>{ try{ u(); }catch(e){} });
+          window._shardUnsubs = [];
+          SHARD_KEYS.forEach(key=>{ DB._shardSeen[key] = new Set(); });   // re-arm the "wait for all shards" gate for next attach
+        }
+
+        function _applyVisibilityMode(){
+          if(document.visibilityState==='visible'){
+            if(window._shardBgTimer){ clearInterval(window._shardBgTimer); window._shardBgTimer=null; }
+            _pollShardedClientData();   // catch up immediately on whatever happened while hidden
+            _attachShardedRealtime();
+          } else {
+            _detachShardedRealtime();
+            if(!window._shardBgTimer) window._shardBgTimer = setInterval(_pollShardedClientData, 4*60000); // every 4 min while hidden
+          }
+        }
+
+        document.addEventListener('visibilitychange', _applyVisibilityMode);
+        _applyVisibilityMode();   // set initial mode for this load
       }
 
       ['eq_clients','mf_clients','leads','seminars'].forEach(key=>{
-        if(DB._isSharded(key)) return;   // handled by the poll above now
+        if(DB._isSharded(key)) return;   // handled above (balanced realtime/poll) — only leads/seminars land here, they aren't sharded
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
           if(DB._writing[key]>0) return;
