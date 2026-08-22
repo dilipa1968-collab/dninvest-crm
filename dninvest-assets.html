@@ -79,13 +79,21 @@
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;}
   .panel h2{margin:0 0 4px;font-size:15px;color:var(--gold-soft);font-weight:600;}
   .panel .sub{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.55;}
+  @media (max-width:760px){
+    .panel{padding:13px;border-radius:12px;margin-bottom:14px;}
+    .panel h2{font-size:13.5px;}
+    .panel .sub{font-size:11.5px;margin-bottom:10px;}
+    .group-label{margin:16px 0 8px;font-size:10.5px;}
+  }
 
   form{display:grid;grid-template-columns: 1.4fr 1fr 1fr 1.4fr auto;gap:10px;}
   form.wide{grid-template-columns: repeat(4, 1fr) auto;}
   @media (max-width:760px){
-    form, form.wide{grid-template-columns:1fr 1fr;}
+    form, form.wide{grid-template-columns:1fr 1fr;gap:8px;}
     form .full{grid-column:1/-1;}
     form button{grid-column:1/-1;}
+    label{font-size:10px;margin-bottom:3px;}
+    input{padding:8px 9px;font-size:13px;}
   }
   label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
   input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:6px;font-size:14px;}
@@ -95,9 +103,14 @@
   button{cursor:pointer;border:none;border-radius:6px;font-weight:600;font-size:13px;}
   .btn-add{background:var(--gold);color:#1a1508;padding:9px 18px;align-self:end;white-space:nowrap;}
   .btn-add:hover{background:var(--gold-soft);}
+  @media (max-width:760px){ .btn-add{padding:9px 14px;font-size:13px;} }
 
   .toolbar{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;gap:10px;flex-wrap:wrap;}
   .toolbar .ttl{font-size:13px;color:var(--muted);font-weight:600;}
+  @media (max-width:760px){
+    .toolbar{margin:12px 0 8px;}
+    .btn-ghost{padding:6px 10px;font-size:11px;}
+  }
   .actions{display:flex;gap:8px;flex-wrap:wrap;}
   .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);padding:6px 12px;font-size:12px;}
   .btn-ghost:hover{border-color:var(--gold);color:var(--gold-soft);}
@@ -119,6 +132,29 @@
   .icon-btn:hover{border-color:var(--gold);color:var(--gold-soft);}
   .icon-btn.danger:hover{border-color:var(--red);color:var(--red);}
 
+  /* ===== Mobile: turn each table row into a compact stacked card — no
+     horizontal scroll, no cut-off figures. First cell (name/month) sits on
+     its own full-width line; middle value cells wrap naturally below it;
+     the actions cell (edit/delete) pins to the right. ===== */
+  @media (max-width:760px){
+    .table-scroll{overflow-x:visible;}
+    table{min-width:0;}
+    thead{display:none;}
+    tbody, tr{display:block;width:100%;}
+    tbody tr{
+      display:flex; flex-wrap:wrap; align-items:center; gap:3px 12px;
+      padding:11px 2px; border-bottom:1px solid var(--line);
+    }
+    tbody td{
+      display:inline-flex; border:none; padding:0; white-space:normal;
+      font-size:12.5px; vertical-align:baseline;
+    }
+    tbody td:first-child{flex:1 1 100%; order:1; margin-bottom:1px;}
+    tbody td:first-child .acct{font-size:14px;}
+    tbody td:last-child{order:99; flex:0 0 auto; margin-left:auto;}
+    tbody td:not(:first-child):not(:last-child){order:2; font-weight:700; text-align:left;}
+  }
+
   .total-row{
     display:flex;justify-content:space-between;align-items:center;
     background:var(--panel2);border:1px solid var(--line);border-radius:8px;
@@ -126,6 +162,11 @@
   }
   .total-row .l{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
   .total-row .v{font-size:20px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;}
+  @media (max-width:760px){
+    .total-row{padding:10px 12px;}
+    .total-row .l{font-size:11px;}
+    .total-row .v{font-size:16px;}
+  }
 
   .legend{
     background:var(--panel2);border:1px solid var(--line);border-radius:8px;
