@@ -2104,60 +2104,51 @@ function initApp(){
         updateBadges();
       };
 
-      ['eq_clients','mf_clients','leads','seminars'].forEach(key=>{
-        // ── sharded key: one listener per shard, merged back together ──
-        if(DB._isSharded(key)){
-          const n = SHARD_CFG[key];
-          if(!DB._shardCache[key]) DB._shardCache[key] = Array.from({length:n},()=>[]);
-          if(!DB._shardSeen[key])  DB._shardSeen[key]  = new Set();
-          for(let i=0;i<n;i++){
-            DB._shardRef(key,i).onSnapshot(doc=>{
-              if(doc.metadata.hasPendingWrites) return;
-              if(DB._writing[key]>0) return;
-              if(!(doc.exists && doc.data() && Array.isArray(doc.data().data))) return;
-              DB._shardCache[key][i] = doc.data().data;
-              DB._shardSeen[key].add(i);
-              // Don't publish a half-loaded picture: wait until every shard
-              // has reported in at least once.
-              if(DB._shardSeen[key].size < n) return;
-              const merged   = DB._mergeShards(key);
-              // Fast change check: compare record count first, then spot-check
-              // a few items, before falling back to a full JSON.stringify
-              // comparison (expensive for 3000+ clients with rich nested
-              // fields like aum_schemes/sip_details).
-              // NOTE: this used to count '{' characters in the raw JSON via
-              // regex as a stand-in for "how many records", but that counts
-              // EVERY nested object too (aum_detail, each aum_schemes/
-              // sip_details entry, etc.) — comparing that against merged's
-              // plain record count was comparing two different units, so the
-              // "same count" shortcut essentially never matched and this
-              // fired a full localStorage overwrite + re-render on nearly
-              // every snapshot, whether or not anything actually changed.
-              let existingArr = null;
-              try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
-              if(Array.isArray(existingArr) && existingArr.length===merged.length){
-                const ex=existingArr;
-                if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
-              }
-              // _mem is the source of truth DB.get() actually reads within a
-              // session — update it FIRST, unconditionally, then treat
-              // localStorage as a best-effort cache only. (Same
-              // QuotaExceededError class as the syncFromFirebase sharded
-              // branch above: without this ordering, a quota failure here
-              // silently threw the freshly-synced data away completely.)
-              if(!DB._mem) DB._mem = {};
-              DB._mem[key] = merged;
-              if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
-              try{
-                localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
-              }catch(e){
-                console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e);
-              }
-              _afterRealtime(key);
-            });
-          }
-          return;
+      // ── mf_clients/eq_clients/leads/seminars: PERIODIC POLL, not a standing
+      // realtime listener (billing fix, 20-Aug-2026, "aggressive" option).
+      // Before this, one onSnapshot per shard stayed open in every RM's +
+      // Admin's browser tab all day. A single client edit anywhere then
+      // re-delivered that whole shard doc to every other open tab, and
+      // Firestore bills every one of those deliveries as a document read —
+      // with 9 RMs + Admin routinely leaving a tab open, that adds up fast
+      // over a full working day. Polling every 3 min instead means at most
+      // one read per shard per tab per 3-min window, no matter how many
+      // edits happen in between. Trade-off (explicitly chosen over staying
+      // realtime while the tab is active): another RM/Admin's edit now shows
+      // up within ~3 min instead of instantly. rm_messages/announcement/
+      // comm_history/force_logout/call_limits are untouched below — those
+      // are small single docs and/or need to stay instant (security
+      // kill-switch, RM↔Admin messaging), so they keep onSnapshot as before.
+      async function _pollShardedClientData(){
+        for(const key of ['eq_clients','mf_clients','leads','seminars']){
+          if(!DB._isSharded(key)) continue;
+          try{
+            const parts = await DB._ensureMigrated(key);
+            DB._shardCache[key] = parts.map(p=>p||[]);
+            const merged = DB._mergeShards(key);
+            // Same fast change-check as the old listener used, to avoid an
+            // unnecessary localStorage write + re-render when nothing changed.
+            let existingArr = null;
+            try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
+            if(Array.isArray(existingArr) && existingArr.length===merged.length){
+              const ex=existingArr;
+              if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) continue;
+            }
+            if(!DB._mem) DB._mem = {};
+            DB._mem[key] = merged;
+            if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
+            try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }
+            catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
+            _afterRealtime(key);
+          }catch(e){ console.log('poll failed for',key,e); }
         }
+      }
+      if(!window._shardPollTimer){
+        window._shardPollTimer = setInterval(_pollShardedClientData, 3*60000); // every 3 min
+      }
+
+      ['eq_clients','mf_clients','leads','seminars'].forEach(key=>{
+        if(DB._isSharded(key)) return;   // handled by the poll above now
         fdb.collection('crm_data').doc(key).onSnapshot(doc=>{
           if(doc.metadata.hasPendingWrites) return;
           if(DB._writing[key]>0) return;
