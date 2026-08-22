@@ -153,6 +153,18 @@
     tbody td:first-child .acct{font-size:14px;}
     tbody td:last-child{order:99; flex:0 0 auto; margin-left:auto;}
     tbody td:not(:first-child):not(:last-child){order:2; font-weight:700; text-align:left;}
+
+    /* Labelled value cells (Monthly table) — small muted caption above the
+       number, so it's clear what each figure means without the header row. */
+    tbody td[data-label]{
+      display:inline-flex; flex-direction:column; align-items:flex-start; gap:1px;
+      flex:0 1 auto; min-width:78px; padding:2px 8px 2px 0;
+    }
+    tbody td[data-label]::before{
+      content:attr(data-label);
+      font-size:9.5px; font-weight:600; letter-spacing:.2px; text-transform:uppercase;
+      color:var(--muted);
+    }
   }
 
   .total-row{
@@ -740,7 +752,12 @@ function renderMonths(){
   emptyMsg.style.display = 'none';
   [...rows].reverse().forEach(e=>{
     const tr = document.createElement('tr');
-    const cells = view.row(e);
+    // Tag every value cell (skip the first — month — which is self-evident)
+    // with its column header as data-label, so mobile can show a small
+    // "Naya Invest ₹1,000" style caption instead of an unlabelled number.
+    const cells = view.row(e).map((html, i) =>
+      i === 0 ? html : html.replace('<td', `<td data-label="${escapeHtml(view.head[i])}"`)
+    );
     const actionCell = `<td><div class="row-actions">
         <button class="icon-btn" title="Edit" onclick="editMonth('${e.id}')">✎</button>
         <button class="icon-btn danger" title="Delete" onclick="deleteMonth('${e.id}')">✕</button>
