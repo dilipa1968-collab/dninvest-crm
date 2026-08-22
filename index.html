@@ -1297,6 +1297,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <span class="icon">⚙️</span> Users & Settings
         <span class="badge" id="admin-inbox-badge-nav" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('ledger'); renderLedgerPage();" id="nav-ledger" title="Apna personal daily ledger — sirf admin ko dikhta hai">
+        <span class="icon">💰</span> My Ledger
+      </div>
 
       <!-- RM: Message Admin button (hidden for admin) -->
       <div class="sidebar-section" id="msg-admin-nav-section" style="display:none">Messages</div>
@@ -1943,6 +1946,23 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </div>
 
       <!-- ── BROKERAGE ── -->
+      <!-- ══════ MY LEDGER PAGE (admin only — personal daily xlsx tracker) ══════ -->
+      <div class="page" id="page-ledger">
+        <div class="page-hdr">
+          <div class="page-title">💰 My Ledger</div>
+          <div class="hdr-actions" id="ledger-updated-line" style="color:var(--gray);font-size:.78rem"></div>
+        </div>
+        <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.82rem">
+          🔒 Ye page sirf Admin ko dikhta hai. Roz wahi Excel file (Social / Assets / Work / Cash sheets) upload karo — purana data overwrite ho jaayega. <b>"Password" naam ka sheet kabhi upload/store nahi hota, chahe file me ho bhi</b> — security ke liye.
+        </div>
+        <input type="file" id="ledger-file" accept=".xlsx,.xls" style="display:none" onchange="handleLedgerFile(this)">
+        <div class="import-zone" id="ledger-zone" onclick="document.getElementById('ledger-file').click()">
+          📤 Click karke apni Excel file chuno (roz wahi file, dobara upload karo)
+        </div>
+        <div id="ledger-content" style="margin-top:18px"></div>
+      </div>
+      <!-- ══════ END MY LEDGER PAGE ══════ -->
+
       <div class="page" id="page-duplicates">
         <div class="page-hdr">
           <div class="page-title">🧹 Duplicate Finder</div>

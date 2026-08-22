@@ -963,7 +963,7 @@ const DB = {
     // login, page refresh, and the 30-min auto-reload, so a sequential for-loop here
     // directly adds up to slow login/page-open times (each collection = one network
     // round-trip; sequential = sum of all of them, parallel = the slowest single one).
-    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'].map(async (key)=>{
+    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk','personal_ledger'].map(async (key)=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
         if(this._isSharded(key)){
@@ -1567,6 +1567,82 @@ function openHrPortal(){
   }catch(e){}
   window.open('dninvest-hr.html?autologin='+token+'&u='+encodeURIComponent(CU.username), '_blank');
 }
+
+// ══════════════════════════════════════════
+// MY LEDGER — admin's personal daily xlsx tracker (22-Aug-2026)
+// Only the Social / Assets / Work / Cash sheets are ever read or stored — the
+// "Password" sheet (Income Tax/GST/bank/email/website-admin plaintext
+// credentials, seen in the user's actual upload) is skipped unconditionally
+// at parse time and never touches Firestore, by explicit user choice: this
+// CRM is shared across 9 RM logins over the same Firestore project, so
+// anything written to 'personal_ledger' is reachable by every one of those
+// sessions — fine for daily cash/asset tracking, not for banking passwords.
+// Stored as one small non-sharded doc (crm_data/personal_ledger), same as
+// other admin-only single-value settings elsewhere in this file.
+// ══════════════════════════════════════════
+const LEDGER_SKIP_SHEETS = ['password','passwords','pwd'];
+function handleLedgerFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(CU.role!=='admin'){ toast('Admin only','error'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary', cellDates:true});
+      const sheets = {};
+      let skippedPassword = false;
+      wb.SheetNames.forEach(sn=>{
+        if(LEDGER_SKIP_SHEETS.includes(String(sn).trim().toLowerCase())){ skippedPassword = true; return; }
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''});
+        // Drop fully-blank rows (common in daily-tracker sheets with lots of
+        // pre-formatted empty rows below the real data) and cap at 2000 rows
+        // per sheet so one odd file can't blow past Firestore's 1MB doc limit.
+        const clean = rows.filter(r=>Object.values(r).some(v=>String(v).trim()!=='')).slice(0,2000);
+        if(clean.length) sheets[sn] = clean;
+      });
+      if(!Object.keys(sheets).length){ toast('Is file me koi readable sheet nahi mili','error'); input.value=''; return; }
+      const payload = { sheets, updated:new Date().toISOString(), uploadedBy:CU.name||CU.username };
+      DB.set('personal_ledger', payload);
+      renderLedgerPage();
+      toast('Ledger update ho gaya'+(skippedPassword?' (Password sheet skip kar diya)':''),'success');
+    }catch(err){
+      toast('File padhne me error: '+err.message,'error');
+    }
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+function renderLedgerPage(){
+  const box = document.getElementById('ledger-content');
+  const line = document.getElementById('ledger-updated-line');
+  if(!box) return;
+  const data = DB.get('personal_ledger');
+  if(!data || !data.sheets || !Object.keys(data.sheets).length){
+    box.innerHTML = '<div style="color:var(--gray);padding:20px;text-align:center">Abhi tak koi file upload nahi hui.</div>';
+    if(line) line.textContent = '';
+    return;
+  }
+  if(line) line.textContent = 'Last updated: '+fmtDate(data.updated)+' · by '+escapeHtml(data.uploadedBy||'');
+  let html='';
+  Object.keys(data.sheets).forEach(sheetName=>{
+    const rows = data.sheets[sheetName];
+    if(!rows.length) return;
+    const cols = Object.keys(rows[0]);
+    html += `<div class="dash-card" style="margin-bottom:16px">
+      <h3>${escapeHtml(sheetName)} <span style="font-weight:400;color:var(--gray)">(${rows.length} rows)</span></h3>
+      <div style="overflow-x:auto"><table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
+    rows.forEach(r=>{
+      html += '<tr>'+cols.map(c=>{
+        let v = r[c];
+        if(v instanceof Date) v = fmtDate(v.toISOString());
+        return `<td>${escapeHtml(v===undefined||v===null?'':String(v))}</td>`;
+      }).join('')+'</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  });
+  box.innerHTML = html;
+}
+
 
 function doLogout(){
   CU=null;
@@ -2267,6 +2343,8 @@ function initApp(){
   if(quizNav) quizNav.style.display=CU.role==='admin'?'flex':'none';
   const dupNav=document.getElementById('nav-duplicates');
   if(dupNav) dupNav.style.display=CU.role==='admin'?'flex':'none';
+  const ledgerNav=document.getElementById('nav-ledger');
+  if(ledgerNav) ledgerNav.style.display=CU.role==='admin'?'flex':'none';
 
   // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
@@ -2292,7 +2370,7 @@ function initApp(){
      'nav-eq-followup','nav-eq-notrade','nav-eq-nocall','nav-eq-demat',
      'nav-mf-followup','nav-mf-sip','nav-mf-nocall','nav-mf-txns',
      'nav-other-products','nav-reports','nav-activity-log',
-     'nav-announcements','nav-admin','nav-duplicates'].forEach(id=>{
+     'nav-announcements','nav-admin','nav-duplicates','nav-ledger'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='none';
     });
