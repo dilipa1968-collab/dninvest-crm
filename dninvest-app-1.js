@@ -2332,9 +2332,9 @@ function initApp(){
   const hrBtn = document.getElementById('hrPortalTopBtn');
   if(hrBtn) hrBtn.style.display = '';
 
-  // Asset & Net Worth Tracker shortcut button — visible only to admin (same as HR)
+  // Asset & Net Worth Tracker shortcut button — admin only
   const assetBtn = document.getElementById('assetTrackerTopBtn');
-  if(assetBtn) assetBtn.style.display = '';
+  if(assetBtn) assetBtn.style.display = (CU.role==='admin') ? '' : 'none';
 
   // Demat A/c Opening nav item — visible when user has Equity access
   const dematNav = document.getElementById('nav-eq-demat');

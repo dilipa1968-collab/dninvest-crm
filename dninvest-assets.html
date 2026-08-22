@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="theme-color" content="#0e0d0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Assets">
 <title>Asset & Net Worth — D N Investment</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -17,15 +22,18 @@
     --muted:#9a9284;
     --green:#5fbf87;
     --red:#e2685f;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{overscroll-behavior-y:contain;}
   body{
     margin:0;
-    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI', system-ui, sans-serif;
     background:radial-gradient(1200px 600px at 80% -10%, rgba(212,175,55,0.08), transparent 60%), var(--bg);
     color:var(--text);
     min-height:100vh;
-    padding:24px 16px 60px;
+    padding:calc(16px + var(--safe-top)) 16px calc(88px + var(--safe-bottom));
   }
   .wrap{max-width:920px;margin:0 auto;}
 
@@ -35,6 +43,38 @@
   .hero-label{font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;}
   .hero-value{font-size:44px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.2;}
   .hero-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+
+  /* ===== Mobile app-like bottom tab bar ===== */
+  .bottom-nav{display:none;}
+  @media (max-width:760px){
+    body{padding-bottom:calc(78px + var(--safe-bottom));}
+    header{
+      position:sticky; top:0; z-index:40; margin:-16px -16px 18px; padding:calc(10px + var(--safe-top)) 16px 10px;
+      background:rgba(14,13,11,0.86); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      border-bottom:1px solid var(--line);
+    }
+    header h1{font-size:16px;margin-bottom:0;}
+    header .brand{font-size:10px;}
+    header .header-desc{display:none;}
+    #uploadBlock{margin-top:8px !important;}
+    #excelUploadBtn{padding:6px 12px !important;font-size:11px;}
+    .bottom-nav{
+      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:50;
+      padding:8px 10px calc(8px + var(--safe-bottom));
+      background:rgba(23,20,15,0.92); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+      border-top:1px solid var(--line);
+      box-shadow:0 -8px 24px rgba(0,0,0,0.35);
+    }
+    .bottom-nav button{
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+      background:transparent; border:none; color:var(--muted); padding:6px 4px; font-size:10.5px;
+      font-weight:600; border-radius:12px; transition:color .15s, background .15s;
+    }
+    .bottom-nav button .bn-icon{font-size:19px; line-height:1; transition:transform .15s;}
+    .bottom-nav button.active{color:var(--gold);}
+    .bottom-nav button.active .bn-icon{transform:translateY(-1px) scale(1.08);}
+    .bottom-nav button:active{background:rgba(212,175,55,0.08);}
+  }
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;}
   .panel h2{margin:0 0 4px;font-size:15px;color:var(--gold-soft);font-weight:600;}
@@ -97,29 +137,44 @@
   .footnote{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;line-height:1.6;}
 
   .page{display:none;}
-  .page.active{display:block;}
+  .page.active{display:block; animation:pageIn .28s ease both;}
+  @keyframes pageIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;}
   .stat-grid.three{grid-template-columns:1fr 1fr 1fr;}
-  @media (max-width:600px){.stat-grid{grid-template-columns:1fr;} .stat-grid.three{grid-template-columns:1fr;}}
+  @media (max-width:600px){.stat-grid{grid-template-columns:1fr 1fr;} .stat-grid.three{grid-template-columns:1fr 1fr;}}
   .group-label{font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold-soft);margin:22px 0 10px;font-weight:600;}
   .group-label:first-child{margin-top:0;}
   .stat-card{
-    background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    padding:18px;cursor:pointer;transition:border-color .15s;
+    background:linear-gradient(155deg, var(--panel) 0%, var(--panel2) 100%);
+    border:1px solid var(--line);border-radius:16px;
+    padding:16px;cursor:pointer;transition:border-color .15s, transform .12s;
+    -webkit-tap-highlight-color:transparent;
   }
   .stat-card:hover{border-color:var(--gold);}
-  .stat-card .l{font-size:11.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-  .stat-card .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold);}
-  .stat-card .m{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
-  .stat-card.big{grid-column:1/-1;}
-  .stat-card.big .v{font-size:38px;}
+  .stat-card:active{transform:scale(0.97);}
+  .stat-card .icn{font-size:20px;margin-bottom:8px;display:block;}
+  .stat-card .l{font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+  .stat-card .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold);}
+  .stat-card .m{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45;}
+  .stat-card.big{grid-column:1/-1;padding:20px;}
+  .stat-card.big .icn{font-size:24px;}
+  .stat-card.big .v{font-size:34px;}
+  @media (max-width:600px){
+    .stat-card{padding:14px;border-radius:14px;}
+    .stat-card .v{font-size:19px;}
+    .stat-card.big .v{font-size:30px;}
+    .stat-card .m{display:none;}
+  }
 
   .back-btn{
     background:transparent;border:1px solid var(--line);color:var(--muted);
-    padding:7px 14px;font-size:12.5px;border-radius:6px;margin-bottom:16px;cursor:pointer;
+    padding:8px 16px;font-size:12.5px;border-radius:20px;margin-bottom:16px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
   .back-btn:hover{border-color:var(--gold);color:var(--gold-soft);}
+  .back-btn:active{transform:scale(0.96);}
+  @media (max-width:760px){ .back-btn{display:none;} }
 
   .nav-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
   .nav-cta button{
@@ -127,6 +182,7 @@
     padding:14px;font-size:13.5px;border-radius:8px;
   }
   .nav-cta button:hover{border-color:var(--gold);}
+  @media (max-width:760px){ .nav-cta{display:none;} }
 
   .filter-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
   .filter-tab{
@@ -143,10 +199,10 @@
   <header>
     <div class="brand">D N Investment · Personal</div>
     <h1>Asset & Net Worth Tracker</h1>
-    <div style="margin-top:14px;">
+    <div style="margin-top:14px;" id="uploadBlock">
       <input type="file" id="excelUpload" accept=".xlsx,.xls" style="display:none;">
       <button class="btn-ghost" id="excelUploadBtn" style="padding:9px 18px;">📤 Excel se Latest Data Upload Karein</button>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Aapki sheet ki "Assets" tab se — Account/Amount/Date, Investment aur Net Worth teeno data khud padh liya jayega.</div>
+      <div class="header-desc" style="font-size:11px;color:var(--muted);margin-top:6px;">Aapki sheet ki "Assets" tab se — Account/Amount/Date, Investment aur Net Worth teeno data khud padh liya jayega.</div>
     </div>
   </header>
 
@@ -156,11 +212,13 @@
     <div class="group-label">Net Worth</div>
     <div class="stat-grid">
       <div class="stat-card big" onclick="goPage('assets','all')">
+        <span class="icn">🏦</span>
         <div class="l">Net Worth (Total)</div>
         <div class="v" id="statNetWorth">₹0</div>
         <div class="m">Sab accounts ka jod — Investment + Cash &amp; Bank + Other. Tap karke poori Assets list dekhein.</div>
       </div>
       <div class="stat-card" onclick="goPage('monthly','networth')">
+        <span class="icn">📈</span>
         <div class="l">Net Worth Growth (is mahine)</div>
         <div class="v" id="statNetWorthGrowth">₹0</div>
         <div class="m">Is mahine ka Net Worth − pichle mahine ka Net Worth. Tap karke mahine-war Net Worth list dekhein.</div>
@@ -170,16 +228,19 @@
     <div class="group-label">Investment</div>
     <div class="stat-grid three">
       <div class="stat-card" onclick="goPage('monthly','investment')">
+        <span class="icn">🪙</span>
         <div class="l">Investment Value (Total Invested)</div>
         <div class="v" id="statInvestValue">₹0</div>
         <div class="m">Ab tak jitna paisa invest kiya (cost) — cumulative jod. Tap karke Investment list dekhein.</div>
       </div>
       <div class="stat-card" onclick="goPage('assets','investment')">
+        <span class="icn">📊</span>
         <div class="l">Investment Current Value</div>
         <div class="v" id="statInvestCurrentValue">₹0</div>
         <div class="m">Investment-tagged accounts (MF/FD) ki abhi market value. Tap karke sirf Investment accounts dekhein.</div>
       </div>
       <div class="stat-card" onclick="goPage('monthly','investment')">
+        <span class="icn">🚀</span>
         <div class="l">Investment Growth (is mahine)</div>
         <div class="v" id="statInvestGrowth">₹0</div>
         <div class="m">Is mahine Current Value − pichle mahine Current Value (sirf market ka asar).</div>
@@ -189,11 +250,13 @@
     <div class="group-label">Cash</div>
     <div class="stat-grid">
       <div class="stat-card" onclick="goPage('assets','cashbank')">
+        <span class="icn">💵</span>
         <div class="l">Current Cash</div>
         <div class="v" id="statCurrentCash">₹0</div>
         <div class="m">Net Worth − Investment Current Value. Tap karke sirf Cash &amp; Bank accounts dekhein.</div>
       </div>
       <div class="stat-card" onclick="goPage('monthly','cash')">
+        <span class="icn">💰</span>
         <div class="l">Cash Growth (is mahine)</div>
         <div class="v" id="statCashGrowth">₹0</div>
         <div class="m">Net Worth Growth − Investment Growth + Naya Invest. Tap karke mahine-war Cash Growth list dekhein.</div>
@@ -337,6 +400,19 @@
 
 </div>
 
+<!-- ===================== MOBILE BOTTOM TAB BAR ===================== -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="active" data-page="dashboard" onclick="goPage('dashboard')">
+    <span class="bn-icon">🏠</span>Home
+  </button>
+  <button data-page="assets" onclick="goPage('assets','all')">
+    <span class="bn-icon">🗂️</span>Assets
+  </button>
+  <button data-page="monthly" onclick="goPage('monthly','all')">
+    <span class="bn-icon">📅</span>Monthly
+  </button>
+</nav>
+
 <script>
 let assetFilter = 'all';
 let monthFilter = 'all';
@@ -344,6 +420,9 @@ let monthFilter = 'all';
 function goPage(name, filter){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('#bottomNav button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.page === name);
+  });
   window.scrollTo(0,0);
   if(name==='dashboard') updateDashboard();
   if(name==='assets' && filter) setAssetFilter(filter);
