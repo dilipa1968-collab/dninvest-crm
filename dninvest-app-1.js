@@ -1623,24 +1623,52 @@ function renderLedgerPage(){
     return;
   }
   if(line) line.textContent = 'Last updated: '+fmtDate(data.updated)+' · by '+escapeHtml(data.uploadedBy||'');
+  const LEDGER_ROWS_COLLAPSED = 10; // default view — "More" reveals the rest
   let html='';
   Object.keys(data.sheets).forEach(sheetName=>{
-    const rows = data.sheets[sheetName];
+    let rows = data.sheets[sheetName].slice();
     if(!rows.length) return;
     const cols = Object.keys(rows[0]);
-    html += `<div class="dash-card" style="margin-bottom:16px">
-      <h3>${escapeHtml(sheetName)} <span style="font-weight:400;color:var(--gray)">(${rows.length} rows)</span></h3>
-      <div style="overflow-x:auto"><table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
-    rows.forEach(r=>{
-      html += '<tr>'+cols.map(c=>{
+    // Latest-first: sort by a "Date" column if this sheet has one (every one
+    // of Social/Assets/Work/Cash does), so the default 10-row view is the
+    // most recent 10 days, not whatever order the sheet happened to be in.
+    const dateCol = cols.find(c=>String(c).trim().toLowerCase()==='date');
+    if(dateCol){
+      rows.sort((a,b)=>{
+        const da=new Date(a[dateCol]), db=new Date(b[dateCol]);
+        const ta=isNaN(da)?-Infinity:da.getTime(), tb=isNaN(db)?-Infinity:db.getTime();
+        return tb-ta;
+      });
+    } else {
+      rows.reverse(); // no date column (e.g. running-balance sheets) — assume last-added-first
+    }
+    const total = rows.length;
+    const rowHtml = r => '<tr>'+cols.map(c=>{
         let v = r[c];
         if(v instanceof Date) v = fmtDate(v.toISOString());
         return `<td>${escapeHtml(v===undefined||v===null?'':String(v))}</td>`;
       }).join('')+'</tr>';
-    });
-    html += '</tbody></table></div></div>';
+    const visibleRows = rows.slice(0, LEDGER_ROWS_COLLAPSED).map(rowHtml).join('');
+    const hiddenRows = rows.slice(LEDGER_ROWS_COLLAPSED).map(rowHtml).join('');
+    const safeId = 'ledger-'+sheetName.replace(/[^a-zA-Z0-9]/g,'');
+    html += `<div class="dash-card" style="margin-bottom:16px">
+      <h3>${escapeHtml(sheetName)} <span style="font-weight:400;color:var(--gray)">(latest ${Math.min(LEDGER_ROWS_COLLAPSED,total)} of ${total})</span></h3>
+      <div style="overflow-x:auto"><table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+      <tbody>${visibleRows}</tbody>
+      <tbody id="${safeId}-more" style="display:none">${hiddenRows}</tbody>
+      </table></div>
+      ${total>LEDGER_ROWS_COLLAPSED?`<button class="btn btn-outline" style="margin-top:8px" id="${safeId}-btn" onclick="toggleLedgerMore('${safeId}')">▼ More (${total-LEDGER_ROWS_COLLAPSED} more rows)</button>`:''}
+      </div>`;
   });
   box.innerHTML = html;
+}
+function toggleLedgerMore(safeId){
+  const more = document.getElementById(safeId+'-more');
+  const btn = document.getElementById(safeId+'-btn');
+  if(!more||!btn) return;
+  const isHidden = more.style.display==='none';
+  more.style.display = isHidden?'table-row-group':'none';
+  btn.textContent = isHidden?'▲ Kam dikhao':('▼ More ('+more.children.length+' more rows)');
 }
 
 
