@@ -963,7 +963,7 @@ const DB = {
     // login, page refresh, and the 30-min auto-reload, so a sequential for-loop here
     // directly adds up to slow login/page-open times (each collection = one network
     // round-trip; sequential = sum of all of them, parallel = the slowest single one).
-    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk','personal_ledger'].map(async (key)=>{
+    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'].map(async (key)=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
         if(this._isSharded(key)){
@@ -1568,152 +1568,6 @@ function openHrPortal(){
   window.open('dninvest-hr.html?autologin='+token+'&u='+encodeURIComponent(CU.username), '_blank');
 }
 
-// ══════════════════════════════════════════
-// MY LEDGER — admin's personal daily xlsx tracker (22-Aug-2026)
-// Only the Social / Assets / Work / Cash sheets are ever read or stored — the
-// "Password" sheet (Income Tax/GST/bank/email/website-admin plaintext
-// credentials, seen in the user's actual upload) is skipped unconditionally
-// at parse time and never touches Firestore, by explicit user choice: this
-// CRM is shared across 9 RM logins over the same Firestore project, so
-// anything written to 'personal_ledger' is reachable by every one of those
-// sessions — fine for daily cash/asset tracking, not for banking passwords.
-// Stored as one small non-sharded doc (crm_data/personal_ledger), same as
-// other admin-only single-value settings elsewhere in this file.
-// ══════════════════════════════════════════
-const LEDGER_SKIP_SHEETS = ['password','passwords','pwd'];
-function handleLedgerFile(input){
-  const file = input.files[0];
-  if(!file) return;
-  if(CU.role!=='admin'){ toast('Admin only','error'); input.value=''; return; }
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const wb = XLSX.read(e.target.result, {type:'binary', cellDates:true});
-      const sheets = {};
-      let skippedPassword = false;
-      wb.SheetNames.forEach(sn=>{
-        if(LEDGER_SKIP_SHEETS.includes(String(sn).trim().toLowerCase())){ skippedPassword = true; return; }
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''});
-        // Drop fully-blank rows (common in daily-tracker sheets with lots of
-        // pre-formatted empty rows below the real data) and cap at 2000 rows
-        // per sheet so one odd file can't blow past Firestore's 1MB doc limit.
-        const clean = rows.filter(r=>Object.values(r).some(v=>String(v).trim()!=='')).slice(0,2000);
-        if(clean.length) sheets[sn] = clean;
-      });
-      if(!Object.keys(sheets).length){ toast('Is file me koi readable sheet nahi mili','error'); input.value=''; return; }
-      const payload = { sheets, updated:new Date().toISOString(), uploadedBy:CU.name||CU.username };
-      DB.set('personal_ledger', payload);
-      renderLedgerPage();
-      toast('Ledger update ho gaya'+(skippedPassword?' (Password sheet skip kar diya)':''),'success');
-    }catch(err){
-      toast('File padhne me error: '+err.message,'error');
-    }
-    input.value='';
-  };
-  reader.readAsBinaryString(file);
-}
-function renderLedgerPage(){
-  const box = document.getElementById('ledger-content');
-  const line = document.getElementById('ledger-updated-line');
-  if(!box) return;
-  const data = DB.get('personal_ledger');
-  if(!data || !data.sheets || !Object.keys(data.sheets).length){
-    box.innerHTML = '<div style="color:var(--gray);padding:20px;text-align:center">Abhi tak koi file upload nahi hui.</div>';
-    if(line) line.textContent = '';
-    return;
-  }
-  if(line) line.textContent = 'Last updated: '+fmtDate(data.updated)+' · by '+escapeHtml(data.uploadedBy||'');
-  const LEDGER_ROWS_COLLAPSED = 10; // default view — "More" reveals the rest
-  if(!window._ledgerSort) window._ledgerSort = {};       // { sheetName: {col, dir} } — click-to-sort state, per sheet
-  if(!window._ledgerDateFilter) window._ledgerDateFilter = {}; // { sheetName: 'YYYY-MM-DD' } — date-picker filter, per sheet
-  const esc = s => String(s==null?'':s).replace(/'/g,"\\'").replace(/"/g,'&quot;'); // for onclick-attribute string args below
-  let html='';
-  Object.keys(data.sheets).forEach(sheetName=>{
-    let rows = data.sheets[sheetName].slice();
-    if(!rows.length) return;
-    const cols = Object.keys(rows[0]);
-    const dateCol = cols.find(c=>String(c).trim().toLowerCase()==='date');
-    const safeId = 'ledger-'+sheetName.replace(/[^a-zA-Z0-9]/g,'');
-    const sortState = window._ledgerSort[sheetName];
-    const dateFilterVal = window._ledgerDateFilter[sheetName]||'';
-
-    // Sort: whatever column was last clicked (any sheet, any column — e.g.
-    // Assets sheet's "Month" then "Date" headers), defaulting to Date desc
-    // (latest day first) when nothing's been clicked yet.
-    const sortCol = sortState ? sortState.col : dateCol;
-    const sortDir = sortState ? sortState.dir : -1; // -1 = desc (latest first), 1 = asc
-    if(sortCol){
-      rows.sort((a,b)=>{
-        let va=a[sortCol], vb=b[sortCol];
-        const da=new Date(va), db=new Date(vb);
-        const bothDates = !isNaN(da) && !isNaN(db) && (va instanceof Date || vb instanceof Date || /^\d{4}-\d{2}-\d{2}/.test(String(va)) || /^\d{4}-\d{2}-\d{2}/.test(String(vb)));
-        if(bothDates) return sortDir*((isNaN(da)?-8.64e15:da.getTime())-(isNaN(db)?-8.64e15:db.getTime()));
-        const na=parseFloat(va), nb=parseFloat(vb);
-        if(!isNaN(na) && !isNaN(nb) && String(va).trim()!=='' && String(vb).trim()!=='') return sortDir*(na-nb);
-        return sortDir*String(va||'').localeCompare(String(vb||''));
-      });
-    } else {
-      rows.reverse(); // no date column and nothing clicked — assume last-added-first
-    }
-
-    // Date-picker filter (per sheet, only offered when the sheet has a Date
-    // column) — "on or after" the chosen day, e.g. jump straight to a
-    // specific date in Cash instead of paging through "More" repeatedly.
-    if(dateCol && dateFilterVal){
-      const from = new Date(dateFilterVal);
-      rows = rows.filter(r=>{ const d=new Date(r[dateCol]); return !isNaN(d) && d.getTime()>=from.getTime(); });
-    }
-
-    const total = rows.length;
-    const rowHtml = r => '<tr>'+cols.map(c=>{
-        let v = r[c];
-        if(v instanceof Date) v = fmtDate(v.toISOString());
-        return `<td>${escapeHtml(v===undefined||v===null?'':String(v))}</td>`;
-      }).join('')+'</tr>';
-    const visibleRows = rows.slice(0, LEDGER_ROWS_COLLAPSED).map(rowHtml).join('');
-    const hiddenRows = rows.slice(LEDGER_ROWS_COLLAPSED).map(rowHtml).join('');
-    const theadCells = cols.map(c=>{
-      const active = sortCol===c;
-      const arrow = active ? (sortDir===1?' ▲':' ▼') : '';
-      return `<th onclick="ledgerSortClick('${esc(sheetName)}','${esc(c)}')" style="cursor:pointer;white-space:nowrap">${escapeHtml(c)}${arrow}</th>`;
-    }).join('');
-    html += `<div class="dash-card ledger-sheet-card" style="margin-bottom:16px">
-      <h3 style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;justify-content:space-between">
-        <span>${escapeHtml(sheetName)} <span style="font-weight:400;color:var(--gray)">(${dateFilterVal?'filtered — ':''}showing ${Math.min(LEDGER_ROWS_COLLAPSED,total)} of ${total})</span></span>
-        ${dateCol?`<span style="display:flex;align-items:center;gap:6px;font-weight:400">
-            <label style="font-size:.7rem;color:var(--gray)">From date:</label>
-            <input type="date" value="${esc(dateFilterVal)}" style="padding:4px 6px;font-size:.75rem;border:1px solid var(--border);border-radius:6px" onchange="ledgerDateFilterChange('${esc(sheetName)}',this.value)">
-            ${dateFilterVal?`<button class="btn-icon" onclick="ledgerDateFilterChange('${esc(sheetName)}','')" title="Clear filter">✖ Clear</button>`:''}
-          </span>`:''}
-      </h3>
-      <div style="overflow-x:auto"><table class="ledger-table"><thead><tr>${theadCells}</tr></thead>
-      <tbody>${visibleRows}</tbody>
-      <tbody id="${safeId}-more" style="display:none">${hiddenRows}</tbody>
-      </table></div>
-      ${total>LEDGER_ROWS_COLLAPSED?`<button class="btn btn-outline" style="margin-top:8px" id="${safeId}-btn" onclick="toggleLedgerMore('${safeId}')">▼ More (${total-LEDGER_ROWS_COLLAPSED} more rows)</button>`:''}
-      </div>`;
-  });
-  box.innerHTML = html;
-}
-function ledgerSortClick(sheetName, col){
-  const cur = window._ledgerSort[sheetName];
-  const newDir = (cur && cur.col===col) ? -cur.dir : -1; // first click = latest/desc, click again = flip
-  window._ledgerSort[sheetName] = {col, dir:newDir};
-  renderLedgerPage();
-}
-function ledgerDateFilterChange(sheetName, value){
-  if(value) window._ledgerDateFilter[sheetName] = value;
-  else delete window._ledgerDateFilter[sheetName];
-  renderLedgerPage();
-}
-function toggleLedgerMore(safeId){
-  const more = document.getElementById(safeId+'-more');
-  const btn = document.getElementById(safeId+'-btn');
-  if(!more||!btn) return;
-  const isHidden = more.style.display==='none';
-  more.style.display = isHidden?'table-row-group':'none';
-  btn.textContent = isHidden?'▲ Kam dikhao':('▼ More ('+more.children.length+' more rows)');
-}
 
 
 function doLogout(){
@@ -2415,8 +2269,6 @@ function initApp(){
   if(quizNav) quizNav.style.display=CU.role==='admin'?'flex':'none';
   const dupNav=document.getElementById('nav-duplicates');
   if(dupNav) dupNav.style.display=CU.role==='admin'?'flex':'none';
-  const ledgerNav=document.getElementById('nav-ledger');
-  if(ledgerNav) ledgerNav.style.display=CU.role==='admin'?'flex':'none';
 
   // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
@@ -2442,7 +2294,7 @@ function initApp(){
      'nav-eq-followup','nav-eq-notrade','nav-eq-nocall','nav-eq-demat',
      'nav-mf-followup','nav-mf-sip','nav-mf-nocall','nav-mf-txns',
      'nav-other-products','nav-reports','nav-activity-log',
-     'nav-announcements','nav-admin','nav-duplicates','nav-ledger'].forEach(id=>{
+     'nav-announcements','nav-admin','nav-duplicates'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='none';
     });

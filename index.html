@@ -919,17 +919,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 #page-brokerage-calc .bc-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;
   box-shadow:0 1px 2px rgba(16,30,60,.05)}
 
-/* ═══ MY LEDGER — colourful navy-gradient header + compact rows, sortable ═══ */
-#page-ledger .ledger-sheet-card{padding:14px 16px}
-#page-ledger .ledger-table{font-size:.72rem}
-#page-ledger .ledger-table thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;
-  padding:6px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:1;
-  user-select:none;font-size:.66rem;letter-spacing:.3px;text-transform:uppercase;}
-#page-ledger .ledger-table thead th:hover{background:var(--navy2)}
-#page-ledger .ledger-table tbody tr{border-bottom:1px solid var(--border);transition:background .12s ease}
-#page-ledger .ledger-table tbody tr:nth-child(even){background:#f8faff}
-#page-ledger .ledger-table tbody tr:hover{background:var(--blue2)!important}
-#page-ledger .ledger-table td{padding:4px 8px;white-space:nowrap}
 #page-brokerage-calc .bc-card h2{font-size:.9rem;font-weight:800;color:var(--navy);margin-bottom:6px;display:flex;align-items:center;gap:6px}
 #page-brokerage-calc .bc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 #page-brokerage-calc .bc-field label{display:block;font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase;
@@ -1308,9 +1297,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Users & Settings
         <span class="badge" id="admin-inbox-badge-nav" style="display:none;background:var(--red);color:#fff;border-radius:50%;padding:1px 6px;font-size:.72rem;margin-left:4px">0</span>
-      </div>
-      <div class="nav-item" onclick="showPage('ledger'); renderLedgerPage();" id="nav-ledger" title="Apna personal daily ledger — sirf admin ko dikhta hai">
-        <span class="icon">💰</span> My Ledger
       </div>
 
       <!-- RM: Message Admin button (hidden for admin) -->
@@ -1958,22 +1944,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </div>
 
       <!-- ── BROKERAGE ── -->
-      <!-- ══════ MY LEDGER PAGE (admin only — personal daily xlsx tracker) ══════ -->
-      <div class="page" id="page-ledger">
-        <div class="page-hdr">
-          <div class="page-title">💰 My Ledger</div>
-          <div class="hdr-actions" id="ledger-updated-line" style="color:var(--gray);font-size:.78rem"></div>
-        </div>
-        <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.82rem">
-          🔒 Ye page sirf Admin ko dikhta hai. Roz wahi Excel file (Social / Assets / Work / Cash sheets) upload karo — purana data overwrite ho jaayega. <b>"Password" naam ka sheet kabhi upload/store nahi hota, chahe file me ho bhi</b> — security ke liye.
-        </div>
-        <input type="file" id="ledger-file" accept=".xlsx,.xls" style="display:none" onchange="handleLedgerFile(this)">
-        <div class="import-zone" id="ledger-zone" onclick="document.getElementById('ledger-file').click()">
-          📤 Click karke apni Excel file chuno (roz wahi file, dobara upload karo)
-        </div>
-        <div id="ledger-content" style="margin-top:18px"></div>
-      </div>
-      <!-- ══════ END MY LEDGER PAGE ══════ -->
 
       <div class="page" id="page-duplicates">
         <div class="page-hdr">
