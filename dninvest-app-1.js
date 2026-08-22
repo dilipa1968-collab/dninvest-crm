@@ -3961,6 +3961,16 @@ function updateBadges(){
 // EQUITY TABLE
 // ══════════════════════════════════════════
 function filterEq(){ eqPage=1; renderEqTable(); }
+// Debounced wrapper for the search box only (21-Aug-2026, "fast redraw" fix)
+// — oninput fired filterEq() on every single keystroke, and each call does a
+// full filter+sort+innerHTML rebuild over the whole client list, which was
+// visibly janky for a fast typer. onchange callers (status/RM/date filters,
+// which fire rarely) and internal programmatic callers still call filterEq()
+// directly for an immediate result — only the search input's oninput was
+// switched (in index.html) to call this instead, so typing waits 200ms after
+// the last keystroke before actually re-rendering.
+let _filterEqT;
+function filterEqDebounced(){ clearTimeout(_filterEqT); _filterEqT=setTimeout(filterEq,200); }
 function toggleFuFilterMenu(seg){
   const menu = document.getElementById(seg+'-fu-menu');
   if(!menu) return;
@@ -4360,6 +4370,8 @@ function renderEqTable(){
 // MF TABLE
 // ══════════════════════════════════════════
 function filterMf(){ mfPage=1; renderMfTable(); }
+let _filterMfT;
+function filterMfDebounced(){ clearTimeout(_filterMfT); _filterMfT=setTimeout(filterMf,200); }
 function sortMfTable(colIndex){
   if(mfSortField===colIndex) mfSortDir = -mfSortDir;
   else { mfSortField=colIndex; mfSortDir=1; }
@@ -9677,6 +9689,8 @@ function renderMfProspects(){
   }
 }
 function filterMfp(){ mfpPage=1; renderMfProspects(); }
+let _filterMfpT;
+function filterMfpDebounced(){ clearTimeout(_filterMfpT); _filterMfpT=setTimeout(filterMfp,200); }
 function gpMfp(p){ if(p<1) return; mfpPage=p; renderMfProspects(); }
 function resetMfpFilters(){
   const s=document.getElementById('mfp-search'); if(s) s.value='';

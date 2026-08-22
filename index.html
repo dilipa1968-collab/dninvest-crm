@@ -204,6 +204,8 @@ window.dnXlsx = function(filename, title, columns, rows, totalRow){
   --border:#e3e8f0;--gray:#5d6e8a;
   --shadow:0 1px 3px rgba(16,30,60,.06);
   --shadow2:0 6px 20px rgba(16,30,60,.10);
+  --shadow3:0 10px 30px rgba(16,30,60,.14);
+  --lift:translateY(-2px);
   --radius:12px;--radius-sm:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -305,6 +307,8 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 /* ── BUTTONS ── */
 .btn{padding:7px 14px;border-radius:8px;cursor:pointer;font-size:.78rem;font-weight:700;
   border:none;transition:all .2s;display:inline-flex;align-items:center;gap:5px;}
+.btn:hover{transform:translateY(-1px);}
+.btn:active{transform:translateY(0);}
 .btn-primary{background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;box-shadow:0 2px 8px rgba(10,20,50,.18);}
 .btn-primary:hover{background:linear-gradient(135deg,var(--navy3),var(--navy2));box-shadow:0 4px 14px rgba(10,20,50,.25);}
 .btn-success{background:var(--green);color:#fff;}
@@ -326,8 +330,8 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px;}
 .stat-card{background:linear-gradient(135deg,#fff 60%,var(--blue2) 200%);border-radius:14px;padding:14px 16px;
   box-shadow:0 1px 6px rgba(10,20,50,.08);
-  border-left:4px solid var(--navy);cursor:pointer;transition:box-shadow .15s;position:relative;}
-.stat-card:hover{box-shadow:0 4px 14px rgba(10,20,50,.12);}
+  border-left:4px solid var(--navy);cursor:pointer;transition:box-shadow .2s ease,transform .2s ease;position:relative;}
+.stat-card:hover{box-shadow:var(--shadow3);transform:var(--lift);}
 .stat-card.green{border-left-color:var(--green);background:linear-gradient(135deg,#fff 60%,var(--green2) 200%);}
 .stat-card.red{border-left-color:var(--red);background:linear-gradient(135deg,#fff 60%,var(--red2) 200%);}
 .stat-card.gold{border-left-color:var(--gold);background:linear-gradient(135deg,#fff 60%,var(--gold3) 200%);}
@@ -361,8 +365,8 @@ thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);col
   white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;font-size:.67rem;letter-spacing:.4px;text-transform:uppercase;}
 thead th:hover{background:var(--navy2);}
 thead th.sorted{background:#253f72;}
-tbody tr{border-bottom:1px solid var(--border);transition:background .12s;line-height:1.2;}
-tbody tr:hover{background:var(--blue2)!important;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s ease,box-shadow .15s ease;line-height:1.2;}
+tbody tr:hover{background:var(--blue2)!important;box-shadow:inset 3px 0 0 var(--navy);}
 
 /* ── SQUARE-OFF (T+5) — premium navy/gold themed table ── */
 #sq-table{font-size:.83rem;border-collapse:separate;border-spacing:0;}
@@ -568,7 +572,9 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 .dash-section-hdr{color:#fff;font-weight:800;font-size:.78rem;letter-spacing:.8px;text-transform:uppercase;
   padding:8px 16px;border-radius:10px;margin:0 0 2px;box-shadow:0 2px 8px rgba(10,20,50,.14);}
 .dash-card{background:#fff;border-radius:14px;padding:10px 14px;
-  box-shadow:0 1px 6px rgba(10,20,50,.07);border:1px solid rgba(10,20,50,.05);}
+  box-shadow:0 1px 6px rgba(10,20,50,.07);border:1px solid rgba(10,20,50,.05);
+  transition:box-shadow .2s ease;}
+.dash-card:hover{box-shadow:var(--shadow2);}
 .dash-card h3{font-size:.7rem;color:var(--gray);font-weight:800;text-transform:uppercase;
   letter-spacing:.7px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
 .dash-card.collapsible h3{display:flex;align-items:center;justify-content:space-between;
@@ -1423,7 +1429,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
         <div class="filters" id="eq-filters">
-          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEq()" id="eq-search" autocomplete="off" name="eq-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEqDebounced()" id="eq-search" autocomplete="off" name="eq-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterEq()" id="eq-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
@@ -1555,7 +1561,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
         <div class="filters">
-          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMf()" id="mf-search" autocomplete="off" name="mf-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMfDebounced()" id="mf-search" autocomplete="off" name="mf-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterMf()" id="mf-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Investor</option><option>Prospect</option><option value="DNC">🚫 DNC</option></select>
           <select onchange="filterMf()" id="mf-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All RMs</option></select>
@@ -1760,7 +1766,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           change anything on the Equity side, and the Equity RM is untouched.
         </p>
         <div class="filters">
-          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMfp()" id="mfp-search" autocomplete="off" name="mfp-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
+          <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMfpDebounced()" id="mfp-search" autocomplete="off" name="mfp-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterMfp()" id="mfp-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">All Equity RMs</option></select>
           <select onchange="changePageSize('mfp',this.value)" id="mfp-pagesize" style="max-width:98px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
