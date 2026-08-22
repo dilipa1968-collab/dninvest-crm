@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset & Net Worth — D N Investment</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0e0d0b;
+    --panel:#17140f;
+    --panel2:#1d1a14;
+    --line:#2b2620;
+    --gold:#d4af37;
+    --gold-soft:#f0d78c;
+    --text:#efe9db;
+    --muted:#9a9284;
+    --green:#5fbf87;
+    --red:#e2685f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%, rgba(212,175,55,0.08), transparent 60%), var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  header{text-align:center;margin-bottom:22px;padding-bottom:20px;border-bottom:1px solid var(--line);}
+  .brand{font-size:12px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+  h1{margin:2px 0 16px;font-size:20px;font-weight:600;color:var(--gold-soft);}
+  .hero-label{font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;}
+  .hero-value{font-size:44px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.2;}
+  .hero-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;}
+  .panel h2{margin:0 0 4px;font-size:15px;color:var(--gold-soft);font-weight:600;}
+  .panel .sub{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.55;}
+
+  form{display:grid;grid-template-columns: 1.4fr 1fr 1fr 1.4fr auto;gap:10px;}
+  form.wide{grid-template-columns: repeat(4, 1fr) auto;}
+  @media (max-width:760px){
+    form, form.wide{grid-template-columns:1fr 1fr;}
+    form .full{grid-column:1/-1;}
+    form button{grid-column:1/-1;}
+  }
+  label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
+  input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:6px;font-size:14px;}
+  input:focus{outline:none;border-color:var(--gold);}
+  input[type="date"], input[type="month"]{color-scheme:dark;}
+
+  button{cursor:pointer;border:none;border-radius:6px;font-weight:600;font-size:13px;}
+  .btn-add{background:var(--gold);color:#1a1508;padding:9px 18px;align-self:end;white-space:nowrap;}
+  .btn-add:hover{background:var(--gold-soft);}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;gap:10px;flex-wrap:wrap;}
+  .toolbar .ttl{font-size:13px;color:var(--muted);font-weight:600;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);padding:6px 12px;font-size:12px;}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold-soft);}
+
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;min-width:520px;}
+  thead th{text-align:left;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th.num, td.num{text-align:right;}
+  tbody td{padding:10px 8px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle;white-space:nowrap;}
+  tbody tr:hover{background:rgba(212,175,55,0.04);}
+  .acct{font-weight:600;}
+  .remark{color:var(--muted);font-size:12px;}
+  .amt-pos{color:var(--green);font-variant-numeric:tabular-nums;}
+  .amt-neg{color:var(--red);font-variant-numeric:tabular-nums;}
+  .bal{color:var(--gold-soft);font-variant-numeric:tabular-nums;font-weight:600;}
+  .muted-num{color:var(--muted);font-variant-numeric:tabular-nums;}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  .icon-btn{background:transparent;border:1px solid var(--line);color:var(--muted);width:26px;height:26px;border-radius:5px;font-size:13px;line-height:1;padding:0;}
+  .icon-btn:hover{border-color:var(--gold);color:var(--gold-soft);}
+  .icon-btn.danger:hover{border-color:var(--red);color:var(--red);}
+
+  .total-row{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;margin-top:10px;
+  }
+  .total-row .l{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .total-row .v{font-size:20px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;}
+
+  .legend{
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.7;
+  }
+  .legend b{color:var(--gold-soft);}
+
+  .empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:13px;}
+  .footnote{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;line-height:1.6;}
+
+  .page{display:none;}
+  .page.active{display:block;}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;}
+  .stat-grid.three{grid-template-columns:1fr 1fr 1fr;}
+  @media (max-width:600px){.stat-grid{grid-template-columns:1fr;} .stat-grid.three{grid-template-columns:1fr;}}
+  .group-label{font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold-soft);margin:22px 0 10px;font-weight:600;}
+  .group-label:first-child{margin-top:0;}
+  .stat-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:18px;cursor:pointer;transition:border-color .15s;
+  }
+  .stat-card:hover{border-color:var(--gold);}
+  .stat-card .l{font-size:11.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+  .stat-card .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold);}
+  .stat-card .m{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .stat-card.big{grid-column:1/-1;}
+  .stat-card.big .v{font-size:38px;}
+
+  .back-btn{
+    background:transparent;border:1px solid var(--line);color:var(--muted);
+    padding:7px 14px;font-size:12.5px;border-radius:6px;margin-bottom:16px;cursor:pointer;
+  }
+  .back-btn:hover{border-color:var(--gold);color:var(--gold-soft);}
+
+  .nav-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
+  .nav-cta button{
+    flex:1;min-width:180px;background:var(--panel2);border:1px solid var(--line);color:var(--gold-soft);
+    padding:14px;font-size:13.5px;border-radius:8px;
+  }
+  .nav-cta button:hover{border-color:var(--gold);}
+
+  .filter-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .filter-tab{
+    background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+    padding:7px 14px;font-size:12.5px;border-radius:20px;
+  }
+  .filter-tab.active{background:var(--gold);color:#1a1508;border-color:var(--gold);}
+  .filter-tab:hover:not(.active){border-color:var(--gold-soft);color:var(--gold-soft);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">D N Investment · Personal</div>
+    <h1>Asset & Net Worth Tracker</h1>
+    <div style="margin-top:14px;">
+      <input type="file" id="excelUpload" accept=".xlsx,.xls" style="display:none;">
+      <button class="btn-ghost" id="excelUploadBtn" style="padding:9px 18px;">📤 Excel se Latest Data Upload Karein</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Aapki sheet ki "Assets" tab se — Account/Amount/Date, Investment aur Net Worth teeno data khud padh liya jayega.</div>
+    </div>
+  </header>
+
+  <!-- ===================== PAGE 1: DASHBOARD ===================== -->
+  <div class="page active" id="page-dashboard">
+
+    <div class="group-label">Net Worth</div>
+    <div class="stat-grid">
+      <div class="stat-card big" onclick="goPage('assets','all')">
+        <div class="l">Net Worth (Total)</div>
+        <div class="v" id="statNetWorth">₹0</div>
+        <div class="m">Sab accounts ka jod — Investment + Cash &amp; Bank + Other. Tap karke poori Assets list dekhein.</div>
+      </div>
+      <div class="stat-card" onclick="goPage('monthly','networth')">
+        <div class="l">Net Worth Growth (is mahine)</div>
+        <div class="v" id="statNetWorthGrowth">₹0</div>
+        <div class="m">Is mahine ka Net Worth − pichle mahine ka Net Worth. Tap karke mahine-war Net Worth list dekhein.</div>
+      </div>
+    </div>
+
+    <div class="group-label">Investment</div>
+    <div class="stat-grid three">
+      <div class="stat-card" onclick="goPage('monthly','investment')">
+        <div class="l">Investment Value (Total Invested)</div>
+        <div class="v" id="statInvestValue">₹0</div>
+        <div class="m">Ab tak jitna paisa invest kiya (cost) — cumulative jod. Tap karke Investment list dekhein.</div>
+      </div>
+      <div class="stat-card" onclick="goPage('assets','investment')">
+        <div class="l">Investment Current Value</div>
+        <div class="v" id="statInvestCurrentValue">₹0</div>
+        <div class="m">Investment-tagged accounts (MF/FD) ki abhi market value. Tap karke sirf Investment accounts dekhein.</div>
+      </div>
+      <div class="stat-card" onclick="goPage('monthly','investment')">
+        <div class="l">Investment Growth (is mahine)</div>
+        <div class="v" id="statInvestGrowth">₹0</div>
+        <div class="m">Is mahine Current Value − pichle mahine Current Value (sirf market ka asar).</div>
+      </div>
+    </div>
+
+    <div class="group-label">Cash</div>
+    <div class="stat-grid">
+      <div class="stat-card" onclick="goPage('assets','cashbank')">
+        <div class="l">Current Cash</div>
+        <div class="v" id="statCurrentCash">₹0</div>
+        <div class="m">Net Worth − Investment Current Value. Tap karke sirf Cash &amp; Bank accounts dekhein.</div>
+      </div>
+      <div class="stat-card" onclick="goPage('monthly','cash')">
+        <div class="l">Cash Growth (is mahine)</div>
+        <div class="v" id="statCashGrowth">₹0</div>
+        <div class="m">Net Worth Growth − Investment Growth + Naya Invest. Tap karke mahine-war Cash Growth list dekhein.</div>
+      </div>
+    </div>
+
+    <div class="footnote">
+      Data sirf is browser ke andar (localStorage) save hota hai — kahin bhejaa nahi jaata.
+    </div>
+  </div>
+
+  <!-- ===================== PAGE 2: ASSETS (BALANCE) ===================== -->
+  <div class="page" id="page-assets">
+    <button class="back-btn" onclick="goPage('dashboard')">← Wapas Dashboard</button>
+    <div class="hero-label" style="text-align:center;">Aapka Total Balance (Abhi)</div>
+    <div class="hero-value" id="heroValue" style="text-align:center;">₹0</div>
+    <div class="hero-sub" style="text-align:center;margin-bottom:16px;">Yeh neeche wale "Aapke Assets" ke sab accounts ka jod hai — jaise hi aap kuch add/edit karte hain, yeh khud update ho jaata hai.</div>
+
+  <!-- ===================== SECTION 1: ASSETS (BALANCE) ===================== -->
+  <div class="panel">
+    <h2>Aapke Assets</h2>
+    <div class="sub">Har account/paisa ki entry yahan daalein. Total Balance (upar) in sab ka simple jod hai — koi hidden calculation nahi.</div>
+
+    <div class="filter-tabs" id="assetFilterTabs">
+      <button class="filter-tab active" data-filter="all" onclick="setAssetFilter('all')">Sab</button>
+      <button class="filter-tab" data-filter="investment" onclick="setAssetFilter('investment')">Investment</button>
+      <button class="filter-tab" data-filter="cashbank" onclick="setAssetFilter('cashbank')">Cash &amp; Bank</button>
+    </div>
+
+    <form id="entryForm">
+      <div><label for="account">Account</label><input type="text" id="account" placeholder="e.g. Nirmala Mf" required></div>
+      <div><label for="amount">Amount (− likhein ghatane ke liye)</label><input type="number" id="amount" step="0.01" placeholder="0" required></div>
+      <div><label for="date">Date</label><input type="date" id="date" required></div>
+      <div class="full"><label for="remark">Remark (optional)</label><input type="text" id="remark" placeholder="optional note"></div>
+      <div class="full">
+        <label for="category">Category</label>
+        <select id="category" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:6px;font-size:14px;">
+          <option value="other">Other</option>
+          <option value="investment">Investment (MF/FD/portfolio)</option>
+          <option value="cashbank">Cash & Bank</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-add">Add</button>
+    </form>
+
+    <div class="toolbar">
+      <div class="ttl" id="assetListTitle">Sab Accounts</div>
+      <div class="actions">
+        <button class="btn-ghost" id="exportBtn">Export CSV</button>
+        <button class="btn-ghost" id="resetBtn">Reset to Sheet Data</button>
+        <button class="btn-ghost" id="clearBtn">Clear All</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Account</th><th class="num">Amount</th><th>Date</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptyMsg" style="display:none;">Koi entry nahi hai — upar se apna pehla asset add karein.</div>
+
+    <div class="total-row" id="totalRowAll">
+      <div class="l">Total Balance (sab accounts)</div>
+      <div class="v" id="totalRowValue">₹0</div>
+    </div>
+    <div class="total-row" id="totalRowInvest" style="margin-top:8px;">
+      <div class="l">— Investment Value (MF/FD tagged)</div>
+      <div class="v" id="investTotalRowValue" style="color:var(--gold-soft);font-size:17px;">₹0</div>
+    </div>
+    <div class="total-row" id="totalRowCash" style="margin-top:8px;">
+      <div class="l">— Cash & Bank (tagged)</div>
+      <div class="v" id="cashTotalRowValue" style="color:var(--gold-soft);font-size:17px;">₹0</div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ===================== PAGE 3: MONTHLY ===================== -->
+  <div class="page" id="page-monthly">
+    <button class="back-btn" onclick="goPage('dashboard')">← Wapas Dashboard</button>
+
+  <!-- ===================== SECTION 2: MONTHLY HISTORY (COMBINED) ===================== -->
+  <div class="panel">
+    <h2 id="monthlyTitle">Mahine-War Growth aur Income</h2>
+    <div class="sub">Har mahine ke end mein 3 cheezein bharein: us mahine kitna naya paisa invest kiya, aapke investment ki current value, aur total net worth (ya "Sync" button se seedha upar wale Total Balance se le lein). Baaki sab column khud calculate ho jaate hain.</div>
+
+    <div class="filter-tabs" id="monthFilterTabs">
+      <button class="filter-tab active" data-filter="all" onclick="setMonthFilter('all')">Sab</button>
+      <button class="filter-tab" data-filter="networth" onclick="setMonthFilter('networth')">Net Worth</button>
+      <button class="filter-tab" data-filter="investment" onclick="setMonthFilter('investment')">Investment</button>
+      <button class="filter-tab" data-filter="cash" onclick="setMonthFilter('cash')">Cash</button>
+    </div>
+
+    <form id="monthForm" class="wide">
+      <div><label for="mMonth">Mahina</label><input type="month" id="mMonth" required></div>
+      <div><label for="mNewInvest">Naya Invest (is mahine)</label><input type="number" id="mNewInvest" step="0.01" value="0" required></div>
+      <div><label for="mPortfolio">Investment Value (month-end)</label><input type="number" id="mPortfolio" step="0.01" required></div>
+      <div><label for="mAssets">Total Net Worth (month-end)</label><input type="number" id="mAssets" step="0.01" required></div>
+      <button type="submit" class="btn-add">Add / Update</button>
+    </form>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-ghost" id="syncBtn">↺ "Total Net Worth" Balance se bhar do</button>
+      <button class="btn-ghost" id="syncInvestBtn">↺ "Investment Value" tagged accounts se bhar do</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="ttl">Mahine-War Table</div>
+      <div class="actions">
+        <button class="btn-ghost" id="monthResetBtn">Reset to Sheet Data</button>
+        <button class="btn-ghost" id="monthClearBtn">Clear All</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead id="monthTableHead">
+          <tr>
+            <th>Mahina</th>
+            <th class="num">Naya Invest</th>
+            <th class="num">Total Invest Ab Tak</th>
+            <th class="num">Investment Value</th>
+            <th class="num">Investment Growth</th>
+            <th class="num">Net Worth</th>
+            <th class="num">Net Worth Growth</th>
+            <th class="num">Baaki Income</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="monthRowsBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="monthEmptyMsg" style="display:none;">Koi mahina add nahi hua — upar se ek add karein.</div>
+
+    <div class="legend" id="monthLegend">
+      <div><b>Investment Value</b> = Assets page mein "Investment" category wale accounts (Nirmala Fd, Nirmala Mf, DILIP HUF, Dilip Mf, FD Idfc, Tata Aia) ka jod — button se seedha bhar sakte hain. "Cash & Bank" category alag se track hoti hai (Bhagwan, Chery, Bank, Ghar cash, etc.), Total Balance mein woh bhi shaamil hai.</div>
+      <div><b>Total Invest Ab Tak</b> = pichle mahine ka Total Invest + is mahine ka Naya Invest (chalta hua jod).</div>
+      <div><b>Investment Growth</b> = is mahine ki Investment Value − pichle mahine ki Investment Value (sirf market ka asar) = <b>Dashboard ka "Investment Growth"</b> jab latest mahina ho.</div>
+      <div><b>Net Worth Growth</b> = is mahine ka Net Worth − pichle mahine ka Net Worth (poora badlaav — sab accounts milakar) = <b>Dashboard ka "Net Worth Growth"</b>.</div>
+      <div><b>Baaki Income</b> = Net Worth Growth − Investment Growth + Naya Invest. Yeh wo paisa hai jo investment ke market-movement se nahi aaya — matlab salary/business/rent jaisi income minus kharcha = <b>Dashboard ka "Cash Growth"</b>.</div>
+    </div>
+  </div>
+  </div>
+
+</div>
+
+<script>
+let assetFilter = 'all';
+let monthFilter = 'all';
+
+function goPage(name, filter){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  window.scrollTo(0,0);
+  if(name==='dashboard') updateDashboard();
+  if(name==='assets' && filter) setAssetFilter(filter);
+  if(name==='monthly' && filter) setMonthFilter(filter);
+}
+
+function setAssetFilter(f){
+  assetFilter = f;
+  document.querySelectorAll('#assetFilterTabs .filter-tab').forEach(b=>{
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+  renderLedger();
+}
+
+function setMonthFilter(f){
+  monthFilter = f;
+  document.querySelectorAll('#monthFilterTabs .filter-tab').forEach(b=>{
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+  renderMonths();
+}
+
+function fmt(n){
+  if(n === null || n === undefined || isNaN(n)) return '—';
+  const sign = n < 0 ? '-' : '';
+  const v = Math.abs(n);
+  return sign + '₹' + v.toLocaleString('en-IN', {maximumFractionDigits:2, minimumFractionDigits:(v % 1 === 0 ? 0 : 2)});
+}
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function genId(){ return 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7); }
+function todayStr(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function currentMonthStr(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function monthLabel(m){
+  if(!m) return '';
+  const [y,mo] = m.split('-');
+  const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return names[parseInt(mo,10)-1] + " '" + y.slice(2);
+}
+
+/* ===================== SECTION 1: ASSETS / BALANCE ===================== */
+const LEDGER_KEY = 'dninvest-assets-v1';
+const LEDGER_SEED = [
+  {account:"Nirmala Fd", amount:440000, date:"2026-07-31", remark:"", category:"investment"},
+  {account:"Nirmala Mf", amount:11079000, date:"2026-08-22", remark:"", category:"investment"},
+  {account:"DILIP HUF", amount:1083000, date:"2026-08-22", remark:"", category:"investment"},
+  {account:"Dilip Mf", amount:672000, date:"2026-08-22", remark:"", category:"investment"},
+  {account:"FD Idfc", amount:97000, date:"2026-07-31", remark:"", category:"investment"},
+  {account:"Tata Aia", amount:788000, date:"2026-07-31", remark:"", category:"investment"},
+  {account:"Bhagwan", amount:-220700, date:"2026-07-31", remark:"", category:"cashbank"},
+  {account:"Credit Card", amount:-161435.52, date:"2026-08-22", remark:"", category:"cashbank"},
+  {account:"Chery", amount:2674000, date:"2026-08-12", remark:"", category:"cashbank"},
+  {account:"Ma", amount:3610, date:"2026-08-08", remark:"", category:"cashbank"},
+  {account:"Morning", amount:-13945, date:"2026-08-16", remark:"", category:"cashbank"},
+  {account:"Nirmala Bank", amount:95000, date:"2026-08-22", remark:"", category:"cashbank"},
+  {account:"HUF BANK", amount:234811, date:"2026-08-20", remark:"", category:"cashbank"},
+  {account:"Dipu", amount:8850, date:"2026-08-20", remark:"", category:"cashbank"},
+  {account:"Raju", amount:3337, date:"2026-08-10", remark:"", category:"cashbank"},
+  {account:"Ghar cash", amount:35000, date:"2026-08-12", remark:"", category:"cashbank"},
+  {account:"Tizori", amount:400000, date:"2026-08-12", remark:"", category:"cashbank"},
+  {account:"Ramesh", amount:800000, date:"2026-08-18", remark:"", category:"cashbank"},
+  {account:"Bank", amount:483688.74, date:"2026-08-22", remark:"", category:"cashbank"},
+  {account:"New", amount:142000, date:"2026-07-31", remark:"", category:"other"},
+];
+function loadLedger(){
+  try{ const raw = localStorage.getItem(LEDGER_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return LEDGER_SEED.map((e,i)=>({...e, id:'seed-'+i}));
+}
+function saveLedger(){ localStorage.setItem(LEDGER_KEY, JSON.stringify(entries)); }
+let entries = loadLedger();
+
+function grandTotal(){ return entries.reduce((s,e)=> s + Number(e.amount), 0); }
+function investmentTotal(){ return entries.filter(e=>e.category==='investment').reduce((s,e)=> s + Number(e.amount), 0); }
+function cashBankTotal(){ return entries.filter(e=>e.category==='cashbank').reduce((s,e)=> s + Number(e.amount), 0); }
+
+const CATEGORY_LABEL = {investment:'Investment', cashbank:'Cash & Bank', other:''};
+const FILTER_TITLE = {all:'Sab Accounts', investment:'Investment Accounts', cashbank:'Cash & Bank Accounts'};
+
+function renderLedger(){
+  const tbody = document.getElementById('rows');
+  const emptyMsg = document.getElementById('emptyMsg');
+  tbody.innerHTML = '';
+  const filtered = assetFilter === 'all' ? entries : entries.filter(e=>e.category===assetFilter);
+  document.getElementById('assetListTitle').textContent = FILTER_TITLE[assetFilter] || 'Sab Accounts';
+  document.getElementById('totalRowAll').style.display = assetFilter==='all' ? 'flex' : 'none';
+  document.getElementById('totalRowInvest').style.display = (assetFilter==='all' || assetFilter==='investment') ? 'flex' : 'none';
+  document.getElementById('totalRowCash').style.display = (assetFilter==='all' || assetFilter==='cashbank') ? 'flex' : 'none';
+  if(filtered.length === 0){ emptyMsg.style.display='block'; }
+  else{
+    emptyMsg.style.display = 'none';
+    const sorted = [...filtered].sort((a,b)=> new Date(b.date) - new Date(a.date) || 0);
+    sorted.forEach(e=>{
+      const tr = document.createElement('tr');
+      const amtClass = e.amount < 0 ? 'amt-neg' : 'amt-pos';
+      const label = CATEGORY_LABEL[e.category] || '';
+      const tag = (assetFilter==='all' && label) ? ` <span style="font-size:10px;color:var(--gold-soft);border:1px solid var(--line);border-radius:10px;padding:1px 6px;">${label}</span>` : '';
+      tr.innerHTML = `
+        <td><div class="acct">${escapeHtml(e.account)}${tag}</div>${e.remark ? `<div class="remark">${escapeHtml(e.remark)}</div>` : ''}</td>
+        <td class="num ${amtClass}">${e.amount < 0 ? '' : '+'}${fmt(e.amount)}</td>
+        <td>${e.date || ''}</td>
+        <td><div class="row-actions">
+          <button class="icon-btn" title="Edit" onclick="editEntry('${e.id}')">✎</button>
+          <button class="icon-btn danger" title="Delete" onclick="deleteEntry('${e.id}')">✕</button>
+        </div></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  const total = grandTotal();
+  document.getElementById('heroValue').textContent = fmt(total);
+  document.getElementById('totalRowValue').textContent = fmt(total);
+  document.getElementById('investTotalRowValue').textContent = fmt(investmentTotal());
+  document.getElementById('cashTotalRowValue').textContent = fmt(cashBankTotal());
+  updateDashboard();
+}
+
+document.getElementById('entryForm').addEventListener('submit', function(ev){
+  ev.preventDefault();
+  const account = document.getElementById('account').value.trim();
+  const amount = parseFloat(document.getElementById('amount').value);
+  const date = document.getElementById('date').value;
+  const remark = document.getElementById('remark').value.trim();
+  const category = document.getElementById('category').value;
+  if(!account || isNaN(amount) || !date) return;
+  entries.push({id:genId(), account, amount, date, remark, category});
+  saveLedger(); renderLedger(); this.reset();
+  document.getElementById('date').value = todayStr();
+  document.getElementById('account').focus();
+});
+function editEntry(id){
+  const e = entries.find(x=>x.id===id); if(!e) return;
+  const newAccount = prompt('Account name:', e.account); if(newAccount===null) return;
+  const newAmount = prompt('Amount (− likhein ghatane ke liye):', e.amount); if(newAmount===null) return;
+  const newDate = prompt('Date (YYYY-MM-DD):', e.date); if(newDate===null) return;
+  const newRemark = prompt('Remark (optional):', e.remark||''); if(newRemark===null) return;
+  const newCat = prompt('Category — likhein: investment / cashbank / other', e.category||'other'); if(newCat===null) return;
+  e.account = newAccount.trim()||e.account;
+  const p = parseFloat(newAmount); if(!isNaN(p)) e.amount = p;
+  if(newDate.trim()) e.date = newDate.trim();
+  e.remark = newRemark.trim();
+  e.category = ['investment','cashbank','other'].includes(newCat.trim()) ? newCat.trim() : (e.category||'other');
+  saveLedger(); renderLedger(); renderMonths();
+}
+function deleteEntry(id){
+  if(!confirm('Delete this entry?')) return;
+  entries = entries.filter(e=>e.id!==id); saveLedger(); renderLedger(); renderMonths();
+}
+document.getElementById('resetBtn').addEventListener('click', function(){
+  if(!confirm('Reset to the original sheet data? This replaces all current entries.')) return;
+  entries = LEDGER_SEED.map((e,i)=>({...e, id:'seed-'+i})); saveLedger(); renderLedger(); renderMonths();
+});
+document.getElementById('clearBtn').addEventListener('click', function(){
+  if(!confirm('Delete ALL entries? This cannot be undone.')) return;
+  entries = []; saveLedger(); renderLedger(); renderMonths();
+});
+document.getElementById('exportBtn').addEventListener('click', function(){
+  const sorted = [...entries].sort((a,b)=> new Date(a.date) - new Date(b.date) || 0);
+  let running = 0;
+  const lines = ['Account,Amount,Date,Remark,RunningBalance'];
+  sorted.forEach(e=>{ running += Number(e.amount); lines.push([e.account, e.amount, e.date, (e.remark||'').replace(/,/g,';'), running.toFixed(2)].join(',')); });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = 'asset-ledger.csv'; a.click(); URL.revokeObjectURL(url);
+});
+document.getElementById('date').value = todayStr();
+
+/* ===================== SECTION 2: MONTHLY (COMBINED INVESTMENT + NET WORTH) ===================== */
+const MONTH_KEY = 'dninvest-months-v1';
+// Seed built from the uploaded sheet: investment tracking (Dec'25-Aug'26) + net worth (Aug'25-Aug'26) merged by month.
+const MONTH_SEED = [
+  {month:"2025-07", newInvest:0,      portfolio:null,     assets:14110852.20},
+  {month:"2025-08", newInvest:0,      portfolio:null,     assets:14429265.95},
+  {month:"2025-09", newInvest:0,      portfolio:null,     assets:14756018.40},
+  {month:"2025-10", newInvest:0,      portfolio:null,     assets:14778400.86},
+  {month:"2025-11", newInvest:0,      portfolio:null,     assets:15013184.83},
+  {month:"2025-12", newInvest:7872000,portfolio:10206000, assets:15119958.60},
+  {month:"2026-01", newInvest:251000, portfolio:10166000, assets:15082838.74},
+  {month:"2026-02", newInvest:151000, portfolio:10285000, assets:15407582.66},
+  {month:"2026-03", newInvest:651000, portfolio:10073000, assets:15154012.76},
+  {month:"2026-04", newInvest:451000, portfolio:11628000, assets:16091322.70},
+  {month:"2026-05", newInvest:251000, portfolio:11987000, assets:16365343.08},
+  {month:"2026-06", newInvest:406000, portfolio:12758000, assets:17388080.94},
+  {month:"2026-07", newInvest:706000, portfolio:13757000, assets:17860878.86},
+  {month:"2026-08", newInvest:46000,  portfolio:14159000, assets:18643216.22},
+];
+function loadMonths(){
+  try{ const raw = localStorage.getItem(MONTH_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return MONTH_SEED.map((e,i)=>({...e, id:'mseed-'+i}));
+}
+function saveMonths(){ localStorage.setItem(MONTH_KEY, JSON.stringify(months)); }
+let months = loadMonths();
+
+function computedMonths(){
+  const sorted = [...months].sort((a,b)=> a.month.localeCompare(b.month));
+  let cumInvest = 0, prevPortfolio = null, prevAssets = null, isFirstInvestRow = true;
+  return sorted.map(e=>{
+    const hasPortfolio = e.portfolio !== null && e.portfolio !== undefined && e.portfolio !== '';
+    let investGrowth = null, totalInvest = null, wasBaselineInvestRow = false;
+    if(hasPortfolio){
+      cumInvest += Number(e.newInvest || 0);
+      totalInvest = cumInvest;
+      if(prevPortfolio === null){
+        investGrowth = Number(e.portfolio) - totalInvest;
+        wasBaselineInvestRow = isFirstInvestRow;
+      } else {
+        investGrowth = Number(e.portfolio) - prevPortfolio;
+      }
+      prevPortfolio = Number(e.portfolio);
+      isFirstInvestRow = false;
+    }
+    const worthGrowth = prevAssets === null ? 0 : (Number(e.assets) - prevAssets);
+    prevAssets = Number(e.assets);
+    const otherIncome = (hasPortfolio && !wasBaselineInvestRow) ? (worthGrowth - investGrowth + Number(e.newInvest || 0)) : null;
+    return {...e, totalInvest, investGrowth, worthGrowth, otherIncome};
+  });
+}
+
+const MONTH_VIEWS = {
+  all: {
+    title: 'Mahine-War Growth aur Income',
+    head: ['Mahina','Naya Invest','Total Invest Ab Tak','Investment Value','Investment Growth','Net Worth','Net Worth Growth','Baaki Income',''],
+    row: e => [
+      `<td class="acct">${monthLabel(e.month)}</td>`,
+      `<td class="num muted-num">${e.newInvest ? fmt(e.newInvest) : '—'}</td>`,
+      `<td class="num bal">${e.totalInvest === null ? '—' : fmt(e.totalInvest)}</td>`,
+      `<td class="num muted-num">${e.portfolio === null || e.portfolio === undefined || e.portfolio==='' ? '—' : fmt(e.portfolio)}</td>`,
+      `<td class="num ${e.investGrowth === null ? 'muted-num' : (e.investGrowth<0?'amt-neg':'amt-pos')}">${e.investGrowth === null ? '—' : (e.investGrowth<0?'':'+')+fmt(e.investGrowth)}</td>`,
+      `<td class="num bal">${fmt(e.assets)}</td>`,
+      `<td class="num ${e.worthGrowth<0?'amt-neg':'amt-pos'}">${e.worthGrowth<0?'':'+'}${fmt(e.worthGrowth)}</td>`,
+      `<td class="num ${e.otherIncome === null ? 'muted-num' : (e.otherIncome<0?'amt-neg':'amt-pos')}">${e.otherIncome===null ? '—' : (e.otherIncome<0?'':'+')+fmt(e.otherIncome)}</td>`,
+    ]
+  },
+  networth: {
+    title: 'Net Worth — Mahine-War',
+    head: ['Mahina','Net Worth','Net Worth Growth',''],
+    row: e => [
+      `<td class="acct">${monthLabel(e.month)}</td>`,
+      `<td class="num bal">${fmt(e.assets)}</td>`,
+      `<td class="num ${e.worthGrowth<0?'amt-neg':'amt-pos'}">${e.worthGrowth<0?'':'+'}${fmt(e.worthGrowth)}</td>`,
+    ]
+  },
+  investment: {
+    title: 'Investment — Mahine-War',
+    head: ['Mahina','Naya Invest','Total Invest Ab Tak','Investment Value','Investment Growth',''],
+    row: e => [
+      `<td class="acct">${monthLabel(e.month)}</td>`,
+      `<td class="num muted-num">${e.newInvest ? fmt(e.newInvest) : '—'}</td>`,
+      `<td class="num bal">${e.totalInvest === null ? '—' : fmt(e.totalInvest)}</td>`,
+      `<td class="num muted-num">${e.portfolio === null || e.portfolio === undefined || e.portfolio==='' ? '—' : fmt(e.portfolio)}</td>`,
+      `<td class="num ${e.investGrowth === null ? 'muted-num' : (e.investGrowth<0?'amt-neg':'amt-pos')}">${e.investGrowth === null ? '—' : (e.investGrowth<0?'':'+')+fmt(e.investGrowth)}</td>`,
+    ]
+  },
+  cash: {
+    title: 'Cash Growth — Mahine-War',
+    head: ['Mahina','Cash Growth',''],
+    row: e => [
+      `<td class="acct">${monthLabel(e.month)}</td>`,
+      `<td class="num ${e.otherIncome === null ? 'muted-num' : (e.otherIncome<0?'amt-neg':'amt-pos')}">${e.otherIncome===null ? '—' : (e.otherIncome<0?'':'+')+fmt(e.otherIncome)}</td>`,
+    ]
+  },
+};
+
+function renderMonths(){
+  const view = MONTH_VIEWS[monthFilter] || MONTH_VIEWS.all;
+  document.getElementById('monthlyTitle').textContent = view.title;
+  document.getElementById('monthLegend').style.display = monthFilter === 'all' ? 'block' : 'none';
+
+  const thead = document.getElementById('monthTableHead');
+  thead.innerHTML = '<tr>' + view.head.map((h,i)=> i===0 ? `<th>${h}</th>` : (h==='' ? '<th></th>' : `<th class="num">${h}</th>`)).join('') + '</tr>';
+
+  const tbody = document.getElementById('monthRowsBody');
+  const emptyMsg = document.getElementById('monthEmptyMsg');
+  tbody.innerHTML = '';
+  const rows = computedMonths();
+  if(rows.length === 0){ emptyMsg.style.display='block'; updateDashboard(); return; }
+  emptyMsg.style.display = 'none';
+  [...rows].reverse().forEach(e=>{
+    const tr = document.createElement('tr');
+    const cells = view.row(e);
+    const actionCell = `<td><div class="row-actions">
+        <button class="icon-btn" title="Edit" onclick="editMonth('${e.id}')">✎</button>
+        <button class="icon-btn danger" title="Delete" onclick="deleteMonth('${e.id}')">✕</button>
+      </div></td>`;
+    tr.innerHTML = cells.join('') + actionCell;
+    tbody.appendChild(tr);
+  });
+  updateDashboard();
+}
+
+document.getElementById('monthForm').addEventListener('submit', function(ev){
+  ev.preventDefault();
+  const month = document.getElementById('mMonth').value;
+  const newInvest = parseFloat(document.getElementById('mNewInvest').value) || 0;
+  const portfolioRaw = document.getElementById('mPortfolio').value;
+  const portfolio = portfolioRaw === '' ? null : parseFloat(portfolioRaw);
+  const assets = parseFloat(document.getElementById('mAssets').value);
+  if(!month || isNaN(assets)) return;
+  const existing = months.find(r=>r.month===month);
+  if(existing){ existing.newInvest = newInvest; existing.portfolio = portfolio; existing.assets = assets; }
+  else{ months.push({id:genId(), month, newInvest, portfolio, assets}); }
+  saveMonths(); renderMonths(); this.reset();
+  document.getElementById('mMonth').value = currentMonthStr();
+  document.getElementById('mNewInvest').value = 0;
+});
+function editMonth(id){
+  const e = months.find(x=>x.id===id); if(!e) return;
+  const newInvest = prompt('Naya Invest is mahine:', e.newInvest||0); if(newInvest===null) return;
+  const newPortfolio = prompt('Investment Value (month-end) — khaali chhodein agar track nahi kar rahe:', e.portfolio===null?'':e.portfolio); if(newPortfolio===null) return;
+  const newAssets = prompt('Total Net Worth (month-end):', e.assets); if(newAssets===null) return;
+  const pi = parseFloat(newInvest); if(!isNaN(pi)) e.newInvest = pi;
+  e.portfolio = newPortfolio.trim()==='' ? null : parseFloat(newPortfolio);
+  const pa = parseFloat(newAssets); if(!isNaN(pa)) e.assets = pa;
+  saveMonths(); renderMonths();
+}
+function deleteMonth(id){
+  if(!confirm('Delete this month?')) return;
+  months = months.filter(e=>e.id!==id); saveMonths(); renderMonths();
+}
+document.getElementById('monthResetBtn').addEventListener('click', function(){
+  if(!confirm('Reset to the original sheet data?')) return;
+  months = MONTH_SEED.map((e,i)=>({...e, id:'mseed-'+i})); saveMonths(); renderMonths();
+});
+document.getElementById('monthClearBtn').addEventListener('click', function(){
+  if(!confirm('Delete ALL months? This cannot be undone.')) return;
+  months = []; saveMonths(); renderMonths();
+});
+document.getElementById('syncBtn').addEventListener('click', function(){
+  const month = currentMonthStr();
+  const total = grandTotal();
+  document.getElementById('mMonth').value = month;
+  document.getElementById('mAssets').value = total.toFixed(2);
+  alert(`"${monthLabel(month)}" ke liye Total Net Worth = ${fmt(total)} bhar diya gaya hai. Baaki fields bharke "Add / Update" dabayein.`);
+});
+document.getElementById('syncInvestBtn').addEventListener('click', function(){
+  const month = currentMonthStr();
+  const total = investmentTotal();
+  document.getElementById('mMonth').value = month;
+  document.getElementById('mPortfolio').value = total.toFixed(2);
+  alert(`"${monthLabel(month)}" ke liye Investment Value = ${fmt(total)} bhar diya gaya hai (jo accounts "Investment" tagged hain unka jod). Baaki fields bharke "Add / Update" dabayein.`);
+});
+document.getElementById('mMonth').value = currentMonthStr();
+
+/* ===================== INIT ===================== */
+function updateDashboard(){
+  const total = grandTotal();
+  const rows = computedMonths();
+  const latest = rows.length ? rows[rows.length-1] : null;
+  const investCurrentValue = (latest && latest.portfolio !== null && latest.portfolio !== undefined) ? Number(latest.portfolio) : investmentTotal();
+
+  document.getElementById('statNetWorth').textContent = fmt(total);
+  document.getElementById('statNetWorthGrowth').textContent = latest ? fmt(latest.worthGrowth) : '—';
+
+  document.getElementById('statInvestValue').textContent = (latest && latest.totalInvest !== null) ? fmt(latest.totalInvest) : '—';
+  document.getElementById('statInvestCurrentValue').textContent = fmt(investCurrentValue);
+  document.getElementById('statInvestGrowth').textContent = (latest && latest.investGrowth !== null) ? fmt(latest.investGrowth) : '—';
+
+  document.getElementById('statCurrentCash').textContent = fmt(total - investCurrentValue);
+  document.getElementById('statCashGrowth').textContent = (latest && latest.otherIncome !== null) ? fmt(latest.otherIncome) : '—';
+}
+
+renderLedger();
+renderMonths();
+updateDashboard();
+
+/* ===================== EXCEL UPLOAD (import latest from sheet) ===================== */
+const KNOWN_CATEGORY = {
+  'nirmala fd':'investment', 'nirmala mf':'investment', 'dilip huf':'investment',
+  'dilip mf':'investment', 'fd idfc':'investment', 'tata aia':'investment',
+  'bhagwan':'cashbank', 'credit card':'cashbank', 'chery':'cashbank', 'ma':'cashbank',
+  'morning':'cashbank', 'nirmala bank':'cashbank', 'huf bank':'cashbank', 'dipu':'cashbank',
+  'raju':'cashbank', 'ghar cash':'cashbank', 'tizori':'cashbank', 'ramesh':'cashbank', 'bank':'cashbank',
+};
+const LABEL_ROWS = ['total','balance','grand total'];
+
+function excelDateToMonthStr(v){
+  let d = null;
+  if(v instanceof Date) d = v;
+  else if(typeof v === 'number') d = new Date(Math.round((v - 25569) * 86400 * 1000));
+  else if(typeof v === 'string' && v.trim()){ const parsed = new Date(v); if(!isNaN(parsed)) d = parsed; }
+  if(!d || isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function excelDateToDateStr(v){
+  let d = null;
+  if(v instanceof Date) d = v;
+  else if(typeof v === 'number') d = new Date(Math.round((v - 25569) * 86400 * 1000));
+  else if(typeof v === 'string' && v.trim()){ const parsed = new Date(v); if(!isNaN(parsed)) d = parsed; }
+  if(!d || isNaN(d)) return todayStr();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function parseWorkbookToAppData(wb){
+  const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('asset')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+
+  const newEntries = [];
+  const monthMap = {};
+
+  for(let i=1; i<rows.length; i++){
+    const r = rows[i];
+    if(!r) continue;
+
+    // --- Table 1: Account / Amount / Date / Remark (cols A-D) ---
+    const account = r[0];
+    const amount = r[1];
+    if(account && typeof account === 'string' && !LABEL_ROWS.includes(account.trim().toLowerCase()) && typeof amount === 'number'){
+      const key = account.trim().toLowerCase();
+      newEntries.push({
+        id: genId(),
+        account: account.trim(),
+        amount: amount,
+        date: excelDateToDateStr(r[2]),
+        remark: (r[3] && typeof r[3]==='string') ? r[3].trim() : '',
+        category: KNOWN_CATEGORY[key] || 'other',
+      });
+    }
+
+    // --- Table 2: Month / Old-Investment / (Total Investment) / Current Value (cols E,F,H) ---
+    const invMonth = excelDateToMonthStr(r[4]);
+    const currentValue = r[7];
+    if(invMonth && typeof currentValue === 'number'){
+      if(!monthMap[invMonth]) monthMap[invMonth] = {month:invMonth, newInvest:0, portfolio:null, assets:null};
+      monthMap[invMonth].newInvest = (typeof r[5]==='number') ? r[5] : 0;
+      monthMap[invMonth].portfolio = currentValue;
+    }
+
+    // --- Table 3: Month / Assets (cols K,L) ---
+    const worthMonth = excelDateToMonthStr(r[10]);
+    const assetsVal = r[11];
+    if(worthMonth && typeof assetsVal === 'number'){
+      if(!monthMap[worthMonth]) monthMap[worthMonth] = {month:worthMonth, newInvest:0, portfolio:null, assets:null};
+      monthMap[worthMonth].assets = assetsVal;
+    }
+  }
+
+  const newMonths = Object.values(monthMap)
+    .filter(m => m.assets !== null || m.portfolio !== null)
+    .map(m => ({...m, id: genId()}))
+    .sort((a,b)=> a.month.localeCompare(b.month));
+
+  return {newEntries, newMonths};
+}
+
+document.getElementById('excelUploadBtn').addEventListener('click', function(){
+  document.getElementById('excelUpload').click();
+});
+document.getElementById('excelUpload').addEventListener('change', function(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const {newEntries, newMonths} = parseWorkbookToAppData(wb);
+      if(newEntries.length === 0 && newMonths.length === 0){
+        alert('Is file mein "Assets" jaisa data nahi mila. Sheet ka naam ya format check karein.');
+        return;
+      }
+      const ok = confirm(`Excel mein mila: ${newEntries.length} accounts, ${newMonths.length} mahine ka data.\n\nYeh current data ko REPLACE kar dega. Aage badhein?`);
+      if(!ok) return;
+      entries = newEntries;
+      months = newMonths;
+      saveLedger();
+      saveMonths();
+      renderLedger();
+      renderMonths();
+      updateDashboard();
+      goPage('dashboard');
+      alert('Latest data upload ho gaya!');
+    }catch(err){
+      alert('File padhne mein dikkat aayi: ' + err.message);
+    }finally{
+      ev.target.value = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+</script>
+</body>
+</html>
