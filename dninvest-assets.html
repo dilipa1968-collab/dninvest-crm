@@ -992,7 +992,11 @@ function excelDateToMonthStr(v){
   else if(typeof v === 'number') d = new Date(Math.round((v - 25569) * 86400 * 1000));
   else if(typeof v === 'string' && v.trim()){ const parsed = new Date(v); if(!isNaN(parsed)) d = parsed; }
   if(!d || isNaN(d)) return null;
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  // Use UTC getters, not local — SheetJS builds date cells as a UTC-midnight
+  // instant, and reading them back with local getters can land on the wrong
+  // calendar day depending on the browser's timezone. UTC getters always
+  // give back the exact date that was in the spreadsheet cell.
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
 }
 function excelDateToDateStr(v){
   let d = null;
@@ -1000,7 +1004,7 @@ function excelDateToDateStr(v){
   else if(typeof v === 'number') d = new Date(Math.round((v - 25569) * 86400 * 1000));
   else if(typeof v === 'string' && v.trim()){ const parsed = new Date(v); if(!isNaN(parsed)) d = parsed; }
   if(!d || isNaN(d)) return todayStr();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
 }
 
 function parseWorkbookToAppData(wb){
