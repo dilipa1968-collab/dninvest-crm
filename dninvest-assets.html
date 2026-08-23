@@ -991,25 +991,36 @@ const KNOWN_CATEGORY = {
 };
 const LABEL_ROWS = ['total','balance','grand total'];
 
+function excelSerialToYMD(v){
+  // v is a raw Excel date serial (cellDates is off, so this is what we get
+  // for every date cell). This is the standard, verified serial→UTC-midnight
+  // conversion — Excel day 0 = 1899-12-30, and *86400*1000 turns days into
+  // milliseconds since the Unix epoch (already UTC by definition).
+  const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+  if(isNaN(d)) return null;
+  return {y: d.getUTCFullYear(), m: d.getUTCMonth()+1, day: d.getUTCDate()};
+}
 function excelDateToMonthStr(v){
-  let d = null;
-  if(v instanceof Date) d = v;
-  else if(typeof v === 'number') d = new Date(Math.round((v - 25569) * 86400 * 1000));
-  else if(typeof v === 'string' && v.trim()){ const parsed = new Date(v); if(!isNaN(parsed)) d = parsed; }
-  if(!d || isNaN(d)) return null;
-  // Use UTC getters, not local — SheetJS builds date cells as a UTC-midnight
-  // instant, and reading them back with local getters can land on the wrong
-  // calendar day depending on the browser's timezone. UTC getters always
-  // give back the exact date that was in the spreadsheet cell.
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  let ymd = null;
+  if(typeof v === 'number') ymd = excelSerialToYMD(v);
+  else if(v instanceof Date) ymd = {y:v.getFullYear(), m:v.getMonth()+1, day:v.getDate()};
+  else if(typeof v === 'string' && v.trim()){
+    const parsed = new Date(v);
+    if(!isNaN(parsed)) ymd = {y:parsed.getUTCFullYear(), m:parsed.getUTCMonth()+1, day:parsed.getUTCDate()};
+  }
+  if(!ymd) return null;
+  return `${ymd.y}-${String(ymd.m).padStart(2,'0')}`;
 }
 function excelDateToDateStr(v){
-  let d = null;
-  if(v instanceof Date) d = v;
-  else if(typeof v === 'number') d = new Date(Math.round((v - 25569) * 86400 * 1000));
-  else if(typeof v === 'string' && v.trim()){ const parsed = new Date(v); if(!isNaN(parsed)) d = parsed; }
-  if(!d || isNaN(d)) return todayStr();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  let ymd = null;
+  if(typeof v === 'number') ymd = excelSerialToYMD(v);
+  else if(v instanceof Date) ymd = {y:v.getFullYear(), m:v.getMonth()+1, day:v.getDate()};
+  else if(typeof v === 'string' && v.trim()){
+    const parsed = new Date(v);
+    if(!isNaN(parsed)) ymd = {y:parsed.getUTCFullYear(), m:parsed.getUTCMonth()+1, day:parsed.getUTCDate()};
+  }
+  if(!ymd) return todayStr();
+  return `${ymd.y}-${String(ymd.m).padStart(2,'0')}-${String(ymd.day).padStart(2,'0')}`;
 }
 
 function parseWorkbookToAppData(wb){
@@ -1075,7 +1086,13 @@ document.getElementById('excelUpload').addEventListener('change', function(ev){
   reader.onload = function(e){
     try{
       const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      // cellDates is deliberately OFF: with it on, SheetJS builds a Date
+      // object using local-time components, and reading that back with UTC
+      // getters (or vice versa) silently shifts the day depending on the
+      // browser's timezone — that mismatch was the exact bug reported here.
+      // Keeping raw Excel serial numbers and converting them ourselves with
+      // one fixed, verified formula (below) removes that ambiguity entirely.
+      const wb = XLSX.read(data, {type:'array'});
       const {newEntries, newMonths} = parseWorkbookToAppData(wb);
       if(newEntries.length === 0 && newMonths.length === 0){
         alert('No "Assets"-style data found in this file. Check the sheet name or format.');
