@@ -483,7 +483,7 @@
     <div class="empty" id="monthEmptyMsg" style="display:none;">No months added yet — add one above.</div>
 
     <div class="legend" id="monthLegend">
-      <div><b>Investment Value</b> = sum of accounts tagged "Investment" on the Assets page (Nirmala Fd, Nirmala Mf, DILIP HUF, Dilip Mf, FD Idfc, Tata Aia) — you can fill it straight from the button. "Cash & Bank" is tracked separately (Bhagwan, Chery, Bank, Ghar cash, etc.), and is also included in Total Balance.</div>
+      <div><b>Investment Value</b> = sum of accounts tagged "Investment" on the Assets page (Nirmala Fd, Nirmala Mf, Dilip Huf Mf, Dilip Ind Mf, Idfc Fd, Tata Aia Ins) — you can fill it straight from the button. "Cash & Bank" is tracked separately (Social, Chery, Bank Balance, Ghar Cash, etc.), and is also included in Total Balance.</div>
       <div><b>Total Invested So Far</b> = last month's Total Invested + this month's New Investment (running total).</div>
       <div><b>Investment Growth</b> = this month's Investment Value − last month's Investment Value (market movement only) = the Dashboard's <b>"Investment Growth"</b> when it's the latest month.</div>
       <div><b>Net Worth Growth</b> = this month's Net Worth − last month's Net Worth (the full change — all accounts combined) = the Dashboard's <b>"Net Worth Growth"</b>.</div>
@@ -619,26 +619,26 @@ function monthLabel(m){
 /* ===================== SECTION 1: ASSETS / BALANCE ===================== */
 const LEDGER_KEY = 'dninvest-assets-v1';
 const LEDGER_SEED = [
-  {account:"Nirmala Fd", amount:440000, date:"2026-07-31", remark:"", category:"investment"},
-  {account:"Nirmala Mf", amount:11079000, date:"2026-08-22", remark:"", category:"investment"},
-  {account:"DILIP HUF", amount:1083000, date:"2026-08-22", remark:"", category:"investment"},
-  {account:"Dilip Mf", amount:672000, date:"2026-08-22", remark:"", category:"investment"},
-  {account:"FD Idfc", amount:97000, date:"2026-07-31", remark:"", category:"investment"},
-  {account:"Tata Aia", amount:788000, date:"2026-07-31", remark:"", category:"investment"},
-  {account:"Bhagwan", amount:-220700, date:"2026-07-31", remark:"", category:"cashbank"},
-  {account:"Credit Card", amount:-161435.52, date:"2026-08-22", remark:"", category:"cashbank"},
-  {account:"Chery", amount:2674000, date:"2026-08-12", remark:"", category:"cashbank"},
-  {account:"Ma", amount:3610, date:"2026-08-08", remark:"", category:"cashbank"},
-  {account:"Morning", amount:-13945, date:"2026-08-16", remark:"", category:"cashbank"},
-  {account:"Nirmala Bank", amount:95000, date:"2026-08-22", remark:"", category:"cashbank"},
-  {account:"HUF BANK", amount:234811, date:"2026-08-20", remark:"", category:"cashbank"},
-  {account:"Dipu", amount:8850, date:"2026-08-20", remark:"", category:"cashbank"},
-  {account:"Raju", amount:3337, date:"2026-08-10", remark:"", category:"cashbank"},
-  {account:"Ghar cash", amount:35000, date:"2026-08-12", remark:"", category:"cashbank"},
-  {account:"Tizori", amount:400000, date:"2026-08-12", remark:"", category:"cashbank"},
-  {account:"Ramesh", amount:800000, date:"2026-08-18", remark:"", category:"cashbank"},
-  {account:"Bank", amount:483688.74, date:"2026-08-22", remark:"", category:"cashbank"},
-  {account:"New", amount:142000, date:"2026-07-31", remark:"", category:"other"},
+  {account:"NIRMALA FD", amount:440000, date:"2026-07-31", remark:"", category:"investment"},
+  {account:"NIRMALA MF", amount:11079000, date:"2026-08-22", remark:"", category:"investment"},
+  {account:"DILIP HUF MF", amount:1083000, date:"2026-08-22", remark:"", category:"investment"},
+  {account:"DILIP IND MF", amount:672000, date:"2026-08-22", remark:"", category:"investment"},
+  {account:"IDFC FD", amount:97000, date:"2026-07-31", remark:"", category:"investment"},
+  {account:"TATA AIA INS", amount:788000, date:"2026-07-31", remark:"", category:"investment"},
+  {account:"SOCIAL", amount:-220700, date:"2026-07-31", remark:"", category:"cashbank"},
+  {account:"CREDIT CARD", amount:-163497.68, date:"2026-08-23", remark:"", category:"cashbank"},
+  {account:"CHERY", amount:2674000, date:"2026-08-12", remark:"", category:"cashbank"},
+  {account:"MAA", amount:3610, date:"2026-08-08", remark:"", category:"cashbank"},
+  {account:"MORNING", amount:-13095, date:"2026-08-23", remark:"", category:"cashbank"},
+  {account:"BANK NIRMALA", amount:95000, date:"2026-08-22", remark:"", category:"cashbank"},
+  {account:"BANK DILIP HUF", amount:234811, date:"2026-08-20", remark:"", category:"cashbank"},
+  {account:"CASH IN HAND", amount:3850, date:"2026-08-23", remark:"", category:"cashbank"},
+  {account:"OFFICE EXP", amount:3337, date:"2026-08-10", remark:"", category:"cashbank"},
+  {account:"NIMBU CASH", amount:35000, date:"2026-08-12", remark:"", category:"cashbank"},
+  {account:"GHAR CASH", amount:400000, date:"2026-08-12", remark:"", category:"cashbank"},
+  {account:"RAMESH", amount:800000, date:"2026-08-18", remark:"", category:"cashbank"},
+  {account:"BANK BALANCE", amount:482485.74, date:"2026-08-23", remark:"", category:"cashbank"},
+  {account:"NEW CURRENCY", amount:142000, date:"2026-07-31", remark:"", category:"other"},
 ];
 function loadLedger(){
   try{ const raw = localStorage.getItem(LEDGER_KEY); if(raw) return JSON.parse(raw); }catch(e){}
@@ -789,7 +789,7 @@ const MONTH_SEED = [
   {month:"2026-05", newInvest:251000, portfolio:11987000, assets:16365343.08},
   {month:"2026-06", newInvest:406000, portfolio:12758000, assets:17388080.94},
   {month:"2026-07", newInvest:706000, portfolio:13757000, assets:17860878.86},
-  {month:"2026-08", newInvest:46000,  portfolio:14159000, assets:18643216.22},
+  {month:"2026-08", newInvest:46000,  portfolio:14159000, assets:18635801.06},
 ];
 function loadMonths(){
   try{ const raw = localStorage.getItem(MONTH_KEY); if(raw) return JSON.parse(raw); }catch(e){}
@@ -978,11 +978,16 @@ initCloudSync();
 
 /* ===================== EXCEL UPLOAD (import latest from sheet) ===================== */
 const KNOWN_CATEGORY = {
-  'nirmala fd':'investment', 'nirmala mf':'investment', 'dilip huf':'investment',
-  'dilip mf':'investment', 'fd idfc':'investment', 'tata aia':'investment',
-  'bhagwan':'cashbank', 'credit card':'cashbank', 'chery':'cashbank', 'ma':'cashbank',
-  'morning':'cashbank', 'nirmala bank':'cashbank', 'huf bank':'cashbank', 'dipu':'cashbank',
-  'raju':'cashbank', 'ghar cash':'cashbank', 'tizori':'cashbank', 'ramesh':'cashbank', 'bank':'cashbank',
+  'nirmala fd':'investment', 'nirmala mf':'investment', 'dilip huf mf':'investment',
+  'dilip ind mf':'investment', 'idfc fd':'investment', 'tata aia ins':'investment',
+  'social':'cashbank', 'credit card':'cashbank', 'chery':'cashbank', 'maa':'cashbank',
+  'morning':'cashbank', 'bank nirmala':'cashbank', 'bank dilip huf':'cashbank', 'cash in hand':'cashbank',
+  'office exp':'cashbank', 'nimbu cash':'cashbank', 'ghar cash':'cashbank', 'ramesh':'cashbank',
+  'bank balance':'cashbank', 'new currency':'other',
+  // older account names kept as aliases in case an older sheet is re-uploaded
+  'dilip huf':'investment', 'dilip mf':'investment', 'fd idfc':'investment', 'tata aia':'investment',
+  'bhagwan':'cashbank', 'ma':'cashbank', 'nirmala bank':'cashbank', 'huf bank':'cashbank',
+  'dipu':'cashbank', 'raju':'cashbank', 'tizori':'cashbank', 'bank':'cashbank', 'new':'other',
 };
 const LABEL_ROWS = ['total','balance','grand total'];
 
