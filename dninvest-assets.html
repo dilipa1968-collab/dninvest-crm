@@ -132,6 +132,18 @@
   .table-scroll{overflow-x:auto;}
   table{width:100%;border-collapse:collapse;min-width:520px;}
   thead th{text-align:left;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  thead th.sortable{cursor:pointer;user-select:none;}
+  thead th.sortable:hover{color:var(--primary);}
+  .sort-arrow{font-size:9px;color:var(--gold);display:inline-block;width:8px;}
+
+  .mobile-sort-bar{display:none;}
+  @media (max-width:760px){
+    .mobile-sort-bar{
+      display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px;
+    }
+    .mobile-sort-bar .mobile-sort-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-right:2px;}
+    .mobile-sort-bar .filter-tab{padding:5px 11px;font-size:11px;}
+  }
   th.num, td.num{text-align:right;}
   tbody td{padding:10px 8px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle;white-space:nowrap;}
   tbody tr:hover{background:rgba(22,33,62,0.04);}
@@ -381,9 +393,20 @@
         <button class="btn-ghost" id="clearBtn">Clear All</button>
       </div>
     </div>
+    <div class="mobile-sort-bar" id="mobileSortBar">
+      <span class="mobile-sort-label">Sort:</span>
+      <button class="filter-tab" data-sort="account" onclick="setLedgerSort('account')">Name <span class="sort-arrow" id="sortArrowM-account"></span></button>
+      <button class="filter-tab" data-sort="amount" onclick="setLedgerSort('amount')">Amount <span class="sort-arrow" id="sortArrowM-amount"></span></button>
+      <button class="filter-tab" data-sort="date" onclick="setLedgerSort('date')">Date <span class="sort-arrow" id="sortArrowM-date"></span></button>
+    </div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Account</th><th class="num">Amount</th><th>Date</th><th></th></tr></thead>
+        <thead><tr>
+          <th class="sortable" data-sort="account" onclick="setLedgerSort('account')">Account <span class="sort-arrow" id="sortArrow-account"></span></th>
+          <th class="num sortable" data-sort="amount" onclick="setLedgerSort('amount')">Amount <span class="sort-arrow" id="sortArrow-amount"></span></th>
+          <th class="sortable" data-sort="date" onclick="setLedgerSort('date')">Date <span class="sort-arrow" id="sortArrow-date"></span></th>
+          <th></th>
+        </tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
@@ -631,6 +654,29 @@ function cashBankTotal(){ return entries.filter(e=>e.category==='cashbank').redu
 const CATEGORY_LABEL = {investment:'Investment', cashbank:'Cash & Bank', other:''};
 const FILTER_TITLE = {all:'Sab Accounts', investment:'Investment Accounts', cashbank:'Cash & Bank Accounts'};
 
+let ledgerSort = {field:'date', dir:'desc'};
+
+function setLedgerSort(field){
+  if(ledgerSort.field === field){
+    ledgerSort.dir = ledgerSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    ledgerSort = {field, dir: field==='account' ? 'asc' : 'desc'};
+  }
+  renderLedger();
+}
+
+function sortEntries(list){
+  const {field, dir} = ledgerSort;
+  const mult = dir === 'asc' ? 1 : -1;
+  return [...list].sort((a,b)=>{
+    let v;
+    if(field === 'account') v = a.account.localeCompare(b.account);
+    else if(field === 'amount') v = Number(a.amount) - Number(b.amount);
+    else v = new Date(a.date) - new Date(b.date);
+    return v * mult;
+  });
+}
+
 function renderLedger(){
   const tbody = document.getElementById('rows');
   const emptyMsg = document.getElementById('emptyMsg');
@@ -640,10 +686,18 @@ function renderLedger(){
   document.getElementById('totalRowAll').style.display = assetFilter==='all' ? 'flex' : 'none';
   document.getElementById('totalRowInvest').style.display = (assetFilter==='all' || assetFilter==='investment') ? 'flex' : 'none';
   document.getElementById('totalRowCash').style.display = (assetFilter==='all' || assetFilter==='cashbank') ? 'flex' : 'none';
+  ['account','amount','date'].forEach(f=>{
+    const el = document.getElementById('sortArrow-'+f);
+    if(el) el.textContent = (ledgerSort.field === f) ? (ledgerSort.dir === 'asc' ? '▲' : '▼') : '';
+    const elM = document.getElementById('sortArrowM-'+f);
+    if(elM) elM.textContent = (ledgerSort.field === f) ? (ledgerSort.dir === 'asc' ? '▲' : '▼') : '';
+    const btnM = document.querySelector('#mobileSortBar .filter-tab[data-sort="'+f+'"]');
+    if(btnM) btnM.classList.toggle('active', ledgerSort.field === f);
+  });
   if(filtered.length === 0){ emptyMsg.style.display='block'; }
   else{
     emptyMsg.style.display = 'none';
-    const sorted = [...filtered].sort((a,b)=> new Date(b.date) - new Date(a.date) || 0);
+    const sorted = sortEntries(filtered);
     sorted.forEach(e=>{
       const tr = document.createElement('tr');
       const amtClass = e.amount < 0 ? 'amt-neg' : 'amt-pos';
