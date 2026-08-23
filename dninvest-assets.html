@@ -13,6 +13,10 @@
 <meta name="apple-mobile-web-app-title" content="Assets">
 <title>Asset & Net Worth — D N Investment</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase — same project as the CRM/HR portal, used here for personal
+     cross-device sync (this tool has no login of its own, single user). -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#eef1f6;
@@ -481,6 +485,66 @@
 </nav>
 
 <script>
+/* ===================== CLOUD SYNC (Firebase — same project as the CRM) =====================
+   This is a personal, single-user tool, so there's no login/auth here — it
+   just reads/writes one shared document so every device (desktop, mobile,
+   home screen shortcut) always shows the same data. Local data still saves
+   to localStorage first (instant, works offline); the cloud copy is synced
+   on every save and a real-time listener pulls in changes made elsewhere. */
+const firebaseConfig = {
+  apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
+  authDomain: "dninvest-crm.firebaseapp.com",
+  projectId: "dninvest-crm",
+  storageBucket: "dninvest-crm.firebasestorage.app",
+  messagingSenderId: "331999342266",
+  appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
+};
+let cloudSyncEnabled = false;
+let assetsDocRef = null;
+let suppressNextSnapshot = false;
+
+function initCloudSync(){
+  try{
+    if(typeof firebase === 'undefined' || !firebase.firestore) return;
+    if(!window.fdb){
+      firebase.initializeApp(firebaseConfig);
+      window.fdb = firebase.firestore();
+    }
+    assetsDocRef = window.fdb.collection('personal_data').doc('dninvest_assets');
+    cloudSyncEnabled = true;
+
+    // First-ever load on any device: if the cloud doc doesn't exist yet,
+    // seed it with whatever is currently loaded locally.
+    assetsDocRef.get().then(function(doc){
+      if(!doc.exists) pushToCloud();
+    }).catch(function(err){ console.warn('Cloud sync initial check failed:', err); });
+
+    assetsDocRef.onSnapshot(function(doc){
+      if(suppressNextSnapshot){ suppressNextSnapshot = false; return; }
+      if(!doc.exists) return;
+      const data = doc.data();
+      let changed = false;
+      if(Array.isArray(data.entries)){ entries = data.entries; changed = true; }
+      if(Array.isArray(data.months)){ months = data.months; changed = true; }
+      if(!changed) return;
+      localStorage.setItem(LEDGER_KEY, JSON.stringify(entries));
+      localStorage.setItem(MONTH_KEY, JSON.stringify(months));
+      renderLedger();
+      renderMonths();
+      updateDashboard();
+    }, function(err){ console.warn('Cloud sync listener error:', err); });
+  }catch(e){ console.warn('Cloud sync init failed:', e); }
+}
+
+function pushToCloud(){
+  if(!cloudSyncEnabled || !assetsDocRef) return;
+  suppressNextSnapshot = true;
+  assetsDocRef.set({
+    entries, months,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(err){ console.warn('Cloud sync write failed:', err); suppressNextSnapshot = false; });
+}
+
 let assetFilter = 'all';
 let monthFilter = 'all';
 
@@ -557,7 +621,7 @@ function loadLedger(){
   try{ const raw = localStorage.getItem(LEDGER_KEY); if(raw) return JSON.parse(raw); }catch(e){}
   return LEDGER_SEED.map((e,i)=>({...e, id:'seed-'+i}));
 }
-function saveLedger(){ localStorage.setItem(LEDGER_KEY, JSON.stringify(entries)); }
+function saveLedger(){ localStorage.setItem(LEDGER_KEY, JSON.stringify(entries)); pushToCloud(); }
 let entries = loadLedger();
 
 function grandTotal(){ return entries.reduce((s,e)=> s + Number(e.amount), 0); }
@@ -677,7 +741,7 @@ function loadMonths(){
   try{ const raw = localStorage.getItem(MONTH_KEY); if(raw) return JSON.parse(raw); }catch(e){}
   return MONTH_SEED.map((e,i)=>({...e, id:'mseed-'+i}));
 }
-function saveMonths(){ localStorage.setItem(MONTH_KEY, JSON.stringify(months)); }
+function saveMonths(){ localStorage.setItem(MONTH_KEY, JSON.stringify(months)); pushToCloud(); }
 let months = loadMonths();
 
 function computedMonths(){
@@ -856,6 +920,7 @@ function updateDashboard(){
 renderLedger();
 renderMonths();
 updateDashboard();
+initCloudSync();
 
 /* ===================== EXCEL UPLOAD (import latest from sheet) ===================== */
 const KNOWN_CATEGORY = {
