@@ -2018,6 +2018,16 @@ function initApp(){
           const newData = doc.data().data;
           const existing = JSON.parse(localStorage.getItem('dninvest_rm_messages')||'[]');
           if(JSON.stringify(newData) !== JSON.stringify(existing)){
+            // 24-Aug-2026 fix: this listener updated localStorage but never
+            // invalidated DB._mem['rm_messages'] — since DB.get() returns
+            // straight from _mem when present (see DB.get above) without
+            // re-reading localStorage, renderInbox()/checkRmReply() kept
+            // rendering the OLD cached thread list even though the fresh
+            // data had already landed in localStorage. Looked exactly like
+            // "message only shows after a refresh" (which resets _mem from
+            // scratch) — because that's exactly what was happening.
+            if(!DB._mem) DB._mem={};
+            DB._mem['rm_messages'] = newData;
             localStorage.setItem('dninvest_rm_messages', JSON.stringify(newData));
             console.log('Real-time update: rm_messages');
             updateMsgBadge();
@@ -2100,6 +2110,13 @@ function initApp(){
         const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
         const existingRaw = localStorage.getItem('dninvest_eq_risk');
         if(existingRaw===JSON.stringify(norm)) return; // no real change
+        // Same DB._mem-invalidation bug as rm_messages (24-Aug-2026 fix) —
+        // clearEqRiskCache() below only clears the SEPARATE _eqRiskCache;
+        // getEqRisk() falls through to DB.get('eq_risk'), which was still
+        // returning the stale DB._mem value since only localStorage was
+        // being updated here.
+        if(!DB._mem) DB._mem={};
+        DB._mem['eq_risk'] = norm;
         localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
         console.log('Real-time update: eq_risk (compact,', norm.count, 'clients)');
         if(typeof clearEqRiskCache==='function') clearEqRiskCache();
