@@ -1583,12 +1583,23 @@ function openAssetTracker(){
 // was the culprit. This button does the same fix as manually clearing the
 // browser cache, in one tap: wipes every 'dninvest_*' cached-data key
 // (client lists, snapshots, sort state, etc.) but deliberately KEEPS
-// 'dninvest_session' so the person doesn't get logged out for this, then
-// reloads so DB.syncFromFirebase() rebuilds every cache fresh from Firestore.
+// 'dninvest_session' AND 'dninvest_users' so the person doesn't get logged
+// out, then reloads so DB.syncFromFirebase() rebuilds every cache fresh
+// from Firestore.
+// 24-Aug-2026 fix: 'dninvest_users' was NOT excluded before, so a Clear
+// Cache reload wiped the cached user/password list too. tryAutoLogin() runs
+// synchronously on page load and validates the saved session against
+// DB.get('users') — with that cache empty, it fell back to DEFAULT_USERS,
+// whose hardcoded default passwords don't match whatever the real current
+// password/PIN actually is, so the session match failed and force-logged
+// the person out. Keeping 'dninvest_users' in place (small, low-risk to
+// keep one page-load stale — it re-syncs from Firestore moments later
+// anyway) fixes this without losing the point of Clear Cache.
 function clearCrmCache(){
   if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  const KEEP = ['dninvest_session','dninvest_users'];
   Object.keys(localStorage).forEach(k=>{
-    if(k.startsWith('dninvest_') && k!=='dninvest_session') localStorage.removeItem(k);
+    if(k.startsWith('dninvest_') && !KEEP.includes(k)) localStorage.removeItem(k);
   });
   location.reload();
 }
