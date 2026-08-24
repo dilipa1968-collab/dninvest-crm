@@ -1568,6 +1568,13 @@ function openHrPortal(){
   window.open('dninvest-hr.html?autologin='+token+'&u='+encodeURIComponent(CU.username), '_blank');
 }
 
+// Opens the personal Asset & Net Worth Tracker in a new tab. This is a
+// standalone, localStorage-only tool (no Firebase/login), so — unlike HR —
+// there's no autologin token to generate; it just opens the file directly.
+function openAssetTracker(){
+  window.open('dninvest-assets.html', '_blank');
+}
+
 
 
 // Clear stale local data cache without logging out (24-Aug-2026 — mobile
@@ -2339,6 +2346,10 @@ function initApp(){
   // HR Portal shortcut button — visible only to admin (top-right corner)
   const hrBtn = document.getElementById('hrPortalTopBtn');
   if(hrBtn) hrBtn.style.display = '';
+
+  // Asset & Net Worth Tracker shortcut button — admin only
+  const assetBtn = document.getElementById('assetTrackerTopBtn');
+  if(assetBtn) assetBtn.style.display = (CU.role==='admin') ? '' : 'none';
 
   // Demat A/c Opening nav item — visible when user has Equity access
   const dematNav = document.getElementById('nav-eq-demat');
