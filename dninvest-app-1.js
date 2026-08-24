@@ -2250,6 +2250,12 @@ function initApp(){
             const newData = doc.data().data;
             const existing = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]');
             if(JSON.stringify(newData) !== JSON.stringify(existing)){
+              // Same DB._mem-invalidation bug as rm_messages/eq_risk
+              // (24-Aug-2026 fix) — this listener updated localStorage but
+              // never touched DB._mem[key], so a new Lead or Seminar added
+              // by anyone else only ever showed up after a manual refresh.
+              if(!DB._mem) DB._mem={};
+              DB._mem[key] = newData;
               localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
               _afterRealtime(key);
             }
