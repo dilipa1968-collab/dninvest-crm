@@ -2993,7 +2993,7 @@ function _drawBirthdayCard(emblemImg, name, num, first){
     const hint=ov.querySelector('#_bcHint');
     function close(){ URL.revokeObjectURL(url); ov.remove(); }
     ov.querySelector('#_bcCl').onclick=close;
-    ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); };
+    ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); markBdayWished(idx,'card'); };
     const shr=ov.querySelector('#_bcShare');
     if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); markBdayWished(idx,'card'); }catch(e){} };
     const send=ov.querySelector('#_bcSend');
