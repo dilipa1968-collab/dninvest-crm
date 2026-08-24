@@ -685,13 +685,17 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
 @media(max-width:800px){
   .hamburger-btn{display:inline-block;}
   .topbar{padding:0 8px;}
-  .topbar-brand{font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .topbar-logo-img{width:26px;height:26px;}
+  .topbar-left{flex:0 0 auto;min-width:0;display:flex;align-items:center;overflow:hidden;}
+  .topbar-brand{font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .topbar-logo-img{width:22px;height:22px;flex:0 0 auto;}
   .user-pill{display:none;}
   #changeCredBtn{font-size:.7rem;padding:4px 6px;}
   #changeCredBtn .cred-btn-text{display:none;}
-  .topbar-right{gap:4px;}
-  .btn-sm{font-size:.7rem;padding:5px 7px;}
+  #hrPortalTopBtn, #assetTrackerTopBtn{font-size:.7rem!important;padding:4px 7px!important;}
+  .topbar-btn-text{display:none;}   /* icon-only for HR/Assets buttons on mobile — frees up space for the logo */
+  .topbar-right{gap:4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:60vw;}
+  .topbar-right::-webkit-scrollbar{display:none;}
+  .btn-sm{font-size:.7rem;padding:5px 7px;flex:0 0 auto;}
   .seg-indicator{display:none;}
   /* Zoom widget hidden on mobile — use pinch-zoom instead */
   #dnZoomBar{display:none!important;}
@@ -1188,13 +1192,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         🔑 <span class="cred-btn-text">Change PIN/Password</span>
       </button>
       <button class="btn-sm" id="hrPortalTopBtn" onclick="openHrPortal()" title="HR Portal kholo" style="background:#7c3aed;display:none;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
-        👔 HR
+        👔 <span class="topbar-btn-text">HR</span>
       </button>
       <button class="btn-sm" id="assetTrackerTopBtn" onclick="openAssetTracker()" title="Asset & Net Worth Tracker kholo" style="background:#c9971e;display:none;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
-        💰 Assets
-      </button>
-      <button class="btn-sm" onclick="clearCrmCache()" title="Purana/stale data clear karke fresh reload kare" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
-        🧹 Clear Cache
+        💰 <span class="topbar-btn-text">Assets</span>
       </button>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
