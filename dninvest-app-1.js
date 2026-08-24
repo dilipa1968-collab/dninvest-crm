@@ -215,6 +215,33 @@ const DB = {
   },
   // Generic set for small/array data (users, call_logs, mf_business)
   set(key,val){
+    // ── Collapse-to-empty guard (24-Aug-2026, after a real mf_business
+    // wipe-out incident) — 'mf_business' (MF Transactions) is read-modify-
+    // written as ONE full array by several places (delete/approve/decline/
+    // edit/fund-name-merge): read the whole list, change one record, write
+    // the whole list back. If that "read" ever returned a stale/empty
+    // snapshot (e.g. a sync gap right after a reload), the "write" would
+    // silently replace the REAL Firestore data with an empty/near-empty
+    // array — wiping every transaction, triggered by something as small as
+    // one Delete click. This refuses any such collapse instead of writing
+    // it: if mf_business is about to go from a healthy-sized list down to
+    // (near) zero, abort and alert loudly rather than corrupt the shared
+    // database. A genuine "delete everything" always removes records one
+    // at a time or via an explicit bulk-select, never in one single jump
+    // this large, so this guard should never block real, deliberate use.
+    if(key==='mf_business'){
+      const newCount = Array.isArray(val) ? val.length : (val?.entries?.length||0);
+      let oldCount = 0;
+      try{
+        const prev = this._mem && this._mem[key] !== undefined ? this._mem[key] : JSON.parse(localStorage.getItem('dninvest_mf_business')||'null');
+        oldCount = Array.isArray(prev) ? prev.length : (prev?.entries?.length||0);
+      }catch(e){}
+      if(oldCount>=5 && newCount===0){
+        alert('⚠️ BLOCKED: This action would have deleted ALL '+oldCount+' MF transaction records at once — refused to save, to protect your data. Please reload the page and try again. If you genuinely intended to remove records, use the normal Delete/Bulk-Select tools one group at a time, and contact support if this keeps happening.');
+        console.log('DB.set: blocked a collapse-to-empty write for mf_business (had',oldCount,', tried to save 0)');
+        return Promise.resolve();
+      }
+    }
     if(this._mem) this._mem[key] = val;   // update cache immediately with new value
     try{
       localStorage.setItem('dninvest_'+key,JSON.stringify(val));
