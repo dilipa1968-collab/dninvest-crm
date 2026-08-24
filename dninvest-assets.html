@@ -878,7 +878,7 @@ function computedMonths(){
 const MONTH_VIEWS = {
   all: {
     title: 'Month-By-Month Growth & Income',
-    head: ['Month','New Investment','Total Invested So Far','Investment Value','Investment Growth','Net Worth','Net Worth Growth','Cash Income',''],
+    head: ['Month','New Investment','Total Invested So Far','Investment Value','Investment Growth','Net Worth','Net Worth Growth','Cash Income','Income For Month',''],
     row: e => [
       `<td class="acct">${monthLabel(e.month)}</td>`,
       `<td class="num muted-num">${e.newInvest ? fmt(e.newInvest) : '—'}</td>`,
@@ -888,6 +888,7 @@ const MONTH_VIEWS = {
       `<td class="num bal">${fmt(e.assets)}</td>`,
       `<td class="num ${e.worthGrowth<0?'amt-neg':'amt-pos'}">${e.worthGrowth<0?'':'+'}${fmt(e.worthGrowth)}</td>`,
       `<td class="num ${e.otherIncome === null ? 'muted-num' : (e.otherIncome<0?'amt-neg':'amt-pos')}">${e.otherIncome===null ? '—' : (e.otherIncome<0?'':'+')+fmt(e.otherIncome)}</td>`,
+      `<td class="num ${e.incomeForMonth === null || e.incomeForMonth === undefined ? 'muted-num' : (e.incomeForMonth<0?'amt-neg':'amt-pos')}">${e.incomeForMonth === null || e.incomeForMonth === undefined ? '—' : (e.incomeForMonth<0?'':'+')+fmt(e.incomeForMonth)}</td>`,
     ]
   },
   networth: {
@@ -912,10 +913,11 @@ const MONTH_VIEWS = {
   },
   cash: {
     title: 'Cash Growth — Month-By-Month',
-    head: ['Month','Cash Growth',''],
+    head: ['Month','Cash Growth','Income For Month',''],
     row: e => [
       `<td class="acct">${monthLabel(e.month)}</td>`,
       `<td class="num ${e.otherIncome === null ? 'muted-num' : (e.otherIncome<0?'amt-neg':'amt-pos')}">${e.otherIncome===null ? '—' : (e.otherIncome<0?'':'+')+fmt(e.otherIncome)}</td>`,
+      `<td class="num ${e.incomeForMonth === null || e.incomeForMonth === undefined ? 'muted-num' : (e.incomeForMonth<0?'amt-neg':'amt-pos')}">${e.incomeForMonth === null || e.incomeForMonth === undefined ? '—' : (e.incomeForMonth<0?'':'+')+fmt(e.incomeForMonth)}</td>`,
     ]
   },
 };
@@ -1036,7 +1038,7 @@ const KNOWN_CATEGORY = {
   'social':'cashbank', 'credit card':'cashbank', 'chery':'cashbank', 'maa':'cashbank',
   'morning':'cashbank', 'bank nirmala':'cashbank', 'bank dilip huf':'cashbank', 'cash in hand':'cashbank',
   'office exp':'cashbank', 'nimbu cash':'cashbank', 'ghar cash':'cashbank', 'ramesh':'cashbank',
-  'bank balance':'cashbank', 'new currency':'cashbank',
+  'bank balance':'cashbank', 'new currency':'cashbank', 'old cash':'cashbank',
   // older account names kept as aliases in case an older sheet is re-uploaded
   'dilip huf':'investment', 'dilip mf':'investment', 'fd idfc':'investment', 'tata aia':'investment',
   'bhagwan':'cashbank', 'ma':'cashbank', 'nirmala bank':'cashbank', 'huf bank':'cashbank',
@@ -1107,17 +1109,19 @@ function parseWorkbookToAppData(wb){
     const invMonth = excelDateToMonthStr(r[4]);
     const currentValue = r[7];
     if(invMonth && typeof currentValue === 'number'){
-      if(!monthMap[invMonth]) monthMap[invMonth] = {month:invMonth, newInvest:0, portfolio:null, assets:null};
+      if(!monthMap[invMonth]) monthMap[invMonth] = {month:invMonth, newInvest:0, portfolio:null, assets:null, incomeForMonth:null};
       monthMap[invMonth].newInvest = (typeof r[5]==='number') ? r[5] : 0;
       monthMap[invMonth].portfolio = currentValue;
     }
 
-    // --- Table 3: Month / Assets (cols K,L) ---
+    // --- Table 3: Month / Assets / Growth / Income For Month (cols K,L,M,N) ---
     const worthMonth = excelDateToMonthStr(r[10]);
     const assetsVal = r[11];
+    const incomeForMonth = r[13];   // new column added 24-Aug-2026, right after "Growth"
     if(worthMonth && typeof assetsVal === 'number'){
-      if(!monthMap[worthMonth]) monthMap[worthMonth] = {month:worthMonth, newInvest:0, portfolio:null, assets:null};
+      if(!monthMap[worthMonth]) monthMap[worthMonth] = {month:worthMonth, newInvest:0, portfolio:null, assets:null, incomeForMonth:null};
       monthMap[worthMonth].assets = assetsVal;
+      if(typeof incomeForMonth === 'number') monthMap[worthMonth].incomeForMonth = incomeForMonth;
     }
   }
 
