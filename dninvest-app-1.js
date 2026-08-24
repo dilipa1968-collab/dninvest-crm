@@ -5976,7 +5976,7 @@ async function fbDelete(idx){
   const r=(window._semFbList||[])[idx];
   if(!r) return;
   if(CU.role!=='admin'){ toast('Only Admin can delete feedback','error'); return; }
-  if(!confirm('Permanently delete feedback response from "'+(r.name||'')+'"?')) return;
+  if(!(await dangerConfirm('Permanently delete feedback response from "'+(r.name||'')+'"?'))) return;
   try{
     if(r._docId){ await fdb.collection('seminar_feedback').doc(r._docId).delete(); }
     (window._semFbList||[]).splice(idx,1);
@@ -8963,9 +8963,9 @@ function renderMfTxnTable(){
   MFTBULK.afterRender();
 }
 
-function deleteMfTxnEntry(id){
+async function deleteMfTxnEntry(id){
   if(CU.role!=='admin') return;
-  if(!confirm('Delete this transaction entry?')) return;
+  if(!(await dangerConfirm('Delete this transaction entry? This cannot be undone.'))) return;
   const entries=getMfBizEntries().filter(e=>e.id!==id);
   setMfBizEntries(entries);
   toast('Entry deleted','success');
@@ -9310,9 +9310,9 @@ function markPendingEqDematEntry(id){
   renderEqDematTable();
 }
 
-function deleteEqDematEntry(id){
+async function deleteEqDematEntry(id){
   if(CU.role!=='admin') return;
-  if(!confirm('Delete this Demat account entry?')) return;
+  if(!(await dangerConfirm('Delete this Demat account entry? This cannot be undone.'))) return;
   const entries = getEqDematEntries().filter(e=>e.id!==id);
   setEqDematEntries(entries);
   toast('Entry deleted','success');
@@ -10492,9 +10492,9 @@ function editBusinessEntry(id){
   document.getElementById('businessModal').classList.add('open');
 }
 
-function deleteBusinessEntry(id){
+async function deleteBusinessEntry(id){
   if(CU.role!=='admin') return;
-  if(!confirm('Delete this business entry? This cannot be undone.')) return;
+  if(!(await dangerConfirm('Delete this business entry? This cannot be undone.'))) return;
   const biz = DB.get('mf_business');
   const entries = (Array.isArray(biz) ? biz : (biz?.entries||[])).filter(e=>e.id!==id);
   const eqEntries = Array.isArray(biz) ? [] : (biz?.eq_entries||[]);
@@ -11698,8 +11698,8 @@ function toggleOffer(id){
   toast(o.active?'▶ Offer resumed — popup will show again':'⏸ Offer paused — popup stopped for RMs');
 }
 
-function deleteOffer(id){
-  if(!confirm('Delete this offer?\n\n(Its record will remain safely in 📜 History below.)')) return;
+async function deleteOffer(id){
+  if(!(await dangerConfirm('Delete this offer? Its record will remain safely in History below.'))) return;
   saveSpecialOffersList(getSpecialOffers().filter(x=>x.id!==id));
   // Mark the history record as deleted (record stays in history)
   const hl=getCommHistory();
@@ -12655,6 +12655,36 @@ function toast(msg,type=''){
   el.textContent=msg; el.className='show '+(type||'');
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>el.className='',3000);
+}
+// Big red confirmation modal for genuinely destructive delete actions
+// (24-Aug-2026) — replaces the plain browser confirm() popup, which is easy
+// to click through on autopilot, with a deliberately loud, hard-to-miss
+// warning. Returns a Promise<boolean> — callers must `await` it. Used
+// wherever a delete happens in the app, whether the person doing it is an
+// RM or Admin.
+function dangerConfirm(message, opts){
+  opts = opts || {};
+  return new Promise(resolve=>{
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+        <div style="background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;padding:20px 22px;display:flex;align-items:center;gap:12px">
+          <div style="font-size:32px;line-height:1">⚠️</div>
+          <div style="font-weight:800;font-size:1.1rem">${opts.title||'Confirm Delete'}</div>
+        </div>
+        <div style="padding:20px 22px;font-size:.92rem;color:#1f2937;line-height:1.5">${escapeHtml(message)}</div>
+        <div style="display:flex;gap:10px;padding:16px 22px 22px;justify-content:flex-end">
+          <button id="_dcCancel" style="padding:10px 18px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;color:#374151;font-weight:700;cursor:pointer;font-size:.85rem">Cancel</button>
+          <button id="_dcOk" style="padding:10px 18px;border:none;border-radius:9px;background:#dc2626;color:#fff;font-weight:800;cursor:pointer;font-size:.85rem">${opts.okLabel||'🗑️ Delete'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = ok => { document.body.removeChild(ov); resolve(ok); };
+    ov.querySelector('#_dcCancel').onclick = ()=>close(false);
+    ov.querySelector('#_dcOk').onclick = ()=>close(true);
+    ov.addEventListener('click', ev=>{ if(ev.target===ov) close(false); });
+  });
 }
 // ══ IMPORT SYSTEM ══
 var importData = { aum: null, sip: null, contact: null, activeTab: 'aum' };
@@ -13734,7 +13764,7 @@ async function mergeMfDupsSelected(){
     survivor.updated=today();
     survivors.push(survivor);
   });
-  if(!confirm('Confirm: '+groups.length+' group(s) will be merged, '+totalDel+' duplicate record(s) will be deleted (their info will be added to the survivor). Proceed?')) return;
+  if(!(await dangerConfirm(groups.length+' group(s) will be merged, '+totalDel+' duplicate record(s) will be permanently deleted (their info will be added to the survivor). Proceed?'))) return;
   try{
     await DB.setClientsBulk('mf_clients', survivors);
     await DB.deleteClientsBulk('mf_clients', delIds);
@@ -13799,7 +13829,7 @@ function openEqBadImportReview(){
 async function deleteEqBadImportSelected(){
   const ids=[...document.querySelectorAll('.eqbad-chk')].filter(x=>x.checked).map(x=>x.getAttribute('data-id'));
   if(!ids.length){ toast('Nothing selected','error'); return; }
-  if(!confirm('Confirm: '+ids.length+' equity client(s) will be permanently deleted. This cannot be undone. Proceed?')) return;
+  if(!(await dangerConfirm(ids.length+' equity client(s) will be permanently deleted. This cannot be undone. Proceed?'))) return;
   try{
     await DB.deleteClientsBulk('eq_clients', ids);
     const ovx=document.getElementById('eqBadImportOverlay'); if(ovx) ovx.remove();
