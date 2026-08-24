@@ -243,7 +243,9 @@
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;}
   .stat-grid.three{grid-template-columns:1fr 1fr 1fr;}
-  @media (max-width:600px){.stat-grid{grid-template-columns:1fr 1fr;} .stat-grid.three{grid-template-columns:1fr 1fr;}}
+  .stat-grid.four{grid-template-columns:1fr 1fr 1fr 1fr;}
+  @media (max-width:900px){.stat-grid.four{grid-template-columns:1fr 1fr;}}
+  @media (max-width:600px){.stat-grid{grid-template-columns:1fr 1fr;} .stat-grid.three{grid-template-columns:1fr 1fr;} .stat-grid.four{grid-template-columns:1fr 1fr;}}
   .group-label{font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--primary);margin:22px 0 10px;font-weight:700;}
   .group-label:first-child{margin-top:0;}
   .stat-card{
@@ -270,14 +272,16 @@
   .stat-card.c-green{border-left:4px solid var(--green);}
   .stat-card .icn{font-size:20px;margin-bottom:8px;display:block;position:relative;z-index:1;}
   .stat-card .l{font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:700;position:relative;z-index:1;}
-  .stat-card .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--primary);position:relative;z-index:1;}
+  .stat-card .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--primary);position:relative;z-index:1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .stat-card .m{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45;position:relative;z-index:1;}
   .stat-card.big{grid-column:1/-1;padding:20px;}
   .stat-card.big .icn{font-size:24px;}
   .stat-card.big .v{font-size:34px;color:var(--gold);}
   @media (max-width:600px){
     .stat-card{padding:14px;border-radius:14px;}
-    .stat-card .v{font-size:19px;}
+    .stat-card .v{font-size:16px;}
+    .stat-card.big .v{font-size:26px;}
     .stat-card.big .v{font-size:30px;}
     .stat-card .m{display:none;}
   }
@@ -341,7 +345,13 @@
     </div>
 
     <div class="group-label">Investment</div>
-    <div class="stat-grid three">
+    <div class="stat-grid four">
+      <div class="stat-card c-teal" onclick="goPage('monthly','investment')">
+        <span class="icn">💸</span>
+        <div class="l">New Investment (This Month)</div>
+        <div class="v" id="statNewInvest">₹0</div>
+        <div class="m">Fresh money added this month. Tap for the Investment list.</div>
+      </div>
       <div class="stat-card c-teal" onclick="goPage('monthly','investment')">
         <span class="icn">🪙</span>
         <div class="l">Investment Value (Total Invested)</div>
@@ -1006,6 +1016,7 @@ function updateDashboard(){
   document.getElementById('statNetWorthGrowth').textContent = latest ? fmt(latest.worthGrowth) : '—';
 
   document.getElementById('statInvestValue').textContent = (latest && latest.totalInvest !== null) ? fmt(latest.totalInvest) : '—';
+  document.getElementById('statNewInvest').textContent = latest ? fmt(Number(latest.newInvest || 0)) : '₹0';
   document.getElementById('statInvestCurrentValue').textContent = fmt(investCurrentValue);
   document.getElementById('statInvestGrowth').textContent = (latest && latest.investGrowth !== null) ? fmt(latest.investGrowth) : '—';
 
