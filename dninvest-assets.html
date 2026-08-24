@@ -330,7 +330,7 @@
 
     <div class="group-label">Net Worth</div>
     <div class="stat-grid">
-      <div class="stat-card big c-navy" onclick="goPage('assets','all')">
+      <div class="stat-card c-navy" onclick="goPage('assets','all')">
         <span class="icn">🏦</span>
         <div class="l">Net Worth (Total)</div>
         <div class="v" id="statNetWorth">₹0</div>
@@ -345,18 +345,12 @@
     </div>
 
     <div class="group-label">Investment</div>
-    <div class="stat-grid four">
+    <div class="stat-grid three">
       <div class="stat-card c-teal" onclick="goPage('monthly','investment')">
         <span class="icn">💸</span>
         <div class="l">New Investment (This Month)</div>
         <div class="v" id="statNewInvest">₹0</div>
         <div class="m">Fresh money added this month. Tap for the Investment list.</div>
-      </div>
-      <div class="stat-card c-teal" onclick="goPage('monthly','investment')">
-        <span class="icn">🪙</span>
-        <div class="l">Investment Value (Total Invested)</div>
-        <div class="v" id="statInvestValue">₹0</div>
-        <div class="m">Total money invested so far (cost) — running total. Tap for the Investment list.</div>
       </div>
       <div class="stat-card c-teal" onclick="goPage('assets','investment')">
         <span class="icn">📊</span>
@@ -1015,7 +1009,6 @@ function updateDashboard(){
   document.getElementById('statNetWorth').textContent = fmt(total);
   document.getElementById('statNetWorthGrowth').textContent = latest ? fmt(latest.worthGrowth) : '—';
 
-  document.getElementById('statInvestValue').textContent = (latest && latest.totalInvest !== null) ? fmt(latest.totalInvest) : '—';
   document.getElementById('statNewInvest').textContent = latest ? fmt(Number(latest.newInvest || 0)) : '₹0';
   document.getElementById('statInvestCurrentValue').textContent = fmt(investCurrentValue);
   document.getElementById('statInvestGrowth').textContent = (latest && latest.investGrowth !== null) ? fmt(latest.investGrowth) : '—';
