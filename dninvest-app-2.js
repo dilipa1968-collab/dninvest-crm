@@ -1207,7 +1207,7 @@ const BK = {
   COLLECTIONS: ['crm_data','hr_data','shared_control'],
   setStatus(msg){ const el=document.getElementById('bk-status'); if(el) el.textContent=msg||''; },
   async backup(){
-    if(!(CU&&CU.role==='admin')){ toast('Admin only','error'); return; }
+    if(!(CU&&(CU.role==='admin'||CU.backup_access))){ toast('No access','error'); return; }
     if(typeof fdb==='undefined'){ toast('Firebase is not connected','error'); return; }
     this.setStatus('Creating backup…');
     try{

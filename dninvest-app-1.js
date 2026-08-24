@@ -2384,6 +2384,8 @@ function initApp(){
   if(quizNav) quizNav.style.display=CU.role==='admin'?'flex':'none';
   const dupNav=document.getElementById('nav-duplicates');
   if(dupNav) dupNav.style.display=CU.role==='admin'?'flex':'none';
+  const rmBackupNav=document.getElementById('nav-rm-backup');
+  if(rmBackupNav) rmBackupNav.style.display=(CU.role==='admin'||CU.backup_access)?'flex':'none';
 
   // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
@@ -10844,6 +10846,12 @@ function userForm(u){
         Also give Back Office access (Equity/MF Import Excel maps to ALL clients office-wide, in addition to their own RM work)
       </label>
     </div>
+    <div class="form-field" id="uf_backup_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
+        <input type="checkbox" id="uf_backup_access" ${u?.backup_access?'checked':''}>
+        Also give Data Backup access (can Download Full Backup only — cannot Restore/overwrite data)
+      </label>
+    </div>
     <div class="form-field" id="uf_mfprospects_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600;cursor:pointer">
         <input type="checkbox" id="uf_mfprospects_access" onchange="document.getElementById('uf_mfprospects_rms_wrap').style.display=this.checked?'':'none'" ${u?.mf_prospects_access?'checked':''}>
@@ -10880,6 +10888,7 @@ async function saveUser(){
   const mfDeskAccess = role==='rm' && !!document.getElementById('uf_mfdesk_access')?.checked;
   const riskUpload = role==='rm' && !!document.getElementById('uf_risk_upload')?.checked;
   const backofficeAccess = role==='rm' && !!document.getElementById('uf_backoffice_access')?.checked;
+  const backupAccess = role==='rm' && !!document.getElementById('uf_backup_access')?.checked;
   const mfProspectsAccess = role==='rm' && !!document.getElementById('uf_mfprospects_access')?.checked;
   const mfProspectsEqRms = mfProspectsAccess ? Array.from(document.querySelectorAll('.uf-mfp-eqrm:checked')).map(x=>x.value) : [];
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
@@ -10899,7 +10908,7 @@ async function saveUser(){
       if(idx>=0){
         const mob=document.getElementById('uf_mobile').value.trim();
         const eml=document.getElementById('uf_email').value.trim();
-        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
+        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,backup_access:backupAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
         if(pwd) users[idx].password=pwd;
         if(role==='rm' && pinVal) users[idx].pin=pinVal;
       }
@@ -10907,7 +10916,7 @@ async function saveUser(){
       if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return false; }
       const mob2=document.getElementById('uf_mobile').value.trim();
       const eml2=document.getElementById('uf_email').value.trim();
-      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
+      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,backup_access:backupAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
       if(role==='rm' && pinVal) newUser.pin=pinVal;
       users.push(newUser);
     }

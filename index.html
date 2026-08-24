@@ -1288,6 +1288,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="nav-item" onclick="clearCrmCache()" id="nav-clear-cache" title="Purana/stale data clear karke fresh reload kare">
         <span class="icon">🧹</span> Clear Cache
       </div>
+      <div class="nav-item" onclick="showPage('rm-backup')" id="nav-rm-backup" style="display:none" title="Weekly backup lena">
+        <span class="icon">💾</span> Data Backup
+      </div>
 
       <div class="sidebar-section" id="reports-nav-section">Reports</div>
       <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
@@ -2215,6 +2218,20 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div id="bcPrintView" class="no-upper"></div>
       </div>
       <!-- ══════ END BROKERAGE CALCULATOR PAGE ══════ -->
+
+      <!-- ══════ RM DATA BACKUP PAGE (download only — no Restore) ══════ -->
+      <div class="page" id="page-rm-backup">
+        <div class="page-hdr">
+          <div class="page-title">💾 Data Backup</div>
+        </div>
+        <div class="card" style="border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:18px;max-width:760px">
+          <p style="color:var(--gray);font-size:.85rem;margin:0 0 14px">Complete data (CRM + HR Portal + access settings) in a single JSON file. Please download this once a week and keep it safe on your computer.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary" onclick="BK.backup()">⬇️ Download Full Backup</button>
+          </div>
+        </div>
+      </div>
+      <!-- ══════ END RM DATA BACKUP PAGE ══════ -->
 
       <div class="page" id="page-reports">
         <div class="page-hdr"><div class="page-title">Reports</div></div>
