@@ -1095,13 +1095,27 @@ function parseWorkbookToAppData(wb){
     const amount = r[1];
     if(account && typeof account === 'string' && !LABEL_ROWS.includes(account.trim().toLowerCase()) && typeof amount === 'number'){
       const key = account.trim().toLowerCase();
+      // 24-Aug-2026: category now decided by ROW POSITION in the sheet first
+      // (Excel rows 2-7 = Investment, rows 10-26 = Cash & Bank — matches the
+      // two visual blocks in the "Assets" tab), falling back to the
+      // name-lookup table only for rows outside that range. Before this,
+      // category was ONLY name-based — any new/renamed account (like the
+      // just-added "OLD CASH") silently fell through to "other" and was
+      // missing from the Cash & Bank total until someone remembered to add
+      // its exact name to KNOWN_CATEGORY in the code. Row position is a much
+      // more durable signal since it matches how the sheet itself is laid
+      // out, and doesn't break just because an account gets renamed/added.
+      let category;
+      if(i>=1 && i<=6) category = 'investment';        // Excel rows 2-7
+      else if(i>=9 && i<=25) category = 'cashbank';     // Excel rows 10-26
+      else category = KNOWN_CATEGORY[key] || 'other';
       newEntries.push({
         id: genId(),
         account: account.trim(),
         amount: amount,
         date: excelDateToDateStr(r[2]),
         remark: (r[3] && typeof r[3]==='string') ? r[3].trim() : '',
-        category: KNOWN_CATEGORY[key] || 'other',
+        category: category,
       });
     }
 
