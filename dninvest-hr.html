@@ -457,6 +457,7 @@ input:focus, select:focus, textarea:focus{
         <div class="avatar" id="top-avatar"></div>
         <span id="top-name"></span>
       </div>
+      <button class="logout-btn" style="background:#64748b;margin-right:8px" onclick="clearHrCache()" title="Purana/stale data clear karke fresh reload kare">🧹 Clear Cache</button>
       <button class="logout-btn" onclick="doLogout()">Logout</button>
     </div>
   </div>
@@ -2166,6 +2167,17 @@ function stopHeartbeat(){
   _hbBlockedSession=false; // recomputed fresh on the next login
 }
 
+// Clear stale local data cache without logging out (24-Aug-2026, same fix
+// as the CRM's Clear Cache button) — wipes every 'dnihr_*' cached-data key
+// but keeps 'dnihr_user' (per-device login state) so this doesn't log the
+// person out, then reloads so listeners re-attach and refetch fresh data.
+function clearHrCache(){
+  if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith('dnihr_') && k!==KEY_USER) localStorage.removeItem(k);
+  });
+  location.reload();
+}
 async function doLogout(){
   // Save out_time on manual logout
   // Rule (Option A): manual logout par HAMESHA actual time save hota hai —

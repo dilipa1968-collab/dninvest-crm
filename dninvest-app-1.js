@@ -1568,15 +1568,23 @@ function openHrPortal(){
   window.open('dninvest-hr.html?autologin='+token+'&u='+encodeURIComponent(CU.username), '_blank');
 }
 
-// Opens the personal Asset & Net Worth Tracker in a new tab. This is a
-// standalone, localStorage-only tool (no Firebase/login), so — unlike HR —
-// there's no autologin token to generate; it just opens the file directly.
-function openAssetTracker(){
-  window.open('dninvest-assets.html', '_blank');
+
+
+// Clear stale local data cache without logging out (24-Aug-2026 — mobile
+// browser was showing old/stuck data; clearing the browser's cache fixed it,
+// which meant a stale localStorage cache — NOT a Firestore sync problem —
+// was the culprit. This button does the same fix as manually clearing the
+// browser cache, in one tap: wipes every 'dninvest_*' cached-data key
+// (client lists, snapshots, sort state, etc.) but deliberately KEEPS
+// 'dninvest_session' so the person doesn't get logged out for this, then
+// reloads so DB.syncFromFirebase() rebuilds every cache fresh from Firestore.
+function clearCrmCache(){
+  if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith('dninvest_') && k!=='dninvest_session') localStorage.removeItem(k);
+  });
+  location.reload();
 }
-
-
-
 function doLogout(){
   CU=null;
   localStorage.removeItem('dninvest_session');
@@ -2331,10 +2339,6 @@ function initApp(){
   // HR Portal shortcut button — visible only to admin (top-right corner)
   const hrBtn = document.getElementById('hrPortalTopBtn');
   if(hrBtn) hrBtn.style.display = '';
-
-  // Asset & Net Worth Tracker shortcut button — admin only
-  const assetBtn = document.getElementById('assetTrackerTopBtn');
-  if(assetBtn) assetBtn.style.display = (CU.role==='admin') ? '' : 'none';
 
   // Demat A/c Opening nav item — visible when user has Equity access
   const dematNav = document.getElementById('nav-eq-demat');
