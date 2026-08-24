@@ -952,9 +952,22 @@ const DB = {
     finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
   load(){
-    if(!this.get('users')) this.set('users', DEFAULT_USERS);
-    if(!this.get('call_logs')) this.set('call_logs', []);
-    if(!this.get('mf_business')) this.set('mf_business', []);
+    // 24-Aug-2026 — CRITICAL FIX: this used to call this.set(...), which
+    // writes BOTH locally AND straight to the shared Firestore document.
+    // If the local 'users' cache was ever empty at the moment this ran
+    // (e.g. right after Clear Cache, a fresh browser, or a transient
+    // Firestore sync failure — see the .catch() below) this SILENTLY
+    // OVERWROTE THE REAL SHARED 'users' DOCUMENT with the hardcoded
+    // 8-person DEFAULT_USERS list — deleting any user added since (a
+    // real "Shyam disappeared, everyone's status reset" incident,
+    // 24-Aug-2026) and reverting every status/password to the default.
+    // setLocal() only ever touches THIS browser's local cache, never
+    // Firestore, so a transient empty-cache moment can no longer corrupt
+    // the shared database — it just shows sensible in-memory defaults
+    // until the next successful sync brings in the real data.
+    if(!this.get('users')) this.setLocal('users', DEFAULT_USERS);
+    if(!this.get('call_logs')) this.setLocal('call_logs', []);
+    if(!this.get('mf_business')) this.setLocal('mf_business', []);
   },
   async syncFromFirebase(){
     if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
@@ -1583,23 +1596,23 @@ function openAssetTracker(){
 // was the culprit. This button does the same fix as manually clearing the
 // browser cache, in one tap: wipes every 'dninvest_*' cached-data key
 // (client lists, snapshots, sort state, etc.) but deliberately KEEPS
-// 'dninvest_session' AND 'dninvest_users' so the person doesn't get logged
-// out, then reloads so DB.syncFromFirebase() rebuilds every cache fresh
-// from Firestore.
-// 24-Aug-2026 fix: 'dninvest_users' was NOT excluded before, so a Clear
-// Cache reload wiped the cached user/password list too. tryAutoLogin() runs
-// synchronously on page load and validates the saved session against
-// DB.get('users') — with that cache empty, it fell back to DEFAULT_USERS,
-// whose hardcoded default passwords don't match whatever the real current
-// password/PIN actually is, so the session match failed and force-logged
-// the person out. Keeping 'dninvest_users' in place (small, low-risk to
-// keep one page-load stale — it re-syncs from Firestore moments later
-// anyway) fixes this without losing the point of Clear Cache.
+// 'dninvest_session' so the person doesn't get logged out, then reloads so
+// DB.syncFromFirebase() rebuilds every cache fresh from Firestore.
+// 24-Aug-2026: briefly also excluded 'dninvest_users' from the wipe to fix
+// a logout bug, but that reintroduced a worse problem — if THIS browser's
+// cached user list was stale (e.g. hadn't been open since before a new RM
+// was added or a status changed elsewhere), Clear Cache would preserve and
+// reload with that stale snapshot, and if anything then saved the in-memory
+// user list back to Firestore, it would overwrite everyone's real current
+// data with the old one (an RM appearing to "disappear", statuses
+// reverting — reported same day). Reverted: 'dninvest_users' is wiped again
+// like everything else. The actual logout bug is fixed properly below, in
+// tryAutoLogin(), by fetching the user list fresh from Firestore when the
+// local cache is empty instead of ever falling back to hardcoded defaults.
 function clearCrmCache(){
   if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
-  const KEEP = ['dninvest_session','dninvest_users'];
   Object.keys(localStorage).forEach(k=>{
-    if(k.startsWith('dninvest_') && !KEEP.includes(k)) localStorage.removeItem(k);
+    if(k.startsWith('dninvest_') && k!=='dninvest_session') localStorage.removeItem(k);
   });
   location.reload();
 }
