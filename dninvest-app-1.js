@@ -1596,23 +1596,29 @@ function openAssetTracker(){
 // was the culprit. This button does the same fix as manually clearing the
 // browser cache, in one tap: wipes every 'dninvest_*' cached-data key
 // (client lists, snapshots, sort state, etc.) but deliberately KEEPS
-// 'dninvest_session' so the person doesn't get logged out, then reloads so
-// DB.syncFromFirebase() rebuilds every cache fresh from Firestore.
-// 24-Aug-2026: briefly also excluded 'dninvest_users' from the wipe to fix
-// a logout bug, but that reintroduced a worse problem — if THIS browser's
-// cached user list was stale (e.g. hadn't been open since before a new RM
-// was added or a status changed elsewhere), Clear Cache would preserve and
-// reload with that stale snapshot, and if anything then saved the in-memory
-// user list back to Firestore, it would overwrite everyone's real current
-// data with the old one (an RM appearing to "disappear", statuses
-// reverting — reported same day). Reverted: 'dninvest_users' is wiped again
-// like everything else. The actual logout bug is fixed properly below, in
-// tryAutoLogin(), by fetching the user list fresh from Firestore when the
-// local cache is empty instead of ever falling back to hardcoded defaults.
+// 'dninvest_session' AND 'dninvest_users' so the person doesn't get logged
+// out, then reloads so DB.syncFromFirebase() rebuilds every cache fresh
+// from Firestore.
+// History on 'dninvest_users' specifically (24-Aug-2026, same day):
+//   1. First excluded it from the wipe, to fix RMs with a custom (non-
+//      default) password getting logged out — tryAutoLogin() validates the
+//      saved session against DB.get('users'), and an empty cache right
+//      after Clear Cache made that check fail.
+//   2. That got REVERTED because DB.load()'s fallback-seed logic at the
+//      time used DB.set() — which also writes to the SHARED Firestore doc —
+//      so an empty/stale 'users' cache at the wrong moment could silently
+//      overwrite everyone's real user list with hardcoded defaults (an RM
+//      "disappearing", statuses reverting).
+//   3. DB.load() is now fixed to use setLocal() (browser-local only, never
+//      touches Firestore — see DB.load() below), which removes that danger
+//      entirely. So excluding 'dninvest_users' here is safe again, and is
+//      back — it's what actually fixes the original logout-on-custom-
+//      password bug.
 function clearCrmCache(){
   if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  const KEEP = ['dninvest_session','dninvest_users'];
   Object.keys(localStorage).forEach(k=>{
-    if(k.startsWith('dninvest_') && k!=='dninvest_session') localStorage.removeItem(k);
+    if(k.startsWith('dninvest_') && !KEEP.includes(k)) localStorage.removeItem(k);
   });
   location.reload();
 }
@@ -1714,7 +1720,20 @@ async function tryAutoLogin(){
   if(saved){
     try{
       const {username, password, at} = JSON.parse(saved);
-      const users = DB.get('users') || DEFAULT_USERS;
+      // 24-Aug-2026: was `DB.get('users') || DEFAULT_USERS` — falling back
+      // straight to hardcoded defaults if the local cache is empty (e.g.
+      // right after Clear Cache, before it re-syncs) logged out anyone with
+      // a non-default password/PIN, since it could never match. Now: if the
+      // cache is empty, do one live Firestore read before giving up, so a
+      // momentarily-empty cache doesn't force a real login screen.
+      let users = DB.get('users');
+      if(!users && typeof fdb!=='undefined'){
+        try{
+          const doc = await fdb.collection('crm_data').doc('users').get();
+          if(doc.exists && doc.data() && Array.isArray(doc.data().data)) users = doc.data().data;
+        }catch(e){}
+      }
+      users = users || DEFAULT_USERS;
       const td = today();
       // Same credential + active rules as doLogin():
       // - RM can match via password OR 4-digit PIN (session stores whatever was typed)
