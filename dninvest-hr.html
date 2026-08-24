@@ -484,6 +484,7 @@ input:focus, select:focus, textarea:focus{
         <div style="text-align:right">
           <div class="time-big" id="dash-clock"></div>
           <p style="font-size:11px;opacity:0.8;margin-top:2px">Current time</p>
+          <button class="admin-only" style="display:none;margin-top:8px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer" onclick="forceRefreshDashboard(this)">🔄 Refresh</button>
         </div>
       </div>
 
@@ -1153,6 +1154,14 @@ const DB = {
           await new Promise(r=>setTimeout(r, BASE_DELAY * Math.pow(2, attempt-1)));
         } else {
           console.warn('setAttendanceRecord: all '+MAX_ATTEMPTS+' attempts failed for '+name+' on '+record.date);
+          // Was console-only before (24-Aug-2026 fix) — the employee's own
+          // screen still showed "Present" (local cache was updated
+          // optimistically above, before any Firestore attempt), so a
+          // silent server-side failure here meant the employee genuinely
+          // believed they'd checked in while Admin's dashboard — driven
+          // entirely by Firestore — never received it. This alert makes
+          // that failure visible where it can actually be acted on.
+          alert('⚠️ Aapka attendance server pe save nahi ho paaya (internet issue lagta hai). Aapki screen pe "Present" dikh raha hai lekin Admin tak abhi nahi pahuncha — internet check karke ek baar phir check-in/out try karein.');
         }
       }
     }
@@ -2685,6 +2694,31 @@ function startClock(){
   tick();setInterval(tick,1000);
 }
 
+// Force a one-time fresh read from Firestore, bypassing the wait for the
+// next onSnapshot delivery (24-Aug-2026 — Admin's dashboard was showing
+// stale "0 present / all absent" even though every RM had checked in
+// elsewhere; this button lets Admin manually confirm/pull the latest data
+// immediately instead of wondering whether the realtime listener is stuck).
+async function forceRefreshDashboard(btn){
+  if(typeof fdb==='undefined') return;
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.textContent='⏳ Refreshing…'; btn.disabled=true; }
+  try{
+    const keys=['attendance','holidays','salaries','perf_incentive','advances'];
+    await Promise.all(keys.map(async key=>{
+      const doc = await fdb.collection('hr_data').doc(key).get({source:'server'});
+      if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+        DB.setLocal(key, doc.data().data);
+      }
+    }));
+    renderDashboard(); renderAttendancePage(); renderLeavePage();
+    if(isAdmin){ renderAdvanceBox(); renderAdvanceHistory(); }
+  }catch(e){
+    console.log('forceRefreshDashboard error:', e);
+    alert('Refresh fail ho gaya — internet check karo aur dobara try karo.');
+  }
+  if(btn){ btn.textContent=orig; btn.disabled=false; }
+}
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
 function renderDashboard(){
   const att=getAtt(); const td=today();
