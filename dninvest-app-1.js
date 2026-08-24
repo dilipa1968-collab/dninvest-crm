@@ -4914,7 +4914,7 @@ async function confirmDeleteLead(id,name){
   // Admin can delete any lead. RM can delete ONLY their own (lead.rm === apna naam).
   const isOwnLead = lead && CU.role==='rm' && lead.rm===CU.name;
   if(CU.role!=='admin' && !isOwnLead){ toast('You can only delete your own leads','error'); return; }
-  if(!confirm(`Delete lead "${name}"? This cannot be undone.`)) return;
+  if(!(await dangerConfirm(`Delete lead "${name}"? This cannot be undone.`))) return;
   await DB.deleteClient('leads',id);
   toast('Lead deleted','success');
   renderLeadsTable();
@@ -5380,7 +5380,7 @@ async function saveSeminar(){
 
 async function confirmDeleteSeminar(id,name){
   if(CU.role!=='admin') return;
-  if(!confirm(`Delete seminar "${name}"? This cannot be undone.`)) return;
+  if(!(await dangerConfirm(`Delete seminar "${name}"? This cannot be undone.`))) return;
   await DB.deleteClient('seminars',id);
   toast('Seminar deleted','success');
   renderSeminarsTable();
@@ -6392,7 +6392,7 @@ function editClient(id, seg){
 
 async function confirmDeleteClient(id, seg, name){
   if(CU.role!=='admin') return;
-  if(!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  if(!(await dangerConfirm(`Delete "${name}"? This cannot be undone.`))) return;
   const key = seg==='equity'?'eq_clients':'mf_clients';
   await DB.deleteClient(key, id);
   closeModal('viewModal');
@@ -8329,7 +8329,7 @@ async function _deleteFundNameSuggestions(names){
   });
 }
 async function deleteFundNameSuggestion(name){
-  if(!confirm(`Delete "${name}" from fund-name suggestions? This won't change any past transaction that already used it.`)) return;
+  if(!(await dangerConfirm(`Delete "${name}" from fund-name suggestions? This won't change any past transaction that already used it.`))) return;
   await _deleteFundNameSuggestions([name]);
   toast(`Deleted "${name}" from suggestions`,'success');
   document.getElementById('fundDupOverlay')?.remove();
@@ -8338,7 +8338,7 @@ async function deleteFundNameSuggestion(name){
 async function deleteFundNameSuggestionsBulk(){
   const names = [...document.querySelectorAll('.funddel-chk:checked')].map(c=>c.value);
   if(!names.length){ toast('No fund names selected','error'); return; }
-  if(!confirm(`Delete ${names.length} fund name(s) from suggestions? This won't change any past transaction that already used them.`)) return;
+  if(!(await dangerConfirm(`Delete ${names.length} fund name(s) from suggestions? This won't change any past transaction that already used them.`))) return;
   await _deleteFundNameSuggestions(names);
   toast(`Deleted ${names.length} fund name(s) from suggestions`,'success');
   document.getElementById('fundDupOverlay')?.remove();
@@ -8394,7 +8394,7 @@ async function mergeFundDupsSelected(){
   }).filter(g=>g.canonical && g.variants.length);
 
   const totalVariants = selectedGroups.reduce((s,g)=>s+g.variants.length,0);
-  if(!confirm(`Confirm: ${selectedGroups.length} group(s), ${totalVariants} variant name(s) will be merged into their canonical spelling — including rewriting any past transactions that used them. Proceed?`)) return;
+  if(!(await dangerConfirm(`${selectedGroups.length} group(s), ${totalVariants} variant name(s) will be merged into their canonical spelling — permanently rewriting any past transactions that used them. Proceed?`))) return;
 
   // Build one lowercase-variant → canonical map across all selected groups.
   const rewriteMap = {};
@@ -11855,11 +11855,11 @@ function updateChDelBtn(){
   if(btn) btn.style.display = n>0 ? '' : 'none';
 }
 
-function deleteSelectedHistory(){
+async function deleteSelectedHistory(){
   if(!CU || CU.role!=='admin'){ toast('Admin only','error'); return; }
   const ids=Array.from(document.querySelectorAll('.ch-chk:checked')).map(c=>c.value);
   if(!ids.length){ toast('Select at least one record','error'); return; }
-  if(!confirm(ids.length+' history record(s) will be PERMANENTLY deleted from history.\n\nThis cannot be undone. Continue?')) return;
+  if(!(await dangerConfirm(ids.length+' history record(s) will be PERMANENTLY deleted from history. This cannot be undone. Continue?'))) return;
   const idSet=new Set(ids);
   saveCommHistory(getCommHistory().filter(h=>!idSet.has(h.id)));
   renderCommHistory();

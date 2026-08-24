@@ -665,7 +665,7 @@ const DUP = {
     if(!rec) return;
     const bad = this._wouldEmpty(seg, new Set([id]));
     if(bad.length){ toast('This is the last record in the group — cannot delete it','error'); return; }
-    if(!confirm(`Delete "${rec.name}"?\n\n${seg==='eq'?'Code':'PAN'}: ${seg==='eq'?rec.code:rec.pan}\nRM: ${rec.rm||'—'}\n\nThis is permanent.`)) return;
+    if(!(await dangerConfirm(`Delete "${rec.name}"? ${seg==='eq'?'Code':'PAN'}: ${seg==='eq'?rec.code:rec.pan} — RM: ${rec.rm||'—'}. This is permanent.`))) return;
     await DB.deleteClient(key, id);
     DB.addActivityLog({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf', client_id:id,
       client_name:rec.name, rm:rec.rm, by:CU.name, date:new Date().toISOString(),
@@ -685,7 +685,7 @@ const DUP = {
     }
     const list = DB.get(key)||[];
     const recs = list.filter(c=>ids.has(c.id));
-    if(!confirm(`${recs.length} records will be DELETED?\n\nThis is permanent and cannot be undone.\nHave you taken a backup?`)) return;
+    if(!(await dangerConfirm(`${recs.length} records will be permanently deleted. Have you taken a backup?`))) return;
     await DB.deleteClientsBulk(key, [...ids]);
     DB.addActivityLog(recs.map(r=>({ id:uid(), type:'delete', seg:seg==='eq'?'equity':'mf',
       client_id:r.id, client_name:r.name, rm:r.rm, by:CU.name, date:new Date().toISOString(),
@@ -2297,7 +2297,7 @@ function viewOpEntry(id){
 
 // ── Delete ──
 async function deleteOpEntry(id){
-  if(!confirm('Delete this entry?')) return;
+  if(!(await dangerConfirm('Delete this entry? This cannot be undone.'))) return;
   await deleteOpFromFirestore(id);
   toast('Deleted','success');
   renderOpTable();
