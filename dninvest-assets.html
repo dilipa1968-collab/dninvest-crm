@@ -315,6 +315,7 @@
   <div style="margin-top:14px;" id="uploadBlock">
     <input type="file" id="excelUpload" accept=".xlsx,.xls" style="display:none;">
     <button class="btn-ghost" id="excelUploadBtn" style="padding:9px 18px;background:var(--teal);color:#fff;border-color:var(--teal);">📤 Upload Latest Data From Excel</button>
+    <button class="btn-ghost" onclick="clearAssetsCache()" style="padding:9px 18px;background:#64748b;color:#fff;border-color:#64748b;margin-left:8px" title="Purana/stale data clear karke cloud se fresh reload kare">🧹 Clear Cache</button>
     <div class="header-desc" style="font-size:11px;color:#c3cad9;margin-top:6px;">Reads straight from your sheet's "Assets" tab — Account/Amount/Date, Investment and Net Worth data all picked up automatically.</div>
   </div>
 </header>
@@ -597,6 +598,16 @@ function pushToCloud(){
     entries, months,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   }).catch(function(err){ console.warn('Cloud sync write failed:', err); suppressNextSnapshot = false; });
+}
+// Clear stale local data cache (24-Aug-2026, same "Clear Cache" fix as the
+// CRM and HR portal) — wipes the two localStorage keys this app uses, then
+// reloads so it fetches fresh straight from the Firestore cloud doc via
+// initCloudSync() instead of showing whatever was last cached on this device.
+function clearAssetsCache(){
+  if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  localStorage.removeItem(LEDGER_KEY);
+  localStorage.removeItem(MONTH_KEY);
+  location.reload();
 }
 
 let assetFilter = 'all';
