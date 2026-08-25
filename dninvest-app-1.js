@@ -15103,10 +15103,43 @@ setTimeout(sortAllVisibleTables, 1000);
 // ══════════════════════════════════════════
 // COLUMN RESIZE (drag column borders to resize)
 // ══════════════════════════════════════════
+// 25-Aug-2026: widths are now persisted per-table (keyed by the nearest
+// ancestor id, e.g. "mftxn-table") in localStorage, and reapplied every time
+// the table re-renders. Before this, dragging a column wider/narrower only
+// lasted until the next render (any filter/sort/search on MF Transactions
+// rebuilds the whole <table> from scratch) — the layout kept snapping back
+// to default, so the same manual adjustment had to be redone constantly.
+function _colResizeTableId(table){
+  const host = table.closest('[id]');
+  return host ? host.id : null;
+}
+function _loadColWidths(tid){
+  if(!tid) return null;
+  try{ return JSON.parse(localStorage.getItem('dninvest_colw2_'+tid)||'null'); }catch(e){ return null; }
+}
+function _saveColWidths(tid, table){
+  if(!tid) return;
+  const widths = {};
+  table.querySelectorAll('thead th').forEach((th,i)=>{
+    if(th.style.width) widths[i] = th.style.width;
+  });
+  try{ localStorage.setItem('dninvest_colw2_'+tid, JSON.stringify(widths)); }catch(e){}
+}
 function enableColumnResize(table){
   if(table.dataset.resizableInit) return;
   table.dataset.resizableInit='1';
+  const tid = _colResizeTableId(table);
   const ths = table.querySelectorAll('thead th');
+
+  // Reapply any previously-saved widths for this table right away, before
+  // wiring up the drag handles, so a re-render looks exactly like it did
+  // when the person last left it.
+  const saved = _loadColWidths(tid);
+  if(saved && Object.keys(saved).length){
+    table.style.tableLayout='fixed';
+    ths.forEach((th,i)=>{ if(saved[i]) th.style.width=saved[i]; });
+  }
+
   ths.forEach(th=>{
     if(th.querySelector('.col-resize-handle')) return;
     th.style.position = th.style.position || 'sticky';
@@ -15136,6 +15169,7 @@ function enableColumnResize(table){
         handle.classList.remove('active');
         document.removeEventListener('mousemove',onMove);
         document.removeEventListener('mouseup',onUp);
+        _saveColWidths(tid, table);
       }
       document.addEventListener('mousemove',onMove);
       document.addEventListener('mouseup',onUp);
@@ -15155,6 +15189,7 @@ function enableColumnResize(table){
         handle.classList.remove('active');
         document.removeEventListener('touchmove',onMove);
         document.removeEventListener('touchend',onEnd);
+        _saveColWidths(tid, table);
       }
       document.addEventListener('touchmove',onMove,{passive:true});
       document.addEventListener('touchend',onEnd);
