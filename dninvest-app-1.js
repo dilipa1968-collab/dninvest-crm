@@ -2789,28 +2789,37 @@ function hardRefresh(){
 }
 
 // ── Birthday "Wish All" stepper: opens each client's WhatsApp chat one-by-one ──
-let _bdayQueue=[], _bdayStep=0, _bdayCards=[], _bdayMeta=[];
+let _bdayQueue=[], _bdayStep=0;
 
 // ── 🎂 Birthday wish SENT stamp ──
 // Jab RM Wish/Card bhejta hai, client record pe {y, by, at, via} stamp lag jaata
 // hai. Ye Firestore me sync hota hai → Admin ke dashboard pe turant "✅ Sent by
 // RIYA" dikh jaata hai. Har saal ka alag (y = year), to agle saal reset.
-async function markBdayWished(idx, via){
-  const m = _bdayMeta[idx];
-  if(!m || !m.id) return;
-  const list = DB.get(m.key)||[];
-  const ex = list.find(c=>c.id===m.id);
+async function markBdayWished(clientId, clientKey, via){
+  // 24-Aug-2026 fix: was markBdayWished(idx, via), looking the client up via
+  // a shared _bdayMeta[idx] array that gets WIPED AND REBUILT on every
+  // refreshDash() call (see "_bdayMeta=[]" a few lines below in the render
+  // loop). Any background re-render between the dashboard drawing the
+  // button and the person actually clicking it — another RM editing a
+  // client, a realtime sync, anything — silently invalidated that idx, so
+  // the click looked like it did nothing (real symptom: "0/13 sent" even
+  // after clicking every Wish button). Now takes the client's actual id +
+  // key directly, which never goes stale no matter how many times the
+  // dashboard re-renders in between.
+  if(!clientId || !clientKey) return;
+  const list = DB.get(clientKey)||[];
+  const ex = list.find(c=>c.id===clientId);
   if(!ex) return;
   const yr = parseInt(today().slice(0,4),10);
   const already = ex.bday_wish && ex.bday_wish.y===yr;
   const stamp = {y:yr, by:CU.name, at:new Date().toISOString(), via:via||'wish'};
   ex.bday_wish = stamp;
   ex.updated = today();
-  try{ await DB.setClient(m.key, ex); }catch(e){ console.log('bday stamp sync error',e); }
+  try{ await DB.setClient(clientKey, ex); }catch(e){ console.log('bday stamp sync error',e); }
   if(!already){
     try{
       await DB.addActivityLog([{
-        id: uid(), type:'birthday_wish', seg: m.key==='eq_clients'?'equity':'mf',
+        id: uid(), type:'birthday_wish', seg: clientKey==='eq_clients'?'equity':'mf',
         client_id: ex.id, client_name: ex.name, rm: ex.rm||'',
         by: CU.name, date: stamp.at,
         changes: [{field:'Birthday Wish', old:'—', new:(via==='card'?'Card bheja':'WhatsApp wish bheja')}]
@@ -2826,7 +2835,7 @@ function wishAllBirthdays(){
   if(_bdayStep>=_bdayQueue.length) _bdayStep=0;   // allow restart
   const c=_bdayQueue[_bdayStep];
   window.open(c.url,'_blank','noopener');
-  if(c.idx!==undefined) markBdayWished(c.idx,'wish');
+  if(c.id && c.key) markBdayWished(c.id,c.key,'wish');
   _bdayStep++;
   if(btn){
     if(_bdayStep>=_bdayQueue.length){
@@ -2855,14 +2864,29 @@ function _getDnEmblemImg(cb){
   img.onerror = ()=>{ cb(null); };   // draw the card without the emblem rather than not at all
   img.src = 'data:image/png;base64,'+_DN_EMBLEM_B64;
 }
-function birthdayCardImage(idx){
-  const rec=_bdayCards[idx]||{};
-  const name=(rec.name||'Friend').trim();
-  const num=rec.num||'';
+function birthdayCardImage(clientId, clientKey){
+  // 24-Aug-2026 fix: previously took an `idx` and read _bdayCards[idx] — same
+  // staleness risk as markBdayWished (see its comment above), PLUS a second,
+  // separate bug: the onclick handlers inside _drawBirthdayCard's modal
+  // (Send/Share/Download) referenced `idx` directly, but _drawBirthdayCard
+  // never received idx as a parameter — every click threw a silent
+  // ReferenceError, so the Card flow never actually marked anyone as sent,
+  // ever, since this card design shipped. Now looks the client up fresh by
+  // id, and passes id+key all the way through so the modal's buttons call
+  // markBdayWished with real, always-valid identifiers.
+  const list = DB.get(clientKey)||[];
+  const rec = list.find(c=>c.id===clientId);
+  const name=(rec?.name||'Friend').trim();
+  let num='';
+  if(rec){
+    let d=String(rec.mobile||'').replace(/\D/g,'');
+    if(d.length===10) d='91'+d;
+    if(d.length>=12) num=d;
+  }
   const first=name.split(' ')[0]||name;
-  _getDnEmblemImg(function(emblemImg){ _drawBirthdayCard(emblemImg, name, num, first); });
+  _getDnEmblemImg(function(emblemImg){ _drawBirthdayCard(emblemImg, name, num, first, clientId, clientKey); });
 }
-function _drawBirthdayCard(emblemImg, name, num, first){
+function _drawBirthdayCard(emblemImg, name, num, first, clientId, clientKey){
   const W=1080,H=1080;
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d');
   const GOLD='#c9942a', GOLD_L='#f5d98a', GOLD_PALE='#fdf6e3', CREAM='#f3e9d2', INK='#c9c2b0';
@@ -2993,9 +3017,9 @@ function _drawBirthdayCard(emblemImg, name, num, first){
     const hint=ov.querySelector('#_bcHint');
     function close(){ URL.revokeObjectURL(url); ov.remove(); }
     ov.querySelector('#_bcCl').onclick=close;
-    ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); markBdayWished(idx,'card'); };
+    ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); markBdayWished(clientId,clientKey,'card'); };
     const shr=ov.querySelector('#_bcShare');
-    if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); markBdayWished(idx,'card'); }catch(e){} };
+    if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); markBdayWished(clientId,clientKey,'card'); }catch(e){} };
     const send=ov.querySelector('#_bcSend');
     if(send) send.onclick=function(){
       // ── MOBILE: clipboard-paste WhatsApp par kaam nahi karta. Native share
@@ -3003,7 +3027,7 @@ function _drawBirthdayCard(emblemImg, name, num, first){
       if(isMobileDevice() && canShare){
         navigator.share({files:[file], title:'Happy Birthday',
           text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'})
-          .then(function(){ markBdayWished(idx,'card');
+          .then(function(){ markBdayWished(clientId,clientKey,'card');
             hint.innerHTML='✅ Share sheet me WhatsApp chunkar '+first+' ko bhej do. 🎉'; })
           .catch(function(){});
         return;
@@ -3014,7 +3038,7 @@ function _drawBirthdayCard(emblemImg, name, num, first){
       let writeP=null;
       try{ writeP=navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); }catch(e){ writeP=Promise.reject(e); }
       const win=window.open('https://wa.me/'+num,'_blank','noopener');
-      markBdayWished(idx,'card');
+      markBdayWished(clientId,clientKey,'card');
       hint.innerHTML='⏳ Copying image...';
       writeP.then(function(){
         hint.innerHTML = win
@@ -3475,10 +3499,10 @@ function refreshDash(){
       bHead.style.display=bdays.length>0?'':'none';
       bHead.style.background=(bdays.length && _nSent===bdays.length)?'#16a34a':'#e11d8f';
     }
-    _bdayQueue=[]; _bdayStep=0; _bdayCards=[]; _bdayMeta=[];   // reset stepper on each dashboard refresh
+    _bdayQueue=[]; _bdayStep=0;   // reset stepper on each dashboard refresh (id-based now, see markBdayWished comment)
     bdayEl.innerHTML = bdays.length
       ? (()=>{
-        const rows = bdays.map((c,idx)=>{
+        const rows = bdays.map((c)=>{
           const nm=c.name||'—';
           let d=String(c.mobile||'').replace(/\D/g,'');
           if(d.length===10) d='91'+d;                       // add country code for wa.me
@@ -3487,9 +3511,7 @@ function refreshDash(){
           const msg=`Dear ${nm.split(' ')[0]||nm}, Wishing you a very Happy Birthday! 🎉🎂 May the year ahead bring you great health, happiness and prosperity. Warm regards, D N Investment.`;
           const url=`https://wa.me/${d}?text=${encodeURIComponent(msg)}`;
           const sent = c.bw && c.bw.y===curYear ? c.bw : null;
-          if(d.length>=12 && !sent) _bdayQueue.push({name:nm, url, idx});   // Wish-All: only the pending ones
-          _bdayCards[idx]={name:nm, num:(d.length>=12?d:'')};   // name + wa number for card
-          _bdayMeta[idx]={id:c.id, key:c.key, name:nm};         // for the sent-stamp
+          if(d.length>=12 && !sent) _bdayQueue.push({name:nm, url, id:c.id, key:c.key});   // Wish-All: only the pending ones
           // ✅ Sent stamp — Admin ko dikhta hai ki kisne aur kab bheja
           let sentTag='';
           if(sent){
@@ -3500,9 +3522,9 @@ function refreshDash(){
               ✅ Sent${sent.by?' · '+escapeHtml(sent.by):''}${tm?' · '+tm:''}</span>`;
           }
           const waBtn = d.length>=12
-            ? `<a href="${url}" target="_blank" rel="noopener" onclick="markBdayWished(${idx},'wish')" style="margin-left:auto;background:${sent?'#9ca3af':'#25D366'};color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 ${sent?'Re-send':'Wish'}</a>`
+            ? `<a href="${url}" target="_blank" rel="noopener" onclick="markBdayWished('${escapeHtml(c.id)}','${c.key}','wish')" style="margin-left:auto;background:${sent?'#9ca3af':'#25D366'};color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:8px;text-decoration:none;flex-shrink:0">💬 ${sent?'Re-send':'Wish'}</a>`
             : `<span style="margin-left:auto;font-size:.68rem;color:var(--gray);flex-shrink:0">No number</span>`;
-          const cardBtn=`<button onclick="birthdayCardImage(${idx})" title="Make colourful card image for client" style="margin-left:6px;background:${sent?'#9ca3af':'#e11d8f'};color:#fff;border:none;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:8px;cursor:pointer;flex-shrink:0">🎨 Card</button>`;
+          const cardBtn=`<button onclick="birthdayCardImage('${escapeHtml(c.id)}','${c.key}')" title="Make colourful card image for client" style="margin-left:6px;background:${sent?'#9ca3af':'#e11d8f'};color:#fff;border:none;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:8px;cursor:pointer;flex-shrink:0">🎨 Card</button>`;
           return `<div class="bar-row bday-row" style="border-left:3px solid ${sent?'#16a34a':'#e11d8f'};padding-left:9px;${sent?'background:#f6fef9;':''}">
             <div class="bday-main">
               <span class="bar-name">${escapeHtml(nm)}${turns}</span>
