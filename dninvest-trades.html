@@ -438,7 +438,14 @@ async function handleFiles(fileList){
           const existing = byId.get(r.id);
           if(existing){
             let updated = false;
+            // 'channel' is force-overwritten (not just filled when blank) —
+            // the CHANNEL USER-vs-CHANNEL CODE preference logic changed
+            // after some trades were already saved with the older, less
+            // specific value, so those need a real overwrite here, not just
+            // "fill in if currently empty".
+            if(r.channel && existing.channel !== r.channel){ existing.channel = r.channel; updated = true; }
             Object.keys(r).forEach(k=>{
+              if(k==='channel') return;   // handled above
               if(!existing[k] && r[k]){ existing[k] = r[k]; updated = true; }
             });
             if(updated) totalEnriched++; else totalSkippedDup++;
