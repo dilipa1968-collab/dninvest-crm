@@ -9034,7 +9034,7 @@ function renderMfTxnTable(){
   // Column AutoFilter
   entries = CF.applyMftxn(entries);
   const cnt=document.getElementById('mftxn-count');
-  if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('mf',entries))+'</b>';
+  if(cnt) cnt.innerHTML=entries.length+' entries · <b>Total ₹'+brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))+'</b> · <b>Incentive '+INC.fmt(INC.total('mf',entries))+'</b>';
 
   if(entries.length===0){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">No transactions found</div>';
