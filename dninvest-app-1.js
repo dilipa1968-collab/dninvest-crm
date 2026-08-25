@@ -9010,6 +9010,9 @@ const MFTXN_TYPE_COLOR = {
   Lumpsum:'#1D9E75', SIP:'#185FA5', 'SIP Stop':'#C0392B', Switch:'#B7950B',
   STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
 };
+const MFTXN_SOURCE_COLOR = {
+  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#B7950B', NSE:'#0891B2', Physical:'#5D6E8A'
+};
 
 function renderMfTxnTable(){
   const wrap=document.getElementById('mftxn-table');
@@ -9053,7 +9056,7 @@ function renderMfTxnTable(){
           ${INC.cell('mf',e)}
           <td style="width:95px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
-          <td style="width:60px;font-size:.65rem;white-space:nowrap">${e.source?escapeHtml(e.source):'<span style="color:var(--gray)">—</span>'}</td>
+          <td style="width:60px;font-size:.65rem;white-space:nowrap">${e.source?`<span class="badge" style="background:${(MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A')}22;color:${MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A'};font-size:.61rem;padding:1px 5px">${escapeHtml(e.source)}</span>`:'<span style="color:var(--gray)">—</span>'}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
@@ -9102,12 +9105,13 @@ function exportMfTxns(){
     {header:'Amount', width:14, money:true},
     {header:'Incentive', width:14, money:true},
     {header:'Status', width:12, color:dnStatusColor, align:'center'},
-    {header:'Cross-Check Remark', width:22}
+    {header:'Cross-Check Remark', width:22},
+    {header:'Source', width:12}
   ];
-  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.target_scheme||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.status||'Pending',e.cross_remark||'']);
+  const rows=entries.map(e=>[e.date||'',e.client_name||'',e.rm||'',e.type||'',e.fund_name||'',e.target_scheme||'',e.amount||0,(INC.isApproved(e)?Math.round(INC.mf(e).amt):0),e.status||'Pending',e.cross_remark||'',e.source||'']);
   const totAmt=entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
   const totInc=Math.round(INC.total('mf',entries));
-  const totalRow=['TOTAL','','','','','',totAmt,totInc,'', ''];
+  const totalRow=['TOTAL','','','','','',totAmt,totInc,'', '', ''];
   dnXlsx('MF_Transactions_'+today()+'.xlsx', 'MF Transactions — '+today(), cols, rows, totalRow);
   toast(onlySel?`Exported ${entries.length} selected`:'Export done!','success');
 }
