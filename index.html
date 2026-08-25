@@ -298,6 +298,20 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .page{display:none;}
 .page.active{display:block;}
 
+/* ── MF TRANSACTIONS: fixed frame, table scrolls internally (25-Aug-2026) ──
+   Every other page still scrolls normally with the whole document (topbar/
+   sidebar just stay visually in place via position:sticky, but the browser
+   itself is still scrolling top-to-bottom). This page's own header/New-
+   Transaction/filters are pinned in a fixed-height column instead, so only
+   the row list scrolls, inside its own small scrollbar — no whole-page
+   scrolling needed to reach the bottom rows or the Total row. */
+#page-mf-txns.active{display:flex;flex-direction:column;height:calc(100vh - 78px);}
+#page-mf-txns > .page-hdr,
+#page-mf-txns > #mftxn-newform-card,
+#page-mf-txns > .filters{flex:0 0 auto;}
+#page-mf-txns > #mftxn-tablewrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+#page-mf-txns > #mftxn-tablewrap .tbl-scroll{flex:1 1 auto;max-height:none;}
+
 /* ── PAGE HEADER ── */
 .page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
 .page-title{font-size:1.15rem;font-weight:800;color:var(--navy);letter-spacing:-.1px;}
@@ -1792,7 +1806,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <button type="button" onclick="clearMfTxnFilters()" title="Clear all filters" style="margin-left:auto;padding:5px 8px;font-size:.72rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--gray);cursor:pointer;white-space:nowrap">🔄 Clear</button>
           <span class="res-count" id="mftxn-count" style="white-space:nowrap;font-size:.68rem"></span>
         </div>
-        <div class="tbl-wrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
+        <div class="tbl-wrap" id="mftxn-tablewrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
       </div>
 
       <!-- ── MF PROSPECTS (Equity clients not yet an MF investor) ── -->
