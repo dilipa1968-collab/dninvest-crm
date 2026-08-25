@@ -124,7 +124,17 @@
         <option value="Rejected">Rejected</option>
         <option value="Expired">Expired</option>
       </select>
-      <select id="fChannel" onchange="renderTable()"><option value="">All Channels</option></select>
+      <div id="channelFilterWrap" style="position:relative">
+        <button type="button" class="btn btn-outline" id="channelFilterBtn" onclick="toggleChannelDropdown()" style="padding:6px 10px;font-size:.8rem;background:var(--bg);border:1px solid var(--border);color:var(--navy);font-weight:400">All Channels ▾</button>
+        <div id="channelFilterPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(10,20,50,.15);width:230px;z-index:50;padding:8px">
+          <input type="text" id="channelFilterSearch" placeholder="🔍 Search channel..." oninput="renderChannelCheckboxes()" style="width:100%;padding:5px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;margin-bottom:6px">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <button type="button" class="btn btn-outline" style="flex:1;padding:4px;font-size:.7rem" onclick="selectAllChannels()">Select All</button>
+            <button type="button" class="btn btn-outline" style="flex:1;padding:4px;font-size:.7rem" onclick="clearChannelSelection()">Clear</button>
+          </div>
+          <div id="channelCheckboxList" style="max-height:220px;overflow-y:auto"></div>
+        </div>
+      </div>
       <select id="fMonth" onchange="onMonthChange()"></select>
       <input type="date" id="fFrom" onchange="renderTable()">
       <input type="date" id="fTo" onchange="renderTable()">
@@ -567,22 +577,84 @@ function populateRmFilter(){
   sel.value = (rms.includes(cur) || cur==='__unknown__') ? cur : '';
 }
 
+// ── Multi-select Channel filter (25-Aug-2026) ──
+// The channel list can be quite long (one entry per broker login/RM-user
+// code), so this is a checkbox dropdown with its own search box rather than
+// a plain <select> — lets you tick several channels at once.
+let allChannels = [];              // every channel value seen in the current month
+let selectedChannels = new Set();  // empty set = "All Channels" (no filter applied)
+
 function populateChannelFilter(){
   const data = monthCache[currentMonth] || {equity:[], fo:[]};
   const all = [...data.equity, ...data.fo];
-  const channels = [...new Set(all.map(r=>r.channel).filter(Boolean))].sort();
-  const sel = document.getElementById('fChannel');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All Channels</option>' + channels.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  sel.value = channels.includes(cur) ? cur : '';
+  allChannels = [...new Set(all.map(r=>r.channel).filter(Boolean))].sort();
+  // Drop any previously-selected channel that no longer exists in this month's data
+  selectedChannels = new Set([...selectedChannels].filter(c=>allChannels.includes(c)));
+  renderChannelCheckboxes();
+  updateChannelFilterButtonLabel();
 }
+
+function renderChannelCheckboxes(){
+  const q = (document.getElementById('channelFilterSearch')?.value||'').trim().toLowerCase();
+  const list = document.getElementById('channelCheckboxList');
+  const shown = q ? allChannels.filter(c=>c.toLowerCase().includes(q)) : allChannels;
+  if(!shown.length){
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gray);font-size:.78rem">No channels match</div>';
+    return;
+  }
+  list.innerHTML = shown.map(c=>`
+    <label style="display:flex;align-items:center;gap:7px;padding:4px 4px;font-size:.8rem;cursor:pointer;border-radius:5px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <input type="checkbox" ${selectedChannels.has(c)?'checked':''} onchange="toggleChannel('${esc(c).replace(/'/g,"\\'")}', this.checked)">
+      <span>${esc(c)}</span>
+    </label>`).join('');
+}
+
+function toggleChannel(c, checked){
+  if(checked) selectedChannels.add(c); else selectedChannels.delete(c);
+  updateChannelFilterButtonLabel();
+  renderTable();
+}
+
+function selectAllChannels(){
+  const q = (document.getElementById('channelFilterSearch')?.value||'').trim().toLowerCase();
+  const shown = q ? allChannels.filter(c=>c.toLowerCase().includes(q)) : allChannels;
+  shown.forEach(c=>selectedChannels.add(c));
+  renderChannelCheckboxes();
+  updateChannelFilterButtonLabel();
+  renderTable();
+}
+
+function clearChannelSelection(){
+  selectedChannels.clear();
+  renderChannelCheckboxes();
+  updateChannelFilterButtonLabel();
+  renderTable();
+}
+
+function updateChannelFilterButtonLabel(){
+  const btn = document.getElementById('channelFilterBtn');
+  if(!btn) return;
+  btn.textContent = selectedChannels.size===0 ? 'All Channels ▾' : `${selectedChannels.size} Channel${selectedChannels.size>1?'s':''} ▾`;
+}
+
+function toggleChannelDropdown(){
+  const panel = document.getElementById('channelFilterPanel');
+  panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+  if(panel.style.display==='block') document.getElementById('channelFilterSearch').focus();
+}
+document.addEventListener('click', function(ev){
+  const wrap = document.getElementById('channelFilterWrap');
+  if(wrap && !wrap.contains(ev.target)) document.getElementById('channelFilterPanel').style.display='none';
+});
 
 function clearFilters(){
   document.getElementById('fSearch').value='';
   document.getElementById('fRm').value='';
   document.getElementById('fSeg').value='';
   document.getElementById('fStatus').value='';
-  document.getElementById('fChannel').value='';
+  selectedChannels.clear();
+  renderChannelCheckboxes();
+  updateChannelFilterButtonLabel();
   document.getElementById('fFrom').value='';
   document.getElementById('fTo').value='';
   renderTable();
@@ -617,7 +689,6 @@ function renderTable(){
   const rm = document.getElementById('fRm').value;
   const seg = document.getElementById('fSeg').value;
   const statusF = document.getElementById('fStatus').value;
-  const channelF = document.getElementById('fChannel').value;
   const from = document.getElementById('fFrom').value;
   const to = document.getElementById('fTo').value;
 
@@ -626,7 +697,7 @@ function renderTable(){
   else if(rm) rows = rows.filter(r=>r.rm===rm);
   if(seg) rows = rows.filter(r=>r.seg===seg);
   if(statusF) rows = rows.filter(r=>r.status===statusF);
-  if(channelF) rows = rows.filter(r=>r.channel===channelF);
+  if(selectedChannels.size) rows = rows.filter(r=>selectedChannels.has(r.channel));
   if(from) rows = rows.filter(r=>r.date>=from);
   if(to) rows = rows.filter(r=>r.date<=to);
 
