@@ -9049,12 +9049,6 @@ function renderMfTxnTable(){
   wrap.innerHTML=`<table>
     <thead>
     <tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('start_date','SIP Start')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}${sTh('source','Source','source')}<th></th></tr>
-    <tr class="mftxn-total-row" style="font-weight:700;background:var(--bg,#f6f7fb);border-bottom:2px solid var(--border,#ddd)">
-      <th colspan="${CU.role==='admin'?7:6}" style="text-align:right;font-weight:700">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</th>
-      <th style="text-align:right;font-weight:700">₹${brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))}</th>
-      <th style="text-align:right;font-weight:700">${INC.fmt(INC.total('mf',entries))}</th>
-      <th colspan="4"></th>
-    </tr>
     </thead>
     <tbody>
       ${entries.map(e=>{
@@ -9087,22 +9081,13 @@ function renderMfTxnTable(){
         </tr>`;
       }).join('')}
     </tbody>
+    <tfoot><tr style="font-weight:700;background:var(--bg,#f6f7fb);border-top:2px solid var(--border,#ddd)">
+      <td colspan="${CU.role==='admin'?7:6}" style="text-align:right">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</td>
+      <td style="text-align:right">₹${brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))}</td>
+      <td style="text-align:right">${INC.fmt(INC.total('mf',entries))}</td>
+      <td colspan="4"></td>
+    </tr></tfoot>
   </table>`;
-  // Total row (see thead above) needs to sit sticky right below the header
-  // row — its own "top" offset has to equal the header row's actual
-  // rendered height, which varies with zoom level (the app has a 90%/etc
-  // zoom control) and font settings, so it's measured here rather than
-  // hardcoded.
-  (function(){
-    const table = wrap.querySelector('table');
-    const headRow = table && table.querySelector('thead tr:first-child');
-    const totalRow = table && table.querySelector('.mftxn-total-row');
-    if(headRow && totalRow){
-      const h = headRow.offsetHeight;
-      Array.from(headRow.children).forEach(c=>{ c.style.position='sticky'; c.style.top='0'; c.style.zIndex=3; });
-      Array.from(totalRow.children).forEach(c=>{ c.style.position='sticky'; c.style.top=h+'px'; c.style.zIndex=2; });
-    }
-  })();
   MFTBULK.afterRender();
 }
 
