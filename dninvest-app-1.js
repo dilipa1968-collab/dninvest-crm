@@ -2449,15 +2449,12 @@ function initApp(){
   const assetBtn = document.getElementById('assetTrackerTopBtn');
   if(assetBtn) assetBtn.style.display = (CU.role==='admin') ? '' : 'none';
 
-  // Mobile sidebar equivalents of the topbar buttons above (25-Aug-2026) —
-  // same role rules, just mirrored onto the sidebar nav items so mobile has
-  // a usable, full-width way to reach these instead of tiny topbar icons.
-  document.getElementById('nav-change-cred')?.classList.add('role-ok');           // everyone
-  document.getElementById('nav-hr-portal')?.classList.add('role-ok');             // everyone (matches hrBtn above)
-  document.getElementById('nav-asset-tracker')?.classList.toggle('role-ok', CU.role==='admin');
-  // nav-trades-app already has role-ok in the HTML — Trades has no role restriction (matches tradesAppTopBtn)
+  // Mobile action row (25-Aug-2026) — same button set as the topbar above,
+  // laid out as its own icon-grid row under the header on narrow screens.
+  // Assets stays admin-only there too, matching assetTrackerTopBtn.
+  const mAssetBtn = document.getElementById('mAssetTrackerBtn');
+  if(mAssetBtn) mAssetBtn.style.display = (CU.role==='admin') ? '' : 'none';
 
-  // Demat A/c Opening nav item — visible when user has Equity access
   const dematNav = document.getElementById('nav-eq-demat');
   if(dematNav) dematNav.style.display = hasEq ? 'flex' : 'none';
 

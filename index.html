@@ -285,7 +285,6 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .nav-item:hover{background:var(--bg);color:var(--navy);}
 .nav-item.active{background:linear-gradient(90deg,#e8edf8 0%,#f5f7fc 100%);color:var(--navy);font-weight:700;border-left-color:var(--navy);border-left-width:4px;}
 .nav-item .icon{font-size:.88rem;width:18px;text-align:center;}
-.mobile-only-nav{display:none;}   /* desktop-hidden by default — desktop uses the topbar buttons instead; shown on mobile via the media query below, once JS marks it role-ok */
 .nav-badge{margin-left:auto;background:var(--blue2);color:var(--navy);font-size:.68rem;
   padding:2px 7px;border-radius:10px;font-weight:700;}
 .nav-badge.red{background:var(--red2);color:var(--red);}
@@ -732,21 +731,25 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .user-pill{display:none;}
   /* 25-Aug-2026: the topbar was carrying 6 buttons (key, HR, Assets, Trades,
      Clear Cache, Logout) squeezed into a narrow strip on mobile — hard to
-     tap accurately, and the "key" (Change PIN) icon in particular got lost
-     in the crowd. On mobile these all move into the sidebar instead (full-
-     width rows, real labels, much easier to hit) — see .mobile-only-nav
-     below — and the topbar keeps only Logout, which people expect to find
-     in the header. Desktop is untouched; it still shows the full button row. */
+     tap accurately. They now live in their own dedicated row right under
+     the topbar (#mobileActionRow, styled below) instead — a proper icon
+     grid with real tap targets, not crammed sideways into the header. The
+     topbar itself keeps only Logout, which people expect to find there.
+     Desktop is untouched — it still shows the full button row in the topbar
+     and never sees #mobileActionRow at all. */
   #changeCredBtn, #hrPortalTopBtn, #assetTrackerTopBtn, #tradesAppTopBtn, #topbarClearCacheBtn{display:none!important;}
   .topbar-right{gap:4px;flex-wrap:nowrap;overflow-x:visible;max-width:none;}
   .btn-sm{font-size:.78rem;padding:6px 12px;flex:0 0 auto;}
   .seg-indicator{display:none;}
-  /* Sidebar shortcuts that only exist for mobile (desktop already has the
-     equivalent buttons in the topbar) — "role-ok" is set by JS the same
-     way the topbar buttons' visibility already was, so someone who
-     wouldn't have seen (say) the Assets button on desktop doesn't see it
-     here either. */
-  .mobile-only-nav.role-ok{display:flex;}
+  #mobileActionRow{display:grid!important;grid-template-columns:repeat(5,1fr);gap:6px;
+    background:linear-gradient(180deg,#fff 0%,var(--bg) 100%);padding:8px 10px 10px;
+    border-bottom:1px solid var(--border);box-shadow:0 2px 6px rgba(10,20,50,.04);}
+  .mobile-action-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:8px 2px 6px;
+    cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}
+  .mobile-action-btn:active{transform:scale(.94);box-shadow:0 1px 4px rgba(10,20,50,.1) inset;}
+  .mobile-action-btn .mab-icon{font-size:1.15rem;line-height:1;}
+  .mobile-action-btn .mab-label{font-size:.6rem;font-weight:700;letter-spacing:.2px;color:var(--gray);text-transform:uppercase;}
   /* Zoom widget hidden on mobile — use pinch-zoom instead */
   #dnZoomBar{display:none!important;}
   #dnSqBell{display:none!important;}
@@ -1257,6 +1260,28 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
   </div>
 
+  <!-- ── Mobile-only quick-action row (25-Aug-2026) — Change PIN / HR /
+       Assets / Trades / Clear Cache, laid out as a clean icon-grid strip
+       right under the main topbar. Desktop keeps the same buttons inside
+       the topbar itself; this row is CSS-hidden on desktop. ── -->
+  <div id="mobileActionRow" style="display:none">
+    <button class="mobile-action-btn" id="mChangeCredBtn" onclick="openChangeCredModal()" style="color:#0891b2" title="Change PIN/Password">
+      <span class="mab-icon">🔑</span><span class="mab-label">PIN</span>
+    </button>
+    <button class="mobile-action-btn" id="mHrPortalBtn" onclick="openHrPortal()" style="color:#7c3aed" title="HR Portal">
+      <span class="mab-icon">👔</span><span class="mab-label">HR</span>
+    </button>
+    <button class="mobile-action-btn" id="mAssetTrackerBtn" onclick="openAssetTracker()" style="color:#c9971e" title="Assets">
+      <span class="mab-icon">💰</span><span class="mab-label">Assets</span>
+    </button>
+    <button class="mobile-action-btn" id="mTradesAppBtn" onclick="openTradesApp()" style="color:#0f7a45" title="Trades">
+      <span class="mab-icon">📋</span><span class="mab-label">Trades</span>
+    </button>
+    <button class="mobile-action-btn" onclick="clearCrmCache()" style="color:#64748b" title="Clear Cache">
+      <span class="mab-icon">🧹</span><span class="mab-label">Cache</span>
+    </button>
+  </div>
+
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <!-- MOBILE BOTTOM QUICK-NAV (visible only ≤800px) -->
@@ -1338,18 +1363,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </div>
 
       <div class="sidebar-section" id="tools-nav-section">Tools</div>
-      <div class="nav-item mobile-only-nav" onclick="openChangeCredModal(); closeSidebar();" id="nav-change-cred" title="Change PIN/Password">
-        <span class="icon">🔑</span> Change PIN/Password
-      </div>
-      <div class="nav-item mobile-only-nav" onclick="openHrPortal(); closeSidebar();" id="nav-hr-portal" title="HR Portal kholo">
-        <span class="icon">👔</span> HR Portal
-      </div>
-      <div class="nav-item mobile-only-nav" onclick="openAssetTracker(); closeSidebar();" id="nav-asset-tracker" title="Asset & Net Worth Tracker kholo">
-        <span class="icon">💰</span> Assets
-      </div>
-      <div class="nav-item mobile-only-nav role-ok" onclick="openTradesApp(); closeSidebar();" id="nav-trades-app" title="Daily Trade Confirmations kholo">
-        <span class="icon">📋</span> Trades
-      </div>
       <div class="nav-item" onclick="showPage('brokerage-calc'); bcApplyRoleAccess(); bcRenderClientDropdown();" id="nav-brokerage-calc">
         <span class="icon">🧮</span> Brokerage Calculator
       </div>
