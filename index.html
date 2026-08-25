@@ -309,8 +309,14 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 #page-mf-txns > .page-hdr,
 #page-mf-txns > #mftxn-newform-card,
 #page-mf-txns > .filters{flex:0 0 auto;}
-#page-mf-txns > #mftxn-tablewrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
-#page-mf-txns > #mftxn-tablewrap .tbl-scroll{flex:1 1 auto;max-height:none;}
+#page-mf-txns > #mftxn-tablewrap{flex:1 1 auto;min-height:0;height:100%;display:flex;flex-direction:column;overflow:hidden;}
+#page-mf-txns > #mftxn-tablewrap .tbl-scroll{flex:1 1 auto;min-height:0;height:100%;max-height:none!important;}
+/* Total row (tfoot) stays pinned to the bottom of the table's own scroll
+   area — same sticky trick already used for the header row (position:
+   sticky), just mirrored to bottom:0 instead of top:0 — so it's always
+   visible without scrolling all the way down, no matter how many rows
+   are in the list. */
+#mftxn-table tfoot td{position:sticky;bottom:0;z-index:2;background:var(--bg,#f6f7fb);}
 
 /* ── PAGE HEADER ── */
 .page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
