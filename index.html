@@ -1662,8 +1662,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
 
-        <div class="tbl-wrap" style="padding:12px 14px;margin-bottom:14px;border-left:4px solid var(--teal);background:linear-gradient(180deg,var(--teal2) 0%,#fff 55%)">
-          <div style="font-size:.8rem;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">➕ New Transaction</div>
+        <div class="tbl-wrap" id="mftxn-newform-card" style="padding:12px 14px;margin-bottom:14px;border-left:4px solid var(--teal);background:linear-gradient(180deg,var(--teal2) 0%,#fff 55%)">
+          <div style="font-size:.8rem;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleMfTxnNewForm()">
+            <span>➕ New Transaction</span>
+            <span id="mftxn-newform-chevron" style="font-size:.7rem;color:var(--gray);transition:transform .2s">▶</span>
+          </div>
+          <div id="mftxn-newform-body" style="display:none">
           <div class="form-row three" style="gap:10px">
             <div class="form-field" style="position:relative">
               <label>Client *</label>
@@ -1742,6 +1746,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <label>&nbsp;</label>
               <button class="btn btn-success" onclick="saveMfTxnEntry()">Save Transaction</button>
             </div>
+          </div>
           </div>
         </div>
 

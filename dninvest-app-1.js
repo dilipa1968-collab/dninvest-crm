@@ -2730,6 +2730,18 @@ function toggleDashCard(id){
   const el=document.getElementById(id);
   if(el) el.classList.toggle('open');
 }
+function toggleMfTxnNewForm(){
+  // "New Transaction" panel on MF Transactions (25-Aug-2026) — collapsed by
+  // default so the table (the thing actually being scrolled/scanned most)
+  // gets far more room without having to scroll past the form first. Click
+  // the header to expand when actually adding a transaction.
+  const body=document.getElementById('mftxn-newform-body');
+  const chev=document.getElementById('mftxn-newform-chevron');
+  if(!body) return;
+  const isOpen = body.style.display!=='none';
+  body.style.display = isOpen ? 'none' : '';
+  if(chev) chev.style.transform = isOpen ? '' : 'rotate(90deg)';
+}
 function closeSidebar(){
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
