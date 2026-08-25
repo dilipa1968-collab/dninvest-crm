@@ -788,6 +788,21 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .page-title{font-weight:800;}
   .mnav-item{transition:color .15s;}
   .mnav-item:active{opacity:.7;}
+
+  /* 25-Aug-2026: Dashboard compacting pass — smaller, tighter stat cards and
+     dash-cards so more fits on screen without feeling cramped/oversized. */
+  .stats-row{gap:7px;margin-bottom:9px;}
+  .stat-card{padding:9px 10px;border-radius:11px;border-left-width:3px;}
+  .stat-card .icon{font-size:1rem;}
+  .stat-n{font-size:clamp(.92rem,4.2vw,1.22rem);letter-spacing:-.2px;}
+  .stat-n.stat-n-md{font-size:clamp(.84rem,3.6vw,1.05rem);}
+  .stat-n.stat-n-sm{font-size:clamp(.76rem,3.1vw,.92rem);}
+  .stat-l{font-size:.6rem;margin-top:2px;letter-spacing:.15px;}
+  .dash-card{padding:8px 10px;border-radius:11px;}
+  .dash-card h3{font-size:.62rem;margin-bottom:6px;gap:5px;}
+  .dash-card.big h3{font-size:.68rem;}
+  .dash-two-col{gap:9px;}
+  .dash-grid{gap:9px;}
 }
 
 </style>
