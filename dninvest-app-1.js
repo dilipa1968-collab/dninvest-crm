@@ -1614,6 +1614,9 @@ function openHrPortal(){
 function openAssetTracker(){
   window.open('dninvest-assets.html', '_blank');
 }
+function openTradesApp(){
+  window.open('dninvest-trades.html', '_blank');
+}
 
 
 

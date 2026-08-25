@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="theme-color" content="#0f1f3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trades">
+<title>Daily Trade Confirmations — D N Investment</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase — same project as the CRM, but its OWN 'trade_data' collection
+     (like HR's 'hr_data' and the Asset Tracker's 'personal_data'), so daily
+     trade volume NEVER touches the CRM's own 'crm_data' sync/load. This page
+     is entirely self-contained and does not read/write anything the CRM
+     reads on login. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --navy:#0f1f3d; --navy2:#162b54; --navy3:#1e3a6e;
+    --gold:#c9942a; --gold2:#f5d98a;
+    --green:#0f7a45; --green2:#e3f7ee;
+    --red:#c0392b; --red2:#fdf0ee;
+    --blue:#1a56db; --blue2:#eef3fc;
+    --bg:#f4f6fa; --white:#fff;
+    --border:#e3e8f0; --gray:#5d6e8a;
+    --radius:12px; --radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--navy);min-height:100vh;}
+  header{background:linear-gradient(90deg,var(--navy) 0%,var(--navy2) 60%,var(--navy3) 100%);color:#fff;padding:20px 20px 22px;}
+  header .brand{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.8}
+  header h1{font-size:1.3rem;font-weight:800;margin-top:4px}
+  .btn{padding:9px 16px;border-radius:8px;border:none;font-size:.82rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+  .btn:hover{opacity:.9}
+  .btn-teal{background:#0891b2;color:#fff}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-gray{background:#64748b;color:#fff}
+  .btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--border)}
+  .wrap{max-width:1100px;margin:0 auto;padding:18px 16px 60px}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  @media(max-width:800px){.stat-grid{grid-template-columns:1fr 1fr}}
+  .stat-card{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 1px 6px rgba(10,20,50,.07);border-left:4px solid var(--navy)}
+  .stat-card .l{font-size:.68rem;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:4px}
+  .stat-card .v{font-size:1.3rem;font-weight:800}
+  .card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 1px 6px rgba(10,20,50,.07);margin-bottom:16px}
+  .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;background:#fafbfd}
+  .upload-zone:hover{border-color:var(--gold)}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+  .filters input,.filters select{padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:.8rem;background:var(--bg)}
+  table{width:100%;border-collapse:collapse;font-size:.75rem}
+  thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:8px 7px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;font-size:.68rem;letter-spacing:.3px;text-transform:uppercase}
+  tbody tr{border-bottom:1px solid var(--border)}
+  tbody tr:nth-child(even){background:#f8faff}
+  tbody tr:hover{background:var(--blue2)}
+  td{padding:6px 7px;white-space:nowrap}
+  .tbl-scroll{max-height:60vh;overflow-y:auto;border-radius:10px;border:1px solid var(--border)}
+  .badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:.68rem;font-weight:700}
+  .seg-eq{background:#e0f2fe;color:#0369a1}
+  .seg-fo{background:#fce7f3;color:#be185d}
+  .bs-b{background:var(--green2);color:var(--green)}
+  .bs-s{background:var(--red2);color:var(--red)}
+  .empty{text-align:center;padding:40px;color:var(--gray)}
+  .status-line{font-size:.8rem;color:var(--gray);margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">D N Investment</div>
+  <h1>📋 Daily Trade Confirmations</h1>
+  <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <input type="file" id="fileUpload" accept=".xls,.xlsx" style="display:none" multiple>
+    <button class="btn btn-teal" id="uploadBtn">📤 Upload Daily Trade File(s)</button>
+    <button class="btn btn-gray" onclick="clearTradesCache()">🧹 Clear Cache</button>
+  </div>
+  <div class="status-line" id="uploadStatus" style="color:#c3cad9"></div>
+</header>
+
+<div class="wrap">
+  <div class="upload-zone" id="dropZone" style="margin-bottom:16px">
+    📥 Yahan Equity (NSE/BSE) ya F&amp;O (NSEFO) — dono tarah ki daily broker files drag-drop ya upload kar sakte ho. App khud pehchan lega kaunsi file kaunsi hai.
+    Sirf <b>"Fully/Partly Executed"</b> trades save hoti hain — Pending/Cancelled/Rejected/Expired orders chhod diye jaate hain.
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="l">Today — Equity</div>
+      <div class="v" id="statTodayEq">0</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#be185d">
+      <div class="l">Today — F&amp;O</div>
+      <div class="v" id="statTodayFo">0</div>
+    </div>
+    <div class="stat-card" style="border-left-color:var(--gold)">
+      <div class="l">This Month — Total Trades</div>
+      <div class="v" id="statMonthTotal">0</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#0891b2">
+      <div class="l">Last Upload</div>
+      <div class="v" id="statLastUpload" style="font-size:.9rem">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="filters">
+      <input type="text" id="fSearch" placeholder="🔍 Client name..." oninput="renderTable()">
+      <select id="fRm" onchange="renderTable()"><option value="">All RMs</option></select>
+      <select id="fSeg" onchange="renderTable()">
+        <option value="">All Segments</option>
+        <option value="EQ">Equity</option>
+        <option value="FO">F&amp;O</option>
+      </select>
+      <select id="fMonth" onchange="onMonthChange()"></select>
+      <input type="date" id="fFrom" onchange="renderTable()">
+      <input type="date" id="fTo" onchange="renderTable()">
+      <button class="btn btn-outline" onclick="clearFilters()">🔄 Clear</button>
+      <span id="resultCount" style="font-size:.78rem;color:var(--gray);margin-left:auto"></span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th>Date/Time</th><th>Segment</th><th>RM</th><th>Client</th>
+          <th>Scrip/Contract</th><th>B/S</th><th>Qty</th><th>Price</th><th>Status</th>
+        </tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
+  authDomain: "dninvest-crm.firebaseapp.com",
+  projectId: "dninvest-crm",
+  storageBucket: "dninvest-crm.firebasestorage.app",
+  messagingSenderId: "331999342266",
+  appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
+};
+firebase.initializeApp(firebaseConfig);
+const fdb = firebase.firestore();
+
+// ── Storage: one Firestore doc PER MONTH (e.g. "trades_2026_08"), each
+// holding {equity:[...], fo:[...], updated}. This keeps any single document
+// small (well under Firestore's 1MB limit) even after years of daily use —
+// each month starts a fresh doc instead of one ever-growing list. ──
+let monthCache = {};   // { "2026-08": {equity:[...], fo:[...]} }
+let currentMonth = null;
+
+function monthKey(d){ return d.slice(0,7); }               // "2026-08-25" -> "2026-08"
+function monthDocId(mk){ return 'trades_' + mk.replace('-','_'); }  // "2026-08" -> "trades_2026_08"
+
+async function loadMonth(mk){
+  if(monthCache[mk]) return monthCache[mk];
+  try{
+    const doc = await fdb.collection('trade_data').doc(monthDocId(mk)).get();
+    const data = (doc.exists && doc.data()) ? doc.data() : {equity:[], fo:[]};
+    monthCache[mk] = {equity: data.equity||[], fo: data.fo||[]};
+  }catch(e){
+    console.warn('loadMonth failed', mk, e);
+    monthCache[mk] = {equity:[], fo:[]};
+  }
+  return monthCache[mk];
+}
+
+async function saveMonth(mk){
+  const data = monthCache[mk] || {equity:[], fo:[]};
+  await fdb.collection('trade_data').doc(monthDocId(mk)).set({
+    equity: data.equity, fo: data.fo, updated: new Date().toISOString()
+  });
+}
+
+// ── Column detection: Equity files have "SCRIP NAME" as a plain column;
+// F&O files have "CONTRACT" instead (option/future contract string). ──
+function detectSegment(headerRow){
+  const norm = headerRow.map(h=>String(h||'').trim().toUpperCase());
+  if(norm.includes('CONTRACT')) return 'FO';
+  if(norm.includes('SCRIP NAME') || norm.includes('SCRIPNAME')) return 'EQ';
+  return null;
+}
+
+function colIndex(headerRow, names){
+  const norm = headerRow.map(h=>String(h||'').trim().toUpperCase());
+  for(const n of names){ const i = norm.indexOf(n.toUpperCase()); if(i>=0) return i; }
+  return -1;
+}
+
+function parseWorkbook(wb){
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:''});
+  if(!rows.length) return null;
+  const header = rows[0];
+  const seg = detectSegment(header);
+  if(!seg) return null;
+
+  const iExch = colIndex(header, ['EXCHANGE']);
+  const iScrip = seg==='EQ' ? colIndex(header, ['SCRIP NAME']) : colIndex(header, ['CONTRACT']);
+  const iBS = colIndex(header, ['BUY SELL']);
+  const iDealer = colIndex(header, ['DEALER']);
+  const iCust = colIndex(header, ['CUSTOMER NAME']);
+  const iExecQty = colIndex(header, ['EXEC QTY','EXECUTED QTY']);
+  const iExecPrice = colIndex(header, ['EXEC PRICE']);
+  const iStatus = colIndex(header, ['ORDER STATUS']);
+  // The primary time column ("EXCH DATE TIME"/"EXCHDATETIME") is sometimes
+  // genuinely blank per-row in the F&O export (a quirk of that report), even
+  // though the column itself exists — "EXCH ACK TIME" and "SK ORDER DATE
+  // TIME" carry the same timestamp in that case, so each row falls back
+  // through this list until it finds a non-empty value.
+  const iTimeCandidates = [
+    colIndex(header, ['EXCH DATE TIME','EXCHDATETIME']),
+    colIndex(header, ['EXCH ACK TIME']),
+    colIndex(header, ['SK ORDER DATE TIME']),
+    colIndex(header, ['LAST MOD TIME'])
+  ].filter(i=>i>=0);
+  const iOrderId = colIndex(header, ['EXCH ORDER ID','EXCHORDERID','EXCHANGE ORDER ID']);
+  const iOptType = seg==='FO' ? colIndex(header, ['OPTION TYPE']) : -1;
+  const iStrike = seg==='FO' ? colIndex(header, ['STRIKE PRICE']) : -1;
+  const iExpiry = seg==='FO' ? colIndex(header, ['EXPIRY DATE']) : -1;
+
+  const out = [];
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r];
+    if(!row || !row.length) continue;
+    const execQty = Number(row[iExecQty]) || 0;
+    if(execQty <= 0) continue;   // only rows where something was actually traded
+    const status = String(row[iStatus]||'').trim();
+    let timeVal = '';
+    for(const ti of iTimeCandidates){ if(row[ti]){ timeVal = String(row[ti]); break; } }
+
+    out.push({
+      id: String(row[iOrderId] || (timeVal+'_'+row[iCust]+'_'+row[iScrip]+'_'+r)),
+      date: timeVal.slice(0,10),
+      time: timeVal,
+      exchange: row[iExch]||'',
+      scrip: row[iScrip]||'',
+      buySell: row[iBS]||'',
+      rm: String(row[iDealer]||'').trim(),
+      client: String(row[iCust]||'').trim().replace(/\s+/g,' '),
+      qty: execQty,
+      price: Number(row[iExecPrice])||0,
+      status: status,
+      optType: iOptType>=0 ? row[iOptType] : '',
+      strike: iStrike>=0 ? row[iStrike] : '',
+      expiry: iExpiry>=0 ? String(row[iExpiry]||'').slice(0,10) : ''
+    });
+  }
+  return {seg, rows: out};
+}
+
+async function handleFiles(fileList){
+  const files = Array.from(fileList);
+  if(!files.length) return;
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = 'Processing ' + files.length + ' file(s)...';
+
+  const touchedMonths = new Set();
+  let totalNew = 0, totalSkippedDup = 0, filesOk = 0, filesFailed = 0;
+
+  for(const file of files){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array', cellDates:false});
+      const parsed = parseWorkbook(wb);
+      if(!parsed){ filesFailed++; continue; }
+      filesOk++;
+
+      // Group parsed rows by month (a file is normally single-day, but this
+      // handles it safely either way) and merge, de-duplicating by id so
+      // re-uploading the same day's file twice doesn't create doubles.
+      const byMonth = {};
+      parsed.rows.forEach(r=>{
+        const mk = r.date ? monthKey(r.date) : monthKey(new Date().toISOString());
+        (byMonth[mk] = byMonth[mk]||[]).push(r);
+      });
+
+      for(const mk in byMonth){
+        await loadMonth(mk);
+        const bucket = monthCache[mk][parsed.seg==='EQ' ? 'equity' : 'fo'];
+        const existingIds = new Set(bucket.map(x=>x.id));
+        byMonth[mk].forEach(r=>{
+          if(existingIds.has(r.id)){ totalSkippedDup++; return; }
+          bucket.push(r); existingIds.add(r.id); totalNew++;
+        });
+        touchedMonths.add(mk);
+      }
+    }catch(e){
+      console.warn('file parse failed', file.name, e);
+      filesFailed++;
+    }
+  }
+
+  for(const mk of touchedMonths) await saveMonth(mk);
+
+  try{ localStorage.setItem('dninvest_trades_last_upload', new Date().toISOString()); }catch(e){}
+
+  statusEl.textContent = `✅ ${filesOk} file(s) read, ${totalNew} new trade(s) added` +
+    (totalSkippedDup ? `, ${totalSkippedDup} already-existing skipped` : '') +
+    (filesFailed ? `, ⚠️ ${filesFailed} file(s) not recognised` : '');
+
+  await populateMonthFilter();
+  await onMonthChange();
+  updateDashboardStats();
+}
+
+function clearTradesCache(){
+  if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  Object.keys(localStorage).forEach(k=>{ if(k.startsWith('dninvest_trades_')) localStorage.removeItem(k); });
+  location.reload();
+}
+
+async function populateMonthFilter(){
+  const sel = document.getElementById('fMonth');
+  const cur = sel.value;
+  let months = [];
+  try{
+    const snap = await fdb.collection('trade_data').get();
+    months = snap.docs.map(d=>d.id.replace('trades_','').replace('_','-')).sort().reverse();
+  }catch(e){ console.warn(e); }
+  if(!months.length) months = [monthKey(new Date().toISOString())];
+  sel.innerHTML = months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.value = months.includes(cur) ? cur : months[0];
+}
+
+async function onMonthChange(){
+  currentMonth = document.getElementById('fMonth').value;
+  if(currentMonth) await loadMonth(currentMonth);
+  populateRmFilter();
+  renderTable();
+}
+
+function populateRmFilter(){
+  const data = monthCache[currentMonth] || {equity:[], fo:[]};
+  const rms = [...new Set([...data.equity, ...data.fo].map(r=>r.rm).filter(Boolean))].sort();
+  const sel = document.getElementById('fRm');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All RMs</option>' + rms.map(r=>`<option value="${r}">${r}</option>`).join('');
+  sel.value = rms.includes(cur) ? cur : '';
+}
+
+function clearFilters(){
+  document.getElementById('fSearch').value='';
+  document.getElementById('fRm').value='';
+  document.getElementById('fSeg').value='';
+  document.getElementById('fFrom').value='';
+  document.getElementById('fTo').value='';
+  renderTable();
+}
+
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderTable(){
+  const data = monthCache[currentMonth] || {equity:[], fo:[]};
+  let rows = [
+    ...data.equity.map(r=>({...r, seg:'EQ'})),
+    ...data.fo.map(r=>({...r, seg:'FO'}))
+  ];
+
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  const rm = document.getElementById('fRm').value;
+  const seg = document.getElementById('fSeg').value;
+  const from = document.getElementById('fFrom').value;
+  const to = document.getElementById('fTo').value;
+
+  if(q) rows = rows.filter(r=>r.client.toLowerCase().includes(q));
+  if(rm) rows = rows.filter(r=>r.rm===rm);
+  if(seg) rows = rows.filter(r=>r.seg===seg);
+  if(from) rows = rows.filter(r=>r.date>=from);
+  if(to) rows = rows.filter(r=>r.date<=to);
+
+  rows.sort((a,b)=> (b.time||'').localeCompare(a.time||''));
+
+  const tbody = document.getElementById('tableBody');
+  document.getElementById('resultCount').textContent = rows.length + ' trades';
+
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="9" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r=>{
+    const scripLabel = r.seg==='FO'
+      ? esc(r.scrip) + (r.optType ? ` <span style="color:var(--gray)">(${esc(r.optType)} ${esc(r.strike)})</span>` : '')
+      : esc(r.scrip) + (r.exchange ? ` <span style="color:var(--gray);font-size:.68rem">${esc(r.exchange)}</span>` : '');
+    const bs = String(r.buySell).toUpperCase().startsWith('B') ? 'B' : 'S';
+    return `<tr>
+      <td>${esc(r.time)}</td>
+      <td><span class="badge ${r.seg==='EQ'?'seg-eq':'seg-fo'}">${r.seg}</span></td>
+      <td>${esc(r.rm)}</td>
+      <td>${esc(r.client)}</td>
+      <td>${scripLabel}</td>
+      <td><span class="badge ${bs==='B'?'bs-b':'bs-s'}">${bs==='B'?'BUY':'SELL'}</span></td>
+      <td>${r.qty}</td>
+      <td>₹${r.price}</td>
+      <td style="font-size:.68rem;color:var(--gray)">${esc(r.status)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateDashboardStats(){
+  const todayStr = new Date().toISOString().slice(0,10);
+  const mk = monthKey(todayStr);
+  await loadMonth(mk);
+  const data = monthCache[mk] || {equity:[], fo:[]};
+  const todayEq = data.equity.filter(r=>r.date===todayStr).length;
+  const todayFo = data.fo.filter(r=>r.date===todayStr).length;
+  document.getElementById('statTodayEq').textContent = todayEq;
+  document.getElementById('statTodayFo').textContent = todayFo;
+  document.getElementById('statMonthTotal').textContent = data.equity.length + data.fo.length;
+  try{
+    const last = localStorage.getItem('dninvest_trades_last_upload');
+    document.getElementById('statLastUpload').textContent = last ? new Date(last).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+  }catch(e){}
+}
+
+document.getElementById('uploadBtn').addEventListener('click', ()=>document.getElementById('fileUpload').click());
+document.getElementById('fileUpload').addEventListener('change', e=>handleFiles(e.target.files));
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('click', ()=>document.getElementById('fileUpload').click());
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.style.borderColor='var(--gold)'; });
+dropZone.addEventListener('dragleave', ()=>{ dropZone.style.borderColor='var(--border)'; });
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault(); dropZone.style.borderColor='var(--border)';
+  handleFiles(e.dataTransfer.files);
+});
+
+(async function init(){
+  await populateMonthFilter();
+  await onMonthChange();
+  updateDashboardStats();
+})();
+</script>
+</body>
+</html>

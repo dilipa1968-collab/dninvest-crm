@@ -720,7 +720,7 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .user-pill{display:none;}
   #changeCredBtn{font-size:.7rem;padding:4px 6px;}
   #changeCredBtn .cred-btn-text{display:none;}
-  #hrPortalTopBtn, #assetTrackerTopBtn{font-size:.7rem!important;padding:4px 7px!important;}
+  #hrPortalTopBtn, #assetTrackerTopBtn, #tradesAppTopBtn{font-size:.7rem!important;padding:4px 7px!important;}
   .topbar-btn-text{display:none;}   /* icon-only for HR/Assets buttons on mobile — frees up space for the logo */
   .topbar-right{gap:4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:60vw;}
   .topbar-right::-webkit-scrollbar{display:none;}
@@ -1225,6 +1225,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </button>
       <button class="btn-sm" id="assetTrackerTopBtn" onclick="openAssetTracker()" title="Asset & Net Worth Tracker kholo" style="background:#c9971e;display:none;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         💰 <span class="topbar-btn-text">Assets</span>
+      </button>
+      <button class="btn-sm" id="tradesAppTopBtn" onclick="openTradesApp()" title="Daily Trade Confirmations kholo" style="background:#0f7a45;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
+        📋 <span class="topbar-btn-text">Trades</span>
       </button>
       <button class="btn-sm" onclick="clearCrmCache()" title="Purana/stale data clear karke fresh reload kare" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         🧹 <span class="topbar-btn-text">Clear Cache</span>
