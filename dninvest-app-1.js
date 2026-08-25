@@ -9011,7 +9011,7 @@ const MFTXN_TYPE_COLOR = {
   STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
 };
 const MFTXN_SOURCE_COLOR = {
-  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#B7950B', NSE:'#0891B2', Physical:'#5D6E8A'
+  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#059669', NSE:'#0891B2', Physical:'#C2410C'
 };
 
 function renderMfTxnTable(){
