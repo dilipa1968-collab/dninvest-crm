@@ -1256,6 +1256,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <button class="btn-sm" id="topbarClearCacheBtn" onclick="clearCrmCache()" title="Purana/stale data clear karke fresh reload kare" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         🧹 <span class="topbar-btn-text">Clear Cache</span>
       </button>
+      <button class="btn-sm" onclick="hardRefresh()" title="Hard Refresh — clear cache and reload" style="background:rgba(255,255,255,.15);padding:5px 9px;font-size:.85rem;border-radius:8px;border:1px solid rgba(255,255,255,.3);color:#fff;cursor:pointer;line-height:1">🔄</button>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
   </div>
@@ -1408,9 +1409,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="page active" id="page-dashboard">
         <div class="page-hdr">
           <div class="page-title">Dashboard <span id="dash-date"></span></div>
-          <div class="hdr-actions">
-            <button class="btn btn-outline" onclick="hardRefresh()" title="Hard Refresh — clear cache and reload">🔄 Refresh</button>
-          </div>
         </div>
         <div class="stats-row" id="dashStats"></div>
 
