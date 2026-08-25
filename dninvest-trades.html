@@ -50,7 +50,9 @@
   .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
   .filters input,.filters select{padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:.8rem;background:var(--bg)}
   table{width:100%;border-collapse:collapse;font-size:.75rem}
-  thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:8px 7px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;font-size:.68rem;letter-spacing:.3px;text-transform:uppercase}
+  thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:8px 7px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;font-size:.68rem;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;user-select:none}
+  thead th:hover{background:var(--navy2)}
+  .sort-arrow{font-size:.62rem;opacity:.85}
   tbody tr{border-bottom:1px solid var(--border)}
   tbody tr:nth-child(even){background:#f8faff}
   tbody tr:hover{background:var(--blue2)}
@@ -121,9 +123,17 @@
     </div>
     <div class="tbl-scroll">
       <table>
-        <thead><tr>
-          <th>Date/Time</th><th>Segment</th><th>RM</th><th>Client</th>
-          <th>Scrip/Contract</th><th>B/S</th><th>Qty</th><th>Price</th><th>Status</th>
+        <thead><tr id="tableHeadRow">
+          <th data-key="time" onclick="sortTrades('time')">Date/Time <span class="sort-arrow" id="arrow-time"></span></th>
+          <th data-key="seg" onclick="sortTrades('seg')">Segment <span class="sort-arrow" id="arrow-seg"></span></th>
+          <th data-key="rm" onclick="sortTrades('rm')">RM <span class="sort-arrow" id="arrow-rm"></span></th>
+          <th data-key="client" onclick="sortTrades('client')">Client <span class="sort-arrow" id="arrow-client"></span></th>
+          <th data-key="scrip" onclick="sortTrades('scrip')">Scrip/Contract <span class="sort-arrow" id="arrow-scrip"></span></th>
+          <th data-key="buySell" onclick="sortTrades('buySell')">B/S <span class="sort-arrow" id="arrow-buySell"></span></th>
+          <th data-key="qty" onclick="sortTrades('qty')">Qty <span class="sort-arrow" id="arrow-qty"></span></th>
+          <th data-key="price" onclick="sortTrades('price')">Price <span class="sort-arrow" id="arrow-price"></span></th>
+          <th data-key="channel" onclick="sortTrades('channel')">Channel <span class="sort-arrow" id="arrow-channel"></span></th>
+          <th data-key="status" onclick="sortTrades('status')">Status <span class="sort-arrow" id="arrow-status"></span></th>
         </tr></thead>
         <tbody id="tableBody"></tbody>
       </table>
@@ -310,6 +320,7 @@ function parseWorkbook(wb){
     colIndex(header, ['LAST MOD TIME'])
   ].filter(i=>i>=0);
   const iOrderId = colIndex(header, ['EXCH ORDER ID','EXCHORDERID','EXCHANGE ORDER ID']);
+  const iChannel = colIndex(header, ['CHANNEL CODE']);
   const iOptType = seg==='FO' ? colIndex(header, ['OPTION TYPE']) : -1;
   const iStrike = seg==='FO' ? colIndex(header, ['STRIKE PRICE']) : -1;
   const iExpiry = seg==='FO' ? colIndex(header, ['EXPIRY DATE']) : -1;
@@ -341,7 +352,8 @@ function parseWorkbook(wb){
       status: status,
       optType: iOptType>=0 ? row[iOptType] : '',
       strike: iStrike>=0 ? row[iStrike] : '',
-      expiry: iExpiry>=0 ? String(row[iExpiry]||'').slice(0,10) : ''
+      expiry: iExpiry>=0 ? String(row[iExpiry]||'').slice(0,10) : '',
+      channel: iChannel>=0 ? String(row[iChannel]||'').trim() : ''
     });
   }
   return {seg, rows: out};
@@ -518,6 +530,14 @@ function clearFilters(){
 
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+let sortState = {field:'time', dir:-1};   // -1 = latest/desc first by default, matching the previous behaviour
+
+function sortTrades(field){
+  if(sortState.field===field) sortState.dir = -sortState.dir;
+  else sortState = {field, dir: (field==='time') ? -1 : 1};
+  renderTable();
+}
+
 function renderTable(){
   const data = monthCache[currentMonth] || {equity:[], fo:[]};
   let rows = [
@@ -538,13 +558,24 @@ function renderTable(){
   if(from) rows = rows.filter(r=>r.date>=from);
   if(to) rows = rows.filter(r=>r.date<=to);
 
-  rows.sort((a,b)=> (b.time||'').localeCompare(a.time||''));
+  const sf = sortState.field, sd = sortState.dir;
+  rows.sort((a,b)=>{
+    let va = a[sf], vb = b[sf];
+    if(sf==='qty' || sf==='price'){ va = Number(va)||0; vb = Number(vb)||0; return sd*(va-vb); }
+    va = String(va||''); vb = String(vb||'');
+    return sd * va.localeCompare(vb);
+  });
+
+  // Update the sort arrows in the header to reflect current state
+  document.querySelectorAll('.sort-arrow').forEach(el=>el.textContent='');
+  const activeArrow = document.getElementById('arrow-'+sf);
+  if(activeArrow) activeArrow.textContent = sd===1 ? '▲' : '▼';
 
   const tbody = document.getElementById('tableBody');
   document.getElementById('resultCount').textContent = rows.length + ' trades';
 
   if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="9" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
     return;
   }
 
@@ -562,6 +593,7 @@ function renderTable(){
       <td><span class="badge ${bs==='B'?'bs-b':'bs-s'}">${bs==='B'?'BUY':'SELL'}</span></td>
       <td>${r.qty}</td>
       <td>₹${r.price}</td>
+      <td style="font-size:.68rem;color:var(--gray)">${esc(r.channel||'—')}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.status)}</td>
     </tr>`;
   }).join('');
