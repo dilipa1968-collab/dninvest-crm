@@ -301,16 +301,25 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 /* ── MF TRANSACTIONS: fixed frame, table scrolls internally (25-Aug-2026) ──
    Every other page still scrolls normally with the whole document (topbar/
    sidebar just stay visually in place via position:sticky, but the browser
-   itself is still scrolling top-to-bottom). This page's own header/New-
-   Transaction/filters are pinned in a fixed-height column instead, so only
-   the row list scrolls, inside its own small scrollbar — no whole-page
-   scrolling needed to reach the bottom rows or the Total row. */
-#page-mf-txns.active{display:flex;flex-direction:column;height:calc(100vh - 78px);}
+   itself is still scrolling top-to-bottom). This page pins itself directly
+   to the VIEWPORT (position:fixed against top/left/right/bottom) instead of
+   relying on percentage/flex heights through several ancestor elements —
+   that chain turned out fragile (any tiny bit of outer-document scroll, or
+   an ancestor not stretching exactly as expected, left a gap of unused
+   space at the bottom with the Total row cut off). Fixed positioning is
+   immune to that: this box is always exactly "below the topbar, right of
+   the sidebar, to the edges of the screen", full stop, so the row list's
+   own internal scrollbar gets every last pixel of real space, and the
+   Total row — pinned to ITS OWN bottom edge — is always fully visible. */
+#page-mf-txns.active{position:fixed;top:50px;left:195px;right:0;bottom:0;display:flex;flex-direction:column;height:auto;padding:14px 16px;background:var(--bg);z-index:10;overflow:hidden;}
 #page-mf-txns > .page-hdr,
 #page-mf-txns > #mftxn-newform-card,
 #page-mf-txns > .filters{flex:0 0 auto;}
 #page-mf-txns > #mftxn-tablewrap{flex:1 1 auto;min-height:0;height:100%;display:flex;flex-direction:column;overflow:hidden;}
 #page-mf-txns > #mftxn-tablewrap .tbl-scroll{flex:1 1 auto;min-height:0;height:100%;max-height:none!important;}
+@media(max-width:800px){
+  #page-mf-txns.active{left:0;}
+}
 /* Total row (tfoot) stays pinned to the bottom of the table's own scroll
    area — same sticky trick already used for the header row (position:
    sticky), just mirrored to bottom:0 instead of top:0 — so it's always
