@@ -124,6 +124,7 @@
         <option value="Rejected">Rejected</option>
         <option value="Expired">Expired</option>
       </select>
+      <select id="fChannel" onchange="renderTable()"><option value="">All Channels</option></select>
       <select id="fMonth" onchange="onMonthChange()"></select>
       <input type="date" id="fFrom" onchange="renderTable()">
       <input type="date" id="fTo" onchange="renderTable()">
@@ -537,6 +538,7 @@ async function onMonthChange(){
   currentMonth = document.getElementById('fMonth').value;
   if(currentMonth) await loadMonth(currentMonth);
   populateRmFilter();
+  populateChannelFilter();
   renderTable();
 }
 
@@ -552,11 +554,22 @@ function populateRmFilter(){
   sel.value = (rms.includes(cur) || cur==='__unknown__') ? cur : '';
 }
 
+function populateChannelFilter(){
+  const data = monthCache[currentMonth] || {equity:[], fo:[]};
+  const all = [...data.equity, ...data.fo];
+  const channels = [...new Set(all.map(r=>r.channel).filter(Boolean))].sort();
+  const sel = document.getElementById('fChannel');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Channels</option>' + channels.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value = channels.includes(cur) ? cur : '';
+}
+
 function clearFilters(){
   document.getElementById('fSearch').value='';
   document.getElementById('fRm').value='';
   document.getElementById('fSeg').value='';
   document.getElementById('fStatus').value='';
+  document.getElementById('fChannel').value='';
   document.getElementById('fFrom').value='';
   document.getElementById('fTo').value='';
   renderTable();
@@ -591,6 +604,7 @@ function renderTable(){
   const rm = document.getElementById('fRm').value;
   const seg = document.getElementById('fSeg').value;
   const statusF = document.getElementById('fStatus').value;
+  const channelF = document.getElementById('fChannel').value;
   const from = document.getElementById('fFrom').value;
   const to = document.getElementById('fTo').value;
 
@@ -599,6 +613,7 @@ function renderTable(){
   else if(rm) rows = rows.filter(r=>r.rm===rm);
   if(seg) rows = rows.filter(r=>r.seg===seg);
   if(statusF) rows = rows.filter(r=>r.status===statusF);
+  if(channelF) rows = rows.filter(r=>r.channel===channelF);
   if(from) rows = rows.filter(r=>r.date>=from);
   if(to) rows = rows.filter(r=>r.date<=to);
 
