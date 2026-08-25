@@ -186,6 +186,44 @@ function colIndex(headerRow, names){
   return -1;
 }
 
+// ── RM lookup from the CRM's own client records (25-Aug-2026) ──
+// Some broker report variants ("Order_Report_*.xls") don't include a DEALER
+// column at all — no RM name in the file. For those, the client's name is
+// matched (case/whitespace-normalised) against the CRM's own eq_clients/
+// mf_clients records to find who their RM actually is. This is a READ-ONLY,
+// one-time-per-session fetch straight from Firestore — it does NOT touch
+// anything the CRM itself loads on login, so it can't add load there.
+let clientRmMap = null;   // { normalisedName: rmName }
+function normName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
+
+async function loadClientRmMap(){
+  if(clientRmMap) return clientRmMap;
+  const map = {};
+  const SHARD_COUNT = 8;
+  const keys = ['eq_clients','mf_clients'];
+  const fetches = [];
+  keys.forEach(key=>{
+    for(let i=0;i<SHARD_COUNT;i++){
+      fetches.push(
+        fdb.collection('crm_data').doc(key+'__s'+i).get()
+          .then(doc=>{
+            if(!doc.exists) return;
+            const arr = (doc.data()||{}).data;
+            if(!Array.isArray(arr)) return;
+            arr.forEach(c=>{
+              const nm = normName(c.name);
+              if(nm && c.rm && !map[nm]) map[nm] = c.rm;   // first match wins if a name exists in both segments
+            });
+          })
+          .catch(()=>{})   // a missing/unreadable shard just contributes nothing — never blocks the rest
+      );
+    }
+  });
+  await Promise.all(fetches);
+  clientRmMap = map;
+  return map;
+}
+
 function parseWorkbook(wb){
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:''});
@@ -197,7 +235,7 @@ function parseWorkbook(wb){
   const iExch = colIndex(header, ['EXCHANGE']);
   const iScrip = seg==='EQ' ? colIndex(header, ['SCRIP NAME']) : colIndex(header, ['CONTRACT']);
   const iBS = colIndex(header, ['BUY SELL']);
-  const iDealer = colIndex(header, ['DEALER']);
+  const iDealer = colIndex(header, ['DEALER']);   // -1 in the "Order_Report" variant — no RM column at all
   const iCust = colIndex(header, ['CUSTOMER NAME']);
   const iExecQty = colIndex(header, ['EXEC QTY','EXECUTED QTY']);
   const iExecPrice = colIndex(header, ['EXEC PRICE']);
@@ -228,6 +266,9 @@ function parseWorkbook(wb){
     let timeVal = '';
     for(const ti of iTimeCandidates){ if(row[ti]){ timeVal = String(row[ti]); break; } }
 
+    const clientRaw = String(row[iCust]||'').trim().replace(/\s+/g,' ');
+    const dealerFromFile = iDealer>=0 ? String(row[iDealer]||'').trim() : '';
+
     out.push({
       id: String(row[iOrderId] || (timeVal+'_'+row[iCust]+'_'+row[iScrip]+'_'+r)),
       date: timeVal.slice(0,10),
@@ -235,8 +276,8 @@ function parseWorkbook(wb){
       exchange: row[iExch]||'',
       scrip: row[iScrip]||'',
       buySell: row[iBS]||'',
-      rm: String(row[iDealer]||'').trim(),
-      client: String(row[iCust]||'').trim().replace(/\s+/g,' '),
+      rm: dealerFromFile,   // filled in from CRM client records afterwards if this is blank
+      client: clientRaw,
       qty: execQty,
       price: Number(row[iExecPrice])||0,
       status: status,
@@ -255,7 +296,8 @@ async function handleFiles(fileList){
   statusEl.textContent = 'Processing ' + files.length + ' file(s)...';
 
   const touchedMonths = new Set();
-  let totalNew = 0, totalSkippedDup = 0, filesOk = 0, filesFailed = 0;
+  let totalNew = 0, totalSkippedDup = 0, filesOk = 0, filesFailed = 0, rmLookedUp = 0, rmUnmatched = 0;
+  let rmMap = null;   // only fetched if actually needed (a file has no DEALER column)
 
   for(const file of files){
     try{
@@ -264,6 +306,19 @@ async function handleFiles(fileList){
       const parsed = parseWorkbook(wb);
       if(!parsed){ filesFailed++; continue; }
       filesOk++;
+
+      // Some report variants ("Order_Report_*.xls") have no DEALER column at
+      // all — fill the RM in from the CRM's own client records, matched by
+      // (normalised) client name, on demand.
+      if(parsed.rows.some(r=>!r.rm)){
+        if(!rmMap) rmMap = await loadClientRmMap();
+        parsed.rows.forEach(r=>{
+          if(r.rm) return;
+          const match = rmMap[normName(r.client)];
+          if(match){ r.rm = match; rmLookedUp++; }
+          else rmUnmatched++;
+        });
+      }
 
       // Group parsed rows by month (a file is normally single-day, but this
       // handles it safely either way) and merge, de-duplicating by id so
@@ -296,6 +351,8 @@ async function handleFiles(fileList){
 
   statusEl.textContent = `✅ ${filesOk} file(s) read, ${totalNew} new trade(s) added` +
     (totalSkippedDup ? `, ${totalSkippedDup} already-existing skipped` : '') +
+    (rmLookedUp ? `, RM matched for ${rmLookedUp} from client records` : '') +
+    (rmUnmatched ? `, ⚠️ RM not found for ${rmUnmatched} (client name didn't match any CRM client)` : '') +
     (filesFailed ? `, ⚠️ ${filesFailed} file(s) not recognised` : '');
 
   await populateMonthFilter();
@@ -331,11 +388,14 @@ async function onMonthChange(){
 
 function populateRmFilter(){
   const data = monthCache[currentMonth] || {equity:[], fo:[]};
-  const rms = [...new Set([...data.equity, ...data.fo].map(r=>r.rm).filter(Boolean))].sort();
+  const all = [...data.equity, ...data.fo];
+  const rms = [...new Set(all.map(r=>r.rm).filter(Boolean))].sort();
+  const hasUnknown = all.some(r=>!r.rm);
   const sel = document.getElementById('fRm');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">All RMs</option>' + rms.map(r=>`<option value="${r}">${r}</option>`).join('');
-  sel.value = rms.includes(cur) ? cur : '';
+  sel.innerHTML = '<option value="">All RMs</option>' + rms.map(r=>`<option value="${r}">${r}</option>`).join('') +
+    (hasUnknown ? '<option value="__unknown__">❓ Unknown (not matched)</option>' : '');
+  sel.value = (rms.includes(cur) || cur==='__unknown__') ? cur : '';
 }
 
 function clearFilters(){
@@ -363,7 +423,8 @@ function renderTable(){
   const to = document.getElementById('fTo').value;
 
   if(q) rows = rows.filter(r=>r.client.toLowerCase().includes(q));
-  if(rm) rows = rows.filter(r=>r.rm===rm);
+  if(rm==='__unknown__') rows = rows.filter(r=>!r.rm);
+  else if(rm) rows = rows.filter(r=>r.rm===rm);
   if(seg) rows = rows.filter(r=>r.seg===seg);
   if(from) rows = rows.filter(r=>r.date>=from);
   if(to) rows = rows.filter(r=>r.date<=to);
@@ -386,7 +447,7 @@ function renderTable(){
     return `<tr>
       <td>${esc(r.time)}</td>
       <td><span class="badge ${r.seg==='EQ'?'seg-eq':'seg-fo'}">${r.seg}</span></td>
-      <td>${esc(r.rm)}</td>
+      <td>${r.rm ? esc(r.rm) : '<span style="color:var(--red);font-weight:700">❓ Unknown</span>'}</td>
       <td>${esc(r.client)}</td>
       <td>${scripLabel}</td>
       <td><span class="badge ${bs==='B'?'bs-b':'bs-s'}">${bs==='B'?'BUY':'SELL'}</span></td>
