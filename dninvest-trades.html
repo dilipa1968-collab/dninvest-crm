@@ -115,6 +115,15 @@
         <option value="EQ">Equity</option>
         <option value="FO">F&amp;O</option>
       </select>
+      <select id="fStatus" onchange="renderTable()">
+        <option value="">All Status</option>
+        <option value="Fully Executed">Fully Executed</option>
+        <option value="Partly Executed">Partly Executed</option>
+        <option value="Pending">Pending</option>
+        <option value="Cancelled">Cancelled</option>
+        <option value="Rejected">Rejected</option>
+        <option value="Expired">Expired</option>
+      </select>
       <select id="fMonth" onchange="onMonthChange()"></select>
       <input type="date" id="fFrom" onchange="renderTable()">
       <input type="date" id="fTo" onchange="renderTable()">
@@ -306,6 +315,7 @@ function parseWorkbook(wb){
   const iDealer = colIndex(header, ['DEALER']);   // -1 in the "Order_Report" variant — no RM column at all
   const iCust = colIndex(header, ['CUSTOMER NAME']);
   const iExecQty = colIndex(header, ['EXEC QTY','EXECUTED QTY']);
+  const iOrderQty = colIndex(header, ['ORDER QTY']);
   const iExecPrice = colIndex(header, ['EXEC PRICE']);
   const iStatus = colIndex(header, ['ORDER STATUS']);
   // The primary time column ("EXCH DATE TIME"/"EXCHDATETIME") is sometimes
@@ -329,13 +339,21 @@ function parseWorkbook(wb){
   for(let r=1; r<rows.length; r++){
     const row = rows[r];
     if(!row || !row.length) continue;
+    const clientCheck = String(row[iCust]||'').trim();
+    if(!clientCheck) continue;   // a genuinely blank/spacer row — nothing usable in it
     const execQty = Number(row[iExecQty]) || 0;
-    if(execQty <= 0) continue;   // only rows where something was actually traded
+    const orderQty = Number(row[iOrderQty]) || 0;
+    // 25-Aug-2026: used to skip any row with execQty<=0, which meant every
+    // Pending/Cancelled/Rejected/Expired order was silently dropped — the
+    // app only ever kept actually-executed trades. Now every order is kept
+    // (for record-keeping — cancelled/rejected orders matter too), and the
+    // Qty shown falls back to the ORIGINAL order quantity when nothing was
+    // actually executed.
     const status = String(row[iStatus]||'').trim();
     let timeVal = '';
     for(const ti of iTimeCandidates){ if(row[ti]){ timeVal = String(row[ti]); break; } }
 
-    const clientRaw = String(row[iCust]||'').trim().replace(/\s+/g,' ');
+    const clientRaw = clientCheck.replace(/\s+/g,' ');
     const dealerFromFile = iDealer>=0 ? String(row[iDealer]||'').trim() : '';
 
     out.push({
@@ -347,7 +365,8 @@ function parseWorkbook(wb){
       buySell: row[iBS]||'',
       rm: dealerFromFile,   // filled in from CRM client records afterwards if this is blank
       client: clientRaw,
-      qty: execQty,
+      qty: execQty>0 ? execQty : orderQty,
+      execQty: execQty,
       price: Number(row[iExecPrice])||0,
       status: status,
       optType: iOptType>=0 ? row[iOptType] : '',
@@ -366,7 +385,7 @@ async function handleFiles(fileList){
   statusEl.textContent = 'Processing ' + files.length + ' file(s)...';
 
   const touchedMonths = new Set();
-  let totalNew = 0, totalSkippedDup = 0, filesOk = 0, filesFailed = 0, rmLookedUp = 0, rmUnmatched = 0;
+  let totalNew = 0, totalSkippedDup = 0, totalEnriched = 0, filesOk = 0, filesFailed = 0, rmLookedUp = 0, rmUnmatched = 0;
   let rmMap = null;   // only fetched if actually needed (a file has no DEALER column)
 
   for(const file of files){
@@ -391,8 +410,13 @@ async function handleFiles(fileList){
       }
 
       // Group parsed rows by month (a file is normally single-day, but this
-      // handles it safely either way) and merge, de-duplicating by id so
-      // re-uploading the same day's file twice doesn't create doubles.
+      // handles it safely either way) and merge. Same trade id already
+      // saved? Don't add a duplicate row — but DO fill in any field on the
+      // existing record that's currently blank (channel, status changing
+      // from Pending to Cancelled between two pulls the same day, etc.)
+      // from the freshly re-uploaded copy. This is what makes "Backfill" /
+      // re-uploading actually fix older records that were saved before a
+      // field like Channel existed, instead of leaving them stuck forever.
       const byMonth = {};
       parsed.rows.forEach(r=>{
         const mk = r.date ? monthKey(r.date) : monthKey(new Date().toISOString());
@@ -402,10 +426,18 @@ async function handleFiles(fileList){
       for(const mk in byMonth){
         await loadMonth(mk);
         const bucket = monthCache[mk][parsed.seg==='EQ' ? 'equity' : 'fo'];
-        const existingIds = new Set(bucket.map(x=>x.id));
+        const byId = new Map(bucket.map(x=>[x.id, x]));
         byMonth[mk].forEach(r=>{
-          if(existingIds.has(r.id)){ totalSkippedDup++; return; }
-          bucket.push(r); existingIds.add(r.id); totalNew++;
+          const existing = byId.get(r.id);
+          if(existing){
+            let updated = false;
+            Object.keys(r).forEach(k=>{
+              if(!existing[k] && r[k]){ existing[k] = r[k]; updated = true; }
+            });
+            if(updated) totalEnriched++; else totalSkippedDup++;
+            return;
+          }
+          bucket.push(r); byId.set(r.id, r); totalNew++;
         });
         touchedMonths.add(mk);
       }
@@ -420,7 +452,8 @@ async function handleFiles(fileList){
   try{ localStorage.setItem('dninvest_trades_last_upload', new Date().toISOString()); }catch(e){}
 
   statusEl.textContent = `✅ ${filesOk} file(s) read, ${totalNew} new trade(s) added` +
-    (totalSkippedDup ? `, ${totalSkippedDup} already-existing skipped` : '') +
+    (totalEnriched ? `, ${totalEnriched} existing trade(s) updated (e.g. Channel filled in)` : '') +
+    (totalSkippedDup ? `, ${totalSkippedDup} already-existing (no change)` : '') +
     (rmLookedUp ? `, RM matched for ${rmLookedUp} from client records` : '') +
     (rmUnmatched ? `, ⚠️ RM not found for ${rmUnmatched} (client name didn't match any CRM client)` : '') +
     (filesFailed ? `, ⚠️ ${filesFailed} file(s) not recognised` : '') +
@@ -523,12 +556,21 @@ function clearFilters(){
   document.getElementById('fSearch').value='';
   document.getElementById('fRm').value='';
   document.getElementById('fSeg').value='';
+  document.getElementById('fStatus').value='';
   document.getElementById('fFrom').value='';
   document.getElementById('fTo').value='';
   renderTable();
 }
 
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const STATUS_COLOR = {
+  'Fully Executed':'#0f7a45', 'Partly Executed':'#0891b2', 'Pending':'#b7950b',
+  'Cancelled':'#5d6e8a', 'Rejected':'#c0392b', 'Expired':'#8a6a1c'
+};
+function statusBadge(status){
+  const c = STATUS_COLOR[status] || '#5d6e8a';
+  return `<span class="badge" style="background:${c}22;color:${c}">${esc(status)}</span>`;
+}
 
 let sortState = {field:'time', dir:-1};   // -1 = latest/desc first by default, matching the previous behaviour
 
@@ -548,6 +590,7 @@ function renderTable(){
   const q = document.getElementById('fSearch').value.trim().toLowerCase();
   const rm = document.getElementById('fRm').value;
   const seg = document.getElementById('fSeg').value;
+  const statusF = document.getElementById('fStatus').value;
   const from = document.getElementById('fFrom').value;
   const to = document.getElementById('fTo').value;
 
@@ -555,6 +598,7 @@ function renderTable(){
   if(rm==='__unknown__') rows = rows.filter(r=>!r.rm);
   else if(rm) rows = rows.filter(r=>r.rm===rm);
   if(seg) rows = rows.filter(r=>r.seg===seg);
+  if(statusF) rows = rows.filter(r=>r.status===statusF);
   if(from) rows = rows.filter(r=>r.date>=from);
   if(to) rows = rows.filter(r=>r.date<=to);
 
@@ -594,21 +638,26 @@ function renderTable(){
       <td>${r.qty}</td>
       <td>₹${r.price}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.channel||'—')}</td>
-      <td style="font-size:.68rem;color:var(--gray)">${esc(r.status)}</td>
+      <td>${statusBadge(r.status)}</td>
     </tr>`;
   }).join('');
 }
 
 async function updateDashboardStats(){
+  const isExecuted = r => r.status==='Fully Executed' || r.status==='Partly Executed';
   const todayStr = new Date().toISOString().slice(0,10);
   const mk = monthKey(todayStr);
   await loadMonth(mk);
   const data = monthCache[mk] || {equity:[], fo:[]};
-  const todayEq = data.equity.filter(r=>r.date===todayStr).length;
-  const todayFo = data.fo.filter(r=>r.date===todayStr).length;
+  // Dashboard cards reflect actual trading activity — Cancelled/Rejected/
+  // Pending/Expired orders are kept for the record but don't count here
+  // (they'd make "today's trades" look far bigger than what actually
+  // executed). The table below shows everything, filterable by Status.
+  const todayEq = data.equity.filter(r=>r.date===todayStr && isExecuted(r)).length;
+  const todayFo = data.fo.filter(r=>r.date===todayStr && isExecuted(r)).length;
   document.getElementById('statTodayEq').textContent = todayEq;
   document.getElementById('statTodayFo').textContent = todayFo;
-  document.getElementById('statMonthTotal').textContent = data.equity.length + data.fo.length;
+  document.getElementById('statMonthTotal').textContent = data.equity.filter(isExecuted).length + data.fo.filter(isExecuted).length;
   try{
     const last = localStorage.getItem('dninvest_trades_last_upload');
     document.getElementById('statLastUpload').textContent = last ? new Date(last).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
