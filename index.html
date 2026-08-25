@@ -285,6 +285,7 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 .nav-item:hover{background:var(--bg);color:var(--navy);}
 .nav-item.active{background:linear-gradient(90deg,#e8edf8 0%,#f5f7fc 100%);color:var(--navy);font-weight:700;border-left-color:var(--navy);border-left-width:4px;}
 .nav-item .icon{font-size:.88rem;width:18px;text-align:center;}
+.mobile-only-nav{display:none;}   /* desktop-hidden by default — desktop uses the topbar buttons instead; shown on mobile via the media query below, once JS marks it role-ok */
 .nav-badge{margin-left:auto;background:var(--blue2);color:var(--navy);font-size:.68rem;
   padding:2px 7px;border-radius:10px;font-weight:700;}
 .nav-badge.red{background:var(--red2);color:var(--red);}
@@ -729,14 +730,23 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .topbar-brand{font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
   .topbar-logo-img{width:22px;height:22px;flex:0 0 auto;}
   .user-pill{display:none;}
-  #changeCredBtn{font-size:.7rem;padding:4px 6px;}
-  #changeCredBtn .cred-btn-text{display:none;}
-  #hrPortalTopBtn, #assetTrackerTopBtn, #tradesAppTopBtn{font-size:.7rem!important;padding:4px 7px!important;}
-  .topbar-btn-text{display:none;}   /* icon-only for HR/Assets buttons on mobile — frees up space for the logo */
-  .topbar-right{gap:4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:60vw;}
-  .topbar-right::-webkit-scrollbar{display:none;}
-  .btn-sm{font-size:.7rem;padding:5px 7px;flex:0 0 auto;}
+  /* 25-Aug-2026: the topbar was carrying 6 buttons (key, HR, Assets, Trades,
+     Clear Cache, Logout) squeezed into a narrow strip on mobile — hard to
+     tap accurately, and the "key" (Change PIN) icon in particular got lost
+     in the crowd. On mobile these all move into the sidebar instead (full-
+     width rows, real labels, much easier to hit) — see .mobile-only-nav
+     below — and the topbar keeps only Logout, which people expect to find
+     in the header. Desktop is untouched; it still shows the full button row. */
+  #changeCredBtn, #hrPortalTopBtn, #assetTrackerTopBtn, #tradesAppTopBtn, #topbarClearCacheBtn{display:none!important;}
+  .topbar-right{gap:4px;flex-wrap:nowrap;overflow-x:visible;max-width:none;}
+  .btn-sm{font-size:.78rem;padding:6px 12px;flex:0 0 auto;}
   .seg-indicator{display:none;}
+  /* Sidebar shortcuts that only exist for mobile (desktop already has the
+     equivalent buttons in the topbar) — "role-ok" is set by JS the same
+     way the topbar buttons' visibility already was, so someone who
+     wouldn't have seen (say) the Assets button on desktop doesn't see it
+     here either. */
+  .mobile-only-nav.role-ok{display:flex;}
   /* Zoom widget hidden on mobile — use pinch-zoom instead */
   #dnZoomBar{display:none!important;}
   #dnSqBell{display:none!important;}
@@ -1240,7 +1250,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <button class="btn-sm" id="tradesAppTopBtn" onclick="openTradesApp()" title="Daily Trade Confirmations kholo" style="background:#0f7a45;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         📋 <span class="topbar-btn-text">Trades</span>
       </button>
-      <button class="btn-sm" onclick="clearCrmCache()" title="Purana/stale data clear karke fresh reload kare" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
+      <button class="btn-sm" id="topbarClearCacheBtn" onclick="clearCrmCache()" title="Purana/stale data clear karke fresh reload kare" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         🧹 <span class="topbar-btn-text">Clear Cache</span>
       </button>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
@@ -1328,6 +1338,18 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </div>
 
       <div class="sidebar-section" id="tools-nav-section">Tools</div>
+      <div class="nav-item mobile-only-nav" onclick="openChangeCredModal(); closeSidebar();" id="nav-change-cred" title="Change PIN/Password">
+        <span class="icon">🔑</span> Change PIN/Password
+      </div>
+      <div class="nav-item mobile-only-nav" onclick="openHrPortal(); closeSidebar();" id="nav-hr-portal" title="HR Portal kholo">
+        <span class="icon">👔</span> HR Portal
+      </div>
+      <div class="nav-item mobile-only-nav" onclick="openAssetTracker(); closeSidebar();" id="nav-asset-tracker" title="Asset & Net Worth Tracker kholo">
+        <span class="icon">💰</span> Assets
+      </div>
+      <div class="nav-item mobile-only-nav role-ok" onclick="openTradesApp(); closeSidebar();" id="nav-trades-app" title="Daily Trade Confirmations kholo">
+        <span class="icon">📋</span> Trades
+      </div>
       <div class="nav-item" onclick="showPage('brokerage-calc'); bcApplyRoleAccess(); bcRenderClientDropdown();" id="nav-brokerage-calc">
         <span class="icon">🧮</span> Brokerage Calculator
       </div>
