@@ -331,7 +331,13 @@ function parseWorkbook(wb){
     colIndex(header, ['LAST MOD TIME'])
   ].filter(i=>i>=0);
   const iOrderId = colIndex(header, ['EXCH ORDER ID','EXCHORDERID','EXCHANGE ORDER ID']);
-  const iChannel = colIndex(header, ['CHANNEL CODE']);
+  // Prefer "CHANNEL USER" (the actual login username who placed the order,
+  // e.g. "ABIS437") over "CHANNEL CODE" (just the platform, e.g. "MOBAND")
+  // — more specific and directly useful for tracking. Not every report
+  // variant has CHANNEL USER (the F&O ones only carry CHANNEL CODE), so
+  // this falls back to CODE when USER isn't present.
+  const iChannelUser = colIndex(header, ['CHANNEL USER']);
+  const iChannelCode = colIndex(header, ['CHANNEL CODE']);
   const iOptType = seg==='FO' ? colIndex(header, ['OPTION TYPE']) : -1;
   const iStrike = seg==='FO' ? colIndex(header, ['STRIKE PRICE']) : -1;
   const iExpiry = seg==='FO' ? colIndex(header, ['EXPIRY DATE']) : -1;
@@ -373,7 +379,7 @@ function parseWorkbook(wb){
       optType: iOptType>=0 ? row[iOptType] : '',
       strike: iStrike>=0 ? row[iStrike] : '',
       expiry: iExpiry>=0 ? String(row[iExpiry]||'').slice(0,10) : '',
-      channel: iChannel>=0 ? String(row[iChannel]||'').trim() : ''
+      channel: iChannelUser>=0 && row[iChannelUser] ? String(row[iChannelUser]).trim() : (iChannelCode>=0 ? String(row[iChannelCode]||'').trim() : '')
     });
   }
   return {seg, rows: out};
