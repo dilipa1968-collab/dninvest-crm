@@ -194,32 +194,88 @@ function colIndex(headerRow, names){
 // one-time-per-session fetch straight from Firestore — it does NOT touch
 // anything the CRM itself loads on login, so it can't add load there.
 let clientRmMap = null;   // { normalisedName: rmName }
+let clientRmDiag = '';    // last diagnostic string, shown in the upload status so mismatches are visible immediately
 function normName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
+
+function absorbClientArray(arr, map){
+  let added = 0;
+  if(!Array.isArray(arr)) return 0;
+  arr.forEach(c=>{
+    const nm = normName(c && c.name);
+    const rm = c && c.rm;
+    if(nm && rm && !map[nm]){ map[nm] = rm; added++; }
+  });
+  return added;
+}
 
 async function loadClientRmMap(){
   if(clientRmMap) return clientRmMap;
   const map = {};
   const SHARD_COUNT = 8;
-  const keys = ['eq_clients','mf_clients'];
-  const fetches = [];
-  keys.forEach(key=>{
+  const diag = [];
+
+  // Strategy A: sharded docs inside crm_data (crm_data/eq_clients__s0..7,
+  // crm_data/mf_clients__s0..7) — the layout most of this CRM's own data
+  // uses.
+  for(const key of ['eq_clients','mf_clients']){
+    let shardsFound = 0, recordsFound = 0;
     for(let i=0;i<SHARD_COUNT;i++){
-      fetches.push(
-        fdb.collection('crm_data').doc(key+'__s'+i).get()
-          .then(doc=>{
-            if(!doc.exists) return;
-            const arr = (doc.data()||{}).data;
-            if(!Array.isArray(arr)) return;
-            arr.forEach(c=>{
-              const nm = normName(c.name);
-              if(nm && c.rm && !map[nm]) map[nm] = c.rm;   // first match wins if a name exists in both segments
-            });
-          })
-          .catch(()=>{})   // a missing/unreadable shard just contributes nothing — never blocks the rest
-      );
+      try{
+        const doc = await fdb.collection('crm_data').doc(key+'__s'+i).get();
+        if(doc.exists){
+          shardsFound++;
+          recordsFound += absorbClientArray((doc.data()||{}).data, map);
+        }
+      }catch(e){}
     }
-  });
-  await Promise.all(fetches);
+    diag.push(`crm_data/${key}__sN: ${shardsFound}/${SHARD_COUNT} shards, ${recordsFound} named`);
+  }
+
+  // Strategy B: a plain (non-sharded) doc at crm_data/eq_clients or
+  // crm_data/mf_clients, in case a segment isn't actually sharded.
+  for(const key of ['eq_clients','mf_clients']){
+    try{
+      const doc = await fdb.collection('crm_data').doc(key).get();
+      if(doc.exists){
+        const n = absorbClientArray((doc.data()||{}).data, map);
+        diag.push(`crm_data/${key} (plain doc): ${n} named`);
+      }
+    }catch(e){}
+  }
+
+  // Strategy C: a separate TOP-LEVEL collection, e.g. "eq_clients_v2" —
+  // seen in this project's Firestore console for equity clients specifically.
+  // Tries both a sharded-inside-that-collection shape (eq_clients_v2/s0..7)
+  // and, failing that, treats every document in the collection as one
+  // client record each.
+  for(const coll of ['eq_clients_v2','mf_clients_v2']){
+    let shardsFound = 0, recordsFound = 0;
+    for(let i=0;i<SHARD_COUNT;i++){
+      try{
+        const doc = await fdb.collection(coll).doc('s'+i).get();
+        if(doc.exists){ shardsFound++; recordsFound += absorbClientArray((doc.data()||{}).data, map); }
+      }catch(e){}
+    }
+    if(shardsFound){
+      diag.push(`${coll}/sN: ${shardsFound}/${SHARD_COUNT} shards, ${recordsFound} named`);
+      continue;
+    }
+    try{
+      const snap = await fdb.collection(coll).limit(2000).get();
+      if(!snap.empty){
+        let n = 0;
+        snap.forEach(doc=>{
+          const d = doc.data()||{};
+          const nm = normName(d.name);
+          if(nm && d.rm && !map[nm]){ map[nm] = d.rm; n++; }
+        });
+        diag.push(`${coll} (one doc per client): ${snap.size} docs, ${n} named`);
+      }
+    }catch(e){}
+  }
+
+  clientRmDiag = diag.join(' · ');
+  console.log('Client RM lookup diagnostic:', clientRmDiag, '— total unique names loaded:', Object.keys(map).length);
   clientRmMap = map;
   return map;
 }
@@ -353,7 +409,9 @@ async function handleFiles(fileList){
     (totalSkippedDup ? `, ${totalSkippedDup} already-existing skipped` : '') +
     (rmLookedUp ? `, RM matched for ${rmLookedUp} from client records` : '') +
     (rmUnmatched ? `, ⚠️ RM not found for ${rmUnmatched} (client name didn't match any CRM client)` : '') +
-    (filesFailed ? `, ⚠️ ${filesFailed} file(s) not recognised` : '');
+    (filesFailed ? `, ⚠️ ${filesFailed} file(s) not recognised` : '') +
+    (clientRmDiag ? `\n🔎 Client lookup: ${clientRmDiag}` : '');
+  statusEl.style.whiteSpace = 'pre-line';
 
   await populateMonthFilter();
   await onMonthChange();
