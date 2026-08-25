@@ -1746,7 +1746,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
 
         <div class="filters">
-          <input type="text" placeholder="🔍 Search..." oninput="renderMfTxnTable()" id="mftxn-search" style="max-width:150px;padding:4px 8px;font-size:.72rem">
+          <input type="text" placeholder="🔍 Search..." oninput="renderMfTxnTable()" id="mftxn-search" style="min-width:90px;max-width:110px;padding:4px 8px;font-size:.72rem">
           <select onchange="renderMfTxnTable()" id="mftxn-rm-filter" style="padding:4px 6px;font-size:.72rem"><option value="">All RMs</option></select>
           <select onchange="renderMfTxnTable()" id="mftxn-status-filter" title="Filter by status" style="padding:4px 6px;font-size:.72rem">
             <option value="">All Status</option>
@@ -1784,7 +1784,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:4px;font-size:.72rem"></label>
           <label style="font-size:.72rem;color:var(--gray);display:flex;align-items:center;gap:2px">To:
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-to-date" style="padding:4px;font-size:.72rem"></label>
-          <button type="button" onclick="clearMfTxnFilters()" title="Clear all filters" style="padding:5px 8px;font-size:.72rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--gray);cursor:pointer;white-space:nowrap">🔄 Clear</button>
+          <button type="button" onclick="clearMfTxnFilters()" title="Clear all filters" style="margin-left:auto;padding:5px 8px;font-size:.72rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--gray);cursor:pointer;white-space:nowrap">🔄 Clear</button>
           <span class="res-count" id="mftxn-count" style="white-space:nowrap;font-size:.68rem"></span>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="mftxn-table"></div></div>
