@@ -62,7 +62,8 @@
   .bs-b{background:var(--green2);color:var(--green)}
   .bs-s{background:var(--red2);color:var(--red)}
   .empty{text-align:center;padding:40px;color:var(--gray)}
-  .status-line{font-size:.8rem;color:var(--gray);margin-top:8px}
+  .status-line{font-size:.8rem;color:var(--gray);margin-top:8px;background:rgba(255,255,255,.08);padding:8px 10px;border-radius:8px;line-height:1.5}
+  .status-line:empty{padding:0;background:none}
 </style>
 </head>
 <body>
@@ -72,6 +73,7 @@
   <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
     <input type="file" id="fileUpload" accept=".xls,.xlsx" style="display:none" multiple>
     <button class="btn btn-teal" id="uploadBtn">📤 Upload Daily Trade File(s)</button>
+    <button class="btn btn-navy" onclick="backfillRm()" title="Purani save ho chuki trades me jinka RM 'Unknown' hai, unhe dobara match karne ki koshish kare">🔁 Backfill RM (Unknown wale)</button>
     <button class="btn btn-gray" onclick="clearTradesCache()">🧹 Clear Cache</button>
   </div>
   <div class="status-line" id="uploadStatus" style="color:#c3cad9"></div>
@@ -414,6 +416,55 @@ async function handleFiles(fileList){
   statusEl.style.whiteSpace = 'pre-line';
 
   await populateMonthFilter();
+  await onMonthChange();
+  updateDashboardStats();
+}
+
+async function backfillRm(){
+  // Fixes trades that got saved as "Unknown" BEFORE the client-lookup logic
+  // existed or worked correctly. Re-uploading the same file again does NOT
+  // help with this — duplicate detection (by order id) skips rows that are
+  // already saved, so a broken rm value saved once stays broken forever
+  // unless something specifically goes back and retries the lookup on
+  // exactly those rows. This button does that, across every saved month —
+  // no new file needed.
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.style.whiteSpace = 'pre-line';
+  statusEl.textContent = 'Loading client records for lookup...';
+  clientRmMap = null;   // force a fresh fetch, in case client/RM assignments changed since last load
+  const rmMap = await loadClientRmMap();
+
+  statusEl.textContent = `Client lookup loaded (${Object.keys(rmMap).length} names). Scanning saved months...`;
+
+  let monthIds = [];
+  try{
+    const snap = await fdb.collection('trade_data').get();
+    monthIds = snap.docs.map(d=>d.id);
+  }catch(e){
+    statusEl.textContent = '❌ Could not list saved months: ' + e.message;
+    return;
+  }
+
+  let totalFixed = 0, totalStillUnknown = 0, monthsTouched = 0;
+  for(const docId of monthIds){
+    const mk = docId.replace('trades_','').replace('_','-');
+    const data = await loadMonth(mk);
+    let changed = false;
+    ['equity','fo'].forEach(seg=>{
+      data[seg].forEach(r=>{
+        if(r.rm) return;
+        const match = rmMap[normName(r.client)];
+        if(match){ r.rm = match; totalFixed++; changed = true; }
+        else totalStillUnknown++;
+      });
+    });
+    if(changed){ await saveMonth(mk); monthsTouched++; }
+  }
+
+  statusEl.textContent = `✅ Backfill done — ${totalFixed} trade(s) fixed across ${monthsTouched} month(s).` +
+    (totalStillUnknown ? ` ⚠️ ${totalStillUnknown} still unmatched (client name not found in CRM — check spelling or add the client).` : '') +
+    `\n🔎 Client lookup: ${clientRmDiag}`;
+
   await onMonthChange();
   updateDashboardStats();
 }
