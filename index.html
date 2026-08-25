@@ -318,7 +318,18 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
 #page-mf-txns > #mftxn-tablewrap{flex:1 1 auto;min-height:0;height:100%;display:flex;flex-direction:column;overflow:hidden;}
 #page-mf-txns > #mftxn-tablewrap .tbl-scroll{flex:1 1 auto;min-height:0;height:100%;max-height:none!important;}
 @media(max-width:800px){
-  #page-mf-txns.active{left:0;}
+  /* 25-Aug-2026: the fixed/pinned frame above relies on 100vh math that's
+     unreliable on mobile browsers — the address bar showing/hiding changes
+     what 100vh actually resolves to, and since this page had NO normal
+     document scroll to fall back on (position:fixed removes it from the
+     page entirely), that miscalculation showed up as "can't scroll at
+     all" on phones. Mobile gets the simple, always-reliable version
+     instead: back to normal document flow, whole page scrolls together
+     like every other page in the app. Desktop keeps the fixed-frame/
+     internal-scroll version above, which works fine there. */
+  #page-mf-txns.active{position:static;display:block;height:auto;padding:0;overflow:visible;}
+  #page-mf-txns > #mftxn-tablewrap{display:block;overflow:visible;height:auto;}
+  #page-mf-txns > #mftxn-tablewrap .tbl-scroll{max-height:none!important;overflow:visible;}
 }
 /* Total row (tfoot) stays pinned to the bottom of the table's own scroll
    area — same sticky trick already used for the header row (position:
