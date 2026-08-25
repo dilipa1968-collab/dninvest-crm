@@ -233,7 +233,7 @@ const CF = (function(){
       eq:  {code:r.code,name:r.name,mobile:r.mobile,rm:r.rm,status:r.status,followup_status:r.followup_status},
       mf:  {name:r.name,mobile:r.mobile,pan:r.pan,rm:r.rm,status:r.status,followup_status:r.followup_status},
       leads:{name:r.name,mobile:r.mobile,source:r.source,segment:r.segment,rm:r.rm,status:r.status,followup_status:r.followup_status},
-      mftxn:{rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending'},
+      mftxn:{rm:r.rm,type:r.type,fund_name:r.fund_name,status:r.status||'Pending',source:r.source||''},
       demat:{rm:r.rm,status:r.status||'Pending'},
       sip:  {rm:r.rm,fund_name:r.fund_name,sip_type:r.sip_type,status:r.status}
     };

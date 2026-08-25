@@ -1727,6 +1727,17 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <label>Date *</label>
               <input type="date" id="mftxn-date">
             </div>
+            <div class="form-field" style="min-width:140px">
+              <label>Source</label>
+              <select id="mftxn-source">
+                <option value="">— Select —</option>
+                <option value="CAMS">CAMS</option>
+                <option value="KFintech">KFintech</option>
+                <option value="BSE">BSE</option>
+                <option value="NSE">NSE</option>
+                <option value="Physical">Physical</option>
+              </select>
+            </div>
             <div class="form-field" style="justify-content:flex-end">
               <label>&nbsp;</label>
               <button class="btn btn-success" onclick="saveMfTxnEntry()">Save Transaction</button>
@@ -1760,6 +1771,14 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </select>
           <select onchange="onMfTxnMonthChange()" id="mftxn-month-filter" title="View month-wise" style="padding:4px 6px;font-size:.72rem">
             <option value="">All Months</option>
+          </select>
+          <select onchange="renderMfTxnTable()" id="mftxn-source-filter" title="Filter by source" style="padding:4px 6px;font-size:.72rem">
+            <option value="">All Sources</option>
+            <option value="CAMS">CAMS</option>
+            <option value="KFintech">KFintech</option>
+            <option value="BSE">BSE</option>
+            <option value="NSE">NSE</option>
+            <option value="Physical">Physical</option>
           </select>
           <label style="font-size:.72rem;color:var(--gray);display:flex;align-items:center;gap:2px">From:
             <input type="date" onchange="renderMfTxnTable()" id="mftxn-from-date" style="padding:4px;font-size:.72rem"></label>
@@ -2684,6 +2703,16 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div id="biz-fund-results" style="display:none;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:99999;margin-top:4px"></div>
         </div>
         <div class="form-field"><label>Date *</label><input id="biz_date" type="date"></div>
+        <div class="form-field"><label>Source</label>
+          <select id="biz_source">
+            <option value="">— Select —</option>
+            <option value="CAMS">CAMS</option>
+            <option value="KFintech">KFintech</option>
+            <option value="BSE">BSE</option>
+            <option value="NSE">NSE</option>
+            <option value="Physical">Physical</option>
+          </select>
+        </div>
       </div>
       <div class="form-row" id="biz_target_wrap" style="display:none">
         <div class="form-field" style="position:relative"><label>Target Scheme (Switch / STP into) *</label>

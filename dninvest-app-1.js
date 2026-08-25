@@ -7334,6 +7334,7 @@ function openBusinessModal(clientId, clientName){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value='';
   toggleBizTarget();
   document.getElementById('biz_date').value = today();
+  const bsResetEl=document.getElementById('biz_source'); if(bsResetEl) bsResetEl.value='';
   document.getElementById('businessModal').classList.add('open');
 }
 
@@ -7344,6 +7345,7 @@ async function saveBusinessEntry(){
   const fundName = (document.getElementById('biz_fund')?.value||'').trim();
   const targetScheme = (document.getElementById('biz_target_fund')?.value||'').trim();
   const date = document.getElementById('biz_date').value;
+  const source = document.getElementById('biz_source')?.value||'';
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
   if(!fundName){ toast('Please enter the fund name','error'); return; }
@@ -7382,6 +7384,7 @@ async function saveBusinessEntry(){
       fresh.first_payment = finalSched ? finalFirstPay : null;
       fresh.start_date = finalSched ? startDate : '';
       fresh.date = date;
+      fresh.source = source;
     });
     if(!r.ok || r.aborted){ if(r.aborted) toast('Entry no longer exists','error'); return; }
     learnFundName(fundName);
@@ -7408,6 +7411,7 @@ async function saveBusinessEntry(){
     first_payment: sched ? firstPay : null,
     start_date: sched ? startDate : '',
     date,
+    source,
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
@@ -7726,6 +7730,7 @@ function clearMfTxnFilters(){
   const st=document.getElementById('mftxn-status-filter'); if(st) st.value='';
   const tp=document.getElementById('mftxn-type-filter'); if(tp) tp.value='';
   const mo=document.getElementById('mftxn-month-filter'); if(mo) mo.value='';
+  const src=document.getElementById('mftxn-source-filter'); if(src) src.value='';
   const fd=document.getElementById('mftxn-from-date'); if(fd) fd.value='';
   const td=document.getElementById('mftxn-to-date'); if(td) td.value='';
   renderMfTxnTable();
@@ -8882,6 +8887,7 @@ function saveMfTxnEntry(){
   const fundName=document.getElementById('mftxn-fund').value.trim();
   const targetScheme=(document.getElementById('mftxn-target-fund')?.value||'').trim();
   const date=document.getElementById('mftxn-date').value;
+  const source=document.getElementById('mftxn-source')?.value||'';
 
   if(!amount || amount<=0){ toast('Please enter the amount','error'); return; }
   if(!fundName){ toast('Please enter the fund name','error'); return; }
@@ -8905,6 +8911,7 @@ function saveMfTxnEntry(){
     first_payment: sched ? firstPay : null,
     start_date: sched ? startDate : '',
     date,
+    source,
     created_by: CU.name,
     created_by_role: CU.role,
     created: today(),
@@ -8951,6 +8958,7 @@ function mfTxnSortValue(e, key){
     case 'fund':   return (e.fund_name||'').toLowerCase();
     case 'amount': return Number(e.amount)||0;
     case 'status': return (e.status||'Pending').toLowerCase();
+    case 'source': return (e.source||'').toLowerCase();
     case 'start_date': return (e.start_date||'');
     case 'date':
     default:       return (e.date||'');
@@ -8974,6 +8982,7 @@ function getFilteredMfTxns(){
   const typeF=document.getElementById('mftxn-type-filter')?.value||'';
   const monthF=document.getElementById('mftxn-month-filter')?.value||'';
   const statusF=document.getElementById('mftxn-status-filter')?.value||'';
+  const sourceF=document.getElementById('mftxn-source-filter')?.value||'';
   const fromD=document.getElementById('mftxn-from-date')?.value||'';
   const toD=document.getElementById('mftxn-to-date')?.value||'';
 
@@ -8982,6 +8991,7 @@ function getFilteredMfTxns(){
   if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
   if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
   if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
+  if(sourceF) entries=entries.filter(e=>(e.source||'')===sourceF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
 
@@ -9022,7 +9032,7 @@ function renderMfTxnTable(){
   const sThNoFilter=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
   wrap.innerHTML=`<table>
-    <thead><tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('start_date','SIP Start')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}<th></th></tr></thead>
+    <thead><tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('start_date','SIP Start')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}${sTh('source','Source','source')}<th></th></tr></thead>
     <tbody>
       ${entries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
@@ -9043,6 +9053,7 @@ function renderMfTxnTable(){
           ${INC.cell('mf',e)}
           <td style="width:95px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
+          <td style="width:60px;font-size:.65rem;white-space:nowrap">${e.source?escapeHtml(e.source):'<span style="color:var(--gray)">—</span>'}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
@@ -9057,7 +9068,7 @@ function renderMfTxnTable(){
       <td colspan="${CU.role==='admin'?7:6}" style="text-align:right">TOTAL${(document.getElementById('mftxn-rm-filter')?.value)?' — '+escapeHtml(document.getElementById('mftxn-rm-filter').value):''} (${entries.length})</td>
       <td style="text-align:right">₹${brkFmt(entries.reduce((s,e)=>s+(Number(e.amount)||0),0))}</td>
       <td style="text-align:right">${INC.fmt(INC.total('mf',entries))}</td>
-      <td colspan="3"></td>
+      <td colspan="4"></td>
     </tr></tfoot>
   </table>`;
   MFTBULK.afterRender();
@@ -10579,6 +10590,7 @@ function editBusinessEntry(id){
   const sdEl=document.getElementById('biz_startdate'); if(sdEl) sdEl.value = e.start_date||'';
   toggleBizTarget();
   document.getElementById('biz_date').value = e.date;
+  const bsEl=document.getElementById('biz_source'); if(bsEl) bsEl.value = e.source||'';
 
   // Nothing is locked/disabled anymore for MF Desk — full edit rights on
   // every field except Delete, which stays Admin-only (its button is simply
