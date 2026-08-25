@@ -584,10 +584,22 @@ function populateRmFilter(){
 let allChannels = [];              // every channel value seen in the current month
 let selectedChannels = new Set();  // empty set = "All Channels" (no filter applied)
 
+// These are D N Investment's own office/admin login IDs (not individual
+// client-facing RM-user codes) — pinned to the very top of the channel
+// list, in this order, so they can all be ticked together in one go
+// without scrolling or searching. "ADMIN" sits first if it's ever present.
+const OFFICE_CHANNEL_PRIORITY = ['ADMIN','TTDNINV10','TTDNINV12','TTDNINV14','TTDNINV17','OTBACKUP1','OTDNINV4C','OTDNINV4A','DNINV1'];
+
 function populateChannelFilter(){
   const data = monthCache[currentMonth] || {equity:[], fo:[]};
   const all = [...data.equity, ...data.fo];
-  allChannels = [...new Set(all.map(r=>r.channel).filter(Boolean))].sort();
+  const seen = [...new Set(all.map(r=>r.channel).filter(Boolean))];
+  const priIndex = c => { const i = OFFICE_CHANNEL_PRIORITY.indexOf(c.toUpperCase()); return i===-1 ? 999 : i; };
+  allChannels = seen.sort((a,b)=>{
+    const pa = priIndex(a), pb = priIndex(b);
+    if(pa!==pb) return pa-pb;          // office IDs first, in the fixed priority order
+    return a.localeCompare(b);         // everything else alphabetically after them
+  });
   // Drop any previously-selected channel that no longer exists in this month's data
   selectedChannels = new Set([...selectedChannels].filter(c=>allChannels.includes(c)));
   renderChannelCheckboxes();
@@ -602,11 +614,22 @@ function renderChannelCheckboxes(){
     list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gray);font-size:.78rem">No channels match</div>';
     return;
   }
-  list.innerHTML = shown.map(c=>`
-    <label style="display:flex;align-items:center;gap:7px;padding:4px 4px;font-size:.8rem;cursor:pointer;border-radius:5px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+  const isOffice = c => OFFICE_CHANNEL_PRIORITY.includes(c.toUpperCase());
+  let html = '';
+  let dividerDrawn = false;
+  shown.forEach((c,i)=>{
+    // A thin divider right after the last office/admin ID (only if the list
+    // actually has both office and non-office entries visible right now).
+    if(!dividerDrawn && !isOffice(c) && i>0 && isOffice(shown[i-1])){
+      html += '<div style="border-top:1px solid var(--border);margin:4px 0"></div>';
+      dividerDrawn = true;
+    }
+    html += `<label style="display:flex;align-items:center;gap:7px;padding:4px 4px;font-size:.8rem;cursor:pointer;border-radius:5px;${isOffice(c)?'font-weight:700':''}" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
       <input type="checkbox" ${selectedChannels.has(c)?'checked':''} onchange="toggleChannel('${esc(c).replace(/'/g,"\\'")}', this.checked)">
       <span>${esc(c)}</span>
-    </label>`).join('');
+    </label>`;
+  });
+  list.innerHTML = html;
 }
 
 function toggleChannel(c, checked){
