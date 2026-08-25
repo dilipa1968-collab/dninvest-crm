@@ -12162,10 +12162,25 @@ function closeFollowupAlert(){
 // thread = { id, rmUsername, rmName, messages: [{id, from, fromName, text, date, isAdmin}] }
 
 function cleanOldMessages(threads){
-  const cutoff = new Date(Date.now() - 24*60*60*1000).toISOString();
+  // 25-Aug-2026: was a rolling 24-hour window (Date.now() - 24h), so a
+  // message from late yesterday could still hang around most of today
+  // before finally aging out. Changed to a same-day boundary — a message
+  // simply disappears once the calendar date has moved past the day it
+  // was sent, regardless of what time it was sent.
+  const todayStr = today();
   return threads.map(t => ({
     ...t,
-    messages: (t.messages||[]).filter(m => m.date > cutoff)
+    messages: (t.messages||[]).filter(m => {
+      // Compare using local-date getters (same basis as today()) rather
+      // than slicing the raw UTC ISO string — a naive string slice would
+      // wrongly treat a message sent between midnight and ~5:30 AM IST as
+      // "yesterday" (its UTC date is still the previous day at that hour)
+      // and delete it immediately instead of keeping it for its actual day.
+      const d = new Date(m.date);
+      if(isNaN(d)) return true;   // malformed date — keep rather than silently lose it
+      const y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
+      return `${y}-${mo}-${da}` >= todayStr;
+    })
   })).filter(t => t.messages.length > 0);
 }
 
@@ -12190,13 +12205,22 @@ function updateMsgBadge(){
   if(!CU) return;
   if(CU.role === 'admin'){
     // Admin: count unread RM messages (not yet seen)
+    // 25-Aug-2026 fix: this used to compare each message's id against a
+    // single 'dninvest_admin_msg_seen' cutoff id, updated ONLY when the
+    // notification popup's Close button was clicked. Reading a message
+    // straight in the Inbox panel (switchInboxTab) updated a totally
+    // separate tracker ('dninvest_admin_seen_msgs') instead — so a message
+    // read in the Inbox never satisfied THIS check, and the browser
+    // notification/badge kept re-firing for the same already-read message
+    // indefinitely (reported: yesterday's "HELLO" from Megha still
+    // triggering notifications today). Now both use the SAME seen-set, so
+    // reading a message anywhere marks it seen everywhere.
     const threads = getRmMessages();
-    const seenKey = 'dninvest_admin_msg_seen';
-    const lastSeen = localStorage.getItem(seenKey) || '';
+    const seenSet = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
     let unread = 0;
     threads.forEach(t => {
       (t.messages||[]).forEach(m => {
-        if(!m.isAdmin && m.id > lastSeen) unread++;
+        if(!m.isAdmin && !seenSet.has(m.id)) unread++;
       });
     });
     const badge = document.getElementById('admin-inbox-badge-nav');
@@ -12387,14 +12411,14 @@ function closeMsgPopup(){
 function checkRmReply(){
   if(!CU) return;
   if(CU.role==='admin'){
-    // Admin: check for new RM messages
+    // Admin: check for new RM messages — uses the same seen-set as
+    // updateMsgBadge/renderInbox now (see updateMsgBadge comment, 25-Aug-2026)
     const threads = getRmMessages();
-    const seenKey = 'dninvest_admin_msg_seen';
-    const lastSeen = localStorage.getItem(seenKey) || '';
+    const seenSet = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
     let newMsgs = [];
     threads.forEach(t => {
       (t.messages||[]).forEach(m => {
-        if(!m.isAdmin && m.id > lastSeen) newMsgs.push({...m, rmName: t.rmName});
+        if(!m.isAdmin && !seenSet.has(m.id)) newMsgs.push({...m, rmName: t.rmName});
       });
     });
     if(!newMsgs.length) return;
@@ -12431,13 +12455,16 @@ function showAdminMsgNotif(msg){
   const closeBtn = popup.querySelector('.modal-footer .btn');
   if(closeBtn){
     closeBtn.onclick = function(){
-      // Mark all current RM messages as seen for admin
+      // Mark all current RM messages as seen for admin — writes into the
+      // SAME 'dninvest_admin_seen_msgs' set the Inbox panel uses (25-Aug-2026
+      // fix, see updateMsgBadge comment), so dismissing this popup and
+      // reading a message in the Inbox panel are consistent from here on.
       const allThreads = getRmMessages();
-      let lastId = '';
+      const seenSet = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
       allThreads.forEach(t => {
-        (t.messages||[]).forEach(m => { if(!m.isAdmin && m.id > lastId) lastId = m.id; });
+        (t.messages||[]).forEach(m => { if(!m.isAdmin) seenSet.add(m.id); });
       });
-      if(lastId) localStorage.setItem('dninvest_admin_msg_seen', lastId);
+      localStorage.setItem('dninvest_admin_seen_msgs', JSON.stringify([...seenSet].slice(-500)));
       popup.classList.remove('open');
       updateMsgBadge();
       if(getCurrentPageId()==='admin') renderInbox();
