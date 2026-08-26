@@ -62,7 +62,7 @@
   tbody tr:hover{background:var(--blue2)}
   td{padding:4px 6px;white-space:nowrap}
   .tbl-scroll{max-height:60vh;overflow-y:auto;border-radius:10px;border:1px solid var(--border)}
-  .badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:.68rem;font-weight:700}
+  .badge{display:inline-block;padding:2px 6px;border-radius:6px;font-size:.68rem;font-weight:700}
   .seg-eq{background:#e0f2fe;color:#0369a1}
   .seg-fo{background:#fce7f3;color:#be185d}
   .bs-b{background:var(--green2);color:var(--green)}
@@ -166,8 +166,8 @@
           <th data-key="orderPrice" onclick="sortTrades('orderPrice')">Ord Price <span class="sort-arrow" id="arrow-orderPrice"></span></th>
           <th data-key="qty" onclick="sortTrades('qty')">Qty <span class="sort-arrow" id="arrow-qty"></span></th>
           <th data-key="price" onclick="sortTrades('price')">Price <span class="sort-arrow" id="arrow-price"></span></th>
-          <th data-key="channel" onclick="sortTrades('channel')">Channel <span class="sort-arrow" id="arrow-channel"></span></th>
-          <th data-key="status" onclick="sortTrades('status')">Status <span class="sort-arrow" id="arrow-status"></span></th>
+          <th data-key="channel" onclick="sortTrades('channel')" style="padding-right:4px">Channel <span class="sort-arrow" id="arrow-channel"></span></th>
+          <th data-key="status" onclick="sortTrades('status')" style="padding-left:4px">Status <span class="sort-arrow" id="arrow-status"></span></th>
           <th data-key="skOrderDateTime" onclick="sortTrades('skOrderDateTime')">SK Order Date Time <span class="sort-arrow" id="arrow-skOrderDateTime"></span></th>
           <th data-key="lastModTime" onclick="sortTrades('lastModTime')">Last Modify Time <span class="sort-arrow" id="arrow-lastModTime"></span></th>
           <th data-key="time" onclick="sortTrades('time')">Exch Date/Time <span class="sort-arrow" id="arrow-time"></span></th>
@@ -1064,8 +1064,8 @@ function renderTable(){
       <td>${r.orderPrice ? '₹'+r.orderPrice : '—'}</td>
       <td>${r.qty}</td>
       <td>₹${r.price}</td>
-      <td style="font-size:.68rem;color:var(--gray)">${esc(r.channel||'—')}</td>
-      <td>${statusBadge(r.status)}</td>
+      <td style="font-size:.68rem;color:var(--gray);padding-right:4px">${esc(r.channel||'—')}</td>
+      <td style="padding-left:4px">${statusBadge(r.status)}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.skOrderDateTime||'—')}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.lastModTime||'—')}</td>
       <td>${esc(r.time)}</td>
