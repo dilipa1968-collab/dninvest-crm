@@ -240,6 +240,23 @@ let clientRmMap = null;   // { normalisedName: rmName }
 let clientRmDiag = '';    // last diagnostic string, shown in the upload status so mismatches are visible immediately
 function normName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 
+// ── Known RM list + name canonicalisation (26-Aug-2026) ──
+// Broker files use ALL-CAPS in the DEALER column ("BHARAT"), while CRM
+// client records store RMs in Title Case ("Bharat") — treated as two
+// different strings everywhere downstream (filters, grouping) unless
+// normalised to ONE canonical spelling. Also: a broker DEALER value that
+// ISN'T one of D N Investment's actual RMs (a shared/backup desk login
+// like "DIPPU" seen in real data) shouldn't be trusted as if it were a
+// real RM — those now fall through to the CRM client-lookup instead of
+// being taken at face value.
+const KNOWN_RMS = ['Puja','Rohit','Raju','Komal','Riya','Bharat','Khokhan','Megha','Anjali','Admin'];
+const KNOWN_RM_MAP = {};
+KNOWN_RMS.forEach(r=>{ KNOWN_RM_MAP[r.toUpperCase()] = r; });
+function canonicalRm(raw){
+  if(!raw) return '';
+  return KNOWN_RM_MAP[String(raw).trim().toUpperCase()] || '';   // '' if not a recognised RM
+}
+
 function absorbClientArray(arr, map){
   let added = 0;
   if(!Array.isArray(arr)) return 0;
@@ -382,7 +399,7 @@ function parseWorkbook(wb){
     for(const ti of iTimeCandidates){ if(row[ti]){ timeVal = String(row[ti]); break; } }
 
     const clientRaw = clientCheck.replace(/\s+/g,' ');
-    const dealerFromFile = iDealer>=0 ? String(row[iDealer]||'').trim() : '';
+    const dealerFromFile = iDealer>=0 ? canonicalRm(row[iDealer]) : '';   // '' if the file's DEALER value isn't a recognised RM — falls through to CRM lookup instead
     const scripRaw = String(row[iScrip]||'').trim();
     const bsRaw = String(row[iBS]||'').trim().toUpperCase().slice(0,1);   // 'B' or 'S' only
     const priceRaw = Number(row[iExecPrice])||0;
@@ -543,23 +560,36 @@ async function backfillRm(){
     return;
   }
 
-  let totalFixed = 0, totalStillUnknown = 0, monthsTouched = 0;
+  let totalFixed = 0, totalStillUnknown = 0, totalRecased = 0, monthsTouched = 0;
   for(const docId of monthIds){
     const mk = docId.replace('trades_','').replace('_','-');
     const data = await loadMonth(mk);
     let changed = false;
     ['equity','fo'].forEach(seg=>{
       data[seg].forEach(r=>{
-        if(r.rm) return;
-        const match = rmMap[normName(r.client)];
-        if(match){ r.rm = match; totalFixed++; changed = true; }
-        else totalStillUnknown++;
+        if(!r.rm){
+          const match = rmMap[normName(r.client)];
+          if(match){ r.rm = match; totalFixed++; changed = true; }
+          else totalStillUnknown++;
+          return;
+        }
+        // 26-Aug-2026: already has an rm value — but is it a RECOGNISED RM,
+        // in the RIGHT casing? Older saved trades may carry "BHARAT" (raw,
+        // all-caps from the file) instead of "Bharat" (canonical), or a
+        // broker desk-login value like "DIPPU" that isn't a real RM at all
+        // — both get corrected here.
+        const canon = canonicalRm(r.rm);
+        if(canon && canon !== r.rm){ r.rm = canon; totalRecased++; changed = true; }
+        else if(!canon){
+          const match = rmMap[normName(r.client)];
+          if(match && match !== r.rm){ r.rm = match; totalFixed++; changed = true; }
+        }
       });
     });
     if(changed){ await saveMonth(mk); monthsTouched++; }
   }
 
-  statusEl.textContent = `✅ Backfill done — ${totalFixed} trade(s) fixed across ${monthsTouched} month(s).` +
+  statusEl.textContent = `✅ Backfill done — ${totalFixed} trade(s) fixed, ${totalRecased} RM name(s) corrected (casing/unrecognised), across ${monthsTouched} month(s).` +
     (totalStillUnknown ? ` ⚠️ ${totalStillUnknown} still unmatched (client name not found in CRM — check spelling or add the client).` : '') +
     `\n🔎 Client lookup: ${clientRmDiag}`;
 
