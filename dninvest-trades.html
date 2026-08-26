@@ -76,6 +76,7 @@
     <input type="file" id="fileUpload" accept=".xls,.xlsx" style="display:none" multiple>
     <button class="btn btn-teal" id="uploadBtn">📤 Upload Daily Trade File(s)</button>
     <button class="btn btn-navy" onclick="backfillRm()" title="Purani save ho chuki trades me jinka RM 'Unknown' hai, unhe dobara match karne ki koshish kare">🔁 Backfill RM (Unknown wale)</button>
+    <button class="btn" style="background:#c0392b;color:#fff" onclick="removeDuplicates()" title="Alag-alag file-format se do baar upload hui same trades ko hataye">🗑️ Remove Duplicates</button>
     <button class="btn btn-gray" onclick="clearTradesCache()">🧹 Clear Cache</button>
   </div>
   <div class="status-line" id="uploadStatus" style="color:#c3cad9"></div>
@@ -372,9 +373,27 @@ function parseWorkbook(wb){
 
     const clientRaw = clientCheck.replace(/\s+/g,' ');
     const dealerFromFile = iDealer>=0 ? String(row[iDealer]||'').trim() : '';
+    const scripRaw = String(row[iScrip]||'').trim();
+    const bsRaw = String(row[iBS]||'').trim().toUpperCase().slice(0,1);   // 'B' or 'S' only
+    const priceRaw = Number(row[iExecPrice])||0;
+    const qtyForId = execQty>0 ? execQty : orderQty;
 
     out.push({
-      id: String(row[iOrderId] || (timeVal+'_'+row[iCust]+'_'+row[iScrip]+'_'+r)),
+      // 25-Aug-2026: was the raw EXCH ORDER ID / EXCHANGE ORDER ID from the
+      // file, or a row-index fallback. Found to be unreliable across
+      // report TYPES for the exact same real-world trade — the "Order
+      // Report" export and the older/other export assign genuinely
+      // DIFFERENT order-id numbers to the identical trade (their own
+      // internal numbering, not a shared exchange reference), so the same
+      // day's trades uploaded via two different report formats silently
+      // duplicated instead of de-duping (every row appeared twice, once
+      // per format). This is now a composite key built entirely from the
+      // trade's own business details — client + scrip/contract + exact
+      // timestamp + buy/sell + qty + price — which are identical for the
+      // same real trade no matter which report it came from, so the same
+      // trade uploaded via any file format now correctly recognises itself
+      // as already-saved.
+      id: normName(clientRaw)+'|'+scripRaw.toUpperCase()+'|'+timeVal+'|'+bsRaw+'|'+qtyForId+'|'+priceRaw,
       date: timeVal.slice(0,10),
       time: timeVal,
       exchange: row[iExch]||'',
@@ -534,6 +553,67 @@ async function backfillRm(){
     (totalStillUnknown ? ` ⚠️ ${totalStillUnknown} still unmatched (client name not found in CRM — check spelling or add the client).` : '') +
     `\n🔎 Client lookup: ${clientRmDiag}`;
 
+  await onMonthChange();
+  updateDashboardStats();
+}
+
+function computeTradeKey(t){
+  // Same composite-key formula as parseWorkbook's `id` — recomputed here
+  // (not read from the stored .id) because entries saved BEFORE this fix
+  // still carry their old report-specific order-id as .id, which is
+  // exactly the thing that failed to match across report formats in the
+  // first place.
+  const bs = String(t.buySell||'').trim().toUpperCase().slice(0,1);
+  const scripU = String(t.scrip||'').trim().toUpperCase();
+  return normName(t.client)+'|'+scripU+'|'+(t.time||'')+'|'+bs+'|'+t.qty+'|'+t.price;
+}
+
+async function removeDuplicates(){
+  // Cleans up trades already saved BEFORE the composite-key id fix above —
+  // the same real trade uploaded via two different report formats got
+  // saved twice (different report-specific order-ids looked like two
+  // different trades). This re-groups every already-saved trade by the
+  // same business-detail key the new uploads use, keeps one copy per
+  // group (merging in any RM/Channel value a duplicate had that the kept
+  // copy was missing), and removes the rest.
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.style.whiteSpace = 'pre-line';
+  statusEl.textContent = 'Scanning saved months for duplicates...';
+  let monthIds = [];
+  try{
+    const snap = await fdb.collection('trade_data').get();
+    monthIds = snap.docs.map(d=>d.id);
+  }catch(e){
+    statusEl.textContent = '❌ Could not list saved months: ' + e.message;
+    return;
+  }
+  let totalRemoved = 0, monthsTouched = 0;
+  for(const docId of monthIds){
+    const mk = docId.replace('trades_','').replace('_','-');
+    const data = await loadMonth(mk);
+    let changed = false;
+    ['equity','fo'].forEach(seg=>{
+      const seen = new Map();
+      const deduped = [];
+      data[seg].forEach(t=>{
+        const key = computeTradeKey(t);
+        const existing = seen.get(key);
+        if(!existing){
+          if(t.id !== key){ t.id = key; changed = true; }   // upgrade old order-id-based ids too
+          seen.set(key, t);
+          deduped.push(t);
+        } else {
+          if(!existing.rm && t.rm) existing.rm = t.rm;
+          if(!existing.channel && t.channel) existing.channel = t.channel;
+          totalRemoved++;
+          changed = true;
+        }
+      });
+      data[seg] = deduped;
+    });
+    if(changed){ await saveMonth(mk); monthsTouched++; }
+  }
+  statusEl.textContent = `✅ Duplicate cleanup done — ${totalRemoved} duplicate trade(s) removed across ${monthsTouched} month(s).`;
   await onMonthChange();
   updateDashboardStats();
 }
