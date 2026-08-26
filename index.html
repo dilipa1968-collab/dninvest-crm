@@ -329,7 +329,15 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:var(--bg);color:
      internal-scroll version above, which works fine there. */
   #page-mf-txns.active{position:static;display:block;height:auto;padding:0;overflow:visible;}
   #page-mf-txns > #mftxn-tablewrap{display:block;overflow:visible;height:auto;}
-  #page-mf-txns > #mftxn-tablewrap .tbl-scroll{max-height:none!important;overflow:visible;}
+  /* 25-Aug-2026 follow-up fix: the line above previously used
+     `overflow:visible` on BOTH axes, which killed the table's own
+     LEFT-RIGHT scroll too (this table has many columns — Amount,
+     Incentive, Cross-Check, Status, Source, Actions — far wider than a
+     phone screen). Vertical stays "visible" (so the page scrolls normally,
+     the actual bug being fixed here), but horizontal stays a proper
+     touch-scrollable region so those right-side columns are still reachable
+     by swiping the table sideways. */
+  #page-mf-txns > #mftxn-tablewrap .tbl-scroll{max-height:none!important;overflow-y:visible;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 }
 /* Total row (tfoot) stays pinned to the bottom of the table's own scroll
    area — same sticky trick already used for the header row (position:
