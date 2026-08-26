@@ -54,13 +54,13 @@
   .date-quick-btn:hover{border-color:var(--teal);color:var(--teal)}
   .date-quick-btn.active{background:linear-gradient(135deg,#0891b2,#0e7490);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(8,145,178,.35)}
   table{width:auto;border-collapse:collapse;font-size:.75rem;table-layout:auto}
-  thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:6px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;font-size:.66rem;letter-spacing:.2px;text-transform:uppercase;cursor:pointer;user-select:none}
+  thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:6px 6px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;font-size:.66rem;letter-spacing:.2px;text-transform:uppercase;cursor:pointer;user-select:none}
   thead th:hover{background:var(--navy2)}
   .sort-arrow{font-size:.62rem;opacity:.85}
   tbody tr{border-bottom:1px solid var(--border)}
   tbody tr:nth-child(even){background:#f8faff}
   tbody tr:hover{background:var(--blue2)}
-  td{padding:4px 8px;white-space:nowrap}
+  td{padding:4px 6px;white-space:nowrap}
   .tbl-scroll{max-height:60vh;overflow-y:auto;border-radius:10px;border:1px solid var(--border)}
   .badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:.68rem;font-weight:700}
   .seg-eq{background:#e0f2fe;color:#0369a1}
@@ -156,14 +156,14 @@
     <div class="tbl-scroll">
       <table>
         <thead><tr id="tableHeadRow">
-          <th data-key="seg" onclick="sortTrades('seg')">Segment <span class="sort-arrow" id="arrow-seg"></span></th>
+          <th data-key="seg" onclick="sortTrades('seg')">Seg <span class="sort-arrow" id="arrow-seg"></span></th>
           <th data-key="rm" onclick="sortTrades('rm')">RM <span class="sort-arrow" id="arrow-rm"></span></th>
           <th data-key="client" onclick="sortTrades('client')">Client <span class="sort-arrow" id="arrow-client"></span></th>
           <th data-key="scrip" onclick="sortTrades('scrip')">Scrip/Contract <span class="sort-arrow" id="arrow-scrip"></span></th>
           <th data-key="s2kId" onclick="sortTrades('s2kId')">S2K ID <span class="sort-arrow" id="arrow-s2kId"></span></th>
           <th data-key="buySell" onclick="sortTrades('buySell')">B/S <span class="sort-arrow" id="arrow-buySell"></span></th>
-          <th data-key="orderQty" onclick="sortTrades('orderQty')">Order Qty <span class="sort-arrow" id="arrow-orderQty"></span></th>
-          <th data-key="orderPrice" onclick="sortTrades('orderPrice')">Order Price <span class="sort-arrow" id="arrow-orderPrice"></span></th>
+          <th data-key="orderQty" onclick="sortTrades('orderQty')">Ord Qty <span class="sort-arrow" id="arrow-orderQty"></span></th>
+          <th data-key="orderPrice" onclick="sortTrades('orderPrice')">Ord Price <span class="sort-arrow" id="arrow-orderPrice"></span></th>
           <th data-key="qty" onclick="sortTrades('qty')">Qty <span class="sort-arrow" id="arrow-qty"></span></th>
           <th data-key="price" onclick="sortTrades('price')">Price <span class="sort-arrow" id="arrow-price"></span></th>
           <th data-key="channel" onclick="sortTrades('channel')">Channel <span class="sort-arrow" id="arrow-channel"></span></th>
@@ -382,7 +382,7 @@ function parseWorkbook(wb){
   // the order's lifecycle (placed vs acknowledged vs last touched).
   const iExchDateTime = colIndex(header, ['EXCH DATE TIME','EXCHDATETIME']);
   const iSkOrderDateTime = colIndex(header, ['SK ORDER DATE TIME']);
-  const iLastModTime = colIndex(header, ['LAST MOD TIME']);
+  const iLastModTime = colIndex(header, ['LAST MOD TIME','GOOD TILL DATE']);   // F&O reports call this "LAST MOD TIME"; NSE/BSE cash (equity) reports carry the same thing under "GOOD TILL DATE" instead
   const iOrderId = colIndex(header, ['EXCH ORDER ID','EXCHORDERID','EXCHANGE ORDER ID']);
   // Prefer "CHANNEL USER" (the actual login username who placed the order,
   // e.g. "ABIS437") over "CHANNEL CODE" (just the platform, e.g. "MOBAND")
@@ -1056,8 +1056,8 @@ function renderTable(){
     return `<tr>
       <td><span class="badge ${r.seg==='EQ'?'seg-eq':'seg-fo'}">${r.seg}</span></td>
       <td>${r.rm ? esc(r.rm) : '<span style="color:var(--red);font-weight:700">❓ Unknown</span>'}</td>
-      <td>${esc(r.client)}</td>
-      <td>${scripLabel}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.client)}">${esc(r.client)}</td>
+      <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.scrip)}">${scripLabel}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.s2kId||'—')}</td>
       <td><span class="badge ${bs==='B'?'bs-b':'bs-s'}">${bs==='B'?'BUY':'SELL'}</span></td>
       <td>${r.orderQty || '—'}</td>
