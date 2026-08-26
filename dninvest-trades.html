@@ -49,6 +49,10 @@
   .upload-zone:hover{border-color:var(--gold)}
   .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
   .filters input,.filters select{padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:.8rem;background:var(--bg)}
+  .date-quick-btn{padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);background:#fff;
+    font-size:.76rem;font-weight:700;color:var(--gray);cursor:pointer;transition:all .15s ease;white-space:nowrap}
+  .date-quick-btn:hover{border-color:var(--teal);color:var(--teal)}
+  .date-quick-btn.active{background:linear-gradient(135deg,#0891b2,#0e7490);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(8,145,178,.35)}
   table{width:100%;border-collapse:collapse;font-size:.75rem}
   thead th{background:linear-gradient(180deg,var(--navy2) 0%,var(--navy) 100%);color:#fff;padding:8px 7px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;font-size:.68rem;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;user-select:none}
   thead th:hover{background:var(--navy2)}
@@ -137,8 +141,13 @@
         </div>
       </div>
       <select id="fMonth" onchange="onMonthChange()"></select>
-      <input type="date" id="fFrom" onchange="renderTable()">
-      <input type="date" id="fTo" onchange="renderTable()">
+      <div id="dateQuickFilters" style="display:flex;gap:5px">
+        <button type="button" class="date-quick-btn" id="dqfToday" onclick="setDateQuickFilter('today')">Today</button>
+        <button type="button" class="date-quick-btn" id="dqfWeek" onclick="setDateQuickFilter('week')">This Week</button>
+        <button type="button" class="date-quick-btn" id="dqfAll" onclick="setDateQuickFilter('all')">All Dates</button>
+      </div>
+      <input type="date" id="fFrom" onchange="onDateInputChange()">
+      <input type="date" id="fTo" onchange="onDateInputChange()">
       <button class="btn btn-outline" onclick="clearFilters()">🔄 Clear</button>
       <span id="resultCount" style="font-size:.78rem;color:var(--gray);margin-left:auto"></span>
     </div>
@@ -750,6 +759,50 @@ document.addEventListener('click', function(ev){
   if(wrap && !wrap.contains(ev.target)) document.getElementById('channelFilterPanel').style.display='none';
 });
 
+// ── Date quick-filters (26-Aug-2026) ──
+// "Today" is now the DEFAULT view (see init() below) instead of showing
+// every trade ever uploaded — that's what the person actually wants to see
+// day to day. "This Week" and "All Dates" are one-click alternates; typing
+// a custom date directly into From/To also works as before and just
+// de-highlights whichever quick-filter button was active.
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function setDateQuickFilter(which){
+  const from = document.getElementById('fFrom'), to = document.getElementById('fTo');
+  if(which==='today'){
+    from.value = todayISO(); to.value = todayISO();
+  } else if(which==='week'){
+    const now = new Date();
+    const day = now.getDay();                      // 0=Sun..6=Sat
+    const mondayOffset = day===0 ? -6 : 1-day;      // week starts Monday
+    const monday = new Date(now); monday.setDate(now.getDate()+mondayOffset);
+    from.value = monday.toISOString().slice(0,10);
+    to.value = todayISO();
+  } else {
+    from.value = ''; to.value = '';
+  }
+  highlightActiveDateQuickFilter(which);
+  renderTable();
+}
+function onDateInputChange(){
+  // Typing a custom date directly — figure out if it happens to still
+  // match one of the quick presets (so the button highlight stays honest),
+  // otherwise none of them show as active.
+  const from = document.getElementById('fFrom').value, to = document.getElementById('fTo').value;
+  if(from===todayISO() && to===todayISO()) highlightActiveDateQuickFilter('today');
+  else if(!from && !to) highlightActiveDateQuickFilter('all');
+  else highlightActiveDateQuickFilter(null);
+  renderTable();
+}
+function highlightActiveDateQuickFilter(which){
+  ['today','week','all'].forEach(w=>{
+    const btn = document.getElementById('dqf'+w.charAt(0).toUpperCase()+w.slice(1));
+    if(btn) btn.classList.toggle('active', w===which);
+  });
+}
+
 function clearFilters(){
   document.getElementById('fSearch').value='';
   document.getElementById('fRm').value='';
@@ -758,9 +811,9 @@ function clearFilters(){
   selectedChannels.clear();
   renderChannelCheckboxes();
   updateChannelFilterButtonLabel();
-  document.getElementById('fFrom').value='';
-  document.getElementById('fTo').value='';
-  renderTable();
+  // "Clear" removes the date restriction entirely (shows every date), not
+  // just resetting back to the "Today" default.
+  setDateQuickFilter('all');
 }
 
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -881,6 +934,7 @@ dropZone.addEventListener('drop', e=>{
 (async function init(){
   await populateMonthFilter();
   await onMonthChange();
+  setDateQuickFilter('today');   // 26-Aug-2026: default view is today's trades, not the whole month
   updateDashboardStats();
 })();
 </script>
