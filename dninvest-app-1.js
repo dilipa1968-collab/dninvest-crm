@@ -1646,7 +1646,17 @@ function openTradesApp(){
 //      password bug.
 function clearCrmCache(){
   if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
-  const KEEP = ['dninvest_session','dninvest_users'];
+  // 26-Aug-2026: 'dninvest_admin_seen_msgs' added to KEEP — this button was
+  // wiping the "already dismissed this notification" marker along with
+  // everything else, so the very next load re-showed old RM-message popups
+  // as if new, every single time Clear Cache was used (this button being
+  // recommended for OTHER bugs elsewhere in this app made that keep
+  // recurring). It's a small UI marker, not real data — no reason for a
+  // data-cache clear to touch it. (Also now synced to Firestore — see
+  // syncAdminSeenFromRemote — so it recovers correctly across devices even
+  // without this exclusion, but keeping it here avoids the unnecessary
+  // round-trip blip.)
+  const KEEP = ['dninvest_session','dninvest_users','dninvest_admin_seen_msgs'];
   Object.keys(localStorage).forEach(k=>{
     if(k.startsWith('dninvest_') && !KEEP.includes(k)) localStorage.removeItem(k);
   });
@@ -12280,7 +12290,10 @@ function updateMsgBadge(){
     // indefinitely (reported: yesterday's "HELLO" from Megha still
     // triggering notifications today). Now both use the SAME seen-set, so
     // reading a message anywhere marks it seen everywhere.
-    const threads = getRmMessages();
+    // 26-Aug-2026: switched to getRmMessagesClean() — same reasoning as
+    // checkRmReply() above, a message past its own day can't inflate this
+    // badge either now.
+    const threads = getRmMessagesClean();
     const seenSet = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
     let unread = 0;
     threads.forEach(t => {
@@ -12479,7 +12492,16 @@ function checkRmReply(){
   if(CU.role==='admin'){
     // Admin: check for new RM messages — uses the same seen-set as
     // updateMsgBadge/renderInbox now (see updateMsgBadge comment, 25-Aug-2026)
-    const threads = getRmMessages();
+    // 26-Aug-2026: was getRmMessages() (raw, uncleaned) — messages only ever
+    // get pruned by cleanOldMessages() as a SIDE EFFECT of someone sending/
+    // replying, never on a plain read. A message nobody touched again just
+    // sat in Firestore untouched indefinitely, and this notification check
+    // kept finding and re-alerting on it (a "HELLO" from days earlier,
+    // reported still popping up). getRmMessagesClean() applies the same
+    // same-day-only filter the Inbox panel already uses, so a message past
+    // its day can no longer trigger a notification at all, regardless of
+    // seen-status.
+    const threads = getRmMessagesClean();
     const seenSet = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
     let newMsgs = [];
     threads.forEach(t => {
