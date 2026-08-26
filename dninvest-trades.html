@@ -156,7 +156,6 @@
     <div class="tbl-scroll">
       <table>
         <thead><tr id="tableHeadRow">
-          <th data-key="time" onclick="sortTrades('time')">Exch Date/Time <span class="sort-arrow" id="arrow-time"></span></th>
           <th data-key="seg" onclick="sortTrades('seg')">Segment <span class="sort-arrow" id="arrow-seg"></span></th>
           <th data-key="rm" onclick="sortTrades('rm')">RM <span class="sort-arrow" id="arrow-rm"></span></th>
           <th data-key="client" onclick="sortTrades('client')">Client <span class="sort-arrow" id="arrow-client"></span></th>
@@ -169,6 +168,9 @@
           <th data-key="price" onclick="sortTrades('price')">Price <span class="sort-arrow" id="arrow-price"></span></th>
           <th data-key="channel" onclick="sortTrades('channel')">Channel <span class="sort-arrow" id="arrow-channel"></span></th>
           <th data-key="status" onclick="sortTrades('status')">Status <span class="sort-arrow" id="arrow-status"></span></th>
+          <th data-key="skOrderDateTime" onclick="sortTrades('skOrderDateTime')">SK Order Date Time <span class="sort-arrow" id="arrow-skOrderDateTime"></span></th>
+          <th data-key="lastModTime" onclick="sortTrades('lastModTime')">Last Modify Time <span class="sort-arrow" id="arrow-lastModTime"></span></th>
+          <th data-key="time" onclick="sortTrades('time')">Exch Date/Time <span class="sort-arrow" id="arrow-time"></span></th>
         </tr></thead>
         <tbody id="tableBody"></tbody>
       </table>
@@ -374,6 +376,13 @@ function parseWorkbook(wb){
     colIndex(header, ['SK ORDER DATE TIME']),
     colIndex(header, ['LAST MOD TIME'])
   ].filter(i=>i>=0);
+  // Individual timestamp columns, kept separately (in addition to the
+  // fallback-based 'time' field above) so each can be shown as its own
+  // column — these are NOT interchangeable, they're different events in
+  // the order's lifecycle (placed vs acknowledged vs last touched).
+  const iExchDateTime = colIndex(header, ['EXCH DATE TIME','EXCHDATETIME']);
+  const iSkOrderDateTime = colIndex(header, ['SK ORDER DATE TIME']);
+  const iLastModTime = colIndex(header, ['LAST MOD TIME']);
   const iOrderId = colIndex(header, ['EXCH ORDER ID','EXCHORDERID','EXCHANGE ORDER ID']);
   // Prefer "CHANNEL USER" (the actual login username who placed the order,
   // e.g. "ABIS437") over "CHANNEL CODE" (just the platform, e.g. "MOBAND")
@@ -440,6 +449,9 @@ function parseWorkbook(wb){
       s2kId: iS2kId>=0 ? String(row[iS2kId]||'').trim() : '',
       orderQty: orderQty,
       orderPrice: iOrderPrice>=0 ? (Number(row[iOrderPrice])||0) : 0,
+      exchDateTime: iExchDateTime>=0 ? String(row[iExchDateTime]||'').trim() : '',
+      skOrderDateTime: iSkOrderDateTime>=0 ? String(row[iSkOrderDateTime]||'').trim() : '',
+      lastModTime: iLastModTime>=0 ? String(row[iLastModTime]||'').trim() : '',
       status: status,
       optType: iOptType>=0 ? row[iOptType] : '',
       strike: iStrike>=0 ? row[iStrike] : '',
@@ -1032,7 +1044,7 @@ function renderTable(){
   document.getElementById('resultCount').textContent = rows.length + ' trades';
 
   if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="13" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="15" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
     return;
   }
 
@@ -1042,7 +1054,6 @@ function renderTable(){
       : esc(r.scrip) + (r.exchange ? ` <span style="color:var(--gray);font-size:.68rem">${esc(r.exchange)}</span>` : '');
     const bs = String(r.buySell).toUpperCase().startsWith('B') ? 'B' : 'S';
     return `<tr>
-      <td>${esc(r.time)}</td>
       <td><span class="badge ${r.seg==='EQ'?'seg-eq':'seg-fo'}">${r.seg}</span></td>
       <td>${r.rm ? esc(r.rm) : '<span style="color:var(--red);font-weight:700">❓ Unknown</span>'}</td>
       <td>${esc(r.client)}</td>
@@ -1055,6 +1066,9 @@ function renderTable(){
       <td>₹${r.price}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.channel||'—')}</td>
       <td>${statusBadge(r.status)}</td>
+      <td style="font-size:.68rem;color:var(--gray)">${esc(r.skOrderDateTime||'—')}</td>
+      <td style="font-size:.68rem;color:var(--gray)">${esc(r.lastModTime||'—')}</td>
+      <td>${esc(r.time)}</td>
     </tr>`;
   }).join('');
 }
