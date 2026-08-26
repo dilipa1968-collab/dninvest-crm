@@ -1990,7 +1990,35 @@ function initApp(){
     return;
   }
   if(typeof fdb!=='undefined'){
-    DB.syncFromFirebase().then(()=>{
+// ── Admin "seen messages" — synced across devices (25-Aug-2026) ──
+// This was pure localStorage before — per-BROWSER, not per-account. Dismiss
+// a message on the desktop CRM tab, and it still shows again on a phone
+// (different browser = different localStorage entirely), because there was
+// no shared record of "already seen" anywhere. Now the same set also lives
+// in one small Firestore doc: on load, merge it INTO localStorage (so
+// anything seen on any other device is picked up here too), and every time
+// the local set changes, push the merged result back out — same
+// mechanism, now consistent everywhere the admin logs in.
+async function syncAdminSeenFromRemote(){
+  if(!CU || CU.role!=='admin' || typeof fdb==='undefined') return;
+  try{
+    const doc = await fdb.collection('crm_data').doc('admin_seen_msgs').get();
+    const remoteIds = (doc.exists && doc.data() && Array.isArray(doc.data().ids)) ? doc.data().ids : [];
+    const local = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
+    remoteIds.forEach(id=>local.add(id));
+    localStorage.setItem('dninvest_admin_seen_msgs', JSON.stringify([...local].slice(-500)));
+  }catch(e){ console.log('syncAdminSeenFromRemote failed', e); }
+}
+function pushAdminSeenToRemote(){
+  if(!CU || CU.role!=='admin' || typeof fdb==='undefined') return;
+  try{
+    const ids = JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]');
+    fdb.collection('crm_data').doc('admin_seen_msgs').set({ids: ids.slice(-500), updated: new Date().toISOString()})
+      .catch(e=>console.log('pushAdminSeenToRemote failed', e));
+  }catch(e){}
+}
+
+DB.syncFromFirebase().then(()=>{
       DB.load(); // only seed defaults AFTER real Firestore data has been loaded
       refreshDash(); updateBadges(); populateRmDropdowns();
       if(getCurrentPageId()==='eq-clients') renderEqTable();
@@ -1998,8 +2026,7 @@ function initApp(){
       if(getCurrentPageId()==='leads') renderLeadsTable();
       checkAnnouncement();
       checkFollowupAlert();
-      updateMsgBadge();
-      checkRmReply();
+      syncAdminSeenFromRemote().then(()=>{ updateMsgBadge(); checkRmReply(); });
       refreshHolidaySet().then(runAutoSchedule); // Load holidays, then run auto-schedule on load
       cleanExpiredTempAccess(); // Clean expired temp access
       loadCallLimits(); // admin-configured call date locks
@@ -12429,6 +12456,7 @@ function switchInboxTab(rmUsername){
   // Trim seen list to last 500 IDs
   const newSeen = [...seenSet].slice(-500);
   localStorage.setItem(adminSeenKey, JSON.stringify(newSeen));
+  pushAdminSeenToRemote();
   // Remove highlight animation from seen messages
   if(panel) panel.querySelectorAll('.msg-new').forEach(el => el.classList.remove('msg-new'));
   if(panel) panel.querySelectorAll('.new-msg').forEach(el => el.classList.remove('new-msg'));
@@ -12503,6 +12531,7 @@ function showAdminMsgNotif(msg){
         (t.messages||[]).forEach(m => { if(!m.isAdmin) seenSet.add(m.id); });
       });
       localStorage.setItem('dninvest_admin_seen_msgs', JSON.stringify([...seenSet].slice(-500)));
+      pushAdminSeenToRemote();
       popup.classList.remove('open');
       updateMsgBadge();
       if(getCurrentPageId()==='admin') renderInbox();
