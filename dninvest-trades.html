@@ -79,6 +79,7 @@
   <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
     <input type="file" id="fileUpload" accept=".xls,.xlsx" style="display:none" multiple>
     <button class="btn btn-teal" id="uploadBtn">📤 Upload Daily Trade File(s)</button>
+    <button class="btn btn-outline" id="refreshBtn" onclick="refreshData()" title="Firebase se latest data dobara load kare (agar kisi aur ne is month me upload kiya ho)">🔄 Refresh</button>
     <button class="btn btn-navy" onclick="backfillRm()" title="Purani save ho chuki trades me jinka RM 'Unknown' hai, unhe dobara match karne ki koshish kare">🔁 Backfill RM (Unknown wale)</button>
     <button class="btn" style="background:#c0392b;color:#fff" onclick="removeDuplicates()" title="Alag-alag file-format se do baar upload hui same trades ko hataye">🗑️ Remove Duplicates</button>
     <button class="btn btn-gray" onclick="clearTradesCache()">🧹 Clear Cache</button>
@@ -155,12 +156,15 @@
     <div class="tbl-scroll">
       <table>
         <thead><tr id="tableHeadRow">
-          <th data-key="time" onclick="sortTrades('time')">Date/Time <span class="sort-arrow" id="arrow-time"></span></th>
+          <th data-key="time" onclick="sortTrades('time')">Exch Date/Time <span class="sort-arrow" id="arrow-time"></span></th>
           <th data-key="seg" onclick="sortTrades('seg')">Segment <span class="sort-arrow" id="arrow-seg"></span></th>
           <th data-key="rm" onclick="sortTrades('rm')">RM <span class="sort-arrow" id="arrow-rm"></span></th>
           <th data-key="client" onclick="sortTrades('client')">Client <span class="sort-arrow" id="arrow-client"></span></th>
           <th data-key="scrip" onclick="sortTrades('scrip')">Scrip/Contract <span class="sort-arrow" id="arrow-scrip"></span></th>
+          <th data-key="s2kId" onclick="sortTrades('s2kId')">S2K ID <span class="sort-arrow" id="arrow-s2kId"></span></th>
           <th data-key="buySell" onclick="sortTrades('buySell')">B/S <span class="sort-arrow" id="arrow-buySell"></span></th>
+          <th data-key="orderQty" onclick="sortTrades('orderQty')">Order Qty <span class="sort-arrow" id="arrow-orderQty"></span></th>
+          <th data-key="orderPrice" onclick="sortTrades('orderPrice')">Order Price <span class="sort-arrow" id="arrow-orderPrice"></span></th>
           <th data-key="qty" onclick="sortTrades('qty')">Qty <span class="sort-arrow" id="arrow-qty"></span></th>
           <th data-key="price" onclick="sortTrades('price')">Price <span class="sort-arrow" id="arrow-price"></span></th>
           <th data-key="channel" onclick="sortTrades('channel')">Channel <span class="sort-arrow" id="arrow-channel"></span></th>
@@ -356,6 +360,8 @@ function parseWorkbook(wb){
   const iExecQty = colIndex(header, ['EXEC QTY','EXECUTED QTY']);
   const iOrderQty = colIndex(header, ['ORDER QTY']);
   const iExecPrice = colIndex(header, ['EXEC PRICE']);
+  const iOrderPrice = colIndex(header, ['ORDER PRICE']);
+  const iS2kId = colIndex(header, ['S2K ID','S2KID']);
   const iStatus = colIndex(header, ['ORDER STATUS']);
   // The primary time column ("EXCH DATE TIME"/"EXCHDATETIME") is sometimes
   // genuinely blank per-row in the F&O export (a quirk of that report), even
@@ -431,6 +437,9 @@ function parseWorkbook(wb){
       qty: execQty>0 ? execQty : orderQty,
       execQty: execQty,
       price: Number(row[iExecPrice])||0,
+      s2kId: iS2kId>=0 ? String(row[iS2kId]||'').trim() : '',
+      orderQty: orderQty,
+      orderPrice: iOrderPrice>=0 ? (Number(row[iOrderPrice])||0) : 0,
       status: status,
       optType: iOptType>=0 ? row[iOptType] : '',
       strike: iStrike>=0 ? row[iStrike] : '',
@@ -1009,7 +1018,7 @@ function renderTable(){
   const sf = sortState.field, sd = sortState.dir;
   rows.sort((a,b)=>{
     let va = a[sf], vb = b[sf];
-    if(sf==='qty' || sf==='price'){ va = Number(va)||0; vb = Number(vb)||0; return sd*(va-vb); }
+    if(sf==='qty' || sf==='price' || sf==='orderQty' || sf==='orderPrice'){ va = Number(va)||0; vb = Number(vb)||0; return sd*(va-vb); }
     va = String(va||''); vb = String(vb||'');
     return sd * va.localeCompare(vb);
   });
@@ -1023,7 +1032,7 @@ function renderTable(){
   document.getElementById('resultCount').textContent = rows.length + ' trades';
 
   if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="10" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" class="empty">Koi trade nahi mili — filters clear karke dekho, ya upload karo.</td></tr>`;
     return;
   }
 
@@ -1038,7 +1047,10 @@ function renderTable(){
       <td>${r.rm ? esc(r.rm) : '<span style="color:var(--red);font-weight:700">❓ Unknown</span>'}</td>
       <td>${esc(r.client)}</td>
       <td>${scripLabel}</td>
+      <td style="font-size:.68rem;color:var(--gray)">${esc(r.s2kId||'—')}</td>
       <td><span class="badge ${bs==='B'?'bs-b':'bs-s'}">${bs==='B'?'BUY':'SELL'}</span></td>
+      <td>${r.orderQty || '—'}</td>
+      <td>${r.orderPrice ? '₹'+r.orderPrice : '—'}</td>
       <td>${r.qty}</td>
       <td>₹${r.price}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.channel||'—')}</td>
@@ -1066,6 +1078,31 @@ async function updateDashboardStats(){
     const last = localStorage.getItem('dninvest_trades_last_upload');
     document.getElementById('statLastUpload').textContent = last ? new Date(last).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
   }catch(e){}
+}
+
+async function refreshData(){
+  const statusEl = document.getElementById('uploadStatus');
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = '⏳ Refreshing...';
+  statusEl.style.whiteSpace = 'pre-line';
+  statusEl.textContent = 'Reloading data from server...';
+  try{
+    // Force every cached month to be re-fetched from Firestore (not served
+    // from the in-memory cache) so trades uploaded by someone else, or from
+    // another device/tab, show up here too.
+    monthCache = {};
+    await populateMonthFilter();
+    await onMonthChange();
+    await updateDashboardStats();
+    statusEl.textContent = '✅ Refreshed — latest data loaded (' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + ')';
+  }catch(e){
+    statusEl.textContent = '❌ Refresh failed: ' + e.message;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
 }
 
 document.getElementById('uploadBtn').addEventListener('click', ()=>document.getElementById('fileUpload').click());
