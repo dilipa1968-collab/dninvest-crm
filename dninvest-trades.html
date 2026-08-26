@@ -1057,7 +1057,7 @@ function renderTable(){
       <td><span class="badge ${r.seg==='EQ'?'seg-eq':'seg-fo'}">${r.seg}</span></td>
       <td>${r.rm ? esc(r.rm) : '<span style="color:var(--red);font-weight:700">❓ Unknown</span>'}</td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.client)}">${esc(r.client)}</td>
-      <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.scrip)}">${scripLabel}</td>
+      <td>${scripLabel}</td>
       <td style="font-size:.68rem;color:var(--gray)">${esc(r.s2kId||'—')}</td>
       <td><span class="badge ${bs==='B'?'bs-b':'bs-s'}">${bs==='B'?'BUY':'SELL'}</span></td>
       <td>${r.orderQty || '—'}</td>
