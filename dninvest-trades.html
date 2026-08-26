@@ -149,6 +149,7 @@
       <input type="date" id="fFrom" onchange="onDateInputChange()">
       <input type="date" id="fTo" onchange="onDateInputChange()">
       <button class="btn btn-outline" onclick="clearFilters()">🔄 Clear</button>
+      <button class="btn" style="background:#c0392b;color:#fff" onclick="deleteByDateRange()" title="Currently selected From/To date range ki saari trades permanently delete kare">🗑️ Delete This Date Range</button>
       <span id="resultCount" style="font-size:.78rem;color:var(--gray);margin-left:auto"></span>
     </div>
     <div class="tbl-scroll">
@@ -623,6 +624,124 @@ async function removeDuplicates(){
     if(changed){ await saveMonth(mk); monthsTouched++; }
   }
   statusEl.textContent = `✅ Duplicate cleanup done — ${totalRemoved} duplicate trade(s) removed across ${monthsTouched} month(s).`;
+  await onMonthChange();
+  updateDashboardStats();
+}
+
+// ── Delete by date range (26-Aug-2026) ──
+// Uses whatever From/To dates are currently set in the filter row above —
+// so pick "Today", "This Week", or a custom range first, THEN hit this
+// button to permanently delete exactly that range. Deliberately requires
+// at least one of From/To to be set (never allows a completely open-ended
+// "delete everything" via this button) and shows a real count + a typed
+// confirmation before touching anything.
+// Big red confirmation modal for genuinely destructive actions (26-Aug-2026)
+// — replaces the plain browser prompt(), which is easy to click through on
+// autopilot and looks tiny/generic. Optionally requires typing a specific
+// word (e.g. "DELETE") before the confirm button even becomes clickable.
+// Returns a Promise<boolean> — callers must `await` it.
+function dangerConfirmPrompt(message, opts){
+  opts = opts || {};
+  return new Promise(resolve=>{
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+    const needsWord = !!opts.typeWord;
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+        <div style="background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;padding:22px 24px;display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px;line-height:1">⚠️</div>
+          <div style="font-weight:800;font-size:1.2rem">${opts.title||'Confirm Delete'}</div>
+        </div>
+        <div style="padding:22px 24px;font-size:.95rem;color:#1f2937;line-height:1.6;white-space:pre-line">${esc(message)}</div>
+        ${needsWord ? `
+        <div style="padding:0 24px 6px">
+          <label style="font-size:.8rem;font-weight:700;color:#991b1b;display:block;margin-bottom:6px">Type <b>${esc(opts.typeWord)}</b> below to confirm:</label>
+          <input type="text" id="_dcpInput" autocomplete="off" style="width:100%;padding:10px 12px;border:2px solid #fca5a5;border-radius:9px;font-size:.95rem;font-weight:700;letter-spacing:.5px" placeholder="${esc(opts.typeWord)}">
+        </div>` : ''}
+        <div style="display:flex;gap:10px;padding:18px 24px 24px;justify-content:flex-end">
+          <button id="_dcpCancel" style="padding:10px 18px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;color:#374151;font-weight:700;cursor:pointer;font-size:.85rem">Cancel</button>
+          <button id="_dcpOk" ${needsWord?'disabled':''} style="padding:10px 18px;border:none;border-radius:9px;background:#dc2626;color:#fff;font-weight:800;cursor:pointer;font-size:.85rem;opacity:${needsWord?'.5':'1'}">${opts.okLabel||'🗑️ Delete Permanently'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = ok => { document.body.removeChild(ov); resolve(ok); };
+    ov.querySelector('#_dcpCancel').onclick = ()=>close(false);
+    const okBtn = ov.querySelector('#_dcpOk');
+    okBtn.onclick = ()=>close(true);
+    if(needsWord){
+      const input = ov.querySelector('#_dcpInput');
+      input.addEventListener('input', ()=>{
+        const match = input.value.trim() === opts.typeWord;
+        okBtn.disabled = !match;
+        okBtn.style.opacity = match ? '1' : '.5';
+      });
+      input.focus();
+    }
+    ov.addEventListener('click', ev=>{ if(ev.target===ov) close(false); });
+  });
+}
+
+async function deleteByDateRange(){
+  const from = document.getElementById('fFrom').value;
+  const to = document.getElementById('fTo').value;
+  if(!from && !to){
+    alert('Pehle From ya To date select karo (upar "Today"/"This Week" button dabao, ya khud date chuno) — safety ke liye poori history ek saath delete nahi hone di jaati.');
+    return;
+  }
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.style.whiteSpace = 'pre-line';
+  statusEl.textContent = 'Scanning saved months for matching trades...';
+
+  let monthIds = [];
+  try{
+    const snap = await fdb.collection('trade_data').get();
+    monthIds = snap.docs.map(d=>d.id);
+  }catch(e){
+    statusEl.textContent = '❌ Could not list saved months: ' + e.message;
+    return;
+  }
+
+  // First pass: just COUNT what would be deleted, without touching anything.
+  const inRange = t => (!from || t.date>=from) && (!to || t.date<=to);
+  let previewCount = 0;
+  const monthData = {};
+  for(const docId of monthIds){
+    const mk = docId.replace('trades_','').replace('_','-');
+    const data = await loadMonth(mk);
+    monthData[mk] = data;
+    previewCount += data.equity.filter(inRange).length + data.fo.filter(inRange).length;
+  }
+
+  if(previewCount===0){
+    statusEl.textContent = 'Is date range me koi trade mili hi nahi — kuch delete nahi karna pada.';
+    return;
+  }
+
+  const rangeLabel = from && to ? `${from} se ${to}` : (from ? `${from} ke baad` : `${to} tak`);
+  const confirmed = await dangerConfirmPrompt(
+    `${previewCount} trade(s) permanently delete ho jaayengi.\n\nDate range: ${rangeLabel}\n\nYe wapas nahi hoga.`,
+    {typeWord: 'DELETE'}
+  );
+  if(!confirmed){
+    statusEl.textContent = 'Cancel kar diya — kuch delete nahi hua.';
+    return;
+  }
+
+  statusEl.textContent = 'Deleting...';
+  let totalDeleted = 0, monthsTouched = 0;
+  for(const mk in monthData){
+    const data = monthData[mk];
+    let changed = false;
+    ['equity','fo'].forEach(seg=>{
+      const before = data[seg].length;
+      data[seg] = data[seg].filter(t=>!inRange(t));
+      const removed = before - data[seg].length;
+      if(removed>0){ totalDeleted += removed; changed = true; }
+    });
+    if(changed){ await saveMonth(mk); monthsTouched++; }
+  }
+
+  statusEl.textContent = `✅ ${totalDeleted} trade(s) deleted (${rangeLabel}), across ${monthsTouched} month(s).`;
   await onMonthChange();
   updateDashboardStats();
 }
