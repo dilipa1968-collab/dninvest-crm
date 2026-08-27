@@ -194,6 +194,15 @@ const fdb = firebase.firestore();
 // holding {equity:[...], fo:[...], updated}. This keeps any single document
 // small (well under Firestore's 1MB limit) even after years of daily use —
 // each month starts a fresh doc instead of one ever-growing list. ──
+// 27-Aug-2026 UPDATE: a single busy month (1880+ trades) genuinely hit that
+// 1MB limit on its own (real incident — "trades_2026_08" was 1,255,419
+// bytes, over the 1,048,576 byte cap, and every save from then on failed).
+// A month is now itself SHARDED across multiple small documents when it
+// needs to be (trades_2026_08__eq0, __eq1, ... / __fo0, __fo1, ...), the
+// same pattern the CRM already uses for its big client lists — completely
+// invisible to the rest of this file: loadMonth()/saveMonth() still hand
+// back/accept one plain {equity, fo} object each, so every other function
+// (filters, Backfill, Remove Duplicates, Delete by date) is unchanged.
 let monthCache = {};   // { "2026-08": {equity:[...], fo:[...]} }
 let currentMonth = null;
 
@@ -202,38 +211,71 @@ function monthDocId(mk){ return 'trades_' + mk.replace('-','_'); }  // "2026-08"
 
 async function loadMonth(mk){
   if(monthCache[mk]) return monthCache[mk];
+  let equity = [], fo = [];
   try{
-    const doc = await fdb.collection('trade_data').doc(monthDocId(mk)).get();
-    const data = (doc.exists && doc.data()) ? doc.data() : {equity:[], fo:[]};
-    monthCache[mk] = {equity: data.equity||[], fo: data.fo||[]};
+    const manifest = await fdb.collection('trade_data').doc(monthDocId(mk)).get();
+    if(manifest.exists){
+      const m = manifest.data()||{};
+      if(m.sharded){
+        const eqN = m.eqShards||0, foN = m.foShards||0;
+        const fetches = [];
+        for(let i=0;i<eqN;i++) fetches.push(fdb.collection('trade_data').doc(monthDocId(mk)+'__eq'+i).get());
+        for(let i=0;i<foN;i++) fetches.push(fdb.collection('trade_data').doc(monthDocId(mk)+'__fo'+i).get());
+        const docs = await Promise.all(fetches);
+        docs.slice(0,eqN).forEach(d=>{ if(d.exists) equity = equity.concat((d.data()||{}).data||[]); });
+        docs.slice(eqN).forEach(d=>{ if(d.exists) fo = fo.concat((d.data()||{}).data||[]); });
+      } else {
+        // Old, pre-sharding single-document format — read straight off the
+        // manifest doc (that's where it was previously stored whole). Gets
+        // converted to the sharded format automatically the next time
+        // anything saves this month.
+        equity = m.equity||[];
+        fo = m.fo||[];
+      }
+    }
   }catch(e){
     console.warn('loadMonth failed', mk, e);
-    monthCache[mk] = {equity:[], fo:[]};
   }
+  monthCache[mk] = {equity, fo};
   return monthCache[mk];
+}
+
+// Greedily packs records into chunks that stay under maxBytes each (JSON
+// size, not record count — trade records vary a fair bit in length
+// depending on how many optional fields they carry).
+function chunkBySize(arr, maxBytes){
+  const chunks = [];
+  let current = [], currentSize = 2;   // 2 for the "[]" wrapper
+  for(const item of arr){
+    const itemSize = JSON.stringify(item).length + 1;
+    if(current.length && currentSize + itemSize > maxBytes){
+      chunks.push(current);
+      current = []; currentSize = 2;
+    }
+    current.push(item);
+    currentSize += itemSize;
+  }
+  if(current.length || !chunks.length) chunks.push(current);
+  return chunks;
 }
 
 async function saveMonth(mk){
   const data = monthCache[mk] || {equity:[], fo:[]};
-  const payload = {
-    equity: data.equity, fo: data.fo, updated: new Date().toISOString()
-  };
-  // 27-Aug-2026: Firestore documents have a hard 1MB limit — one month's
-  // worth of trades CAN approach that on a genuinely busy month (each
-  // trade record isn't tiny, and this doc has no sharding the way the
-  // CRM's big collections do). Rather than let a write silently fail once
-  // the month is already right at the edge, this warns clearly with real
-  // numbers well before that point, so there's time to deal with it
-  // (e.g. asking for this to be split into smaller per-week documents)
-  // instead of a surprise mid-month.
-  const approxBytes = new Blob([JSON.stringify(payload)]).size;
-  if(approxBytes > 750000){
-    console.warn(`trade_data/${monthDocId(mk)} is ${(approxBytes/1024).toFixed(0)}KB — approaching Firestore's 1MB per-document limit.`);
-    const statusEl = document.getElementById('uploadStatus');
-    if(statusEl) statusEl.textContent = (statusEl.textContent?statusEl.textContent+'\n':'') +
-      `⚠️ ${mk} ka data ${(approxBytes/1024).toFixed(0)}KB tak pahunch gaya hai (limit ~1000KB) — jald hi ye mahina split karna padega, batana.`;
-  }
-  await fdb.collection('trade_data').doc(monthDocId(mk)).set(payload);
+  const eqChunks = chunkBySize(data.equity, 700000);   // ~700KB per shard — comfortable headroom under the 1MB cap
+  const foChunks = chunkBySize(data.fo, 700000);
+
+  const batch = fdb.batch();
+  batch.set(fdb.collection('trade_data').doc(monthDocId(mk)), {
+    sharded: true, eqShards: eqChunks.length, foShards: foChunks.length,
+    updated: new Date().toISOString()
+  });
+  eqChunks.forEach((chunk,i)=>{
+    batch.set(fdb.collection('trade_data').doc(monthDocId(mk)+'__eq'+i), {data: chunk});
+  });
+  foChunks.forEach((chunk,i)=>{
+    batch.set(fdb.collection('trade_data').doc(monthDocId(mk)+'__fo'+i), {data: chunk});
+  });
+  await batch.commit();
 }
 
 // ── Column detection: Equity files have "SCRIP NAME" as a plain column;
@@ -614,7 +656,9 @@ async function backfillRm(){
   let monthIds = [];
   try{
     const snap = await fdb.collection('trade_data').get();
-    monthIds = snap.docs.map(d=>d.id);
+    // Skip shard docs (trades_2026_08__eq0, __fo0, ...) — only the plain
+    // month manifest docs are real "months" here.
+    monthIds = snap.docs.map(d=>d.id).filter(id=>!id.includes('__'));
   }catch(e){
     statusEl.textContent = '❌ Could not list saved months: ' + e.message;
     return;
@@ -682,7 +726,9 @@ async function removeDuplicates(){
   let monthIds = [];
   try{
     const snap = await fdb.collection('trade_data').get();
-    monthIds = snap.docs.map(d=>d.id);
+    // Skip shard docs (trades_2026_08__eq0, __fo0, ...) — only the plain
+    // month manifest docs are real "months" here.
+    monthIds = snap.docs.map(d=>d.id).filter(id=>!id.includes('__'));
   }catch(e){
     statusEl.textContent = '❌ Could not list saved months: ' + e.message;
     return;
@@ -785,7 +831,9 @@ async function deleteByDateRange(){
   let monthIds = [];
   try{
     const snap = await fdb.collection('trade_data').get();
-    monthIds = snap.docs.map(d=>d.id);
+    // Skip shard docs (trades_2026_08__eq0, __fo0, ...) — only the plain
+    // month manifest docs are real "months" here.
+    monthIds = snap.docs.map(d=>d.id).filter(id=>!id.includes('__'));
   }catch(e){
     statusEl.textContent = '❌ Could not list saved months: ' + e.message;
     return;
@@ -848,7 +896,7 @@ async function populateMonthFilter(){
   let months = [];
   try{
     const snap = await fdb.collection('trade_data').get();
-    months = snap.docs.map(d=>d.id.replace('trades_','').replace('_','-')).sort().reverse();
+    months = snap.docs.map(d=>d.id).filter(id=>!id.includes('__')).map(id=>id.replace('trades_','').replace('_','-')).sort().reverse();
   }catch(e){ console.warn(e); }
   if(!months.length) months = [monthKey(new Date().toISOString())];
   sel.innerHTML = months.map(m=>`<option value="${m}">${m}</option>`).join('');
