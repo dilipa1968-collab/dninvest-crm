@@ -215,9 +215,25 @@ async function loadMonth(mk){
 
 async function saveMonth(mk){
   const data = monthCache[mk] || {equity:[], fo:[]};
-  await fdb.collection('trade_data').doc(monthDocId(mk)).set({
+  const payload = {
     equity: data.equity, fo: data.fo, updated: new Date().toISOString()
-  });
+  };
+  // 27-Aug-2026: Firestore documents have a hard 1MB limit — one month's
+  // worth of trades CAN approach that on a genuinely busy month (each
+  // trade record isn't tiny, and this doc has no sharding the way the
+  // CRM's big collections do). Rather than let a write silently fail once
+  // the month is already right at the edge, this warns clearly with real
+  // numbers well before that point, so there's time to deal with it
+  // (e.g. asking for this to be split into smaller per-week documents)
+  // instead of a surprise mid-month.
+  const approxBytes = new Blob([JSON.stringify(payload)]).size;
+  if(approxBytes > 750000){
+    console.warn(`trade_data/${monthDocId(mk)} is ${(approxBytes/1024).toFixed(0)}KB — approaching Firestore's 1MB per-document limit.`);
+    const statusEl = document.getElementById('uploadStatus');
+    if(statusEl) statusEl.textContent = (statusEl.textContent?statusEl.textContent+'\n':'') +
+      `⚠️ ${mk} ka data ${(approxBytes/1024).toFixed(0)}KB tak pahunch gaya hai (limit ~1000KB) — jald hi ye mahina split karna padega, batana.`;
+  }
+  await fdb.collection('trade_data').doc(monthDocId(mk)).set(payload);
 }
 
 // ── Column detection: Equity files have "SCRIP NAME" as a plain column;
@@ -355,7 +371,7 @@ function parseWorkbook(wb){
   if(!seg) return null;
 
   const iExch = colIndex(header, ['EXCHANGE']);
-  const iScrip = seg==='EQ' ? colIndex(header, ['SCRIP NAME']) : colIndex(header, ['CONTRACT']);
+  const iScrip = seg==='EQ' ? colIndex(header, ['SCRIP NAME','SCRIPNAME']) : colIndex(header, ['CONTRACT']);
   const iBS = colIndex(header, ['BUY SELL']);
   const iDealer = colIndex(header, ['DEALER']);   // -1 in the "Order_Report" variant — no RM column at all
   const iCust = colIndex(header, ['CUSTOMER NAME']);
@@ -389,7 +405,7 @@ function parseWorkbook(wb){
   // — more specific and directly useful for tracking. Not every report
   // variant has CHANNEL USER (the F&O ones only carry CHANNEL CODE), so
   // this falls back to CODE when USER isn't present.
-  const iChannelUser = colIndex(header, ['CHANNEL USER']);
+  const iChannelUser = colIndex(header, ['CHANNEL USER','CHANNELUSER']);
   const iChannelCode = colIndex(header, ['CHANNEL CODE']);
   const iOptType = seg==='FO' ? colIndex(header, ['OPTION TYPE']) : -1;
   const iStrike = seg==='FO' ? colIndex(header, ['STRIKE PRICE']) : -1;
@@ -538,22 +554,45 @@ async function handleFiles(fileList){
     }
   }
 
-  for(const mk of touchedMonths) await saveMonth(mk);
+  for(const mk of touchedMonths){
+    try{
+      await saveMonth(mk);
+    }catch(e){
+      // 27-Aug-2026 fix: this used to be un-caught — if saving even ONE
+      // month failed (Firestore write error, e.g. a month's document
+      // getting too large after a lot of trading activity, or a network
+      // blip), the status line stayed stuck on "Processing..." forever
+      // with no error shown, and none of the code below (which refreshes
+      // the table/filters/dashboard) ever ran. Now any save failure is
+      // caught, reported, and the rest of the function still completes.
+      console.warn('saveMonth failed for', mk, e);
+      statusEl.textContent = `❌ Save failed for ${mk}: ${e.message||e}. Baaki processing continue kar rahe hain — is mahine ka data poora save nahi hua ho sakta, dobara try karo.`;
+    }
+  }
 
   try{ localStorage.setItem('dninvest_trades_last_upload', new Date().toISOString()); }catch(e){}
 
-  statusEl.textContent = `✅ ${filesOk} file(s) read, ${totalNew} new trade(s) added` +
+  const summary = `✅ ${filesOk} file(s) read, ${totalNew} new trade(s) added` +
     (totalEnriched ? `, ${totalEnriched} existing trade(s) updated (e.g. Channel filled in)` : '') +
     (totalSkippedDup ? `, ${totalSkippedDup} already-existing (no change)` : '') +
     (rmLookedUp ? `, RM matched for ${rmLookedUp} from client records` : '') +
     (rmUnmatched ? `, ⚠️ RM not found for ${rmUnmatched} (client name didn't match any CRM client)` : '') +
     (filesFailed ? `, ⚠️ ${filesFailed} file(s) not recognised` : '') +
     (clientRmDiag ? `\n🔎 Client lookup: ${clientRmDiag}` : '');
+  // Only overwrite the status line with the success summary if nothing
+  // above already reported a save failure (so a real error doesn't get
+  // silently replaced by a falsely-cheerful ✅ message).
+  if(!statusEl.textContent.startsWith('❌')) statusEl.textContent = summary;
   statusEl.style.whiteSpace = 'pre-line';
 
-  await populateMonthFilter();
-  await onMonthChange();
-  updateDashboardStats();
+  try{
+    await populateMonthFilter();
+    await onMonthChange();
+    updateDashboardStats();
+  }catch(e){
+    console.warn('post-upload refresh failed', e);
+    statusEl.textContent += `\n⚠️ Table refresh me dikkat aayi (${e.message||e}) — page ko ek baar manually refresh kar lo.`;
+  }
 }
 
 async function backfillRm(){
