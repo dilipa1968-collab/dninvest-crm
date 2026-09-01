@@ -4460,10 +4460,10 @@ function renderIncentivePage(){
           <td>${fmt(tt.sip)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(incl. perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
-          <td title="${tt.lateDays} late day(s) this month = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDays} late${tt.lateDeductionOverridden?' · edited':''}</small></td>
-          <td style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
-          <td><input type="number" id="inc-paid-${safeId}" value="${paid}" min="0"></td>
-          <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
+          <td title="${tt.lateDays} late day(s) this month = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0" oninput="recalcIncentiveRow('${safeId}')"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDays} late${tt.lateDeductionOverridden?' · edited':''}</small></td>
+          <td id="inc-total-${safeId}" data-rawtotal="${tt.rawTotal}" style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
+          <td><input type="number" id="inc-paid-${safeId}" value="${paid}" min="0" oninput="recalcIncentiveRow('${safeId}')"></td>
+          <td id="inc-bal-${safeId}" style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
           <td><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
         </tr>`;
       }).join('');
@@ -4479,10 +4479,10 @@ function renderIncentivePage(){
           <td>${fmt(T.sip)}</td>
           <td style="color:${T.broCl>0?'var(--green)':'var(--text3)'}">${T.broCl>0?fmt(T.broCl):'—'}</td>
           <td>${fmt(T.other)}</td>
-          <td style="color:${T.lateDed>0?'var(--red)':'var(--text3)'}">${T.lateDed>0?'−'+fmt(T.lateDed):'—'}</td>
-          <td style="color:var(--green)">${fmt(T.total)}</td>
-          <td style="color:var(--green)">${fmt(T.paid)}</td>
-          <td style="color:${T.balance>0?'var(--red)':'var(--green)'}">${fmt(T.balance)}</td>
+          <td id="inc-lateded-ALL" style="color:${T.lateDed>0?'var(--red)':'var(--text3)'}">${T.lateDed>0?'−'+fmt(T.lateDed):'—'}</td>
+          <td id="inc-total-ALL" style="color:var(--green)">${fmt(T.total)}</td>
+          <td id="inc-paid-ALL" style="color:var(--green)">${fmt(T.paid)}</td>
+          <td id="inc-bal-ALL" style="color:${T.balance>0?'var(--red)':'var(--green)'}">${fmt(T.balance)}</td>
           <td></td>
         </tr>`;
       tit.innerHTML=rows+totalRow;
@@ -4508,6 +4508,57 @@ function renderIncentivePage(){
   } else {
     renderMyMultiMonthSummary();
   }
+}
+
+// Live-recalculate Total Incentive + Balance when Late Deduction or Paid
+// amount is edited (25-Aug-2026) — these used to only update on the next
+// full table re-render (i.e. after clicking Save and the page reloading
+// that employee's numbers), so changing Late Ded. visually did nothing
+// until then. Now both the row itself and the footer TOTAL row update
+// immediately as you type, purely client-side — Save still needs to be
+// clicked to actually persist the change to Firestore, this is just the
+// on-screen numbers keeping up with what you're typing.
+function recalcIncentiveRow(safeId){
+  const totalCell = document.getElementById('inc-total-'+safeId);
+  const balCell = document.getElementById('inc-bal-'+safeId);
+  const ldInput = document.getElementById('inc-lateded-'+safeId);
+  const paidInput = document.getElementById('inc-paid-'+safeId);
+  if(!totalCell || !balCell || !ldInput || !paidInput) return;
+
+  const rawTotal = Number(totalCell.dataset.rawtotal)||0;
+  const lateDed = Math.max(0, parseInt(ldInput.value)||0);
+  const paid = Math.max(0, parseInt(paidInput.value)||0);
+  const newTotal = Math.max(0, rawTotal - lateDed);
+  const newBalance = Math.max(0, newTotal - paid);
+
+  totalCell.textContent = fmt(newTotal);
+  totalCell.style.color = newTotal>0 ? 'var(--green)' : 'var(--text3)';
+  balCell.textContent = fmt(newBalance);
+  balCell.style.color = newBalance>0 ? 'var(--red)' : 'var(--green)';
+
+  // Re-sum the footer TOTAL row from whatever's currently on screen across
+  // every row (not just this one), so it stays accurate no matter how many
+  // rows someone edits before saving.
+  let sumLateDed=0, sumTotal=0, sumPaid=0, sumBal=0;
+  document.querySelectorAll('[id^="inc-total-"]').forEach(cell=>{
+    if(cell.id==='inc-total-ALL') return;
+    const id = cell.id.replace('inc-total-','');
+    const ld = document.getElementById('inc-lateded-'+id);
+    const pd = document.getElementById('inc-paid-'+id);
+    const rt = Number(cell.dataset.rawtotal)||0;
+    const ldVal = ld ? Math.max(0, parseInt(ld.value)||0) : 0;
+    const pdVal = pd ? Math.max(0, parseInt(pd.value)||0) : 0;
+    const tot = Math.max(0, rt - ldVal);
+    sumLateDed += ldVal; sumTotal += tot; sumPaid += pdVal; sumBal += Math.max(0, tot-pdVal);
+  });
+  const ldAll = document.getElementById('inc-lateded-ALL');
+  const totAll = document.getElementById('inc-total-ALL');
+  const paidAll = document.getElementById('inc-paid-ALL');
+  const balAll = document.getElementById('inc-bal-ALL');
+  if(ldAll) ldAll.textContent = sumLateDed>0 ? '−'+fmt(sumLateDed) : '—';
+  if(totAll) totAll.textContent = fmt(sumTotal);
+  if(paidAll) paidAll.textContent = fmt(sumPaid);
+  if(balAll){ balAll.textContent = fmt(sumBal); balAll.style.color = sumBal>0 ? 'var(--red)' : 'var(--green)'; }
 }
 
 async function markIncentivePaid(name){
