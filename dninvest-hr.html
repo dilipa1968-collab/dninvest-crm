@@ -5181,6 +5181,34 @@ function renderBroUploadResult(results, minClients, threshold, bonus, unmatchedR
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// Click a Code or Client Name cell in the Brokerage detail modal (25-Aug-2026)
+// — copies "CODE  NAME" together to the clipboard in one click, so it's
+// ready to paste straight into WhatsApp/Excel without separately selecting
+// and copying each value.
+function copyClientCodeName(cell){
+  const tr = cell.closest('tr');
+  if(!tr) return;
+  const text = (tr.dataset.code||'') + '  ' + (tr.dataset.name||'');
+  const done = ok=>{
+    const orig = cell.style.background;
+    cell.style.background = ok ? 'var(--green-bg,#dcf5e6)' : 'var(--red-bg,#fde2e2)';
+    cell.style.transition = 'background .15s ease';
+    setTimeout(()=>{ cell.style.background = orig; }, 500);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text.trim()).then(()=>done(true)).catch(()=>done(false));
+  } else {
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text.trim(); ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done(true);
+    }catch(e){ done(false); }
+  }
+}
+
 // Remove the applied brokerage figures & client-bonus for the selected month
 // (for every employee). Salary, demat, MF, SIP, Other stay untouched.
 async function clearBroForMonth(){
@@ -5397,10 +5425,10 @@ function showBroClientDetail(empName, month){
       for(let i=0;i<list.length;i++){
         const c = list[i];
         const dim = c.eligible ? '' : ';color:var(--text3)';
-        html += '<tr style="border-bottom:1px solid var(--border);background:'+(c.eligible?'var(--surface,#fff)':'var(--surface2,#F1F0EC)')+'">'
+        html += '<tr data-code="'+escapeHtml(String(c.code||''))+'" data-name="'+escapeHtml(c.name||'')+'" style="border-bottom:1px solid var(--border);background:'+(c.eligible?'var(--surface,#fff)':'var(--surface2,#F1F0EC)')+'">'
           +'<td style="padding:7px 10px;color:var(--text3)">'+(i+1)+'</td>'
-          +'<td style="padding:7px 10px;font-size:11.5px'+(c.eligible?';color:var(--text2)':';color:var(--text3)')+'">'+escapeHtml(String(c.code||''))+'</td>'
-          +'<td style="padding:7px 10px'+dim+'">'+escapeHtml(c.name||'')+'</td>'
+          +'<td onclick="copyClientCodeName(this)" title="Click to copy Code + Name" style="padding:7px 10px;font-size:11.5px;cursor:pointer'+(c.eligible?';color:var(--text2)':';color:var(--text3)')+'">'+escapeHtml(String(c.code||''))+'</td>'
+          +'<td onclick="copyClientCodeName(this)" title="Click to copy Code + Name" style="padding:7px 10px;cursor:pointer'+dim+'">'+escapeHtml(c.name||'')+'</td>'
           +'<td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:'+(c.eligible?'600':'400')+dim+'">'+inr2(c.bro)+'</td>'
           +'<td style="padding:7px 10px;text-align:center">'
           +(c.eligible
