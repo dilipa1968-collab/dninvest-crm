@@ -1702,6 +1702,51 @@ function getEsicNumbers(){ return DB.get('esic_numbers', {}) || {}; }
 function getEsicNumber(name){ return (getEsicNumbers()[name]) || ''; }
 async function setEsicNumber(name, val){ await DB.setMerged('esic_numbers', {[name]: (val||'').trim()}); }
 
+// ── Joining / Leaving dates — used to prorate a mid-month join/leave's
+// salary (25-Aug-2026) ──
+// The 10 original employees only ever had a plain display STRING for
+// "joined" (e.g. "Mar 2022", hardcoded in EMPLOYEES_BASE in the source
+// code) — never a real date, and never used in any calculation. Real dates
+// now live here instead (same override pattern as ESIC numbers/Perf.
+// Incentive), settable per employee from the Employees page. If nothing's
+// been set for someone, salary calc treats them as a full-month employee —
+// existing behaviour is unchanged until an admin actually sets a date.
+function getJoinedDates(){ return DB.get('joined_dates', {}) || {}; }
+function getJoinedDate(name){ return (getJoinedDates()[name]) || ''; }   // '' = not set, treat as full-month
+async function setJoinedDate(name, val){ await DB.setMerged('joined_dates', {[name]: (val||'').trim()}); }
+
+function getLeftDates(){ return DB.get('left_dates', {}) || {}; }
+function getLeftDate(name){ return (getLeftDates()[name]) || ''; }
+async function setLeftDate(name, val){ await DB.setMerged('left_dates', {[name]: (val||'').trim()}); }
+
+// How much of ONE calendar month (monthPrefix = "YYYY-MM") an employee was
+// actually employed for, given their joined/left dates. Returns 1 (full
+// month) whenever no relevant date is set — this is what keeps every
+// employee's calculation exactly as it was before for anyone admin hasn't
+// touched.
+function empTenureInMonth(name, monthPrefix){
+  if(!monthPrefix || !/^\d{4}-\d{2}$/.test(monthPrefix)) return {daysInMonth:30, effectiveDays:30, proratedFraction:1};
+  const [y,m] = monthPrefix.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  let effStart = new Date(y, m-1, 1);
+  let effEnd = new Date(y, m-1, daysInMonth);
+
+  const joined = getJoinedDate(name);
+  if(joined && /^\d{4}-\d{2}-\d{2}$/.test(joined)){
+    const jd = new Date(joined+'T00:00:00');
+    if(jd > effEnd) return {daysInMonth, effectiveDays:0, proratedFraction:0};   // hadn't joined yet this month
+    if(jd > effStart) effStart = jd;
+  }
+  const left = getLeftDate(name);
+  if(left && /^\d{4}-\d{2}-\d{2}$/.test(left)){
+    const ld = new Date(left+'T00:00:00');
+    if(ld < effStart) return {daysInMonth, effectiveDays:0, proratedFraction:0};   // already left before this month
+    if(ld < effEnd) effEnd = ld;
+  }
+  const effectiveDays = Math.max(0, Math.round((effEnd-effStart)/86400000)+1);
+  return {daysInMonth, effectiveDays, proratedFraction: effectiveDays/daysInMonth};
+}
+
 // grossWage = the wage figure used to (a) check ceiling eligibility and (b) compute
 // the contribution amount. We use the employee's configured basic salary for the
 // ceiling check (matches how wages are declared to ESIC), and the actual earned
@@ -3632,6 +3677,13 @@ async function removeHoliday(date){
 // Holiday-status days are NOT counted as absent.
 function calcMonthlySalary(name, monthPrefix){
   const sal=getEmpSalary(name);
+  const tenure=empTenureInMonth(name, monthPrefix);
+  // Mid-month join/leave (25-Aug-2026): the "full month" salary baseline
+  // shrinks to the fraction of the month actually worked. The per-day
+  // absence-deduction rate (sal/26) stays the standard daily rate either
+  // way — same logic as before, just applied on top of a smaller base for
+  // a partial month.
+  const proratedSal = Math.round(sal * tenure.proratedFraction);
   const att=getAtt();
   const recs=(att[name]||[]).filter(r=>!monthPrefix || r.date.startsWith(monthPrefix));
   const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
@@ -3640,11 +3692,11 @@ function calcMonthlySalary(name, monthPrefix){
   const perDay=sal/26;
   const halfDeduction=(perDay/2)*halfDays; // Half day = aadhe din ka auto-deduction
   const deduction=perDay*absentDays + halfDeduction;
-  const earnedWage=Math.max(0,sal-deduction);
+  const earnedWage=Math.max(0,proratedSal-deduction);
   const esi=calcESI(name, sal, earnedWage);
   const extra=monthPrefix?getExtraDeductionForMonth(name, monthPrefix):{amount:0, note:''};
   const net=Math.max(0, earnedWage-esi.employeeContribution-extra.amount);
-  return {salary:sal, perDay, presentDays, absentDays, halfDays, deduction, halfDeduction, esi, extra, net};
+  return {salary:sal, proratedSalary:proratedSal, tenure, perDay, presentDays, absentDays, halfDays, deduction, halfDeduction, esi, extra, net};
 }
 
 function viewSalMonth(){
@@ -3802,6 +3854,7 @@ function renderSalaryPage(){
       <p style="font-size:11px;color:var(--text3);margin-bottom:6px">${mLabel}</p>
       <table style="font-size:13px;width:100%">
         <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(r.salary)}</td></tr>
+        ${r.tenure.proratedFraction<1?`<tr><td style="color:var(--text2);padding:6px 0">Prorated (${r.tenure.effectiveDays}/${r.tenure.daysInMonth} days this month)</td><td style="text-align:right;color:var(--amber,#b58a00)">${fmt(r.proratedSalary)}</td></tr>`:''}
         <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷26)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Absent days</td><td style="text-align:right;color:var(--red)">${r.absentDays}</td></tr>
@@ -3835,12 +3888,12 @@ function renderSalaryPage(){
         const paid=(payments[e.name]&&payments[e.name].salaryPaid)||0;
         const balance=Math.max(0, netAfterAdv-paid);
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
-        T.sal+=r.salary; T.abs+=r.absentDays; T.ded+=r.deduction; T.adv+=advDeducted;
+        T.sal+=(r.tenure.proratedFraction<1?r.proratedSalary:r.salary); T.abs+=r.absentDays; T.ded+=r.deduction; T.adv+=advDeducted;
         T.esi+=(r.esi.applicable?r.esi.employeeContribution:0); T.extra+=(r.extra.amount||0);
         T.net+=netAfterAdv; T.paid+=paid; T.bal+=balance;
         return `<tr>
           <td>${e.name}</td>
-          <td>${fmt(r.salary)}</td>
+          <td title="${r.tenure.proratedFraction<1?'Prorated: '+r.tenure.effectiveDays+'/'+r.tenure.daysInMonth+' days this month (joined/left mid-month)':''}">${fmt(r.tenure.proratedFraction<1?r.proratedSalary:r.salary)}${r.tenure.proratedFraction<1?`<br><small style="font-weight:400;color:var(--amber,#b58a00)">(prorated, full ${fmt(r.salary)})</small>`:''}</td>
           <td>${r.absentDays}</td>
           <td style="color:var(--red)">− ${fmt(r.deduction)}</td>
           <td style="color:${advDeducted>0?'var(--red)':'var(--text3)'}">${advDeducted>0?'− '+fmt(advDeducted):'—'}</td>
@@ -3972,8 +4025,10 @@ function calcSalary(){
   const perday=b/26;
   const deduction=perday*absentDays;
   const month=salMonthEl&&salMonthEl.value?salMonthEl.value:'';
+  const tenure=empTenureInMonth(name, month);
+  const proratedB=Math.round(b*tenure.proratedFraction);
   const advDeducted=month?getAdvanceAdjustedForMonth(name,month):0;
-  const earnedWage=Math.max(0,b-deduction);
+  const earnedWage=Math.max(0,proratedB-deduction);
   const esi=calcESI(name, b, earnedWage);
   const extra=month?getExtraDeductionForMonth(name,month):{amount:0,note:''};
   const net=earnedWage-esi.employeeContribution+bonus-advDeducted-extra.amount;
@@ -3981,6 +4036,7 @@ function calcSalary(){
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
       <tr><td style="color:var(--text2);padding:5px 0">Basic</td><td style="text-align:right">${fmt(b)}</td></tr>
+      ${tenure.proratedFraction<1?`<tr><td style="color:var(--text2);padding:5px 0">Prorated (${tenure.effectiveDays}/${tenure.daysInMonth} days this month)</td><td style="text-align:right;color:var(--amber,#b58a00)">${fmt(proratedB)}</td></tr>`:''}
       <tr><td style="color:var(--text2);padding:5px 0">Per day (Salary÷26)</td><td style="text-align:right">${fmt(perday)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Deduction</td><td style="text-align:right;color:var(--red)">− ${fmt(deduction)}</td></tr>
@@ -4003,6 +4059,8 @@ function downloadSalarySlip(){
   const monthLabel=attMonthLabel(month);
 
   const b=getEmpSalary(name);
+  const tenure=empTenureInMonth(name, month);
+  const proratedB=Math.round(b*tenure.proratedFraction);
   const absentEl=document.getElementById('sal-absent');
   const bonusEl=document.getElementById('sal-bonus');
   const absentDays=absentEl?(parseInt(absentEl.value)||0):0;
@@ -4010,7 +4068,7 @@ function downloadSalarySlip(){
   const perday=b/26;
   const deduction=perday*absentDays;
   const advDeducted=getAdvanceAdjustedForMonth(name,month);
-  const earnedWage=Math.max(0,b-deduction);
+  const earnedWage=Math.max(0,proratedB-deduction);
   const esi=calcESI(name, b, earnedWage);
   const extra=getExtraDeductionForMonth(name,month);
   const net=Math.max(0, earnedWage-esi.employeeContribution+bonus-advDeducted-extra.amount);
@@ -4027,6 +4085,7 @@ function downloadSalarySlip(){
 
   const rowsHtml=`
     <tr><td>Basic Salary</td><td class="amt">${fmt(b)}</td></tr>
+    ${tenure.proratedFraction<1?`<tr><td>Prorated (${tenure.effectiveDays}/${tenure.daysInMonth} days this month)</td><td class="amt">${fmt(proratedB)}</td></tr>`:''}
     <tr><td>Per-day rate (Salary ÷ 26)</td><td class="amt">${fmt(perday)}</td></tr>
     <tr><td>Present days</td><td class="amt">${presentDays} / ${numDays}</td></tr>
     <tr><td>Absent days</td><td class="amt">${absentDays}</td></tr>
@@ -6080,7 +6139,14 @@ function renderEmployees(){
     return `
     <tr>
       <td><div class="emp-row"><div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(e.name)}</div><div><div class="emp-name">${e.name}</div></div></div></td>
-      <td>${e.role}</td><td>${e.joined}</td>
+      <td>${e.role}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="date" value="${getJoinedDate(e.name)}" id="emp-joined-${e.name}" style="padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-size:12px" title="${!getJoinedDate(e.name)?'Not set — salary treated as full-month. Set a date only for someone who joined THIS month partway through.':''}">
+          <button class="btn btn-sm btn-primary" onclick="saveJoinedDate('${e.name}')" style="padding:4px 7px;font-size:11px">Set</button>
+        </div>
+        ${!getJoinedDate(e.name)?`<small style="color:var(--text3)">${e.joined}</small>`:''}
+      </td>
       <td>
         <div style="display:flex;align-items:center;gap:4px">
           <span>₹</span>
@@ -6201,9 +6267,17 @@ async function addEmployee(){
   const name=document.getElementById('ne-name').value.trim();
   if(!name){alert('Please enter a name');return}
   if(EMPLOYEES.find(e=>e.name.toLowerCase()===name.toLowerCase())){alert('An employee with this name already exists');return}
-  const emp={name,role:document.getElementById('ne-role').value.trim()||'RM',joined:'Jun 2026',salary:parseInt(document.getElementById('ne-sal').value)||25000};
+  const dojVal=document.getElementById('ne-doj').value;
+  const emp={name,role:document.getElementById('ne-role').value.trim()||'RM',joined:dojVal||today(),salary:parseInt(document.getElementById('ne-sal').value)||25000};
   try{
     await persistAddEmployee(emp);
+    // 25-Aug-2026: the "Date of joining" field used to be captured but
+    // silently discarded — a hardcoded placeholder string went into
+    // emp.joined instead, and nothing ever read it for salary purposes.
+    // Now it's also saved into the real joined_dates override (same store
+    // calcMonthlySalary actually reads), so a new mid-month hire's first
+    // month is prorated correctly right away.
+    if(dojVal) await setJoinedDate(name, dojVal);
     const perfVal=parseInt(document.getElementById('ne-perf').value)||0;
     if(perfVal>0) await setPerfIncentive(name, perfVal);
   }catch(e){
@@ -6238,8 +6312,22 @@ async function saveEsicNo(name){
   alert(name+"'s ESIC number set to: "+(val.trim()||'(blank)'));
 }
 
+async function saveJoinedDate(name){
+  const val=document.getElementById('emp-joined-'+name).value;
+  await setJoinedDate(name, val);
+  renderEmployees();
+  renderSalaryPage && renderSalaryPage();
+  alert(name+"'s joining date set to: "+(val||'(cleared — back to full-month)')+"\n\nSalary will now be prorated for any month before this date, and full for every month after.");
+}
+
 async function deleteEmployee(name){
-  if(!confirm('Mark '+name+' as Left?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed. You can bring them back any time from "Left Employees" below.')) return;
+  const leaveDate = prompt(
+    name+' ko "Left" mark karne se pehle, unki asli leaving date daalo (agar wo is mahine ke beech me gaye hain, to us mahine ki salary automatically prorate ho jaayegi).\n\nKhaali chhodo agar exact date nahi pata / poore mahine tak the:',
+    today()
+  );
+  if(leaveDate===null) return;   // cancelled
+  if(!confirm('Mark '+name+' as Left'+(leaveDate?' (leaving date: '+leaveDate+')':'')+'?\n\nTheir past attendance, salary and incentive records will NOT be deleted — only the active employee entry will be removed. You can bring them back any time from "Left Employees" below.')) return;
+  if(leaveDate) await setLeftDate(name, leaveDate);
   await persistRemoveEmployee(name);
   renderEmployees();
 }
@@ -6253,6 +6341,7 @@ async function reactivateEmployee(name){
     added,
     removed: removed.filter(n=>n!==name)
   }));
+  await setLeftDate(name, '');   // clear their leaving date — they're active again, no more proration from it
   renderEmployees();
   alert(name+' has been reactivated and is back in the active employee list.');
 }
