@@ -3685,7 +3685,17 @@ function calcMonthlySalary(name, monthPrefix){
   // a partial month.
   const proratedSal = Math.round(sal * tenure.proratedFraction);
   const att=getAtt();
-  const recs=(att[name]||[]).filter(r=>!monthPrefix || r.date.startsWith(monthPrefix));
+  // 25-Aug-2026 fix: absent/half-day counts now exclude any date that is
+  // CURRENTLY a declared holiday (or Sunday), regardless of what status the
+  // attendance record happens to already hold. Root cause of the bug this
+  // fixes: an "Absent" record can get auto-created for a day BEFORE that
+  // day was later declared a holiday (holiday added retroactively, or the
+  // auto-mark ran first) — the stored record never fixed itself just
+  // because the holiday was added afterward. Checking isHoliday() here,
+  // at calculation time, means salary is always correct against the
+  // CURRENT holiday list, without needing to hunt down and edit old
+  // attendance records by hand.
+  const recs=(att[name]||[]).filter(r=>!monthPrefix || r.date.startsWith(monthPrefix)).filter(r=>!isHoliday(r.date));
   const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
   const absentDays=recs.filter(r=>r.status==='Absent').length;
   const halfDays=recs.filter(r=>r.status==='Half day').length;
@@ -4015,7 +4025,7 @@ function calcSalary(){
   if(salMonthEl && salMonthEl.value && absentEl && !absentEl.dataset.touched){
     const m=salMonthEl.value;
     const att=getAtt();
-    const recs=(att[name]||[]).filter(r=>r.date.startsWith(m));
+    const recs=(att[name]||[]).filter(r=>r.date.startsWith(m)).filter(r=>!isHoliday(r.date));
     const autoAbsent=recs.filter(r=>r.status==='Absent').length;
     absentEl.value=autoAbsent;
   }
