@@ -300,7 +300,7 @@ function colIndex(headerRow, names){
 // mf_clients records to find who their RM actually is. This is a READ-ONLY,
 // one-time-per-session fetch straight from Firestore — it does NOT touch
 // anything the CRM itself loads on login, so it can't add load there.
-let clientRmMap = null;   // { normalisedName: rmName }
+let clientRmMap = null;   // { byName: {normalisedName: rmName}, byCode: {clientCode: rmName} }
 let clientRmDiag = '';    // last diagnostic string, shown in the upload status so mismatches are visible immediately
 function normName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 
@@ -321,20 +321,39 @@ function canonicalRm(raw){
   return KNOWN_RM_MAP[String(raw).trim().toUpperCase()] || '';   // '' if not a recognised RM
 }
 
-function absorbClientArray(arr, map){
+function normCode(s){ return String(s||'').replace(/\D/g,''); }   // digits-only, so "1493368" and "01493368"/" 1493368 " etc. all match the same
+
+function absorbClientArray(arr, nameMap, codeMap){
   let added = 0;
   if(!Array.isArray(arr)) return 0;
   arr.forEach(c=>{
-    const nm = normName(c && c.name);
-    const rm = c && c.rm;
-    if(nm && rm && !map[nm]){ map[nm] = rm; added++; }
+    if(!c) return;
+    const rm = c.rm;
+    if(!rm) return;
+    const nm = normName(c.name);
+    if(nm && !nameMap[nm]){ nameMap[nm] = rm; added++; }
+    const code = normCode(c.code);   // CRM's "Client Code / UCC" field — only eq_clients have this, mf_clients don't
+    if(code && !codeMap[code]){ codeMap[code] = rm; }
   });
   return added;
 }
 
+// 03-Sep-2026: client CODE (matched against the trade file's S2K ID) is now
+// preferred over client NAME wherever available — a client's UCC/broker
+// code never changes, while their name in a broker export can be spelled
+// slightly differently than in the CRM (extra middle name, spacing, etc.),
+// causing silent name-match misses. resolveRm() tries code first, falls
+// back to name.
+function resolveRm(rmMap, row){
+  const codeKey = normCode(row.s2kId);
+  if(codeKey && rmMap.byCode[codeKey]) return rmMap.byCode[codeKey];
+  const nameKey = normName(row.client);
+  return rmMap.byName[nameKey] || '';
+}
+
 async function loadClientRmMap(){
   if(clientRmMap) return clientRmMap;
-  const map = {};
+  const nameMap = {}, codeMap = {};
   const SHARD_COUNT = 8;
   const diag = [];
 
@@ -348,7 +367,7 @@ async function loadClientRmMap(){
         const doc = await fdb.collection('crm_data').doc(key+'__s'+i).get();
         if(doc.exists){
           shardsFound++;
-          recordsFound += absorbClientArray((doc.data()||{}).data, map);
+          recordsFound += absorbClientArray((doc.data()||{}).data, nameMap, codeMap);
         }
       }catch(e){}
     }
@@ -361,7 +380,7 @@ async function loadClientRmMap(){
     try{
       const doc = await fdb.collection('crm_data').doc(key).get();
       if(doc.exists){
-        const n = absorbClientArray((doc.data()||{}).data, map);
+        const n = absorbClientArray((doc.data()||{}).data, nameMap, codeMap);
         diag.push(`crm_data/${key} (plain doc): ${n} named`);
       }
     }catch(e){}
@@ -377,7 +396,7 @@ async function loadClientRmMap(){
     for(let i=0;i<SHARD_COUNT;i++){
       try{
         const doc = await fdb.collection(coll).doc('s'+i).get();
-        if(doc.exists){ shardsFound++; recordsFound += absorbClientArray((doc.data()||{}).data, map); }
+        if(doc.exists){ shardsFound++; recordsFound += absorbClientArray((doc.data()||{}).data, nameMap, codeMap); }
       }catch(e){}
     }
     if(shardsFound){
@@ -391,17 +410,21 @@ async function loadClientRmMap(){
         snap.forEach(doc=>{
           const d = doc.data()||{};
           const nm = normName(d.name);
-          if(nm && d.rm && !map[nm]){ map[nm] = d.rm; n++; }
+          if(nm && d.rm && !nameMap[nm]){ nameMap[nm] = d.rm; n++; }
+          const code = normCode(d.code);
+          if(code && d.rm && !codeMap[code]) codeMap[code] = d.rm;
         });
         diag.push(`${coll} (one doc per client): ${snap.size} docs, ${n} named`);
       }
     }catch(e){}
   }
 
+  diag.push(`${Object.keys(codeMap).length} client codes indexed`);
   clientRmDiag = diag.join(' · ');
-  console.log('Client RM lookup diagnostic:', clientRmDiag, '— total unique names loaded:', Object.keys(map).length);
-  clientRmMap = map;
-  return map;
+  console.log('Client RM lookup diagnostic:', clientRmDiag, '— total unique names loaded:', Object.keys(nameMap).length);
+  const result = {byName: nameMap, byCode: codeMap};
+  clientRmMap = result;
+  return result;
 }
 
 function parseWorkbook(wb){
@@ -548,7 +571,7 @@ async function handleFiles(fileList){
       // the CRM at all.
       if(!rmMap) rmMap = await loadClientRmMap();
       parsed.rows.forEach(r=>{
-        const match = rmMap[normName(r.client)];
+        const match = resolveRm(rmMap, r);
         if(match){ r.rm = match; rmLookedUp++; }
         else if(r.dealerFromFile){ r.rm = r.dealerFromFile; }
         else rmUnmatched++;
@@ -655,7 +678,7 @@ async function backfillRm(){
   clientRmMap = null;   // force a fresh fetch, in case client/RM assignments changed since last load
   const rmMap = await loadClientRmMap();
 
-  statusEl.textContent = `Client lookup loaded (${Object.keys(rmMap).length} names). Scanning saved months...`;
+  statusEl.textContent = `Client lookup loaded (${Object.keys(rmMap.byName).length} names, ${Object.keys(rmMap.byCode).length} codes). Scanning saved months...`;
 
   let monthIds = [];
   try{
@@ -682,7 +705,7 @@ async function backfillRm(){
         // actually belongs to "Khokhan" per the CRM). Re-running this
         // after fixing/checking a client's RM in the CRM will correct
         // every already-saved trade for that client.
-        const match = rmMap[normName(r.client)];
+        const match = resolveRm(rmMap, r);
         if(match){
           if(match !== r.rm){ r.rm = match; totalFixed++; changed = true; }
           return;
