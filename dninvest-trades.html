@@ -499,7 +499,8 @@ function parseWorkbook(wb){
       exchange: row[iExch]||'',
       scrip: row[iScrip]||'',
       buySell: row[iBS]||'',
-      rm: dealerFromFile,   // filled in from CRM client records afterwards if this is blank
+      rm: '',   // resolved afterwards — CRM client record wins if the client is found there; dealerFromFile is only a fallback
+      dealerFromFile: dealerFromFile,
       client: clientRaw,
       qty: execQty>0 ? execQty : orderQty,
       execQty: execQty,
@@ -538,18 +539,21 @@ async function handleFiles(fileList){
       if(!parsed){ filesFailed++; continue; }
       filesOk++;
 
-      // Some report variants ("Order_Report_*.xls") have no DEALER column at
-      // all — fill the RM in from the CRM's own client records, matched by
-      // (normalised) client name, on demand.
-      if(parsed.rows.some(r=>!r.rm)){
-        if(!rmMap) rmMap = await loadClientRmMap();
-        parsed.rows.forEach(r=>{
-          if(r.rm) return;
-          const match = rmMap[normName(r.client)];
-          if(match){ r.rm = match; rmLookedUp++; }
-          else rmUnmatched++;
-        });
-      }
+      // 03-Sep-2026: CRM client record is now checked FIRST for every row,
+      // always — not just when the file has no DEALER column. A broker
+      // DEALER value can be stale (e.g. a client moved from one RM to
+      // another and the broker terminal's login wasn't updated), so it's
+      // no longer trusted over the CRM's own ownership record. The file's
+      // DEALER is only used as a fallback when the client isn't found in
+      // the CRM at all.
+      if(!rmMap) rmMap = await loadClientRmMap();
+      parsed.rows.forEach(r=>{
+        const match = rmMap[normName(r.client)];
+        if(match){ r.rm = match; rmLookedUp++; }
+        else if(r.dealerFromFile){ r.rm = r.dealerFromFile; }
+        else rmUnmatched++;
+        delete r.dealerFromFile;
+      });
 
       // Group parsed rows by month (a file is normally single-day, but this
       // handles it safely either way) and merge. Same trade id already
@@ -671,23 +675,23 @@ async function backfillRm(){
     let changed = false;
     ['equity','fo'].forEach(seg=>{
       data[seg].forEach(r=>{
-        if(!r.rm){
-          const match = rmMap[normName(r.client)];
-          if(match){ r.rm = match; totalFixed++; changed = true; }
-          else totalStillUnknown++;
+        // 03-Sep-2026: CRM client record is now authoritative, full stop —
+        // if the client is found there, that RM wins even when the trade
+        // already carries a different, perfectly valid-looking RM name
+        // (e.g. a client whose broker DEALER said "Bharat" but who
+        // actually belongs to "Khokhan" per the CRM). Re-running this
+        // after fixing/checking a client's RM in the CRM will correct
+        // every already-saved trade for that client.
+        const match = rmMap[normName(r.client)];
+        if(match){
+          if(match !== r.rm){ r.rm = match; totalFixed++; changed = true; }
           return;
         }
-        // 26-Aug-2026: already has an rm value — but is it a RECOGNISED RM,
-        // in the RIGHT casing? Older saved trades may carry "BHARAT" (raw,
-        // all-caps from the file) instead of "Bharat" (canonical), or a
-        // broker desk-login value like "DIPPU" that isn't a real RM at all
-        // — both get corrected here.
+        if(!r.rm){ totalStillUnknown++; return; }
+        // No CRM record for this client — just canonicalise casing/an
+        // unrecognised desk-login value ("BHARAT" → "Bharat", "DIPPU" → '').
         const canon = canonicalRm(r.rm);
         if(canon && canon !== r.rm){ r.rm = canon; totalRecased++; changed = true; }
-        else if(!canon){
-          const match = rmMap[normName(r.client)];
-          if(match && match !== r.rm){ r.rm = match; totalFixed++; changed = true; }
-        }
       });
     });
     if(changed){ await saveMonth(mk); monthsTouched++; }
