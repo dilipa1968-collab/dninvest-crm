@@ -115,7 +115,7 @@ input,select,textarea,button{font-family:inherit}
           <!-- Question bank (up to 5, pre-filled — host just pushes) -->
           <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — Fill These In Advance, Then Just Hit "Push" During The Seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(Auto-Synced To All Your Devices · 🌐 Auto-Translated To Hindi + English On Push, Any Language You Type)</span></div>
+              <div style="font-weight:700;font-size:.95rem">Question Bank (5) — Fill These In Advance, Then Just Hit "Push" During The Seminar <span style="color:#94a3b8;font-weight:500;font-size:.72rem">(Auto-Synced To All Your Devices · 🌐 Auto-Shown In English + Devanagari Hindi On Push — Common English Words Like SIP/NAV/Mutual Fund Stay As-Is)</span></div>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.loadMfBank()">🎯 Load MF Questions</button>
                 <button class="btn btn-teal" style="padding:5px 10px;font-size:.78rem;background:#0f7a45" onclick="QUIZ.loadShareBank()">📈 Load Share Market Questions</button>
@@ -197,15 +197,48 @@ window.QUIZ = (function(){
       var t=data && data.responseData && data.responseData.translatedText;
       if(t && !/MYMEMORY WARNING/i.test(t)) return t;
     }catch(e){}
-    return '';   // translation failed/unavailable → caller falls back to original-only text
+    return '';   // translation failed/unavailable → caller falls back gracefully
+  }
+  // Common finance/everyday words that people normally say in English even inside a Hindi sentence —
+  // kept as-is (not translated to Sanskrit-heavy Hindi) so the Devanagari line reads like aam bolchaal ki hindi.
+  var _keepEnglishTerms=['SIP','SIPs','NAV','SEBI','RBI','IRDAI','IPO','ETF','KYC','PAN','Aadhaar','EMI','ATM','OTP','UPI',
+    'Mutual Fund','Mutual Funds','Stock Market','Share Market','Stock','Stocks','Share','Shares','Sensex','Nifty',
+    'Demat','Portfolio','Dividend','Broker','Bank','Insurance','Policy','Loan','Credit','Debit','Cheque','Bonus',
+    'Returns','Return','Risk','Investment','Investor','Trading','Trader','Bull','Bear','Rights Issue','Face Value',
+    'App','Online','Digital','Email','WhatsApp','Cricket','Quiz','Winner','Prize'];
+  // en→hi translate, but swap the glossary terms above out for placeholders first so they come back untouched.
+  async function _translateKeepEnglishTerms(text){
+    var placeholders={}, work=text, idx=0;
+    var terms=_keepEnglishTerms.slice().sort(function(a,b){ return b.length-a.length; }); // longer phrases first
+    terms.forEach(function(term){
+      var re=new RegExp('\\b'+term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi');
+      work=work.replace(re, function(match){
+        var key='zzk'+(idx++)+'zz';
+        placeholders[key]=match;
+        return key;
+      });
+    });
+    var translated=await _mmTranslate(work,'en','hi');
+    if(!translated) return '';
+    Object.keys(placeholders).forEach(function(key){
+      translated=translated.replace(new RegExp(key,'gi'), placeholders[key]);
+    });
+    return translated;
   }
   async function bilingual(s){
     s=(s==null?'':String(s)).trim();
     if(!s) return s;
     if(_biCache[s]!=null) return _biCache[s];
     var isHi=_hasDevanagari(s);
-    var translated=await _mmTranslate(s, isHi?'hi':'en', isHi?'en':'hi');
-    var out = translated ? (s+'\n'+translated) : s;
+    var englishText, hindiText;
+    if(isHi){
+      hindiText=s;
+      englishText=(await _mmTranslate(s,'hi','en'))||s;
+    } else {
+      englishText=s;
+      hindiText=(await _translateKeepEnglishTerms(s))||'';
+    }
+    var out = hindiText ? (englishText+'\n'+hindiText) : englishText;
     _biCache[s]=out;
     return out;
   }
