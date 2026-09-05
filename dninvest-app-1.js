@@ -1134,7 +1134,7 @@ function isBackOfficeOrAdmin(){ return !!(CU && (CU.role==='admin' || CU.role===
 // files uploaded together, so one permission covers both.
 function canUploadSquareoff(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.risk_upload===true || CU.backoffice_access===true)); }
 let PG_SIZE = 50;
-let eqPage=1, mfPage=1, leadsPage=1, mfpPage=1;
+let eqPage=1, mfPage=1, leadsPage=1, mfpPage=1, mftxnPage=1, _mftxnFilterSig='';
 let eqSortField=null, eqSortDir=1, mfSortField=null, mfSortDir=1, leadsSortField=null, leadsSortDir=1;
 // Restore column-sort state after page reload (app auto-reloads every 30 min),
 // so the user's chosen sort (e.g. Name) is not lost on the auto-refresh.
@@ -7736,6 +7736,7 @@ function renderMfTxnPage(){
   }
 
   populateMfTxnMonths();
+  mftxnPage=1; _mftxnFilterSig='';
   renderMfTxnTable();
 
   // Admin can attribute a new transaction to ANY RM — show a dropdown instead of
@@ -9081,11 +9082,27 @@ function renderMfTxnTable(){
   const cnt=document.getElementById('mftxn-count');
   if(cnt) cnt.innerHTML=entries.length+' entries · <b>Incentive '+INC.fmt(INC.total('mf',entries))+'</b>';
 
+  // Reset to page 1 whenever the filtered/sorted result set actually changes
+  // shape (new search/filter/month/sort) — compares length + first/last id,
+  // not just length, so a same-count swap still resets. Guards against
+  // landing on an empty page after narrowing a filter.
+  const _sig = entries.length+'|'+(entries[0]&&entries[0].id||'')+'|'+(entries[entries.length-1]&&entries[entries.length-1].id||'');
+  if(_sig!==_mftxnFilterSig){ mftxnPage=1; _mftxnFilterSig=_sig; }
+
   if(entries.length===0){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--gray)">No transactions found</div>';
     MFTBULK.afterRender();
+    renderPg('mftxn',0,1);
     return;
   }
+
+  // Only render the current page's rows into the DOM — this table had no
+  // pagination before (unlike Equity/MF client tables), so every filter
+  // change / refresh rebuilt innerHTML for ALL matching entries (864+ rows,
+  // each with several inline handlers/lookups) — that full rebuild was the
+  // main cause of the page feeling slow. Totals/count below still reflect
+  // the FULL filtered set (`entries`), only the visible rows are capped.
+  const pageEntries = entries.slice((mftxnPage-1)*PG_SIZE, mftxnPage*PG_SIZE);
 
   const arrow=k=> mfTxnSort.key===k ? (mfTxnSort.dir==='asc'?' ▲':' ▼') : ' ⇅';
   const sTh=(k,label,cfCol,extra='')=>CF.th('mftxn',cfCol,`<span onclick="setMfTxnSort('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></span>`);
@@ -9096,7 +9113,7 @@ function renderMfTxnTable(){
     <tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('start_date','SIP Start')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}${sTh('source','Source','source')}<th></th></tr>
     </thead>
     <tbody>
-      ${entries.map(e=>{
+      ${pageEntries.map(e=>{
         const color=MFTXN_TYPE_COLOR[e.type]||'#777';
         const status = e.status||'Pending';
         const canRemark = canAddCrossRemark(e);
@@ -9134,6 +9151,7 @@ function renderMfTxnTable(){
     </tr></tfoot>
   </table>`;
   MFTBULK.afterRender();
+  renderPg('mftxn', entries.length, mftxnPage);
 }
 
 async function deleteMfTxnEntry(id){
@@ -12819,11 +12837,12 @@ function renderPg(tab,tot,cur){
 }
 
 function gp(tab,p){
-  const tot=tab==='eq'?eqFiltered.length:tab==='mf'?mfFiltered.length:leadsFiltered.length;
+  const tot=tab==='eq'?eqFiltered.length:tab==='mf'?mfFiltered.length:tab==='mftxn'?CF.applyMftxn(getFilteredMfTxns()).length:leadsFiltered.length;
   const pages=Math.ceil(tot/PG_SIZE);
   if(p<1||p>pages) return;
   if(tab==='eq'){eqPage=p;renderEqTable();}
   else if(tab==='mf'){mfPage=p;renderMfTable();}
+  else if(tab==='mftxn'){mftxnPage=p;renderMfTxnTable();}
   else{leadsPage=p;renderLeadsTable();}
 }
 
