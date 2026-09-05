@@ -2031,9 +2031,35 @@ function pushAdminSeenToRemote(){
 DB.syncFromFirebase().then(()=>{
       DB.load(); // only seed defaults AFTER real Firestore data has been loaded
       refreshDash(); updateBadges(); populateRmDropdowns();
-      if(getCurrentPageId()==='eq-clients') renderEqTable();
-      if(getCurrentPageId()==='mf-clients') renderMfTable();
-      if(getCurrentPageId()==='leads') renderLeadsTable();
+      // Re-render whatever page is currently open with the freshly-synced data.
+      // This previously only covered eq-clients/mf-clients/leads — any OTHER
+      // page open during a full refresh / Clear Cache (e.g. MF Transactions)
+      // kept showing whatever it rendered from the empty/stale local cache
+      // BEFORE the sync finished ("0 ENTRIES · NO TRANSACTIONS FOUND") and
+      // never updated once the real data arrived, until the user manually
+      // navigated away and back. Mirrors the same page→render mapping used
+      // in showPage(), but calls the TABLE renderer only (not the *Page()
+      // page-open version) so it doesn't reset an in-progress filter/form.
+      const _cp = getCurrentPageId();
+      if(_cp==='eq-clients') renderEqTable();
+      else if(_cp==='mf-clients') renderMfTable();
+      else if(_cp==='leads') renderLeadsTable();
+      else if(_cp==='seminars'){ renderSeminarsTable(); if(typeof QUIZ!=='undefined') QUIZ.initLinkControl(); }
+      else if(_cp==='eq-followup'){ renderFollowup('eqf'); }
+      else if(_cp==='mf-followup'){ renderFollowup('mff'); }
+      else if(_cp==='eq-notrade') renderNoTrade();
+      else if(_cp==='eq-squareoff') renderSquareoff();
+      else if(_cp==='eq-nocall') renderNoCall('equity');
+      else if(_cp==='mf-nocall') renderNoCall('mf');
+      else if(_cp==='mf-sip') renderSip();
+      else if(_cp==='mf-txns') renderMfTxnTable();
+      else if(_cp==='mf-prospects') renderMfProspects();
+      else if(_cp==='eq-demat') renderEqDematTable();
+      else if(_cp==='reports') renderReports();
+      else if(_cp==='activity-log') renderActivityLog();
+      else if(_cp==='duplicates') DUP.scan();
+      else if(_cp==='rm-messages') renderRmMessages();
+      else if(_cp==='other-products') renderOpPage();
       checkAnnouncement();
       checkFollowupAlert();
       syncAdminSeenFromRemote().then(()=>{ updateMsgBadge(); checkRmReply(); });
