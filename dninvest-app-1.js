@@ -2028,7 +2028,16 @@ function pushAdminSeenToRemote(){
   }catch(e){}
 }
 
+// Small top banner so a slow/cold sync (esp. right after Clear Cache, when
+// there's no local cache to fall back on and everything has to come fresh
+// over the network) shows something is actually happening, instead of
+// silently sitting there looking frozen. Purely cosmetic — doesn't block
+// clicks or delay anything; just hides itself once the sync resolves.
+function showSyncBanner(){ const b=document.getElementById('syncBanner'); if(b) b.style.display='block'; }
+function hideSyncBanner(){ const b=document.getElementById('syncBanner'); if(b) b.style.display='none'; }
+showSyncBanner();
 DB.syncFromFirebase().then(()=>{
+      hideSyncBanner();
       DB.load(); // only seed defaults AFTER real Firestore data has been loaded
       refreshDash(); updateBadges(); populateRmDropdowns();
       // Re-render whatever page is currently open with the freshly-synced data.
@@ -2398,7 +2407,7 @@ DB.syncFromFirebase().then(()=>{
           }
         });
       });
-    }).catch(()=>{ DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); checkFollowupAlert(); updateMsgBadge(); checkRmReply(); });
+    }).catch(()=>{ hideSyncBanner(); DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); checkFollowupAlert(); updateMsgBadge(); checkRmReply(); });
   } else {
     DB.load(); refreshDash(); updateBadges(); populateRmDropdowns(); checkAnnouncement(); checkFollowupAlert();
   }
