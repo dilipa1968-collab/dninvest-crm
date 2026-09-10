@@ -9081,7 +9081,8 @@ function getFilteredMfTxns(){
 
   if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.fund_name||'').toLowerCase().includes(q)||(e.target_scheme||'').toLowerCase().includes(q));
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF);
-  if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
+  if(typeF==='__EXCL_SIP__') entries=entries.filter(e=>(e.type||'')!=='SIP' && (e.type||'')!=='SIP Stop');
+  else if(typeF) entries=entries.filter(e=>(e.type||'')===typeF);
   if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
   if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
   if(sourceF) entries=entries.filter(e=>(e.source||'')===sourceF);
