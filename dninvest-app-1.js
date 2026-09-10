@@ -1645,7 +1645,7 @@ function openTradesApp(){
 //      back — it's what actually fixes the original logout-on-custom-
 //      password bug.
 function clearCrmCache(){
-  if(!confirm('Cache clear karke page reload hoga. Continue?')) return;
+  if(!confirm('This will clear the cache and reload the page. Continue?')) return;
   // 26-Aug-2026: 'dninvest_admin_seen_msgs' added to KEEP — this button was
   // wiping the "already dismissed this notification" marker along with
   // everything else, so the very next load re-showed old RM-message popups

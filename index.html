@@ -1276,7 +1276,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <button class="btn-sm" id="tradesAppTopBtn" onclick="openTradesApp()" title="Daily Trade Confirmations kholo" style="background:#0f7a45;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         📋 <span class="topbar-btn-text">Trades</span>
       </button>
-      <button class="btn-sm" id="topbarClearCacheBtn" onclick="clearCrmCache()" title="Purana/stale data clear karke fresh reload kare" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
+      <button class="btn-sm" id="topbarClearCacheBtn" onclick="clearCrmCache()" title="Clears stale/old data and does a fresh reload" style="background:#64748b;padding:5px 10px;font-size:.72rem;border-radius:8px;border:none;color:#fff;cursor:pointer;font-weight:700;white-space:nowrap">
         🧹 <span class="topbar-btn-text">Clear Cache</span>
       </button>
       <button class="btn-sm" onclick="hardRefresh()" title="Hard Refresh — clear cache and reload" style="background:rgba(255,255,255,.15);padding:5px 9px;font-size:.85rem;border-radius:8px;border:1px solid rgba(255,255,255,.3);color:#fff;cursor:pointer;line-height:1">🔄</button>
@@ -1390,7 +1390,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div class="nav-item" onclick="showPage('brokerage-calc'); bcApplyRoleAccess(); bcRenderClientDropdown();" id="nav-brokerage-calc">
         <span class="icon">🧮</span> Brokerage Calculator
       </div>
-      <div class="nav-item" onclick="clearCrmCache()" id="nav-clear-cache" title="Purana/stale data clear karke fresh reload kare">
+      <div class="nav-item" onclick="clearCrmCache()" id="nav-clear-cache" title="Clears stale/old data and does a fresh reload">
         <span class="icon">🧹</span> Clear Cache
       </div>
       <div class="nav-item" onclick="showPage('rm-backup')" id="nav-rm-backup" style="display:none" title="Weekly backup lena">
@@ -1860,7 +1860,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </select>
           <select onchange="renderMfTxnTable()" id="mftxn-type-filter" style="padding:4px 6px;font-size:.72rem">
             <option value="">All Types</option>
-            <option value="__EXCL_SIP__">🚫 New SIP + SIP Stop hata ke</option>
+            <option value="__EXCL_SIP__">🚫 Exclude New SIP + SIP Stop</option>
             <option value="Lumpsum">Lumpsum</option>
             <option value="SIP">New SIP</option>
             <option value="SIP Stop">SIP Stop</option>
