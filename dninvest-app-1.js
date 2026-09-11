@@ -1656,9 +1656,20 @@ function clearCrmCache(){
   // syncAdminSeenFromRemote — so it recovers correctly across devices even
   // without this exclusion, but keeping it here avoids the unnecessary
   // round-trip blip.)
+  // 27-Aug-2026: manually-adjusted column widths (Equity/MF/Leads/MF
+  // Transactions — dninvest_colw_*, dninvest_colw2_* for other resizable
+  // tables) were ALSO getting wiped by this same wildcard, so every Clear
+  // Cache silently threw away layout adjustments too ("idhar udhar ho
+  // jaata hai"). These are just cosmetic column-width preferences, not
+  // data that ever goes stale — excluded by PREFIX (rather than listing
+  // every table by name) so any table's saved widths survive a cache clear.
   const KEEP = ['dninvest_session','dninvest_users','dninvest_admin_seen_msgs'];
+  const KEEP_PREFIXES = ['dninvest_colw_','dninvest_colw2_'];
   Object.keys(localStorage).forEach(k=>{
-    if(k.startsWith('dninvest_') && !KEEP.includes(k)) localStorage.removeItem(k);
+    if(!k.startsWith('dninvest_')) return;
+    if(KEEP.includes(k)) return;
+    if(KEEP_PREFIXES.some(p=>k.startsWith(p))) return;
+    localStorage.removeItem(k);
   });
   location.reload();
 }

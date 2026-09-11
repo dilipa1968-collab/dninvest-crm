@@ -450,7 +450,14 @@ tbody td input, tbody td select, tbody td textarea{text-transform:uppercase;}
    total exceeds screen (desktop & mobile). */
 #eq-table, #mf-table, #leads-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 #eq-table table, #mf-table table, #leads-table table, #mftxn-table table{font-size:.62rem;table-layout:fixed;width:auto;}
-#eq-table thead th, #mf-table thead th, #leads-table thead th, #mftxn-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;position:relative;}
+/* 27-Aug-2026: 'position:relative' removed here — it was silently
+   overriding the sticky header behaviour from the generic 'thead th' rule
+   above (position:sticky), which has lower specificity than this
+   ID-scoped selector. That broke "stays pinned while scrolling" for these
+   four tables' headers. position:sticky already provides a valid
+   positioning context for the .eqrz resize-handle (position:absolute)
+   that needed this rule in the first place, so nothing else changes. */
+#eq-table thead th, #mf-table thead th, #leads-table thead th, #mftxn-table thead th{padding:6px 6px;font-size:.62rem;white-space:nowrap;}
 #eq-table tbody td, #mf-table tbody td, #leads-table tbody td{padding:3px 6px;font-size:.62rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #eq-table tbody td small, #mf-table tbody td small, #leads-table tbody td small{font-size:.54rem;}
 #eq-table td .btn-icon, #mf-table td .btn-icon, #leads-table td .btn-icon{padding:1px 2px;font-size:.72rem;}
