@@ -4357,7 +4357,7 @@ const COL_CFG = {
   mf_txns: {
     cont:'mftxn-table',
     keys:['date','start_date','client','rm','type','fund','amount','incentive','crosscheck','status','source','actions'],
-    def:{date:68,start_date:68,client:105,rm:40,type:62,fund:155,amount:70,incentive:70,crosscheck:95,status:70,source:60,actions:90}
+    def:{date:84,start_date:84,client:140,rm:64,type:98,fund:190,amount:88,incentive:78,crosscheck:100,status:78,source:60,actions:105}
   }
 };
 function getColW(tid){
