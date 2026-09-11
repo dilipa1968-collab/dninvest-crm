@@ -4353,6 +4353,11 @@ const COL_CFG = {
     cont:'leads-table',
     keys:['name','mobile','rm','source','calls','lastcall','nextcall','followup','remarks','actions'],
     def:{name:150,mobile:92,rm:64,source:170,calls:52,lastcall:76,nextcall:76,followup:92,remarks:120,actions:88}
+  },
+  mf_txns: {
+    cont:'mftxn-table',
+    keys:['date','start_date','client','rm','type','fund','amount','incentive','crosscheck','status','source','actions'],
+    def:{date:68,start_date:68,client:105,rm:40,type:62,fund:155,amount:70,incentive:70,crosscheck:95,status:70,source:60,actions:90}
   }
 };
 function getColW(tid){
@@ -9145,7 +9150,17 @@ function renderMfTxnTable(){
   const sTh=(k,label,cfCol,extra='')=>CF.th('mftxn',cfCol,`<span onclick="setMfTxnSort('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></span>`);
   const sThNoFilter=(k,label,extra='')=>`<th style="cursor:pointer;user-select:none;white-space:nowrap;${extra}" onclick="setMfTxnSort('${k}')" title="Click to sort">${label}<span style="color:var(--gray);font-size:.7em">${arrow(k)}</span></th>`;
 
-  wrap.innerHTML=`<table>
+  // 27-Aug-2026: switched to the same colgroup/COL_CFG system Equity, MF
+  // Investors and Leads already use — widths keyed by COLUMN NAME instead
+  // of position in the row. The old system (_saveColWidths in the generic
+  // enableColumnResize()) saved by positional index, which silently breaks
+  // any time the column count/order shifts even slightly (e.g. the bulk-
+  // select checkbox column only exists for admin) — a manually-resized
+  // layout could come back looking wrong ("bigad jata hai") after a
+  // refresh. Name-keyed widths don't have that failure mode.
+  const _mfTxnIsAdmin = CU.role==='admin';
+  const _mfTxnCG = colGroup('mf_txns', _mfTxnIsAdmin);
+  wrap.innerHTML=`<table style="width:${_mfTxnCG.total}px">${_mfTxnCG.cg}
     <thead>
     <tr>${MFTBULK.th()}${sThNoFilter('date','Date')}${sThNoFilter('start_date','SIP Start')}${sThNoFilter('client','Client')}${sTh('rm','RM','rm')}${sTh('type','Type','type')}${sTh('fund','Fund Name','fund_name')}${sThNoFilter('amount','Amount (₹)','text-align:right')}<th style="text-align:right;white-space:nowrap">Incentive</th><th>Cross-Check</th>${sTh('status','Status','status')}${sTh('source','Source','source')}<th></th></tr>
     </thead>
@@ -9159,17 +9174,17 @@ function renderMfTxnTable(){
           : (canRemark ? `<span class="btn-icon" style="cursor:pointer;font-size:.78rem;color:var(--teal)" onclick="addCrossRemark('${e.id}')">💬 Rmk</span>` : '<span style="color:var(--gray);font-size:.78rem">—</span>');
         return `<tr>
           ${MFTBULK.td(e.id)}
-          <td style="width:68px;font-size:.67rem;white-space:nowrap">${e.date||'—'}</td>
-          <td style="width:68px;font-size:.67rem;white-space:nowrap">${e.start_date?fmtDate(e.start_date):'—'}</td>
-          <td onclick="viewMfTxnDetail('${e.id}')" style="width:105px;max-width:110px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;cursor:pointer;color:var(--teal,#0d9488);text-decoration:underline" title="Click to view full transaction detail">${escapeHtml(e.client_name||'—')}</td>
-          <td style="width:40px;font-size:.67rem;white-space:nowrap">${escapeHtml(e.rm||'—')}</td>
-          <td style="width:62px;white-space:nowrap"><span class="badge" style="background:${color}22;color:${color};font-size:.61rem;padding:1px 5px">${escapeHtml(e.type||'—')}</span></td>
-          <td style="width:155px;max-width:160px;font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(e.fund_name||'')}${e.target_scheme?' → '+escapeHtml(e.target_scheme):''}">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<span style="font-size:.63rem;color:var(--teal,#0891b2);margin-left:3px">↳ ${escapeHtml(e.target_scheme)}</span>`:''}</td>
-          <td style="text-align:right;font-weight:600;width:70px;font-size:.67rem;white-space:nowrap">₹${brkFmt(e.amount)}${e.first_payment?` <span title="${e.type==='SWP'?'First withdrawal received':'First payment received'}" style="display:inline-block;color:#fff;background:var(--green,#16a34a);font-size:.55rem;font-weight:700;line-height:1;border-radius:3px;padding:2px 3px;vertical-align:middle">P</span>`:''}</td>
+          <td style="font-size:.67rem;white-space:nowrap">${e.date||'—'}</td>
+          <td style="font-size:.67rem;white-space:nowrap">${e.start_date?fmtDate(e.start_date):'—'}</td>
+          <td onclick="viewMfTxnDetail('${e.id}')" style="font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;cursor:pointer;color:var(--teal,#0d9488);text-decoration:underline" title="Click to view full transaction detail">${escapeHtml(e.client_name||'—')}</td>
+          <td style="font-size:.67rem;white-space:nowrap">${escapeHtml(e.rm||'—')}</td>
+          <td style="white-space:nowrap"><span class="badge" style="background:${color}22;color:${color};font-size:.61rem;padding:1px 5px">${escapeHtml(e.type||'—')}</span></td>
+          <td style="font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(e.fund_name||'')}${e.target_scheme?' → '+escapeHtml(e.target_scheme):''}">${escapeHtml(e.fund_name||'—')}${e.target_scheme?`<span style="font-size:.63rem;color:var(--teal,#0891b2);margin-left:3px">↳ ${escapeHtml(e.target_scheme)}</span>`:''}</td>
+          <td style="text-align:right;font-weight:600;font-size:.67rem;white-space:nowrap">₹${brkFmt(e.amount)}${e.first_payment?` <span title="${e.type==='SWP'?'First withdrawal received':'First payment received'}" style="display:inline-block;color:#fff;background:var(--green,#16a34a);font-size:.55rem;font-weight:700;line-height:1;border-radius:3px;padding:2px 3px;vertical-align:middle">P</span>`:''}</td>
           ${INC.cell('mf',e)}
-          <td style="width:95px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${remarkCell}</td>
+          <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
-          <td style="width:60px;font-size:.65rem;white-space:nowrap">${e.source?`<span class="badge" style="background:${(MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A')}22;color:${MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A'};font-size:.61rem;padding:1px 5px">${escapeHtml(e.source)}</span>`:'<span style="color:var(--gray)">—</span>'}</td>
+          <td style="font-size:.65rem;white-space:nowrap">${e.source?`<span class="badge" style="background:${(MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A')}22;color:${MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A'};font-size:.61rem;padding:1px 5px">${escapeHtml(e.source)}</span>`:'<span style="color:var(--gray)">—</span>'}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
@@ -9188,6 +9203,7 @@ function renderMfTxnTable(){
     </tr></tfoot>
   </table>`;
   MFTBULK.afterRender();
+  enableColResize('mf_txns');
   renderPg('mftxn', entries.length, mftxnPage);
 }
 
@@ -15316,6 +15332,11 @@ function enableColumnResize(table){
 
 function scanForResizableTables(root){
   (root||document).querySelectorAll('.tbl-scroll table, #seminar-attendees-table table').forEach(t=>{
+    // MF Transactions now has its own dedicated, name-keyed resize system
+    // (enableColResize('mf_txns'), called directly from renderMfTxnTable) —
+    // skip it here so this generic, position-keyed system doesn't ALSO
+    // attach its own handles to the same table and fight over it.
+    if(t.closest('#mftxn-table')) return;
     if(!t.dataset.resizableInit) enableColumnResize(t);
   });
 }
@@ -15326,7 +15347,10 @@ const colResizeObserver = new MutationObserver(muts=>{
     if(m.addedNodes && m.addedNodes.length){
       m.addedNodes.forEach(node=>{
         if(node.nodeType!==1) return;
-        if(node.tagName==='TABLE' && !node.dataset.resizableInit) enableColumnResize(node);
+        if(node.tagName==='TABLE'){
+          if(node.closest('#mftxn-table')) return;
+          if(!node.dataset.resizableInit) enableColumnResize(node);
+        }
         else if(node.querySelectorAll) scanForResizableTables(node);
       });
     }
