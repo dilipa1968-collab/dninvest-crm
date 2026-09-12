@@ -2277,6 +2277,16 @@ DB.syncFromFirebase().then(()=>{
         console.log('Real-time update: eq_risk (compact,', norm.count, 'clients)');
         if(typeof clearEqRiskCache==='function') clearEqRiskCache();
         if(getCurrentPageId()==='eq-clients' && typeof renderEqTable==='function') renderEqTable();
+        // 12-Sep-2026 fix: the Dashboard's "Asset" card computes its total
+        // from getEqRisk()/_eqRiskCache too, but this listener only ever
+        // re-rendered the Equity Clients TABLE — never the Dashboard. If
+        // this snapshot's first update arrives (common right after Clear
+        // Cache, since that forces a fresh reload) while the person is
+        // sitting on Dashboard, the Asset card would show ₹0 (computed
+        // before this data existed) and just stay stuck there, since
+        // nothing ever told the Dashboard to recompute once the real
+        // numbers actually showed up.
+        if(getCurrentPageId()==='dashboard' && typeof refreshDash==='function') refreshDash();
       });
 
       // Real-time listeners for eq_clients/mf_clients arrays.
@@ -14233,7 +14243,13 @@ function parseExcelDate(val){
 // ══════════════════════════════════════════
 let _eqRiskCache=null;
 function getEqRisk(){
-  if(_eqRiskCache) return _eqRiskCache;
+  // Same self-healing check as getCrmSchemeNames() — an empty result
+  // (count:0) is treated as "not actually loaded yet" rather than a valid
+  // cache hit, so a too-early first read (before the eq_risk data has
+  // arrived from Firestore) doesn't get stuck returning ₹0 forever; it'll
+  // just try DB.get('eq_risk') again next time, which by then usually has
+  // the real data.
+  if(_eqRiskCache && _eqRiskCache.count>0) return _eqRiskCache;
   _eqRiskCache = DB.get('eq_risk') || {code:{}, updated:'', count:0};
   return _eqRiskCache;
 }
