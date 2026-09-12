@@ -1222,6 +1222,24 @@ function applyEmployeeChanges(){
   merged.sort((a,b)=>a.name.localeCompare(b.name));
   EMPLOYEES.length=0;
   merged.forEach(e=>EMPLOYEES.push(e));
+  populateAttendanceEmpDropdowns();
+}
+
+// 12-Sep-2026 fix: the "Mark manual attendance" and "Mark bulk attendance"
+// Employee dropdowns were a hardcoded list of 9 names baked into the HTML —
+// anyone added later (e.g. Ravi, Manish) never appeared in them, on any
+// device (this wasn't actually mobile-specific, just never noticed on
+// desktop). Both dropdowns are now filled from the real, live EMPLOYEES
+// list instead, so a newly-added employee shows up immediately.
+function populateAttendanceEmpDropdowns(){
+  const opts = EMPLOYEES.map(e=>`<option>${e.name}</option>`).join('');
+  ['man-emp','bulk-emp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    const prev=el.value;
+    el.innerHTML=opts;
+    if(EMPLOYEES.some(e=>e.name===prev)) el.value=prev;
+  });
 }
 applyEmployeeChanges();
 
