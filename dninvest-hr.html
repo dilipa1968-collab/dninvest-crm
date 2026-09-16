@@ -2253,14 +2253,30 @@ function refreshCurrentPage(){
 // it's reconnected (which can take a few seconds, or occasionally longer,
 // on a mobile connection).
 async function refreshAttendanceOnResume(){
+  // 16-Sep-2026: brief, on-screen confirmation this actually ran — mobile
+  // DevTools are hard to get to, so a console.log alone isn't testable in
+  // practice on a phone. This little pill briefly appears in the
+  // top-right corner every time the tab becomes visible again, so it's
+  // obvious (without any dev tools) whether this is firing at all.
+  const pill=document.createElement('div');
+  pill.textContent='🔄 Refreshing…';
+  pill.style.cssText='position:fixed;top:8px;right:8px;z-index:99999;background:#1a2b4a;color:#fff;padding:5px 10px;border-radius:16px;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+  document.body.appendChild(pill);
   try{
-    if(typeof fdb==='undefined') return;
+    if(typeof fdb==='undefined'){ pill.textContent='⚠️ fdb not ready'; setTimeout(()=>pill.remove(),2500); return; }
     const doc = await fdb.collection('hr_data').doc('attendance').get();
     if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
       DB.setLocal('attendance', doc.data().data);
+      pill.textContent='✅ Updated';
+    } else {
+      pill.textContent='⚠️ No data in fetch';
     }
-  }catch(e){ console.log('refreshAttendanceOnResume error:', e); }
+  }catch(e){
+    console.log('refreshAttendanceOnResume error:', e);
+    pill.textContent='❌ Fetch failed';
+  }
   refreshCurrentPage();
+  setTimeout(()=>pill.remove(),2500);
 }
 
 let _hbEdgeBound=false;
