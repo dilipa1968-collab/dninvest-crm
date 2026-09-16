@@ -1177,6 +1177,9 @@ const DB = {
     const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions','esic_numbers','heartbeats'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
+        if(key==='mfsip_by_month'){
+          console.log('[HRSYNC] mfsip_by_month snapshot fired — exists='+doc.exists+' hasData='+!!(doc.data()&&doc.data().data)+' months=['+(doc.exists&&doc.data()&&doc.data().data?Object.keys(doc.data().data).join(', '):'')+']');
+        }
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           this.setLocal(key, doc.data().data);
           if(key==='employee_changes') applyEmployeeChanges();
@@ -1553,13 +1556,13 @@ async function applyCrmToBusiness(){
   if(!s || !Array.isArray(s.rows) || !s.rows.length){ alert('No data received from the CRM. First use "Push to HR Portal" from 📊 RM Summary in the CRM.'); return; }
   const month = (s.month && s.month!=='all') ? s.month : currentIncMonth();
   if(!month){ alert('Month not found'); return; }
-  const empByLower={}; EMPLOYEES.forEach(e=>empByLower[e.name.toLowerCase()]=e.name);
+  const empByLower={}; EMPLOYEES.forEach(e=>empByLower[e.name.trim().toLowerCase()]=e.name);
   const all=getMfSipByMonth();
   if(!all[month]) all[month]={};
   let applied=0, skipped=0;
   const pending=[];
   s.rows.forEach(r=>{
-    const name=empByLower[(r.rm||'').toLowerCase()];
+    const name=empByLower[String(r.rm||'').trim().toLowerCase()];
     if(!name){ skipped++; return; }
     pending.push({name, r}); applied++;
   });
@@ -1945,9 +1948,19 @@ async function doLogin(){
     return;
   }
 
-  // Match CRM's display name to HR's EMPLOYEES list
-  const empMatch=EMPLOYEES.find(e=>e.name.toLowerCase()===String(user.name||'').toLowerCase());
-  const name=empMatch?empMatch.name:user.name;
+  // Match CRM's display name to HR's EMPLOYEES list.
+  // 16-Sep-2026 fix: this comparison used to NOT trim() either side — if a
+  // CRM account's stored name ever had a stray leading/trailing space (an
+  // easy typo when editing a user in the CRM's Admin panel, invisible in a
+  // text field), "Megha " wouldn't match "Megha", empMatch would silently
+  // fail, and currentUser would become "Megha " (with the space) — every
+  // subsequent incentive/attendance lookup keyed on the CLEAN "Megha" would
+  // then find nothing for her specifically, while the Admin's aggregate
+  // views (which iterate EMPLOYEES' own clean names) looked completely
+  // normal. Trimming both sides here removes that whole failure mode.
+  const rawUserName=String(user.name||'').trim();
+  const empMatch=EMPLOYEES.find(e=>e.name.trim().toLowerCase()===rawUserName.toLowerCase());
+  const name=empMatch?empMatch.name:rawUserName;
   currentUser=name;isAdmin=false;
 
   // Auto-record attendance — read FRESH from Firestore first so we never
@@ -2218,10 +2231,56 @@ function startHeartbeat(){
 // hide ya close hone ke theek pehle ek extra ping bhejte hain. Isse "last active"
 // moment (jab RM ne app se dhyan hataya ya band kiya) tighter capture hota hai,
 // aur out-time 5 min purana ya throttle ki wajah se truncated nahi rehta.
+// Re-renders whichever page is currently open, using the exact same
+// per-page render calls showPage() uses — so returning to a backgrounded
+// tab refreshes the actual visible screen, not just some other page.
+function refreshCurrentPage(){
+  const active = document.querySelector('.page.active');
+  if(!active) return;
+  const id = active.id.replace('page-','');
+  if(id==='attendance') renderAttendancePage();
+  else if(id==='leave') renderLeavePage();
+  else if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); } }
+  else if(id==='incentive') renderIncentivePage();
+  else if(id==='dashboard') renderDashboard();
+  else if(id==='employees') renderEmployees();
+  else if(id==='reports'){ renderAttendanceSheet(); renderDateWiseSheet(); }
+}
+
+// One-time direct Firestore fetch for 'attendance' — bypasses whatever
+// state the realtime listener is currently in, so the tab shows fresh data
+// immediately on resume rather than waiting for that listener to notice
+// it's reconnected (which can take a few seconds, or occasionally longer,
+// on a mobile connection).
+async function refreshAttendanceOnResume(){
+  try{
+    if(typeof fdb==='undefined') return;
+    const doc = await fdb.collection('hr_data').doc('attendance').get();
+    if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+      DB.setLocal('attendance', doc.data().data);
+    }
+  }catch(e){ console.log('refreshAttendanceOnResume error:', e); }
+  refreshCurrentPage();
+}
+
 let _hbEdgeBound=false;
 function bindHbEdgePings(){
   if(_hbEdgeBound) return; _hbEdgeBound=true;
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') sendHeartbeatPing(); });
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='hidden'){ sendHeartbeatPing(); return; }
+    // 16-Sep-2026 fix: mobile browsers commonly suspend/disconnect Firestore's
+    // realtime listeners when a tab is backgrounded (phone locked, app
+    // switched away from) — reported as "Dashboard/Attendance page mobile pe
+    // purana data hi dikhata hai, refresh nahi hota". The listener USUALLY
+    // reconnects on its own once the tab is visible again, but there's no
+    // guarantee of exactly when, and nothing was forcing a re-render even
+    // once it did. This does a direct, one-time Firestore fetch for
+    // 'attendance' (the most time-sensitive data — what this page's
+    // complaint was actually about) the moment the tab becomes visible
+    // again, then re-renders whichever page is currently open, instead of
+    // waiting on the listener's own reconnect timing.
+    refreshAttendanceOnResume();
+  });
   window.addEventListener('pagehide', ()=>{ sendHeartbeatPing(); });
   window.addEventListener('blur', ()=>{ sendHeartbeatPing(); });
 }
@@ -2281,7 +2340,7 @@ async function doLogout(){
 }
 
 // Check persisted session
-(function(){
+(async function(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
     if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp(); if(!s.isAdmin) healTodayAttendanceIfNeeded(s.name); return;}
@@ -2296,11 +2355,29 @@ async function doLogout(){
       const stored=JSON.parse(localStorage.getItem('dnihr_autologin_token')||'null');
       if(stored && stored.token===token && Date.now()-stored.at < 30000){
         // Valid token from CRM — find this user in EMPLOYEES list and log them in directly.
-        const empName = stored.name || '';
+        // 16-Sep-2026 fix: this comment always SAID "find this user in
+        // EMPLOYEES list" but the code never actually did that lookup —
+        // it just used stored.name as-is. The normal login path (a few
+        // lines up in doLoginHr) DOES canonicalise via EMPLOYEES.find(),
+        // so whoever's CRM account name happened to be spelled/cased
+        // differently from their EMPLOYEES_BASE entry (e.g. "megha" vs
+        // "Megha") got a currentUser that looked right on screen but
+        // didn't EXACTLY match the key their own incentive/salary data is
+        // stored under — an admin viewing the same data (via EMPLOYEES'
+        // canonical name) saw it fine, but that person's own "My
+        // Incentive"/"My Salary" page came up all ₹0, since those do a
+        // direct, case-sensitive lookup by name. Reported for Megha and
+        // Shyam specifically — both opened HR via this CRM→HR button link.
+        const rawName = stored.name || '';
+        await fetchEmployeeChangesOnce();   // ensure Firestore-added employees (not just the base 9) are in EMPLOYEES before matching
+        const empMatch2 = EMPLOYEES.find(e=>e.name.toLowerCase()===rawName.toLowerCase());
+        const empName = empMatch2 ? empMatch2.name : rawName;
+        console.log('[HRLOGIN] autologin — stored.name='+JSON.stringify(rawName)+' matched='+JSON.stringify(empName)+' EMPLOYEES=['+EMPLOYEES.map(e=>e.name).join(', ')+']');
         const empIsAdmin = stored.isAdmin || false;
         localStorage.removeItem('dnihr_autologin_token'); // use once
         if(empName){
           currentUser=empName; isAdmin=empIsAdmin;
+          console.log('[HRLOGIN] currentUser set to '+JSON.stringify(currentUser));
           startApp(); if(!empIsAdmin) healTodayAttendanceIfNeeded(empName); return;
         }
       }
@@ -2390,7 +2467,7 @@ async function runLateAbsentCheckHr(){
       if(u.lateAbsentMarked===td) continue; // already handled today
 
       const rawName=String(u.name || u.username || '').trim();
-      const empMatch=EMPLOYEES.find(e=>e.name.toLowerCase()===rawName.toLowerCase() || e.name.toLowerCase()===rawName.split(' ')[0].toLowerCase() || e.name.toLowerCase()===String(u.username||'').toLowerCase());
+      const empMatch=EMPLOYEES.find(e=>e.name.trim().toLowerCase()===rawName.toLowerCase() || e.name.trim().toLowerCase()===rawName.split(' ')[0].toLowerCase() || e.name.trim().toLowerCase()===String(u.username||'').trim().toLowerCase());
       const hrName=empMatch?empMatch.name:rawName;
 
       const hasLoggedInToday=(attData[hrName]||[]).some(r=>r.date===td);
@@ -4403,6 +4480,9 @@ function totalIncentive(name, salary, month){
   const monthData = month ? getMfSipForMonth(month) : {};
   const legacy = getMfSip()[name] || {};
   const mfsip = (monthData[name] !== undefined) ? monthData[name] : legacy;
+  if(month && name==='Megha'){
+    console.log('[HRINC] name='+JSON.stringify(name)+' month='+month+' monthData keys=['+Object.keys(monthData).join(', ')+'] resolved mfsip='+JSON.stringify(mfsip));
+  }
   const rates=getIncRates();
   const brok = mfsip.brok!==undefined ? mfsip.brok : 0;
   const demat = mfsip.demat!==undefined ? mfsip.demat : 0;
