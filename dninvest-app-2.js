@@ -933,7 +933,20 @@ const RMSUM = {
     const inMonth = d => !month || (d||'').slice(0,7)===month;
     const map={};
     const get=rm=>{ rm=normRm(rm||'')||'(No RM)'; if(!map[rm]) map[rm]={rm,mf_sales:0,sip_amount:0,demat_count:0,mf_inc:0,demat_inc:0}; return map[rm]; };
+    // 16-Sep-2026 diagnostic — Puja/Rohit/Shyam/Megha showing ₹0 incentive
+    // for RMs the admin believes have real business this month. This logs
+    // every MF Business entry for those 4 (any status, any month) so we can
+    // see directly whether they have qualifying Approved SALES_TYPES/SIP
+    // entries in the right month, or if something else is going on
+    // (wrong status, wrong month, a transaction TYPE that doesn't count
+    // toward incentive, or a name that doesn't normalise to theirs at all).
+    const _watchNames = ['puja','rohit','shyam','megha'];
+    const _watchLog = [];
     getMfBizEntries().forEach(e=>{
+      const _rmNorm = normRm(e.rm||'');
+      if(_watchNames.includes(_rmNorm.toLowerCase())){
+        _watchLog.push({rm:e.rm, normalised:_rmNorm, date:e.date, type:e.type, status:e.status||'Pending', amount:e.amount, counts:(!month||inMonth(e.date))&&(e.status||'Pending')==='Approved'?( e.type==='SIP'||this.SALES_TYPES.includes(e.type) ? 'YES' : 'NO — type not in SALES_TYPES/SIP' ):'NO — status/month'});
+      }
       if((e.status||'Pending')!=='Approved') return;
       if(!inMonth(e.date)) return;
       const inc=INC.mf(e).amt;
@@ -943,6 +956,8 @@ const RMSUM = {
       else if(this.SALES_TYPES.includes(e.type)) r.mf_sales+=amt;
       r.mf_inc += inc;
     });
+    if(_watchLog.length) console.log('[RMSUM] entries for Puja/Rohit/Shyam/Megha (month filter='+month+'):', _watchLog);
+    else console.log('[RMSUM] NO MF Business entries found at all for Puja/Rohit/Shyam/Megha (any status/month) — check the "rm" field on their transactions.');
     getEqDematEntries().forEach(e=>{
       if((e.status||'Pending')!=='Approved') return;
       if(!inMonth(e.date)) return;
