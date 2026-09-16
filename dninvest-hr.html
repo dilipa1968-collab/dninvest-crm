@@ -1553,13 +1553,13 @@ async function applyCrmToBusiness(){
   if(!s || !Array.isArray(s.rows) || !s.rows.length){ alert('No data received from the CRM. First use "Push to HR Portal" from 📊 RM Summary in the CRM.'); return; }
   const month = (s.month && s.month!=='all') ? s.month : currentIncMonth();
   if(!month){ alert('Month not found'); return; }
-  const empByLower={}; EMPLOYEES.forEach(e=>empByLower[e.name.trim().toLowerCase()]=e.name);
+  const empByLower={}; EMPLOYEES.forEach(e=>empByLower[e.name.toLowerCase()]=e.name);
   const all=getMfSipByMonth();
   if(!all[month]) all[month]={};
   let applied=0, skipped=0;
   const pending=[];
   s.rows.forEach(r=>{
-    const name=empByLower[String(r.rm||'').trim().toLowerCase()];
+    const name=empByLower[(r.rm||'').toLowerCase()];
     if(!name){ skipped++; return; }
     pending.push({name, r}); applied++;
   });
@@ -1945,19 +1945,9 @@ async function doLogin(){
     return;
   }
 
-  // Match CRM's display name to HR's EMPLOYEES list.
-  // 16-Sep-2026 fix: this comparison used to NOT trim() either side — if a
-  // CRM account's stored name ever had a stray leading/trailing space (an
-  // easy typo when editing a user in the CRM's Admin panel, invisible in a
-  // text field), "Megha " wouldn't match "Megha", empMatch would silently
-  // fail, and currentUser would become "Megha " (with the space) — every
-  // subsequent incentive/attendance lookup keyed on the CLEAN "Megha" would
-  // then find nothing for her specifically, while the Admin's aggregate
-  // views (which iterate EMPLOYEES' own clean names) looked completely
-  // normal. Trimming both sides here removes that whole failure mode.
-  const rawUserName=String(user.name||'').trim();
-  const empMatch=EMPLOYEES.find(e=>e.name.trim().toLowerCase()===rawUserName.toLowerCase());
-  const name=empMatch?empMatch.name:rawUserName;
+  // Match CRM's display name to HR's EMPLOYEES list
+  const empMatch=EMPLOYEES.find(e=>e.name.toLowerCase()===String(user.name||'').toLowerCase());
+  const name=empMatch?empMatch.name:user.name;
   currentUser=name;isAdmin=false;
 
   // Auto-record attendance — read FRESH from Firestore first so we never
@@ -2291,7 +2281,7 @@ async function doLogout(){
 }
 
 // Check persisted session
-(async function(){
+(function(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
     if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp(); if(!s.isAdmin) healTodayAttendanceIfNeeded(s.name); return;}
@@ -2306,29 +2296,11 @@ async function doLogout(){
       const stored=JSON.parse(localStorage.getItem('dnihr_autologin_token')||'null');
       if(stored && stored.token===token && Date.now()-stored.at < 30000){
         // Valid token from CRM — find this user in EMPLOYEES list and log them in directly.
-        // 16-Sep-2026 fix: this comment always SAID "find this user in
-        // EMPLOYEES list" but the code never actually did that lookup —
-        // it just used stored.name as-is. The normal login path (a few
-        // lines up in doLoginHr) DOES canonicalise via EMPLOYEES.find(),
-        // so whoever's CRM account name happened to be spelled/cased
-        // differently from their EMPLOYEES_BASE entry (e.g. "megha" vs
-        // "Megha") got a currentUser that looked right on screen but
-        // didn't EXACTLY match the key their own incentive/salary data is
-        // stored under — an admin viewing the same data (via EMPLOYEES'
-        // canonical name) saw it fine, but that person's own "My
-        // Incentive"/"My Salary" page came up all ₹0, since those do a
-        // direct, case-sensitive lookup by name. Reported for Megha and
-        // Shyam specifically — both opened HR via this CRM→HR button link.
-        const rawName = stored.name || '';
-        await fetchEmployeeChangesOnce();   // ensure Firestore-added employees (not just the base 9) are in EMPLOYEES before matching
-        const empMatch2 = EMPLOYEES.find(e=>e.name.toLowerCase()===rawName.toLowerCase());
-        const empName = empMatch2 ? empMatch2.name : rawName;
-        console.log('[HRLOGIN] autologin — stored.name='+JSON.stringify(rawName)+' matched='+JSON.stringify(empName)+' EMPLOYEES=['+EMPLOYEES.map(e=>e.name).join(', ')+']');
+        const empName = stored.name || '';
         const empIsAdmin = stored.isAdmin || false;
         localStorage.removeItem('dnihr_autologin_token'); // use once
         if(empName){
           currentUser=empName; isAdmin=empIsAdmin;
-          console.log('[HRLOGIN] currentUser set to '+JSON.stringify(currentUser));
           startApp(); if(!empIsAdmin) healTodayAttendanceIfNeeded(empName); return;
         }
       }
@@ -2418,7 +2390,7 @@ async function runLateAbsentCheckHr(){
       if(u.lateAbsentMarked===td) continue; // already handled today
 
       const rawName=String(u.name || u.username || '').trim();
-      const empMatch=EMPLOYEES.find(e=>e.name.trim().toLowerCase()===rawName.toLowerCase() || e.name.trim().toLowerCase()===rawName.split(' ')[0].toLowerCase() || e.name.trim().toLowerCase()===String(u.username||'').trim().toLowerCase());
+      const empMatch=EMPLOYEES.find(e=>e.name.toLowerCase()===rawName.toLowerCase() || e.name.toLowerCase()===rawName.split(' ')[0].toLowerCase() || e.name.toLowerCase()===String(u.username||'').toLowerCase());
       const hrName=empMatch?empMatch.name:rawName;
 
       const hasLoggedInToday=(attData[hrName]||[]).some(r=>r.date===td);
@@ -4431,9 +4403,6 @@ function totalIncentive(name, salary, month){
   const monthData = month ? getMfSipForMonth(month) : {};
   const legacy = getMfSip()[name] || {};
   const mfsip = (monthData[name] !== undefined) ? monthData[name] : legacy;
-  if(month && name==='Megha'){
-    console.log('[HRINC] name='+JSON.stringify(name)+' month='+month+' monthData keys=['+Object.keys(monthData).join(', ')+'] resolved mfsip='+JSON.stringify(mfsip));
-  }
   const rates=getIncRates();
   const brok = mfsip.brok!==undefined ? mfsip.brok : 0;
   const demat = mfsip.demat!==undefined ? mfsip.demat : 0;
