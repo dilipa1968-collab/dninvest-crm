@@ -4431,8 +4431,8 @@ function totalIncentive(name, salary, month){
   const monthData = month ? getMfSipForMonth(month) : {};
   const legacy = getMfSip()[name] || {};
   const mfsip = (monthData[name] !== undefined) ? monthData[name] : legacy;
-  if(month && monthData[name]===undefined && Object.keys(monthData).length){
-    console.log('[HRINC] totalIncentive: no exact-key match for '+JSON.stringify(name)+' in '+month+' — keys present: ['+Object.keys(monthData).join(', ')+']');
+  if(month && name==='Megha'){
+    console.log('[HRINC] name='+JSON.stringify(name)+' month='+month+' monthData keys=['+Object.keys(monthData).join(', ')+'] resolved mfsip='+JSON.stringify(mfsip));
   }
   const rates=getIncRates();
   const brok = mfsip.brok!==undefined ? mfsip.brok : 0;
