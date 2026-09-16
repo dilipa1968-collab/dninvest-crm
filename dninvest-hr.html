@@ -2323,10 +2323,12 @@ async function doLogout(){
         await fetchEmployeeChangesOnce();   // ensure Firestore-added employees (not just the base 9) are in EMPLOYEES before matching
         const empMatch2 = EMPLOYEES.find(e=>e.name.toLowerCase()===rawName.toLowerCase());
         const empName = empMatch2 ? empMatch2.name : rawName;
+        console.log('[HRLOGIN] autologin — stored.name='+JSON.stringify(rawName)+' matched='+JSON.stringify(empName)+' EMPLOYEES=['+EMPLOYEES.map(e=>e.name).join(', ')+']');
         const empIsAdmin = stored.isAdmin || false;
         localStorage.removeItem('dnihr_autologin_token'); // use once
         if(empName){
           currentUser=empName; isAdmin=empIsAdmin;
+          console.log('[HRLOGIN] currentUser set to '+JSON.stringify(currentUser));
           startApp(); if(!empIsAdmin) healTodayAttendanceIfNeeded(empName); return;
         }
       }
@@ -4429,6 +4431,9 @@ function totalIncentive(name, salary, month){
   const monthData = month ? getMfSipForMonth(month) : {};
   const legacy = getMfSip()[name] || {};
   const mfsip = (monthData[name] !== undefined) ? monthData[name] : legacy;
+  if(month && monthData[name]===undefined && Object.keys(monthData).length){
+    console.log('[HRINC] totalIncentive: no exact-key match for '+JSON.stringify(name)+' in '+month+' — keys present: ['+Object.keys(monthData).join(', ')+']');
+  }
   const rates=getIncRates();
   const brok = mfsip.brok!==undefined ? mfsip.brok : 0;
   const demat = mfsip.demat!==undefined ? mfsip.demat : 0;
