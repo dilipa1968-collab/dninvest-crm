@@ -5854,9 +5854,12 @@ function showClientBrokerageHistory(scopeEmpName){
     +'<div style="padding:16px 22px 18px;overflow-y:auto">'
     +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
     +'<input id="bro-hist-search" type="text" placeholder="Search Code or Client Name…" style="flex:1;min-width:180px;font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
-    +'<select id="bro-hist-month" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
-    +'<option value="">All months (month-by-month table)</option>'
-    + allMonths.slice().reverse().map(m=>'<option value="'+m+'">'+mLabel(m)+' only</option>').join('')
+    +'<select id="bro-hist-from" title="From month" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    + allMonths.map((m,i)=>'<option value="'+m+'"'+(i===0?' selected':'')+'>From: '+mLabel(m)+'</option>').join('')
+    +'</select>'
+    +'<span style="align-self:center;color:var(--text3);font-size:12px">→</span>'
+    +'<select id="bro-hist-to" title="To month" style="font-size:13px;padding:7px 10px;border:1px solid var(--border2,#ccc);border-radius:8px">'
+    + allMonths.map((m,i)=>'<option value="'+m+'"'+(i===allMonths.length-1?' selected':'')+'>To: '+mLabel(m)+'</option>').join('')
     +'</select>'
     + rmFilterHtml
     + rmTotalToggleHtml
@@ -5869,6 +5872,9 @@ function showClientBrokerageHistory(scopeEmpName){
 
   let sortCol = 'total', sortDir = 'desc'; // persists across filter/search re-renders while the modal is open
   let lastExportRows = [], lastExportTotalRow = null, lastExportMonthSel = '', lastRmTotalOn = false;
+  // viewMonths = the months actually shown, driven by the From/To range pickers.
+  // Recomputed on every renderTable() call; also read by the Excel export closure.
+  let viewMonths = allMonths.slice();
 
   const renderTable = function(){
     const rmFilter = scopeEmpName ? '' : (document.getElementById('bro-hist-rm').value || '');
@@ -5876,13 +5882,22 @@ function showClientBrokerageHistory(scopeEmpName){
     lastRmTotalOn = rmTotalOn;
     const clientMap = buildClientMap(rmFilter);
     const q = (document.getElementById('bro-hist-search').value||'').trim().toLowerCase();
-    const monthSel = document.getElementById('bro-hist-month').value || '';
+    // From/To range → the list of months to actually display. Swap if the user
+    // picks them reversed. A single-month range (From===To) falls through to the
+    // existing simple single-month list; a wider range shows a matrix of just
+    // those months; full range = every month (same as the old "All months").
+    let fromM = (document.getElementById('bro-hist-from')||{}).value || (allMonths[0]||'');
+    let toM   = (document.getElementById('bro-hist-to')||{}).value   || (allMonths[allMonths.length-1]||'');
+    if(fromM && toM && fromM>toM){ const t=fromM; fromM=toM; toM=t; }
+    viewMonths = allMonths.filter(m=> (!fromM||m>=fromM) && (!toM||m<=toM));
+    if(!viewMonths.length) viewMonths = allMonths.slice();
+    const monthSel = (viewMonths.length===1) ? viewMonths[0] : '';
 
     let clients = Object.values(clientMap).filter(c=>{
       if(!q) return true;
       return String(c.code||'').toLowerCase().includes(q) || String(c.name||'').toLowerCase().includes(q);
     });
-    clients.forEach(c=>{ c.__total = allMonths.reduce((s,m)=>s+(c.byMonth[m]||0),0); });
+    clients.forEach(c=>{ c.__total = viewMonths.reduce((s,m)=>s+(c.byMonth[m]||0),0); });
 
     // RM-wise Total: collapse straight to one row per RM (sum across that
     // RM's clients — respecting the current search) — no client rows at
@@ -5898,7 +5913,7 @@ function showClientBrokerageHistory(scopeEmpName){
         if(monthSel){
           byRm[k].byMonth[monthSel] = (byRm[k].byMonth[monthSel]||0) + (c.byMonth[monthSel]||0);
         } else {
-          allMonths.forEach(m=>{ byRm[k].byMonth[m] = (byRm[k].byMonth[m]||0) + (c.byMonth[m]||0); });
+          viewMonths.forEach(m=>{ byRm[k].byMonth[m] = (byRm[k].byMonth[m]||0) + (c.byMonth[m]||0); });
           byRm[k].__total += c.__total;
         }
         byRm[k].__n += 1;
@@ -5936,7 +5951,7 @@ function showClientBrokerageHistory(scopeEmpName){
           : '<th data-sort-col="code" style="padding:8px 10px;text-align:left;position:sticky;top:0;left:0;background:var(--surface2);z-index:2;font-size:11px;color:var(--text2);text-transform:uppercase;cursor:pointer;user-select:none">Code'+arrow('code')+'</th>'
             + th('name','Client Name','left')
             +(scopeEmpName?'':th('rm','RM','left')))
-        + allMonths.map(m=>th(m, mLabel(m), 'right')).join('')
+        + viewMonths.map(m=>th(m, mLabel(m), 'right')).join('')
         + th('total','Total','right')
         +(rmTotalOn ? '<th style="padding:8px 10px;text-align:right;position:sticky;top:0;background:var(--surface2);z-index:1;font-size:11px;color:var(--text2);text-transform:uppercase">Clients</th>' : '')
         +'</tr></thead>';
@@ -5947,32 +5962,32 @@ function showClientBrokerageHistory(scopeEmpName){
             : '<td style="padding:7px 10px;position:sticky;left:0;background:var(--surface,#fff);font-weight:600">'+escapeHtml(c.code||'—')+'</td>'
               +'<td style="padding:7px 10px">'+escapeHtml(c.name||'')+'</td>'
               +(scopeEmpName?'':'<td style="padding:7px 10px">'+rmPill(c.rm)+'</td>'))
-          + allMonths.map(m=>amtCell(c.byMonth[m])).join('')
+          + viewMonths.map(m=>amtCell(c.byMonth[m])).join('')
           + amtCell(c.__total, ';font-weight:800')
           +(rmTotalOn ? '<td style="padding:7px 10px;text-align:right;color:var(--text3)">'+c.__n+'</td>' : '')
           +'</tr>';
       }).join('') + '</tbody>';
       const leadCols = rmTotalOn ? 1 : (3+(scopeEmpName?0:0)); // RM-only: 1 lead col; else code+name(+rm handled below)
-      const totalCols = rmTotalOn ? (1+allMonths.length+1+1) : (3+allMonths.length+(scopeEmpName?0:1));
+      const totalCols = rmTotalOn ? (1+viewMonths.length+1+1) : (3+viewMonths.length+(scopeEmpName?0:1));
       if(!clients.length) tbodyHtml = '<tbody><tr><td colspan="'+totalCols+'" style="padding:18px;text-align:center;color:var(--text3)">No '+(rmTotalOn?'data':'clients')+' found</td></tr></tbody>';
       // Month-wise TOTAL row (sum of the rows currently shown, per month)
       const monthTotals = {};
-      allMonths.forEach(m=>{ monthTotals[m] = clients.reduce((s,c)=>s+(c.byMonth[m]||0),0); });
+      viewMonths.forEach(m=>{ monthTotals[m] = clients.reduce((s,c)=>s+(c.byMonth[m]||0),0); });
       const grandTotal = clients.reduce((s,c)=>s+c.__total,0);
       const totalClientN = rmTotalOn ? clients.reduce((s,c)=>s+c.__n,0) : 0;
       tfootHtml = clients.length ? '<tfoot><tr style="background:var(--surface2)">'
         +'<td style="padding:8px 10px;font-weight:700;position:sticky;left:0;bottom:0;z-index:2;background:var(--surface2);border-top:2px solid var(--border)">TOTAL</td>'
         +(rmTotalOn ? '' : '<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'+(scopeEmpName?'':'<td style="padding:8px 10px;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)"></td>'))
-        + allMonths.map(m=>'<td style="padding:8px 10px;text-align:right;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthTotals[m])+'</td>').join('')
+        + viewMonths.map(m=>'<td style="padding:8px 10px;text-align:right;font-weight:700;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(monthTotals[m])+'</td>').join('')
         +'<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+inr2(grandTotal)+'</td>'
         +(rmTotalOn ? '<td style="padding:8px 10px;text-align:right;font-weight:800;position:sticky;bottom:0;z-index:1;background:var(--surface2);border-top:2px solid var(--border)">'+totalClientN+'</td>' : '')
         +'</tr></tfoot>' : '';
       if(rmTotalOn){
-        lastExportRows = clients.map(c=> [c.rm||''].concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total, c.__n]) );
-        lastExportTotalRow = ['TOTAL'].concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal, totalClientN]);
+        lastExportRows = clients.map(c=> [c.rm||''].concat(viewMonths.map(m=>c.byMonth[m]||0)).concat([c.__total, c.__n]) );
+        lastExportTotalRow = ['TOTAL'].concat(viewMonths.map(m=>monthTotals[m])).concat([grandTotal, totalClientN]);
       } else {
-        lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(allMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]) );
-        lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat(allMonths.map(m=>monthTotals[m])).concat([grandTotal]);
+        lastExportRows = clients.map(c=> [c.code||'', c.name||''].concat(scopeEmpName?[]:[c.rm||'']).concat(viewMonths.map(m=>c.byMonth[m]||0)).concat([c.__total]) );
+        lastExportTotalRow = ['TOTAL',''].concat(scopeEmpName?[]:['']).concat(viewMonths.map(m=>monthTotals[m])).concat([grandTotal]);
       }
       lastExportMonthSel = '';
     } else {
@@ -6039,7 +6054,8 @@ function showClientBrokerageHistory(scopeEmpName){
   };
 
   document.getElementById('bro-hist-search').oninput = renderTable;
-  document.getElementById('bro-hist-month').onchange = renderTable;
+  document.getElementById('bro-hist-from').onchange = renderTable;
+  document.getElementById('bro-hist-to').onchange = renderTable;
   if(!scopeEmpName) document.getElementById('bro-hist-rm').onchange = renderTable;
   if(!scopeEmpName) document.getElementById('bro-hist-rmtotal').onchange = renderTable;
   renderTable();
@@ -6050,7 +6066,7 @@ function showClientBrokerageHistory(scopeEmpName){
     let cols, title, fname;
     if(lastRmTotalOn){
       cols = [{header:'RM', width:16, color:rmCellColor}];
-      if(!lastExportMonthSel) allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true, color:posGreenPastel}));
+      if(!lastExportMonthSel) viewMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true, color:posGreenPastel}));
       else cols.push({header:'BROKERAGE (₹) — '+mLabel(lastExportMonthSel).toUpperCase(), width:18, money:true, color:posGreenPastel});
       cols.push({header:'TOTAL', width:15, money:true, color:posGreenPastel});
       cols.push({header:'CLIENTS', width:10});
@@ -6062,7 +6078,7 @@ function showClientBrokerageHistory(scopeEmpName){
         {header:'CLIENT NAME', width:26}
       ];
       if(!scopeEmpName) cols.push({header:'RM', width:12, color:rmCellColor});
-      allMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true, color:posGreenPastel}));
+      viewMonths.forEach(m=> cols.push({header:mLabel(m).toUpperCase(), width:13, money:true, color:posGreenPastel}));
       cols.push({header:'TOTAL', width:15, money:true, color:posGreenPastel});
       title = 'D N Investment — Client Brokerage History · '+scopeLabel;
       fname = 'DN_Client_Brokerage_History_'+(scopeEmpName||'AllRMs').replace(/\s+/g,'_')+'.xlsx';
