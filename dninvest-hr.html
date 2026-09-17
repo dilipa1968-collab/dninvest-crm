@@ -1187,6 +1187,25 @@ const DB = {
         }
       }, err=>console.log('Listener error:',key,err));
     });
+  },
+  // Deterministic direct fetch of the most important documents straight from
+  // Firestore — does NOT rely on the onSnapshot listener, which on some sessions
+  // (esp. mobile, or after a suspended/backgrounded tab) can stay stuck showing
+  // stale/empty data. Populates the local cache and resolves when done.
+  async forceSync(keyList){
+    if(typeof fdb==='undefined') return false;
+    const keys = keyList || ['attendance','mfsip_by_month','holidays','salaries','perf_incentive','advances','inc_rates'];
+    let ok=false;
+    await Promise.all(keys.map(async key=>{
+      try{
+        const doc = await fdb.collection('hr_data').doc(key).get();
+        if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
+          this.setLocal(key, doc.data().data);
+          ok=true;
+        }
+      }catch(e){ console.log('forceSync failed for',key,e); }
+    }));
+    return ok;
   }
 };
 
@@ -2149,6 +2168,14 @@ function startApp(){
     refreshCurrentPage();
   });
 
+  // BELT-AND-SUSPENDERS: don't rely only on the realtime listener to fill data
+  // on first load. On some sessions the onSnapshot subscription comes up stale
+  // or empty (mobile, backgrounded tab, flaky network) and the dashboard sits
+  // showing everyone Absent even though today's attendance exists on the server.
+  // So we ALSO do one guaranteed direct fetch of the critical docs at startup
+  // and re-render — with a small visible pill so it's obvious it ran.
+  forceSyncWithPill();
+
   // Live listener for CRM-pushed sales summary (crm_data collection, not hr_data)
   try{
     if(typeof fdb!=='undefined'){
@@ -2242,6 +2269,29 @@ function refreshCurrentPage(){
   else if(id==='dashboard') renderDashboard();
   else if(id==='employees') renderEmployees();
   else if(id==='reports'){ renderAttendanceSheet(); renderDateWiseSheet(); }
+}
+
+// Startup direct-fetch of critical docs, with a small visible status pill so
+// the user (or a screenshot) can confirm the fresh fetch actually ran and
+// whether it found data — no DevTools needed.
+async function forceSyncWithPill(){
+  const pill=document.createElement('div');
+  pill.textContent='🔄 Data sync…';
+  pill.style.cssText='position:fixed;top:8px;right:8px;z-index:99999;background:#1a2b4a;color:#fff;padding:5px 10px;border-radius:16px;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+  document.body.appendChild(pill);
+  try{
+    const ok = await DB.forceSync();
+    const att = DB.get('attendance', {}) || {};
+    const td = today();
+    let todayCount=0;
+    Object.keys(att).forEach(nm=>{ if((att[nm]||[]).some(r=>r.date===td)) todayCount++; });
+    pill.textContent = ok ? ('✅ Synced · '+Object.keys(att).length+' emp · '+todayCount+' recs today') : '⚠️ No server data';
+  }catch(e){
+    console.log('forceSyncWithPill error:', e);
+    pill.textContent='❌ Sync failed';
+  }
+  refreshCurrentPage();
+  setTimeout(()=>pill.remove(), 4000);
 }
 
 // One-time direct Firestore fetch for 'attendance' — bypasses whatever
