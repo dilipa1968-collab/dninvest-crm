@@ -2140,16 +2140,13 @@ function startApp(){
   // Firestore, this fires and we re-render the relevant pages immediately —
   // no refresh needed, no demo/stale data.
   DB.startListeners(function(changedKey){
+    // PERF: every Firestore key change used to trigger a full-app re-render of
+    // ~13 functions, even for frequent keys like 'heartbeats' (written every
+    // ~5 min by every logged-in RM). That made the portal feel slow. Now we only
+    // re-render the ONE page the user is actually looking at, plus the couple of
+    // side-effects that don't belong to any single page.
     if(changedKey==='employee_changes') populateEmpDropdowns();
-    renderDashboard();
-    renderAttendancePage();
-    renderLeavePage();
-    renderSalaryPage();
-    renderIncentivePage();
-    renderCrmSalesSummary();
-    renderEsiBox();
-    renderExtraDeductionBox();
-    if(isAdmin){ renderEmployees(); renderAdvanceBox(); renderAdvanceHistory(); loadEsiSettingsIntoUI(); renderEsiOverrideTable(); }
+    refreshCurrentPage();
   });
 
   // Live listener for CRM-pushed sales summary (crm_data collection, not hr_data)
@@ -2240,7 +2237,7 @@ function refreshCurrentPage(){
   const id = active.id.replace('page-','');
   if(id==='attendance') renderAttendancePage();
   else if(id==='leave') renderLeavePage();
-  else if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); } }
+  else if(id==='salary'){ renderSalaryPage(); renderAdvanceBox(); renderEsiBox(); renderExtraDeductionBox(); loadEsiSettingsIntoUI(); if(isAdmin){ renderAdvanceHistory(); renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); } }
   else if(id==='incentive') renderIncentivePage();
   else if(id==='dashboard') renderDashboard();
   else if(id==='employees') renderEmployees();
