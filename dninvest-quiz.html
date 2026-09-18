@@ -71,7 +71,7 @@ input,select,textarea,button{font-family:inherit}
 </div>
 
 <!-- ══ SEMINAR QUIZ — BIG SCREEN (LCD / projector) ══ -->
-<div id="quizScreen" style="display:none;position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at 50% 0%,#1e293b,#0f172a 70%);color:#fff;overflow-y:auto;padding:3vh 4vw;box-sizing:border-box;font-family:inherit">
+<div id="quizScreen" style="display:none;position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at 50% 0%,#1e293b,#0f172a 70%);color:#fff;overflow:hidden;padding:4.5vh 5vw;box-sizing:border-box;font-family:inherit">
   <div id="qs-content" style="min-height:100%;display:flex;flex-direction:column;justify-content:center"></div>
 </div>
 
@@ -1842,6 +1842,7 @@ window.QUIZ = (function(){
   async function bootScreen(){
     document.getElementById('quizScreen').style.display='block';
     injectScreenCSS();
+    try{ window.addEventListener('resize', function(){ fitScreenSoon(); }); }catch(e){}
     var app=document.getElementById('app'); if(app) app.style.display='none';
     var ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none';
     // Sound needs a one-time user gesture (browser autoplay policy). Show a small
@@ -1874,7 +1875,7 @@ window.QUIZ = (function(){
     }, function(){});
     LINKS().onSnapshot(function(d){
       var v=d.data()||{}; screen.linkOpen = v.quizOpen!==false; screen.title = (v.screenTitle||'').trim();
-      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz Is Currently Closed</div></div>'; }
+      if(!screen.linkOpen){ if(screen.timer){clearInterval(screen.timer);screen.timer=null;} clearTimerRing(); S().innerHTML='<div style="text-align:center"><div style="font-size:8vw">🔒</div><div style="font-size:3vw;font-weight:800;margin-top:2vh">Quiz Is Currently Closed</div></div>'; fitScreenSoon(); }
       else { DOC().get().then(function(dd){ renderScreen(dd.data()||{}); }); }
     }, function(){});
     screen.unsubResp = RESPONSES().onSnapshot(function(snap){
@@ -1885,6 +1886,38 @@ window.QUIZ = (function(){
   function clearTimerRing(){ var w=document.getElementById('qs-ring-wrap'); if(w) w.remove(); }
 
 
+  // Fit the whole screen content inside the visible area WITHOUT scrolling — a
+  // TV can't scroll a cast/mirror and also crops the outer edges (overscan), so
+  // long result screens used to get cut at the bottom. We measure the content's
+  // natural size and, if it's taller/wider than the safe area, scale it down so
+  // everything (question + options + winner card) always fits on one screen.
+  function fitScreen(){
+    var wrap=document.getElementById('quizScreen'), c=document.getElementById('qs-content');
+    if(!wrap||!c || wrap.style.display==='none') return;
+    // reset to natural (top-aligned, no min-height) so we can measure real size
+    c.style.transform='none';
+    c.style.transformOrigin='top center';
+    c.style.minHeight='0';
+    c.style.justifyContent='flex-start';
+    var cs=getComputedStyle(wrap);
+    var availH=wrap.clientHeight-(parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom));
+    var availW=wrap.clientWidth-(parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight));
+    var h=c.scrollHeight, w=c.scrollWidth;
+    var k=Math.min(1, availH/(h||1), availW/(w||1));
+    if(k<1){
+      // too big → scale down, keep top-aligned so nothing is ever cut off
+      c.style.transform='scale('+k+')';
+    } else {
+      // fits comfortably → restore nice vertical centering
+      c.style.minHeight='100%';
+      c.style.justifyContent='center';
+    }
+  }
+  function fitScreenSoon(){
+    // run after layout + once more after fonts/QR image settle
+    try{ requestAnimationFrame(function(){ fitScreen(); setTimeout(fitScreen,80); setTimeout(fitScreen,400); }); }catch(e){ fitScreen(); }
+  }
+
   function renderScreen(d){
     screen.sessionId=d.sessionId||screen.sessionId;
     if(d.qIndex!==screen.qIndex){ screen.qIndex=d.qIndex||0; screen.ansCount=0; }
@@ -1893,6 +1926,7 @@ window.QUIZ = (function(){
     if(d.state==='live') screenLive(d);
     else if(d.state==='reveal') screenReveal(d);
     else screenLobby(d);
+    fitScreenSoon();
   }
 
   function screenLobby(d){
