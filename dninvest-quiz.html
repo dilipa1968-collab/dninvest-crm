@@ -128,6 +128,12 @@ input,select,textarea,button{font-family:inherit}
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem;color:#dc2626;border-color:#fca5a5" onclick="QUIZ.clearBank()">🗑️ Clear All</button>
                 <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.closeQuestion()">⏹️ Stop / Lobby</button>
               </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+                <span style="font-size:.72rem;color:var(--gray);font-weight:700">⚡ Set ALL 5 Questions To:</span>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.setAllTypes('mcq')">🔤 MCQ (Auto)</button>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.setAllTypes('guess')">🎯 Guess The Number</button>
+                <button class="btn btn-outline" style="padding:5px 10px;font-size:.78rem" onclick="QUIZ.setAllTypes('buzzer')">🔔 Buzzer</button>
+              </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
                 <span style="font-size:.72rem;color:var(--gray);font-weight:700">📤 Upload A New Question Bank (Excel):</span>
                 <input type="text" id="quiz-bank-name" placeholder="Name (e.g. Cricket, Movies)" style="padding:5px 8px;font-size:.76rem;border:1px solid var(--border);border-radius:6px;width:170px">
@@ -1132,6 +1138,16 @@ window.QUIZ = (function(){
     }
     box.innerHTML=html;
   }
+  // Bulk helper: set EVERY question's type in one click, so the host doesn't
+  // have to open each question's dropdown one-by-one. For "guess" it reuses
+  // bankTypeChange, which auto-fills each Actual Value from the correct option.
+  function setAllTypes(t){
+    for(var n=0;n<5;n++){
+      var sel=document.getElementById('qb'+n+'-type');
+      if(sel){ sel.value=t; bankTypeChange(n); }
+    }
+    try{ saveBankSilent(); }catch(e){}
+  }
   function bankTypeChange(n){
     var t=(document.getElementById('qb'+n+'-type')||{}).value||'mcq';
     var o=document.getElementById('qb'+n+'-opts'); if(o) o.style.display=(t==='mcq')?'grid':'none';
@@ -2079,7 +2095,7 @@ window.QUIZ = (function(){
 
   return {
     isPlayMode:isPlayMode, isScreenMode:isScreenMode, openScreen:openScreen, boot:boot,
-    hostInit:hostInit, bankTypeChange:bankTypeChange, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, deleteCustomBank:deleteCustomBank, deleteFilmiButton:deleteFilmiButton, pushQuestion:pushQuestion,
+    hostInit:hostInit, bankTypeChange:bankTypeChange, setAllTypes:setAllTypes, saveBank:saveBank, clearBank:clearBank, loadMfBank:loadMfBank, loadShareBank:loadShareBank, loadFilmiBank:loadFilmiBank, loadCustomBank:loadCustomBank, uploadBankExcel:uploadBankExcel, deleteCustomBank:deleteCustomBank, deleteFilmiButton:deleteFilmiButton, pushQuestion:pushQuestion,
     closeQuestion:closeQuestion, reveal:reveal, exportResults:exportResults, resultImage:resultImage, deleteResultsLog:deleteResultsLog, clearResults:clearResults, newSession:newSession, copyLink:copyLink,
     toggleLink:toggleLink, initLinkControl:initLinkControl, toggleRequireMobile:toggleRequireMobile, saveScreenTitle:saveScreenTitle
   };
