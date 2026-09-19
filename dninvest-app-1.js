@@ -2569,6 +2569,8 @@ DB.syncFromFirebase().then(()=>{
   if(eqFixMobileBtn) eqFixMobileBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const eqFixStatusBtn=document.getElementById('eqFixStatusBtn');
   if(eqFixStatusBtn) eqFixStatusBtn.style.display=CU.role==='admin'?'inline-flex':'none';
+  const eqBackfillRmkBtn=document.getElementById('eqBackfillRmkBtn');
+  if(eqBackfillRmkBtn) eqBackfillRmkBtn.style.display=CU.role==='admin'?'inline-flex':'none';
   const mfImportBtn=document.getElementById('mfImportBtn');
   if(mfImportBtn) mfImportBtn.style.display=isBackOfficeOrAdmin()?'inline-flex':'none';
   const leadsImportBtn=document.getElementById('leadsImportBtn');
@@ -4347,7 +4349,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','comeback','followup-filter','badge','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
+  ['search','status','rm','comeback','followup-filter','badge','stale','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -4494,6 +4496,7 @@ function renderEqTable(){
   const ncTo=(document.getElementById('eq-next-call-to')||{value:''}).value;
   const ltFrom=(document.getElementById('eq-last-trade-from')||{value:''}).value;
   const ltTo=(document.getElementById('eq-last-trade-to')||{value:''}).value;
+  const staleFilter=parseInt((document.getElementById('eq-stale')||{value:''}).value)||0;
 
   if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.code||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
@@ -4536,6 +4539,7 @@ function renderEqTable(){
     if(ltTo && d>ltTo) return false;
     return true;
   });
+  if(staleFilter) data=data.filter(c=>(c.remarks_same_count||0)>=staleFilter);
 
   // Column AutoFilter
   data = CF.applyEq(data);
@@ -4626,7 +4630,7 @@ function renderEqTable(){
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td class="eqc-wrap"><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
-      <td class="eqc-rmk" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td class="eqc-rmk" title="${c.remarks||''}">${c.remarks||'—'}${(c.remarks_same_count||0)>=3?`<span class="badge-tip" data-tip="Remarks unchanged for ${c.remarks_same_count} updates in a row" style="margin-left:4px;font-size:.62rem;background:#dc2626;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">⚠${c.remarks_same_count}x</span>`:''}</td>
       <td>
         ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="editClient('${c.id}','equity')" title="Edit">✏️</button>`:''}
         <button class="btn-icon" onclick="viewClient('${c.id}','equity')" title="View">👁</button>
@@ -4712,6 +4716,7 @@ function renderMfTable(){
   const lcTo=(document.getElementById('mf-last-call-to')||{value:''}).value;
   const lbFrom=(document.getElementById('mf-last-biz-from')||{value:''}).value;
   const lbTo=(document.getElementById('mf-last-biz-to')||{value:''}).value;
+  const staleFilterMf=parseInt((document.getElementById('mf-stale')||{value:''}).value)||0;
 
   if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.pan||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
   if(st==='DNC') data=data.filter(c=>c.do_not_call===true);
@@ -4753,6 +4758,7 @@ function renderMfTable(){
     if(lbTo && d>lbTo) return false;
     return true;
   });
+  if(staleFilterMf) data=data.filter(c=>(c.remarks_same_count||0)>=staleFilterMf);
 
   // Column AutoFilter
   data = CF.applyMf(data);
@@ -4819,7 +4825,7 @@ function renderMfTable(){
       <td>${fmtDate(c.last_call_date)||'—'}</td>
       <td>${fmtDate(c.next_call)||'—'}</td>
       <td><span class="badge ${fuBadge}">${c.followup_status||'—'}</span>${c.do_not_call?'<br><span style="color:var(--red);font-weight:700;font-size:.72rem">🚫 DNC</span>':''}</td>
-      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${c.remarks||''}">${c.remarks||'—'}${(c.remarks_same_count||0)>=3?`<span class="badge-tip" data-tip="Remarks unchanged for ${c.remarks_same_count} updates in a row" style="margin-left:4px;font-size:.62rem;background:#dc2626;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">⚠${c.remarks_same_count}x</span>`:''}</td>
       <td>
         ${CU.role!=='backoffice'?`<button class="btn-icon" onclick="editClient('${c.id}','mf')" title="Edit">✏️</button>`:''}
         <button class="btn-icon" onclick="viewClient('${c.id}','mf')" title="View">👁</button>
@@ -6846,6 +6852,18 @@ function confirmRegNumberChange(oldN, newN){
   });
 }
 
+// ── Remarks "stale streak" tracker ─────────────────────────────────────────
+// remarks_same_count = how many updates in a row (call-logs or edits) left the
+// Remarks text unchanged. Any real change resets it to 0; the very first time
+// a remark is written (old was blank) also counts as a change, not a repeat.
+// Used to flag clients whose remarks look copy-pasted call after call.
+function computeRemarksSameCount(oldRemarks, newRemarks, oldCount){
+  const ov=(oldRemarks||'').trim(), nv=(newRemarks||'').trim();
+  if(!ov && !nv) return 0;
+  if(ov===nv) return (oldCount||0)+1;
+  return 0;
+}
+
 async function saveClient(){
   const seg = document.getElementById('clientSaveBtn').dataset.seg;
   const name = (document.getElementById('f_name')||{value:''}).value.trim();
@@ -6960,6 +6978,9 @@ async function saveClient(){
     // safety: ensure no collision with existing client ids
     while(clients.some(x=>x.id===newId)) newId = uid();
   }
+  const _oldForCount = currentEditId ? clients.find(x=>x.id===currentEditId) : null;
+  const _newRemarksVal = gv2('f_remarks');
+  const _remarksSameCount = computeRemarksSameCount(_oldForCount?_oldForCount.remarks:'', _newRemarksVal, _oldForCount?_oldForCount.remarks_same_count:0);
   // Original mobile is now editable by everyone (admin & RM).
   const _mobileVal = gv2('f_mobile');
   // Alert/confirm when the Registered (original) number is changed while editing.
@@ -6981,7 +7002,7 @@ async function saveClient(){
       last_call_date:gv2('f_last_call'),
       next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
       do_not_call: document.getElementById('f_do_not_call')?.checked || false,
-      followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
+      followup_status:gv2('f_followup'), remarks:_newRemarksVal, remarks_same_count:_remarksSameCount,
       created:currentEditId?undefined:today(), updated:today()
     };
   } else {
@@ -6998,7 +7019,7 @@ async function saveClient(){
       last_invest_date:gv2('f_last_invest'), last_call_date:gv2('f_last_call'),
       next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
       do_not_call: document.getElementById('f_do_not_call')?.checked || false,
-      followup_status:gv2('f_followup'), remarks:gv2('f_remarks'),
+      followup_status:gv2('f_followup'), remarks:_newRemarksVal, remarks_same_count:_remarksSameCount,
       created:currentEditId?undefined:today(), updated:today()
     };
   }
@@ -7360,6 +7381,10 @@ async function saveCallLog(){
   if(idx>=0){
     const oldClient = clients[idx];
     const rm = oldClient.rm;
+    // Capture remarks BEFORE any mutation below — oldClient is the same object
+    // reference as clients[idx], so these would read the NEW value otherwise.
+    const _oldRemarksVal = oldClient.remarks;
+    const _oldRemarksCount = oldClient.remarks_same_count||0;
     // Track changes via call log
     const callChanges = [];
     if(nextCall && nextCall!==oldClient.next_call) callChanges.push({field:'next_call', old:oldClient.next_call||'—', new:nextCall});
@@ -7370,6 +7395,11 @@ async function saveCallLog(){
     clients[idx].followup_status=fuStatus;
     if(note) clients[idx].remarks=note;
     clients[idx].rm = rm;
+    // Every call log is "an update" — whether or not the RM actually changed
+    // the remarks text. If the remarks end up the same as before (note left
+    // blank, or retyped identically), bump the same-streak; any real change
+    // resets it to 0.
+    clients[idx].remarks_same_count = computeRemarksSameCount(_oldRemarksVal, clients[idx].remarks, _oldRemarksCount);
     // Optimistic: setClient writes localStorage + sets the write-guard synchronously
     // before its network await, so the screen updates instantly. The full-list
     // Firestore transaction runs in the background (surfaces its own error toast).
@@ -10125,6 +10155,7 @@ function renderReports(){
   const coCards=[
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
     {icon:'🔀',title:'RM Shift History',desc:'Clients moved between RMs — date & RM wise',fn:'rmShiftReport'},
+    {icon:'⚠️',title:'Stale Remarks Report',desc:'Remarks unchanged 3+ updates in a row — Equity+MF, RM wise',fn:'staleRemarksReport'},
   ];
   document.getElementById('eq-reports').innerHTML=eqCards.map(r=>reportCard(r)).join('');
   document.getElementById('mf-reports').innerHTML=mfCards.map(r=>reportCard(r)).join('');
@@ -10857,6 +10888,24 @@ function rmShiftReport(){
   showReport(
     `RM Shift History (${entries.length} changes)`,
     ['Date','Client Name','Segment','From RM','To RM','Changed By'],
+    rows
+  );
+}
+
+// Clients whose Remarks text hasn't budged across 3+ updates in a row — a
+// quick way for admin to spot RMs pasting the same note call after call
+// instead of actually noting what happened. Combined Equity+MF, RM-wise.
+function staleRemarksReport(){
+  const THRESH=3;
+  const eqRows=getActiveEqClients().filter(c=>(c.remarks_same_count||0)>=THRESH)
+    .map(c=>['Equity',c.rm||'—',c.name,c.mobile||'—',c.remarks_same_count,c.followup_status||'—',fmtDate(c.next_call)||'—',c.remarks||'—']);
+  const mfRows=getMyMfClients().filter(c=>(c.remarks_same_count||0)>=THRESH)
+    .map(c=>['MF',c.rm||'—',c.name,c.mobile||'—',c.remarks_same_count,c.followup_status||'—',fmtDate(c.next_call)||'—',c.remarks||'—']);
+  const rows=[...eqRows,...mfRows].sort((a,b)=> (b[4]-a[4]) || String(a[1]).localeCompare(String(b[1])) );
+  if(!rows.length){ toast(`✅ No client has ${THRESH}+ updates with unchanged Remarks`,'success'); return; }
+  showReport(
+    `Stale Remarks Report (${THRESH}+ updates unchanged) — ${rows.length} clients`,
+    ['Segment','RM','Name','Mobile','Same-Count','Follow-up','Next Call','Remarks'],
     rows
   );
 }
@@ -14553,6 +14602,75 @@ async function fixStatusByLastTrade(){
     changes:[{field:'status', old:x.from, new:x.to}] })));
   toast(`✅ ${toFix.length} clients' status updated (${nInact} Inactive, ${nAct} Active)`,'success');
   renderEqTable(); refreshDash(); updateBadges();
+}
+
+// ── Backfill Remarks Streak — Admin only ───────────────────────────────────
+// remarks_same_count only starts getting tracked from the point this feature
+// shipped — existing clients have no history for it yet. This replays each
+// client's Call Log entries (chronological) plus any manual Remarks edits
+// found in the Activity Log, and rebuilds the "unchanged streak" as if it had
+// been tracked all along.
+// LIMITS (told to the user up front, not perfectly accurate):
+//  - activity_logs only keeps the office's most recent 2000 entries total, so
+//    very old manual edits may be missing from the replay.
+//  - Any remarks change made outside a call-log/edit path (e.g. a bulk Excel
+//    import that touched Remarks) leaves no trail, so if the replayed final
+//    value doesn't match the client's CURRENT remarks, we reset that client's
+//    count to 0 rather than show a number we can't vouch for.
+async function backfillRemarksStreaks(){
+  if(CU.role!=='admin') return;
+  if(!confirm('Rebuild the Remarks same-streak count for ALL Equity + MF clients from their Call Log / Activity Log history?\n\nThis only touches the remarks_same_count field — nothing else changes. Best-effort: very old manual edits beyond the last 2000 activity-log entries, or remarks changed via Excel import, can\'t be reconstructed and will show as 0.\n\nProceed?')) return;
+
+  const callLogs = DB.get('call_logs')||[];
+  // Only 'edit' (manual Add/Edit-form saves) — 'call_update' entries are the
+  // SAME event as a call_logs row (both written by saveCallLog for one call),
+  // so including both would double-count every real remarks change as an
+  // extra "unchanged" tick right after it.
+  const editLogs = (DB.get('activity_logs')||[]).filter(l=>l.type==='edit');
+
+  // client_id -> chronological list of {ts, val}
+  const events = {};
+  const push = (id,ts,val)=>{ if(!id) return; if(!events[id]) events[id]=[]; events[id].push({ts:ts||'', val}); };
+  callLogs.forEach(l=>{
+    if(!l.client_id || l.seg==='lead') return;
+    // note may be '' — that means the RM logged a call but left Remarks blank,
+    // which still carries the OLD remarks forward (handled below).
+    push(l.client_id, l.ts||l.date, {blank: !l.note, val: l.note||''});
+  });
+  editLogs.forEach(l=>{
+    if(!l.client_id) return;
+    const ch=(l.changes||[]).find(c=>c.field==='remarks');
+    if(!ch) return;
+    push(l.client_id, l.date, {blank:false, val: ch.new==='—' ? '' : ch.new});
+  });
+
+  const keys=['eq_clients','mf_clients'];
+  const summary={eq_clients:0, mf_clients:0};
+  let total=0;
+  for(const k of keys){
+    const list=DB.get(k)||[];
+    const touched=[];
+    list.forEach(c=>{
+      const evs=events[c.id];
+      if(!evs || !evs.length) return; // no history at all — leave as-is (0)
+      evs.sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+      let running='', count=0;
+      evs.forEach(e=>{
+        const newVal = e.val.blank ? running : e.val.val;
+        count = computeRemarksSameCount(running, newVal, count);
+        running = newVal;
+      });
+      // Trust the replay only if it lands on the client's actual current remarks.
+      const finalCount = ((running||'').trim()===(c.remarks||'').trim()) ? count : 0;
+      if((c.remarks_same_count||0)!==finalCount){
+        c.remarks_same_count = finalCount;
+        touched.push(c);
+      }
+    });
+    if(touched.length){ await DB.setClientsBulk(k, touched); summary[k]=touched.length; total+=touched.length; }
+  }
+  toast(`✅ Remarks streak backfilled — ${total} clients updated (Equity: ${summary.eq_clients}, MF: ${summary.mf_clients})`,'success');
+  renderEqTable(); if(typeof renderMfTable==='function') renderMfTable(); refreshDash(); updateBadges();
 }
 
 // Entry point for the Equity "Import Excel" file input. Peeks at every sheet's

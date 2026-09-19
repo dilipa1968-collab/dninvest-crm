@@ -1548,6 +1548,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <button class="btn btn-outline" onclick="openEqBulkModal()" id="eqBulkBtn" style="display:none">⇅ Bulk Update (RM / PAN / DOB)</button>
             <button class="btn btn-outline" onclick="fixAllMobiles()" id="eqFixMobileBtn" style="display:none">🧹 Fix Mobile (91)</button>
             <button class="btn btn-outline" onclick="fixStatusByLastTrade()" id="eqFixStatusBtn" style="display:none">🔄 Fix Status (Last Trade)</button>
+            <button class="btn btn-outline" onclick="backfillRemarksStreaks()" id="eqBackfillRmkBtn" style="display:none" title="Rebuild the Remarks same-streak count for existing clients from Call Log / Activity Log history">⚠️ Backfill Remarks Streak</button>
             <button class="btn btn-primary" id="eqAddClientBtn" onclick="openAddClient('equity')">+ Add Client</button>
           </div>
         </div>
@@ -1567,6 +1568,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="H">🟣 H — HNI</option>
             <option value="MH">🟢🟣 M+H — Both</option>
             <option value="NONE">⬜ Not MF Client</option></select>
+          <select onchange="filterEq()" id="eq-stale" title="Remarks text hasn't changed across this many updates in a row" style="background:#FFF5F5;border:1px solid #F5B8B8;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">⚠️ Stale Remarks</option>
+            <option value="3">3+ same updates</option>
+            <option value="5">5+ same updates</option>
+            <option value="10">10+ same updates</option></select>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('eq',this.value)" id="eq-pagesize" style="max-width:98px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
@@ -1697,6 +1702,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <option value="H">🟣 H — HNI</option>
             <option value="EH">🔵🟣 E+H — Both</option>
             <option value="NONE">⬜ Not Equity Client</option></select>
+          <select onchange="filterMf()" id="mf-stale" title="Remarks text hasn't changed across this many updates in a row" style="background:#FFF5F5;border:1px solid #F5B8B8;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">⚠️ Stale Remarks</option>
+            <option value="3">3+ same updates</option>
+            <option value="5">5+ same updates</option>
+            <option value="10">10+ same updates</option></select>
           <div class="filter-sep"></div>
           <select onchange="changePageSize('mf',this.value)" id="mf-pagesize" style="max-width:98px;background:#FEFCF7;border:1px solid #EBCB8E;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
