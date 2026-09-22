@@ -4470,7 +4470,13 @@ function renderEqTable(){
   // Also build a PAN/mobile → MF RM lookup so the "M" badge tooltip can show
   // WHICH RM handles that client's MF account, not just "yes, they're an MF
   // investor" — genuinely useful for an Equity RM wondering who to loop in.
-  const _mfClientsForMatch = getMyMfClients()||[];
+  // Match against ALL MF clients (not just the current RM's own) — the "M"
+  // badge means "this equity client is ALSO an MF investor somewhere in the
+  // firm", and the tooltip already shows which RM handles the MF account. Using
+  // getMyMfClients() here was the bug: an RM couldn't see the M badge when the
+  // client's MF account belonged to a different RM (Admin, who sees all MF
+  // clients, saw it fine).
+  const _mfClientsForMatch = DB.get('mf_clients')||[];
   // Normalise phone to its last 10 digits so a "+91 ", leading 0, spaces or
   // dashes on EITHER the equity or the MF record don't break the "M" match.
   const _mob10 = m => String(m||'').replace(/\D/g,'').slice(-10);
