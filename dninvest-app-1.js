@@ -4471,15 +4471,19 @@ function renderEqTable(){
   // WHICH RM handles that client's MF account, not just "yes, they're an MF
   // investor" — genuinely useful for an Equity RM wondering who to loop in.
   const _mfClientsForMatch = getMyMfClients()||[];
+  // Normalise phone to its last 10 digits so a "+91 ", leading 0, spaces or
+  // dashes on EITHER the equity or the MF record don't break the "M" match.
+  const _mob10 = m => String(m||'').replace(/\D/g,'').slice(-10);
   const _mfPanSet = new Set(_mfClientsForMatch.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
-  const _mfMobileSet = new Set(_mfClientsForMatch.map(c=>String(c.mobile||'').trim()).filter(Boolean));
+  const _mfMobileSet = new Set(_mfClientsForMatch.map(c=>_mob10(c.mobile)).filter(m=>m.length===10));
   const _mfRmByPan = {}, _mfRmByMobile = {};
   _mfClientsForMatch.forEach(c=>{
     const pan=String(c.pan||'').trim().toUpperCase(), mob=String(c.mobile||'').trim();
     if(pan && !_mfRmByPan[pan]) _mfRmByPan[pan]=c.rm||'—';
-    if(mob && !_mfRmByMobile[mob]) _mfRmByMobile[mob]=c.rm||'—';
+    const mob10=_mob10(c.mobile);
+    if(mob10.length===10 && !_mfRmByMobile[mob10]) _mfRmByMobile[mob10]=c.rm||'—';
   });
-  const _mfRmFor = c => _mfRmByPan[String(c.pan||'').trim().toUpperCase()] || _mfRmByMobile[String(c.mobile||'').trim()] || '—';
+  const _mfRmFor = c => _mfRmByPan[String(c.pan||'').trim().toUpperCase()] || _mfRmByMobile[_mob10(c.mobile)] || '—';
   // Parse the RMS risk map ONCE per render (was being re-parsed per comparison
   // during sort → tens of thousands of JSON.parse of a 2700-entry object → hang).
   const _riskMap = (getEqRisk().code) || {};
@@ -4512,7 +4516,7 @@ function renderEqTable(){
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(badgeFilter){
     data=data.filter(c=>{
-      const isM = _mfPanSet.has(String(c.pan||'').trim().toUpperCase()) || _mfMobileSet.has(String(c.mobile||'').trim());
+      const isM = _mfPanSet.has(String(c.pan||'').trim().toUpperCase()) || _mfMobileSet.has(_mob10(c.mobile));
       const isH = (c.asset_value>=500000);
       if(badgeFilter==='M') return isM;
       if(badgeFilter==='H') return isH;
@@ -4620,7 +4624,7 @@ function renderEqTable(){
     const rowStyle = comebackBg ? ` style="background:${comebackBg}"` : '';
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}"${rowStyle}${comebackTag?` title="Comeback trade — ${comebackTag==='blue'?'~1':comebackTag==='green'?'~3':'~6'}+ month gap"`:''}>${BULK.td('eq',c.id)}
-      <td><span style="display:inline-block;min-width:60px">${c.code||'—'}</span>${(_mfPanSet.has(String(c.pan||'').trim().toUpperCase())||_mfMobileSet.has(String(c.mobile||'').trim()))?`<span class="badge-tip" data-tip="MF RM: ${escapeHtml(_mfRmFor(c))}" style="font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">M</span>`:''}</td>
+      <td><span style="display:inline-block;min-width:60px">${c.code||'—'}</span>${(_mfPanSet.has(String(c.pan||'').trim().toUpperCase())||_mfMobileSet.has(_mob10(c.mobile)))?`<span class="badge-tip" data-tip="MF RM: ${escapeHtml(_mfRmFor(c))}" style="font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">M</span>`:''}</td>
       <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
@@ -4696,15 +4700,16 @@ function renderMfTable(){
   // else's book — admin only saw it because getMyEqClients() happens to
   // return everyone for role==='admin'.
   const _eqClientsForMatch = DB.get('eq_clients')||[];
+  const _mob10e = m => String(m||'').replace(/\D/g,'').slice(-10);
   const _eqPanSet = new Set(_eqClientsForMatch.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
-  const _eqMobileSet = new Set(_eqClientsForMatch.map(c=>String(c.mobile||'').trim()).filter(Boolean));
+  const _eqMobileSet = new Set(_eqClientsForMatch.map(c=>_mob10e(c.mobile)).filter(m=>m.length===10));
   const _eqRmByPan = {}, _eqRmByMobile = {};
   _eqClientsForMatch.forEach(c=>{
-    const pan=String(c.pan||'').trim().toUpperCase(), mob=String(c.mobile||'').trim();
+    const pan=String(c.pan||'').trim().toUpperCase(), mob=_mob10e(c.mobile);
     if(pan && !_eqRmByPan[pan]) _eqRmByPan[pan]=c.rm||'—';
-    if(mob && !_eqRmByMobile[mob]) _eqRmByMobile[mob]=c.rm||'—';
+    if(mob.length===10 && !_eqRmByMobile[mob]) _eqRmByMobile[mob]=c.rm||'—';
   });
-  const _eqRmFor = c => _eqRmByPan[String(c.pan||'').trim().toUpperCase()] || _eqRmByMobile[String(c.mobile||'').trim()] || '—';
+  const _eqRmFor = c => _eqRmByPan[String(c.pan||'').trim().toUpperCase()] || _eqRmByMobile[_mob10e(c.mobile)] || '—';
   const q=(document.getElementById('mf-search')||{value:''}).value.toLowerCase();
   const st=(document.getElementById('mf-status')||{value:''}).value;
   const rm=(document.getElementById('mf-rm')||{value:''}).value;
@@ -4731,7 +4736,7 @@ function renderMfTable(){
   if(fu&&!['pending','today','overdue','__BLANK__'].includes(fu)) data=data.filter(c=>(c.followup_status||'').trim().toUpperCase()===fu.trim().toUpperCase());
   if(badgeFilterMf){
     data=data.filter(c=>{
-      const isE = _eqPanSet.has(String(c.pan||'').trim().toUpperCase()) || _eqMobileSet.has(String(c.mobile||'').trim());
+      const isE = _eqPanSet.has(String(c.pan||'').trim().toUpperCase()) || _eqMobileSet.has(_mob10e(c.mobile));
       const isH = (c.aum>=300000);
       if(badgeFilterMf==='E') return isE;
       if(badgeFilterMf==='H') return isH;
@@ -4815,7 +4820,7 @@ function renderMfTable(){
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar"><span style="display:inline-block;width:20px;text-align:left">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(String(c.mobile||'').trim()))?`<span class="badge-tip" data-tip="Equity RM: ${escapeHtml(_eqRmFor(c))}" style="font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">E</span>`:''}</span>${c.name}${(c.aum>=300000)?'<span class="badge-tip" data-tip="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar"><span style="display:inline-block;width:20px;text-align:left">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(_mob10e(c.mobile)))?`<span class="badge-tip" data-tip="Equity RM: ${escapeHtml(_eqRmFor(c))}" style="font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">E</span>`:''}</span>${c.name}${(c.aum>=300000)?'<span class="badge-tip" data-tip="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
@@ -9983,13 +9988,14 @@ function renderMfProspects(){
 
   const eqAll = DB.get('eq_clients')||[];
   const mfAll = DB.get('mf_clients')||[];
+  const _mob10p = m => String(m||'').replace(/\D/g,'').slice(-10);
   const mfPanSet = new Set(mfAll.map(c=>String(c.pan||'').trim().toUpperCase()).filter(Boolean));
-  const mfMobileSet = new Set(mfAll.map(c=>String(c.mobile||'').trim()).filter(Boolean));
+  const mfMobileSet = new Set(mfAll.map(c=>_mob10p(c.mobile)).filter(m=>m.length===10));
 
   let data = eqAll.filter(c=>{
     if(c.do_not_call) return false;
     if(c.status==='Closed') return false;
-    const isMf = mfPanSet.has(String(c.pan||'').trim().toUpperCase()) || mfMobileSet.has(String(c.mobile||'').trim());
+    const isMf = mfPanSet.has(String(c.pan||'').trim().toUpperCase()) || mfMobileSet.has(_mob10p(c.mobile));
     return !isMf;
   });
 
