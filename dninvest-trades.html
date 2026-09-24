@@ -261,21 +261,28 @@ function chunkBySize(arr, maxBytes){
 
 async function saveMonth(mk){
   const data = monthCache[mk] || {equity:[], fo:[]};
-  const eqChunks = chunkBySize(data.equity, 700000);   // ~700KB per shard — comfortable headroom under the 1MB cap
-  const foChunks = chunkBySize(data.fo, 700000);
+  const eqChunks = chunkBySize(data.equity, 600000);   // ~600KB per shard — comfortable headroom under the 1MB per-doc cap
+  const foChunks = chunkBySize(data.fo, 600000);
 
-  const batch = fdb.batch();
-  batch.set(fdb.collection('trade_data').doc(monthDocId(mk)), {
+  // 24-Sep-2026 fix: all shards used to go in ONE batch.commit(). A busy
+  // month (8000+ trades) made that single request ~11MB, over Firestore's
+  // 10MB per-request limit ("Request payload size exceeds the limit"), so
+  // the whole month failed to save. Now each shard is written as its own
+  // small request (a few in parallel), and the manifest is written LAST —
+  // so if anything fails midway, the old manifest still points to a
+  // complete, readable set of shards.
+  const coll = fdb.collection('trade_data');
+  const writes = [];
+  eqChunks.forEach((chunk,i)=> writes.push(()=>coll.doc(monthDocId(mk)+'__eq'+i).set({data: chunk})));
+  foChunks.forEach((chunk,i)=> writes.push(()=>coll.doc(monthDocId(mk)+'__fo'+i).set({data: chunk})));
+  const PARALLEL = 3;
+  for(let i=0;i<writes.length;i+=PARALLEL){
+    await Promise.all(writes.slice(i,i+PARALLEL).map(fn=>fn()));
+  }
+  await coll.doc(monthDocId(mk)).set({
     sharded: true, eqShards: eqChunks.length, foShards: foChunks.length,
     updated: new Date().toISOString()
   });
-  eqChunks.forEach((chunk,i)=>{
-    batch.set(fdb.collection('trade_data').doc(monthDocId(mk)+'__eq'+i), {data: chunk});
-  });
-  foChunks.forEach((chunk,i)=>{
-    batch.set(fdb.collection('trade_data').doc(monthDocId(mk)+'__fo'+i), {data: chunk});
-  });
-  await batch.commit();
 }
 
 // ── Column detection: Equity files have "SCRIP NAME" as a plain column;
