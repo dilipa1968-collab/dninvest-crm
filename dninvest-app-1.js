@@ -605,6 +605,66 @@ const DB = {
     }
     return kept;
   },
+  // ── Call-log ARCHIVE (older logs trimmed from the live call_logs doc) ──
+  // One doc per client: crm_data/cl_arch__<client_id>  → {data:[...logs]}
+  _clArchRef(cid){
+    return fdb.collection('crm_data').doc('cl_arch__'+String(cid||'none').replace(/[\/\s]/g,'_'));
+  },
+  _groupLogsByClient(arr){
+    const g={};
+    (arr||[]).forEach(x=>{ if(!x) return; const k=x.client_id||'none'; (g[k]=g[k]||[]).push(x); });
+    return g;
+  },
+  // Append logs to their client archive docs (idempotent — arrayUnion).
+  async archiveCallLogs(entries){
+    if(typeof fdb==='undefined' || !entries || !entries.length) return false;
+    const groups=this._groupLogsByClient(entries);
+    const cids=Object.keys(groups);
+    const FV=firebase.firestore.FieldValue;
+    for(let i=0;i<cids.length;i+=400){
+      const batch=fdb.batch();
+      cids.slice(i,i+400).forEach(cid=>{
+        batch.set(this._clArchRef(cid), {data:FV.arrayUnion(...this._clean(groups[cid])), updated:new Date().toISOString()}, {merge:true});
+      });
+      await batch.commit();
+    }
+    return true;
+  },
+  // Read one client's archived logs (cached for this session).
+  _clArchCache:{},
+  async fetchArchivedCallLogs(cid){
+    if(!cid || typeof fdb==='undefined') return [];
+    if(this._clArchCache[cid]) return this._clArchCache[cid];
+    try{
+      const doc=await this._clArchRef(cid).get();
+      const arr=(doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+      this._clArchCache[cid]=arr;
+      return arr;
+    }catch(e){ console.log('Archive read error:',e); return []; }
+  },
+  // Recovery: is browser ke localStorage mein jo purane logs server se trim ho
+  // chuke hain (aur kahin save nahi hain), unhe archive mein push karo.
+  async recoverTrimmedCallLogs(serverArr, localArr){
+    try{
+      if(!Array.isArray(serverArr) || !serverArr.length || !Array.isArray(localArr)) return;
+      const key=x=>String((x&&(x.ts||x.date))||'');
+      const serverIds=new Set(serverArr.map(x=>x&&x.id));
+      let minKey=null;
+      serverArr.forEach(x=>{ const k=key(x); if(k && (minKey===null || k<minKey)) minKey=k; });
+      if(minKey===null) return;
+      const orphans=localArr.filter(x=>x && x.id && !serverIds.has(x.id) && key(x) && key(x)<minKey);
+      if(!orphans.length) return;
+      const ids=orphans.map(x=>x.id).sort();
+      const sig=ids.length+'|'+ids[0]+'|'+ids[ids.length-1];
+      try{ if(localStorage.getItem('dninvest_cl_recovered_sig')===sig) return; }catch(_){}
+      const ok=await this.archiveCallLogs(orphans);
+      if(ok){
+        try{ localStorage.setItem('dninvest_cl_recovered_sig', sig); }catch(_){}
+        console.log('♻️ Recovered',orphans.length,'old call logs into archive');
+        this._clArchCache={};
+      }
+    }catch(e){ console.log('Call log recovery error:',e); }
+  },
   async addCallLog(entry){
     // 1) optimistic local append
     let local=[];
@@ -623,14 +683,33 @@ const DB = {
         const byId={};
         latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
         if(entry&&entry.id) byId[entry.id]=entry;   // add/replace this entry
-        finalData = Object.values(byId);
-        // Trim oldest logs so the document stays under Firestore's 1 MiB cap
-        finalData = DB._pruneCallLogs(finalData, 850000);
+        const all = Object.values(byId);
+        // Trim oldest logs so the document stays under Firestore's 1 MiB cap.
+        // FIX (24-Sep-2026): pehle trimmed logs hamesha ke liye DELETE ho jaate the
+        // (isliye purana calling log gayab ho raha tha). Ab trimmed logs per-client
+        // archive doc (crm_data/cl_arch__<client_id>) mein SAME transaction mein
+        // move hote hain — kuch bhi delete nahi hota.
+        finalData = DB._pruneCallLogs(all, 850000);
+        const keptIds = new Set(finalData.map(x=>x&&x.id));
+        const dropped = all.filter(x=>x && !keptIds.has(x.id));
+        if(dropped.length){
+          const groups = DB._groupLogsByClient(dropped);
+          const cids = Object.keys(groups);
+          const FV = firebase.firestore.FieldValue;
+          cids.forEach((cid,i)=>{
+            if(i<400){
+              tx.set(DB._clArchRef(cid), {data:FV.arrayUnion(...DB._clean(groups[cid])), updated:new Date().toISOString()}, {merge:true});
+            } else {
+              finalData.push(...groups[cid]);   // too many for one tx — keep live, archived on a later write
+            }
+          });
+        }
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){
         try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
       }
+      this._clArchCache={};   // archive may have grown
       console.log('Call log transaction-synced');
     }catch(e){
       console.log('Call log sync error:',e);
@@ -1064,6 +1143,8 @@ const DB = {
               const byId={};
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+              // Is browser mein bache purane (server se trim hue) logs ko archive mein bachao
+              DB.recoverTrimmedCallLogs(d, existing);
               localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
               console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
             } else if(key==='activity_logs'){
@@ -7162,18 +7243,39 @@ function viewClient(id,seg){
     </div>`;
   }
 
-  body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
-  if(logs.length){
-    body+=logs.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
-      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — ${l.seg==='equity'?'Equity':'MF'}</div>
-      <div class="call-note">${l.note||'—'}</div>
-      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status}</span>
-        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
-      </div></div>`).join('');
-  } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
+  body+=`<div id="vcCallLogBox">${renderClientCallLogs(logs, false)}</div>`;
 
   document.getElementById('viewModalBody').innerHTML=body;
   document.getElementById('viewModal').classList.add('open');
+
+  // Purane (archived) logs Firebase se laa kar merge karo
+  window._vcCallLogFor=id;
+  DB.fetchArchivedCallLogs(id).then(arch=>{
+    if(window._vcCallLogFor!==id) return;
+    const box=document.getElementById('vcCallLogBox'); if(!box) return;
+    box.innerHTML=renderClientCallLogs(mergeCallLogs(logs, arch), true);
+  });
+}
+
+function mergeCallLogs(live, arch){
+  const byId={};
+  (arch||[]).forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+  (live||[]).forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+  return Object.values(byId).sort((a,b)=>
+    String((b.date||'')+(b.ts||'')).localeCompare(String((a.date||'')+(a.ts||''))));
+}
+
+function renderClientCallLogs(logs, archDone){
+  let h=`<div class="form-section">📋 Calling Log (${logs.length})${archDone?'':' <small style="font-weight:400;color:var(--gray)">· purane logs load ho rahe hain…</small>'}</div>`;
+  if(logs.length){
+    h+=logs.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
+      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — ${l.seg==='equity'?'Equity':(l.seg==='lead'?'Lead':'MF')}${l.by?' · by '+l.by:''}</div>
+      <div class="call-note">${l.note||l.remarks||'—'}</div>
+      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
+        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
+      </div></div>`).join('');
+  } else h+=`<p style="color:var(--gray);font-size:.82rem">${archDone?'No call logs yet.':'Loading…'}</p>`;
+  return h;
 }
 
 function di(label,val){
@@ -7263,16 +7365,14 @@ function viewLeadCalls(id){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
       ${di('RM',c.rm)}${di('Last Call',fmtDate(c.last_call))}${di('Next Call',fmtDate(c.next_call))}
     </div>`;
-  body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
-  if(logs.length){
-    body+=logs.map(l=>`<div class="call-log-item mf">
-      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — by ${l.by||l.rm||'—'}</div>
-      <div class="call-note">${l.note||'—'}</div>
-      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
-        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
-      </div></div>`).join('');
-  } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
+  body+=`<div id="vcCallLogBox">${renderClientCallLogs(logs, false)}</div>`;
   document.getElementById('viewModalBody').innerHTML=body;
+  window._vcCallLogFor=id;
+  DB.fetchArchivedCallLogs(id).then(arch=>{
+    if(window._vcCallLogFor!==id) return;
+    const box=document.getElementById('vcCallLogBox'); if(!box) return;
+    box.innerHTML=renderClientCallLogs(mergeCallLogs(logs, (arch||[]).filter(l=>l.seg==='lead')), true);
+  });
   document.getElementById('viewModal').classList.add('open');
 }
 
