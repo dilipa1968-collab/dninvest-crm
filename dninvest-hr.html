@@ -1174,7 +1174,7 @@ const DB = {
     if(this._listenersStarted) return;
     this._listenersStarted = true;
     if(typeof fdb==='undefined') return;
-    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions','esic_numbers','heartbeats'];
+    const keys = ['attendance','holidays','salaries','perf_incentive','pins','mfsip','mfsip_by_month','inc_rates','employee_changes','advances','payments_by_month','esi_settings','esi_overrides','esi_registered','extra_deductions','esic_numbers','heartbeats','salary_history'];
     keys.forEach(key=>{
       fdb.collection('hr_data').doc(key).onSnapshot(doc=>{
         if(key==='mfsip_by_month'){
@@ -1194,7 +1194,7 @@ const DB = {
   // stale/empty data. Populates the local cache and resolves when done.
   async forceSync(keyList){
     if(typeof fdb==='undefined') return false;
-    const keys = keyList || ['attendance','mfsip_by_month','holidays','salaries','perf_incentive','advances','inc_rates'];
+    const keys = keyList || ['attendance','mfsip_by_month','holidays','salaries','perf_incentive','advances','inc_rates','salary_history'];
     let ok=false;
     await Promise.all(keys.map(async key=>{
       try{
@@ -1476,11 +1476,56 @@ function getIncSalary(){ return DB.get('salaries', {}) || {}; }
 // Central salary getter — checks Firestore-synced override first, else EMPLOYEES default.
 // Used everywhere (Salary page, Incentive page, Employees page) so salary stays in sync
 // across every device the moment Admin changes it.
-function getEmpSalary(name){
+// ─── DATE-WISE SALARY HISTORY (27-Sep-2026) ───────────────────────────────
+// hr_data/salary_history = { Name: [{from:'YYYY-MM-DD', amt, at}] }
+// A salary can now be changed from ANY date — month start or mid-month.
+// Past months keep their old salary; a month with a mid-month change gets a
+// day-weighted salary (e.g. 1-14 Sep old + 15-30 Sep new). Employees with no
+// history entry behave exactly as before (single value from 'salaries').
+function _legacySalary(name){
   const incSal=getIncSalary();
   if(incSal[name]!==undefined) return incSal[name];
   const e=EMPLOYEES.find(x=>x.name===name);
   return e?e.salary:0;
+}
+function getSalaryHistoryAll(){ return DB.get('salary_history', {}) || {}; }
+function getSalaryHistory(name){
+  return ((getSalaryHistoryAll()[name])||[])
+    .filter(x=>x && /^\d{4}-\d{2}-\d{2}$/.test(x.from))
+    .slice().sort((a,b)=>a.from.localeCompare(b.from));
+}
+// Salary applicable on one calendar day
+function salaryOnDate(name, date){
+  const h=getSalaryHistory(name);
+  if(!h.length) return Number(_legacySalary(name))||0;
+  let v=h[0].amt;
+  for(const x of h){ if(x.from<=date) v=x.amt; else break; }
+  return Number(v)||0;
+}
+function _dayStr(monthPrefix, d){ return monthPrefix+'-'+String(d).padStart(2,'0'); }
+// Salary changes that take effect INSIDE this month (not on day 1)
+function salaryRevisionsInMonth(name, monthPrefix){
+  if(!monthPrefix) return [];
+  return getSalaryHistory(name).filter(x=>x.from.startsWith(monthPrefix) && x.from.slice(8)!=='01')
+    .map(x=>{ const prev=new Date(x.from+'T00:00:00'); prev.setDate(prev.getDate()-1);
+      const ps=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0')+'-'+String(prev.getDate()).padStart(2,'0');
+      return {from:x.from, old:salaryOnDate(name, ps), amt:Number(x.amt)||0}; });
+}
+// Full-month salary for a month — day-weighted when it changed mid-month
+function salaryForMonth(name, monthPrefix){
+  if(!getSalaryHistory(name).length) return Number(_legacySalary(name))||0;
+  const [y,m]=monthPrefix.split('-').map(Number);
+  const dim=new Date(y,m,0).getDate();
+  let sum=0;
+  for(let d=1; d<=dim; d++) sum+=salaryOnDate(name, _dayStr(monthPrefix,d));
+  return Math.round(sum/dim);
+}
+// ref: none = today's salary, 'YYYY-MM' = that month's (day-weighted) salary,
+// 'YYYY-MM-DD' = salary on that exact day.
+function getEmpSalary(name, ref){
+  if(ref && /^\d{4}-\d{2}-\d{2}$/.test(ref)) return salaryOnDate(name, ref);
+  if(ref && /^\d{4}-\d{2}$/.test(ref)) return salaryForMonth(name, ref);
+  return salaryOnDate(name, today());
 }
 async function setEmpSalary(name,val){
   await DB.setMerged('salaries', {[name]: parseInt(val)||0});
@@ -1499,8 +1544,8 @@ async function setPerfIncentive(name,val){
   await DB.setMerged('perf_incentive', {[name]: parseInt(val)||0});
 }
 // Base used by the brokerage incentive formula everywhere = Salary + Perf. Incentive.
-function getIncentiveSalary(name){
-  return (Number(getEmpSalary(name))||0) + (Number(getPerfIncentive(name))||0);
+function getIncentiveSalary(name, ref){
+  return (Number(getEmpSalary(name, ref))||0) + (Number(getPerfIncentive(name))||0);
 }
 // Performance Incentive PAYOUT — paid every month under "Other incentives" in the
 // incentive sheet, prorated by attendance with the same ÷26 logic as salary:
@@ -2919,7 +2964,7 @@ async function forceRefreshDashboard(btn){
   const orig = btn ? btn.textContent : '';
   if(btn){ btn.textContent='⏳ Refreshing…'; btn.disabled=true; }
   try{
-    const keys=['attendance','holidays','salaries','perf_incentive','advances'];
+    const keys=['attendance','holidays','salaries','perf_incentive','advances','salary_history'];
     await Promise.all(keys.map(async key=>{
       const doc = await fdb.collection('hr_data').doc(key).get({source:'server'});
       if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
@@ -3834,8 +3879,9 @@ async function removeHoliday(date){
 // Per-day rate = Salary / 30. Each Absent day deducts one per-day rate.
 // Holiday-status days are NOT counted as absent.
 function calcMonthlySalary(name, monthPrefix){
-  const sal=getEmpSalary(name);
+  const sal=monthPrefix ? getEmpSalary(name, monthPrefix) : getEmpSalary(name);
   const tenure=empTenureInMonth(name, monthPrefix);
+  const revisions=salaryRevisionsInMonth(name, monthPrefix);
   // Mid-month join/leave (25-Aug-2026): the "full month" salary baseline
   // shrinks to the fraction of the month actually worked. The per-day
   // absence-deduction rate (sal/26) stays the standard daily rate either
@@ -3858,13 +3904,26 @@ function calcMonthlySalary(name, monthPrefix){
   const absentDays=recs.filter(r=>r.status==='Absent').length;
   const halfDays=recs.filter(r=>r.status==='Half day').length;
   const perDay=sal/26;
-  const halfDeduction=(perDay/2)*halfDays; // Half day = aadhe din ka auto-deduction
-  const deduction=perDay*absentDays + halfDeduction;
+  // Each absent / half day is cut at the salary applicable ON THAT DAY
+  // (matters only when salary changed mid-month; otherwise identical to before).
+  const dayRate=r=>getEmpSalary(name, r.date)/26;
+  const halfDeduction=recs.filter(r=>r.status==='Half day').reduce((t,r)=>t+dayRate(r)/2,0); // Half day = aadhe din ka auto-deduction
+  const deduction=recs.filter(r=>r.status==='Absent').reduce((t,r)=>t+dayRate(r),0) + halfDeduction;
   const earnedWage=Math.max(0,proratedSal-deduction);
   const esi=calcESI(name, sal, earnedWage);
   const extra=monthPrefix?getExtraDeductionForMonth(name, monthPrefix):{amount:0, note:''};
   const net=Math.max(0, earnedWage-esi.employeeContribution-extra.amount);
-  return {salary:sal, proratedSalary:proratedSal, tenure, perDay, presentDays, absentDays, halfDays, deduction, halfDeduction, esi, extra, net};
+  return {salary:sal, proratedSalary:proratedSal, tenure, perDay, presentDays, absentDays, halfDays, deduction, halfDeduction, esi, extra, net, revisions};
+}
+
+function salaryRevisionRow(revs, cls){
+  if(!revs||!revs.length) return '';
+  return revs.map(v=>{
+    const d=new Date(v.from+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+    return cls==='slip'
+      ? `<tr><td>Salary revised from ${d} (${fmt(v.old)} → ${fmt(v.amt)}) — month salary is day-wise</td><td class="amt">—</td></tr>`
+      : `<tr><td colspan="2" style="padding:5px 0;font-size:11.5px;color:var(--blue,#1d4ed8)">📈 Salary revised from ${d}: ${fmt(v.old)} → ${fmt(v.amt)} (this month's basic is day-wise)</td></tr>`;
+  }).join('');
 }
 
 function viewSalMonth(){
@@ -4022,6 +4081,7 @@ function renderSalaryPage(){
       <p style="font-size:11px;color:var(--text3);margin-bottom:6px">${mLabel}</p>
       <table style="font-size:13px;width:100%">
         <tr><td style="color:var(--text2);padding:6px 0">Basic salary</td><td style="text-align:right">${fmt(r.salary)}</td></tr>
+        ${salaryRevisionRow(r.revisions)}
         ${r.tenure.proratedFraction<1?`<tr><td style="color:var(--text2);padding:6px 0">Prorated (${r.tenure.effectiveDays}/${r.tenure.daysInMonth} days this month)</td><td style="text-align:right;color:var(--amber,#b58a00)">${fmt(r.proratedSalary)}</td></tr>`:''}
         <tr><td style="color:var(--text2);padding:6px 0">Per-day rate (Salary÷26)</td><td style="text-align:right">${fmt(r.perDay)}</td></tr>
         <tr><td style="color:var(--text2);padding:6px 0">Present days</td><td style="text-align:right">${r.presentDays}</td></tr>
@@ -4061,7 +4121,7 @@ function renderSalaryPage(){
         T.net+=netAfterAdv; T.paid+=paid; T.bal+=balance;
         return `<tr>
           <td>${e.name}</td>
-          <td title="${r.tenure.proratedFraction<1?'Prorated: '+r.tenure.effectiveDays+'/'+r.tenure.daysInMonth+' days this month (joined/left mid-month)':''}">${fmt(r.tenure.proratedFraction<1?r.proratedSalary:r.salary)}${r.tenure.proratedFraction<1?`<br><small style="font-weight:400;color:var(--amber,#b58a00)">(prorated, full ${fmt(r.salary)})</small>`:''}</td>
+          <td title="${r.tenure.proratedFraction<1?'Prorated: '+r.tenure.effectiveDays+'/'+r.tenure.daysInMonth+' days this month (joined/left mid-month)':''}">${fmt(r.tenure.proratedFraction<1?r.proratedSalary:r.salary)}${r.tenure.proratedFraction<1?`<br><small style="font-weight:400;color:var(--amber,#b58a00)">(prorated, full ${fmt(r.salary)})</small>`:''}${r.revisions&&r.revisions.length?`<br><small style="font-weight:400;color:var(--blue,#1d4ed8)">📈 revised ${r.revisions.map(v=>fmt(v.old)+'→'+fmt(v.amt)).join(', ')}</small>`:''}</td>
           <td>${r.absentDays}</td>
           <td style="color:var(--red)">− ${fmt(r.deduction)}</td>
           <td style="color:${advDeducted>0?'var(--red)':'var(--text3)'}">${advDeducted>0?'− '+fmt(advDeducted):'—'}</td>
@@ -4174,7 +4234,8 @@ function calcSalary(){
   const sel=document.getElementById('sal-emp');
   if(!sel) return;
   const name=sel.value||'Puja';
-  const b=getEmpSalary(name);
+  const _salMon=(document.getElementById('sal-month')||{}).value||'';
+  const b=_salMon?getEmpSalary(name,_salMon):getEmpSalary(name);
 
   // If a month is selected, auto-suggest absent days from that month's attendance
   // (admin can still override the number manually).
@@ -4204,6 +4265,7 @@ function calcSalary(){
   if(el) el.innerHTML=`
     <table style="font-size:13px;width:100%;border-collapse:collapse">
       <tr><td style="color:var(--text2);padding:5px 0">Basic</td><td style="text-align:right">${fmt(b)}</td></tr>
+      ${salaryRevisionRow(salaryRevisionsInMonth(name, month))}
       ${tenure.proratedFraction<1?`<tr><td style="color:var(--text2);padding:5px 0">Prorated (${tenure.effectiveDays}/${tenure.daysInMonth} days this month)</td><td style="text-align:right;color:var(--amber,#b58a00)">${fmt(proratedB)}</td></tr>`:''}
       <tr><td style="color:var(--text2);padding:5px 0">Per day (Salary÷26)</td><td style="text-align:right">${fmt(perday)}</td></tr>
       <tr><td style="color:var(--text2);padding:5px 0">Absent days</td><td style="text-align:right">${absentDays}</td></tr>
@@ -4226,7 +4288,7 @@ function downloadSalarySlip(){
   const month=monthEl&&monthEl.value?monthEl.value:today().slice(0,7);
   const monthLabel=attMonthLabel(month);
 
-  const b=getEmpSalary(name);
+  const b=getEmpSalary(name, month);
   const tenure=empTenureInMonth(name, month);
   const proratedB=Math.round(b*tenure.proratedFraction);
   const absentEl=document.getElementById('sal-absent');
@@ -4253,6 +4315,7 @@ function downloadSalarySlip(){
 
   const rowsHtml=`
     <tr><td>Basic Salary</td><td class="amt">${fmt(b)}</td></tr>
+    ${salaryRevisionRow(salaryRevisionsInMonth(name, month),'slip')}
     ${tenure.proratedFraction<1?`<tr><td>Prorated (${tenure.effectiveDays}/${tenure.daysInMonth} days this month)</td><td class="amt">${fmt(proratedB)}</td></tr>`:''}
     <tr><td>Per-day rate (Salary ÷ 26)</td><td class="amt">${fmt(perday)}</td></tr>
     <tr><td>Present days</td><td class="amt">${presentDays} / ${numDays}</td></tr>
@@ -4559,7 +4622,7 @@ function totalIncentive(name, salary, month){
   const broClientTotal = mfsip.broClientTotal||0;
   const broClientRows  = mfsip.broClientRows||[];
 
-  const br=brokerageIncentive(getIncentiveSalary(name),brok, checkTier2Eligible(demat,sip,mf));
+  const br=brokerageIncentive(getIncentiveSalary(name, month),brok, checkTier2Eligible(demat,sip,mf));
   const dematInc = demat*getDematRate();
   const mfInc = mf*(rates.mfRate||0)/100;
   const netSales = Number(mfsip.netSales)||0;
@@ -4623,7 +4686,7 @@ function renderIncentivePage(){
   if(fbrcEl) fbrcEl.textContent = '≥'+(rates.broClientMin||50)+' clients (≥₹'+(rates.broClientThreshold||100)+') → ₹'+(rates.broClientBonus||700)+' flat';
 
   // My incentive card — salary always pulled from central getEmpSalary (set on Employees page)
-  const mySalary=getEmpSalary(currentUser);
+  const mySalary=getEmpSalary(currentUser, selMonth);
   const myPerf=getPerfIncentive(currentUser);
   const t=totalIncentive(currentUser,mySalary,selMonth);
   const myPay=getPaymentsForMonth(selMonth)[currentUser]||{};
@@ -4668,7 +4731,7 @@ function renderIncentivePage(){
       const payments=getPaymentsForMonth(selMonth);
       const T={incSal:0, brok:0, tier1:0, tier2:0, demat:0, mf:0, sip:0, broCl:0, other:0, total:0, paid:0, balance:0};
       const rows=EMPLOYEES.map(e=>{
-        const sal=getEmpSalary(e.name);
+        const sal=getEmpSalary(e.name, selMonth);
         const perf=getPerfIncentive(e.name);
         const tt=totalIncentive(e.name,sal,selMonth);
         const paid=(payments[e.name]&&payments[e.name].incPaid)||0;
@@ -4853,7 +4916,7 @@ function downloadTeamIncentiveReport(){
 
   const T={incSal:0,brok:0,t1:0,t2:0,demat:0,dInc:0,mf:0,mfInc:0,ns:0,nsInc:0,sip:0,sipInc:0,broCl:0,perf:0,other:0,lateDed:0,total:0,paid:0,bal:0};
   const rows=EMPLOYEES.map(e=>{
-    const sal=getEmpSalary(e.name), perf=getPerfIncentive(e.name);
+    const sal=getEmpSalary(e.name, month), perf=getPerfIncentive(e.name);
     const tt=totalIncentive(e.name,sal,month);
     const paid=(payments[e.name]&&payments[e.name].incPaid)||0;
     const bal=Math.max(0, tt.total-paid);
@@ -4900,7 +4963,7 @@ function downloadTeamIncentiveReport(){
 }
 
 function getMonthIncentiveInfo(name, month){
-  const sal=getEmpSalary(name);
+  const sal=getEmpSalary(name, month);
   const tt=totalIncentive(name,sal,month);
   const pay=getPaymentsForMonth(month)[name]||{};
   const paid=pay.incPaid||0;
@@ -6196,7 +6259,7 @@ function loadIncEmp(){
   if(!sel) return;
   const name=sel.value;
   const month=currentIncMonth();
-  const sal=getEmpSalary(name);
+  const sal=getEmpSalary(name, month);
   const perf=getPerfIncentive(name);
   const monthData=getMfSipForMonth(month);
   const mfsip=monthData[name]||{};
@@ -6239,7 +6302,7 @@ function calcIncentive(){
   const sel=document.getElementById('inc-emp');
   if(!sel) return;
   const name=sel.value;
-  const salary=getIncentiveSalary(name);
+  const salary=getIncentiveSalary(name, currentIncMonth());
   const brok=parseInt(document.getElementById('inc-brok').value)||0;
   const demat=parseInt(document.getElementById('inc-demat').value)||0;
   const mf=parseInt(document.getElementById('inc-mf').value)||0;
@@ -6340,6 +6403,11 @@ function renderEmployees(){
           <input type="number" value="${sal}" id="emp-sal-${e.name}" style="width:58px;padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-size:12px">
           <button class="btn btn-sm btn-primary" onclick="saveEmpSalary('${e.name}')" style="padding:4px 7px;font-size:11px">Set</button>
         </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:4px" title="Salary kis tarikh se lagu hogi — mahine ke beech ki tarikh bhi chalegi">
+          <span style="font-size:10.5px;color:var(--text3)">from</span>
+          <input type="date" id="emp-sal-from-${e.name}" value="${today().slice(0,7)}-01" style="padding:3px 4px;border:1px solid var(--border);border-radius:6px;font-size:11px">
+        </div>
+        ${salaryHistoryBadge(e.name)}
       </td>
       <td>
         <div style="display:flex;align-items:center;gap:4px">
@@ -6427,12 +6495,89 @@ async function toggleHrAccess(checked){
 }
 
 async function saveEmpSalary(name){
-  const val=document.getElementById('emp-sal-'+name).value;
-  await setEmpSalary(name,val);
+  const val=parseInt(document.getElementById('emp-sal-'+name).value)||0;
+  const fromEl=document.getElementById('emp-sal-from-'+name);
+  const from=fromEl?fromEl.value:'';
+  if(!from){
+    if(!confirm('No "from" date is selected.\n\n'+name+'\'s salary will be set to '+fmt(val)+' for ALL months (past months too) and the salary history will be cleared.\n\nProceed?')) return;
+    await DB.setMerged('salary_history', {[name]: [{from:'2000-01-01', amt:val, at:new Date().toISOString()}]});
+    await setEmpSalary(name,val);
+  } else {
+    let h=getSalaryHistory(name);
+    // First dated change → keep today's salary as the base for all earlier dates
+    if(!h.length) h=[{from:'2000-01-01', amt:Number(_legacySalary(name))||0, at:new Date().toISOString()}];
+    const prevD=new Date(from+'T00:00:00'); prevD.setDate(prevD.getDate()-1);
+    const prevStr=prevD.getFullYear()+'-'+String(prevD.getMonth()+1).padStart(2,'0')+'-'+String(prevD.getDate()).padStart(2,'0');
+    let old=h[0].amt; h.forEach(x=>{ if(x.from<=prevStr) old=x.amt; });
+    const later=h.filter(x=>x.from>from);
+    if(later.length && !confirm('Note: '+name+' already has a later salary change ('+later.map(x=>fmtSalDate(x.from)+' → '+fmt(x.amt)).join(', ')+').\nThat will stay as it is.\n\nContinue?')) return;
+    h=h.filter(x=>x.from!==from);
+    h.push({from, amt:val, at:new Date().toISOString()});
+    h.sort((a,b)=>a.from.localeCompare(b.from));
+    await DB.setMerged('salary_history', {[name]: h});
+    // keep the old single-value store in sync with TODAY's salary
+    await setEmpSalary(name, salaryOnDate(name, today()));
+    const mid=from.slice(8)!=='01';
+    alert(name+'\'s salary: '+fmt(old)+' → '+fmt(val)+' from '+fmtSalDate(from)+'.\n\n'+
+      'Months before this keep the old salary.'+
+      (mid?'\n'+attMonthLabel(from.slice(0,7))+' salary will be calculated day-wise ('+fmt(old)+' before '+fmtSalDate(from)+', '+fmt(val)+' from '+fmtSalDate(from)+').':''));
+  }
   renderEmployees();
   renderSalaryPage();
   renderIncentivePage();
-  alert(name+'\'s salary has been set to: '+fmt(parseInt(val)||0)+'\n\nThis will update instantly on the RM\'s device.');
+}
+function fmtSalDate(d){
+  if(d==='2000-01-01') return 'Start (base)';
+  return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+function salaryHistoryBadge(name){
+  const h=getSalaryHistory(name);
+  if(h.length<2) return '';
+  const t=today();
+  const up=h.find(x=>x.from>t);
+  return `<div style="margin-top:3px;font-size:10.5px">
+    <a href="#" onclick="showSalaryHistory('${name.replace(/'/g,"\\'")}');return false" style="color:var(--blue,#1d4ed8)">📈 History (${h.length-1})</a>
+    ${up?`<span style="color:var(--amber,#b58a00);margin-left:4px">next ${fmt(up.amt)} from ${fmtSalDate(up.from)}</span>`:''}
+  </div>`;
+}
+function showSalaryHistory(name){
+  const h=getSalaryHistory(name);
+  const old=document.getElementById('sal-hist-ov'); if(old) old.remove();
+  const ov=document.createElement('div');
+  ov.id='sal-hist-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const rows=h.slice().reverse().map((x,i,arr)=>{
+    const prev=arr[i+1];
+    const diff=prev?Number(x.amt)-Number(prev.amt):0;
+    return `<tr>
+      <td style="padding:8px 10px;border-top:1px solid #eee">${fmtSalDate(x.from)}</td>
+      <td style="padding:8px 10px;border-top:1px solid #eee;text-align:right;font-weight:700">${fmt(x.amt)}</td>
+      <td style="padding:8px 10px;border-top:1px solid #eee;text-align:right;color:${diff>=0?'#15803d':'#dc2626'}">${prev?(diff>=0?'+':'−')+fmt(Math.abs(diff)):''}</td>
+      <td style="padding:8px 10px;border-top:1px solid #eee;text-align:center">${(isAdmin&&x.from!=='2000-01-01')?`<button class="btn btn-sm" style="padding:2px 8px;font-size:11px;color:#dc2626" onclick="deleteSalaryEntry('${name.replace(/'/g,"\\'")}','${x.from}')">Delete</button>`:''}</td>
+    </tr>`;}).join('');
+  ov.innerHTML=`<div style="background:#fff;border-radius:14px;width:min(520px,96vw);max-height:85vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">
+    <div style="padding:14px 18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+      <b>📈 Salary History — ${name}</b>
+      <button onclick="document.getElementById('sal-hist-ov').remove()" style="border:none;background:#f1f5f9;border-radius:8px;width:28px;height:28px;cursor:pointer">✕</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="background:#f8fafc;font-size:11px;color:#64748b"><td style="padding:8px 10px">EFFECTIVE FROM</td><td style="padding:8px 10px;text-align:right">SALARY</td><td style="padding:8px 10px;text-align:right">CHANGE</td><td></td></tr>
+      ${rows}
+    </table>
+    <p style="padding:10px 18px;font-size:11.5px;color:#64748b;margin:0">Salary for a month with a mid-month change is calculated day-wise. "Start (base)" = the salary before any change.</p>
+  </div>`;
+  ov.addEventListener('click',ev=>{ if(ev.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+async function deleteSalaryEntry(name, from){
+  if(!isAdmin) return;
+  if(!confirm('Delete the salary change from '+fmtSalDate(from)+'? Salary for those dates will go back to the previous amount.')) return;
+  const h=getSalaryHistory(name).filter(x=>x.from!==from);
+  await DB.setMerged('salary_history', {[name]: h});
+  await setEmpSalary(name, salaryOnDate(name, today()));
+  const ov=document.getElementById('sal-hist-ov'); if(ov) ov.remove();
+  renderEmployees(); renderSalaryPage(); renderIncentivePage();
+  showSalaryHistory(name);
 }
 
 async function saveEmpPerfInc(name){
