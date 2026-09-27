@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-07-28-v3';
+  const APP_VERSION = '2026-09-27-v1';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -2047,6 +2047,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
         <div class="form-row" style="margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div class="form-field" style="min-width:190px">
+            <label>Month (History)</label>
+            <select id="al-month" onchange="alMonthChange()">
+              <option value="">🕐 Recent (latest)</option>
+            </select>
+          </div>
           <div class="form-field" style="min-width:160px">
             <label>Segment</label>
             <select id="al-seg" onchange="renderActivityLog()">
@@ -2095,6 +2101,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <button class="btn btn-outline" id="al-view-toggle" onclick="toggleAlView()" title="View Toggle">☰ Detailed</button>
           </div>
         </div>
+        <div id="al-month-note" style="font-size:.8rem;color:var(--teal);font-weight:600;margin-bottom:4px"></div>
         <div id="al-count" style="font-size:.8rem;color:var(--gray);margin-bottom:8px"></div>
         <div class="tbl-wrap">
           <div class="tbl-scroll">

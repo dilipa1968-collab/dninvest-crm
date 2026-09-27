@@ -202,6 +202,10 @@ const DB = {
     return v;
   },
   get(key){
+    // Monthly log archive view (27-Sep-2026): when a past month is picked on
+    // the Activity Log page, every reader of DB.get('activity_logs') (table,
+    // filters, Excel export) transparently sees that month's archived data.
+    if(this._logView && this._logView[key]) return this._logView[key];
     // In-memory cache — avoid JSON.parse on every call for large datasets.
     // A write (set/setClient/setClientsBulk) must clear the cache for that key.
     if(this._mem && this._mem[key] !== undefined) return this._mem[key];
@@ -372,9 +376,12 @@ const DB = {
     try{ local=JSON.parse(localStorage.getItem('dninvest_activity_logs')||'[]'); }catch(e){ local=[]; }
     const lById={}; local.forEach(x=>{ if(x&&x.id) lById[x.id]=x; });
     entries.forEach(e=>{ if(e&&e.id) lById[e.id]=e; });
-    try{ localStorage.setItem('dninvest_activity_logs', JSON.stringify(capSort(Object.values(lById)))); }catch(e){}
+    { const _opt=capSort(Object.values(lById)); if(!this._mem) this._mem={}; this._mem['activity_logs']=_opt;
+      try{ localStorage.setItem('dninvest_activity_logs', JSON.stringify(_opt)); }catch(e){} }
     // 2) transactional merge-write
     if(typeof fdb==='undefined') return;
+    // Permanent month-wise archive (fire-and-forget; daily catch-up covers any miss)
+    this.archiveLogs('activity_logs', entries).catch(e=>console.log('archive activity err',e));
     this._alWriting++;
     try{
       const docRef = fdb.collection('crm_data').doc('activity_logs');
@@ -388,7 +395,7 @@ const DB = {
         finalData = capSort(Object.values(byId));
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
-      if(finalData){ try{ localStorage.setItem('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
+      if(finalData){ if(!this._mem) this._mem={}; this._mem['activity_logs']=finalData; try{ localStorage.setItem('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
       console.log('Activity log sync error:',e);
     }finally{
@@ -592,6 +599,142 @@ const DB = {
       return local;
     }
   },
+  // ════════════════════════════════════════════════════════════════
+  // MONTH-WISE PERMANENT LOG ARCHIVE (27-Sep-2026)
+  // The live 'activity_logs' (latest 2000) and 'call_logs' (~850 KB) docs
+  // drop their oldest entries once full — only ~1-2 weeks of history fit.
+  // Every entry is now ALSO copied into a per-month archive that is never
+  // pruned:
+  //     crm_data/logarch_<key>_<YYYY-MM>_p1, _p2 ...   (≤ ~800 KB each)
+  //     crm_data/logarch_<key>_index                  ({months:{'2026-09':{parts,count}}})
+  // A busy month simply spills into p2, p3 … so the 1 MiB Firestore
+  // per-document limit can never be hit. Same 'crm_data' collection, so
+  // existing security rules already cover it. The live docs are untouched —
+  // everything that reads recent logs works exactly as before.
+  // ════════════════════════════════════════════════════════════════
+  _ARCH_PART_BYTES: 800000,
+  _archCache: {},
+  _archIdxRef(key){ return fdb.collection('crm_data').doc('logarch_'+key+'_index'); },
+  _archPartRef(key,month,p){ return fdb.collection('crm_data').doc('logarch_'+key+'_'+month+'_p'+p); },
+  _bytes(v){ try{ return new TextEncoder().encode(JSON.stringify(v)).length; }catch(e){ return JSON.stringify(v).length*2; } },
+  // Which month an entry belongs to. Call logs use the call date the RM
+  // picked; activity logs use their timestamp in local (IST) time.
+  _logMonth(key, e){
+    if(key==='call_logs' && /^\d{4}-\d{2}/.test(String(e.date||''))) return String(e.date).slice(0,7);
+    const d = new Date(e.ts || e.date || Date.now());
+    if(isNaN(d)) return today().slice(0,7);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  },
+  // Slim an entry before archiving (call logs store the note twice).
+  _archSlim(key, e){
+    if(key==='call_logs' && e && e.remarks!==undefined && e.remarks===e.note){ const c={...e}; delete c.remarks; return c; }
+    return e;
+  },
+  async archiveLogs(key, entries){
+    if(typeof fdb==='undefined') return;
+    const byMonth = {};
+    (entries||[]).forEach(e=>{ if(!e||!e.id) return; const m=this._logMonth(key,e); (byMonth[m]=byMonth[m]||[]).push(this._archSlim(key,e)); });
+    for(const m of Object.keys(byMonth).sort()){ await this._archiveMonth(key, m, byMonth[m]); }
+  },
+  async _archiveMonth(key, month, entries){
+    const idxRef = this._archIdxRef(key);
+    const LIMIT = this._ARCH_PART_BYTES;
+    let added = 0;
+    await fdb.runTransaction(async (tx)=>{
+      added = 0;
+      const idxDoc = await tx.get(idxRef);
+      const idx = (idxDoc.exists && idxDoc.data() && idxDoc.data().data) ? idxDoc.data().data : {};
+      const months = {...(idx.months||{})};
+      const info = months[month] || {parts:0, count:0};
+      const parts = info.parts||0;
+      // ALL reads first (Firestore rule) — every part of this month, so an
+      // entry already archived in ANY part is never written twice.
+      const partData = [];
+      for(let p=1;p<=parts;p++){
+        const d = await tx.get(this._archPartRef(key,month,p));
+        partData.push((d.exists && d.data() && Array.isArray(d.data().data)) ? d.data().data : []);
+      }
+      const have = new Set();
+      partData.forEach(a=>a.forEach(x=>{ if(x&&x.id) have.add(x.id); }));
+      const fresh = [];
+      entries.forEach(e=>{ if(!have.has(e.id)){ have.add(e.id); fresh.push(e); } });
+      if(!fresh.length) return;               // nothing new — no write at all
+      let cur = parts || 1;
+      let arr = parts ? partData[parts-1].slice() : [];
+      let size = this._bytes(arr);
+      const writes = {};
+      fresh.forEach(e=>{
+        const s = this._bytes(e)+1;
+        if(arr.length && size+s > LIMIT){ writes[cur]=arr; cur++; arr=[]; size=2; }
+        arr.push(e); size+=s;
+      });
+      writes[cur] = arr;
+      const now = new Date().toISOString();
+      Object.keys(writes).forEach(p=>{
+        tx.set(this._archPartRef(key,month,p), {data:DB._clean(writes[p]), month, part:+p, count:writes[p].length, updated:now});
+      });
+      months[month] = {parts:cur, count:(info.count||0)+fresh.length};
+      tx.set(idxRef, {data:{...idx, months}, updated:now});
+      added = fresh.length;
+    });
+    delete this._archCache[key+'|'+month];
+    delete this._archCache[key+'|__idx'];
+    return added;
+  },
+  // Months that have archived data, newest first: [{month, parts, count}]
+  async listLogMonths(key){
+    if(typeof fdb==='undefined') return [];
+    const ck = key+'|__idx';
+    const c = this._archCache[ck];
+    if(c && Date.now()-c.at < 5*60000) return c.data;
+    const d = await this._archIdxRef(key).get();
+    const months = (d.exists && d.data() && d.data().data && d.data().data.months) ? d.data().data.months : {};
+    const list = Object.keys(months).sort().reverse().map(m=>({month:m, parts:months[m].parts||1, count:months[m].count||0}));
+    this._archCache[ck] = {at:Date.now(), data:list};
+    return list;
+  },
+  // Every archived entry for one month (all parts merged, newest first)
+  async fetchLogMonth(key, month){
+    if(typeof fdb==='undefined') return [];
+    const ck = key+'|'+month;
+    const c = this._archCache[ck];
+    const isCurrent = month===today().slice(0,7);
+    if(c && (!isCurrent || Date.now()-c.at < 2*60000)) return c.data;
+    const list = await this.listLogMonths(key);
+    const info = list.find(x=>x.month===month);
+    if(!info) return [];
+    const snaps = await Promise.all(Array.from({length:info.parts},(_,i)=>this._archPartRef(key,month,i+1).get()));
+    const byId = {};
+    snaps.forEach(s=>{ if(s.exists && s.data() && Array.isArray(s.data().data)) s.data().data.forEach(x=>{ if(x&&x.id){ if(key==='call_logs' && x.remarks===undefined) x.remarks=x.note; byId[x.id]=x; } }); });
+    const data = Object.values(byId).sort((a,b)=>String(b.ts||b.date||'').localeCompare(String(a.ts||a.date||'')));
+    this._archCache[ck] = {at:Date.now(), data};
+    return data;
+  },
+  // Every archived entry across ALL months (used for a client's full call history)
+  async fetchAllLogMonths(key){
+    const list = await this.listLogMonths(key);
+    const all = await Promise.all(list.map(x=>this.fetchLogMonth(key, x.month)));
+    return [].concat(...all);
+  },
+  // Safety net — once a day per device, copy whatever is in the live docs
+  // into the archive. Idempotent (already-archived ids are skipped, and a
+  // month with nothing new is not written at all). This (a) seeds the
+  // archive with all existing history the first time it runs, and (b)
+  // recovers any archive write that failed (network blip, tab closed).
+  async archiveCatchUp(force){
+    if(typeof fdb==='undefined') return;
+    const flag = 'dninvest_logarch_catchup';
+    if(!force && localStorage.getItem(flag)===today()) return;
+    try{
+      for(const key of ['activity_logs','call_logs']){
+        const doc = await fdb.collection('crm_data').doc(key).get();
+        const live = (doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
+        if(live.length) await this.archiveLogs(key, live);
+      }
+      localStorage.setItem(flag, today());
+      console.log('Log archive catch-up done');
+    }catch(e){ console.log('Log archive catch-up failed (will retry next load):', e); }
+  },
   // Keep the shared call_logs document safely under Firestore's 1 MiB limit.
   // Newest entries are kept; oldest are dropped once the JSON size crosses the cap.
   _pruneCallLogs(arr, maxBytes){
@@ -605,74 +748,17 @@ const DB = {
     }
     return kept;
   },
-  // ── Call-log ARCHIVE (older logs trimmed from the live call_logs doc) ──
-  // One doc per client: crm_data/cl_arch__<client_id>  → {data:[...logs]}
-  _clArchRef(cid){
-    return fdb.collection('crm_data').doc('cl_arch__'+String(cid||'none').replace(/[\/\s]/g,'_'));
-  },
-  _groupLogsByClient(arr){
-    const g={};
-    (arr||[]).forEach(x=>{ if(!x) return; const k=x.client_id||'none'; (g[k]=g[k]||[]).push(x); });
-    return g;
-  },
-  // Append logs to their client archive docs (idempotent — arrayUnion).
-  async archiveCallLogs(entries){
-    if(typeof fdb==='undefined' || !entries || !entries.length) return false;
-    const groups=this._groupLogsByClient(entries);
-    const cids=Object.keys(groups);
-    const FV=firebase.firestore.FieldValue;
-    for(let i=0;i<cids.length;i+=400){
-      const batch=fdb.batch();
-      cids.slice(i,i+400).forEach(cid=>{
-        batch.set(this._clArchRef(cid), {data:FV.arrayUnion(...this._clean(groups[cid])), updated:new Date().toISOString()}, {merge:true});
-      });
-      await batch.commit();
-    }
-    return true;
-  },
-  // Read one client's archived logs (cached for this session).
-  _clArchCache:{},
-  async fetchArchivedCallLogs(cid){
-    if(!cid || typeof fdb==='undefined') return [];
-    if(this._clArchCache[cid]) return this._clArchCache[cid];
-    try{
-      const doc=await this._clArchRef(cid).get();
-      const arr=(doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data : [];
-      this._clArchCache[cid]=arr;
-      return arr;
-    }catch(e){ console.log('Archive read error:',e); return []; }
-  },
-  // Recovery: is browser ke localStorage mein jo purane logs server se trim ho
-  // chuke hain (aur kahin save nahi hain), unhe archive mein push karo.
-  async recoverTrimmedCallLogs(serverArr, localArr){
-    try{
-      if(!Array.isArray(serverArr) || !serverArr.length || !Array.isArray(localArr)) return;
-      const key=x=>String((x&&(x.ts||x.date))||'');
-      const serverIds=new Set(serverArr.map(x=>x&&x.id));
-      let minKey=null;
-      serverArr.forEach(x=>{ const k=key(x); if(k && (minKey===null || k<minKey)) minKey=k; });
-      if(minKey===null) return;
-      const orphans=localArr.filter(x=>x && x.id && !serverIds.has(x.id) && key(x) && key(x)<minKey);
-      if(!orphans.length) return;
-      const ids=orphans.map(x=>x.id).sort();
-      const sig=ids.length+'|'+ids[0]+'|'+ids[ids.length-1];
-      try{ if(localStorage.getItem('dninvest_cl_recovered_sig')===sig) return; }catch(_){}
-      const ok=await this.archiveCallLogs(orphans);
-      if(ok){
-        try{ localStorage.setItem('dninvest_cl_recovered_sig', sig); }catch(_){}
-        console.log('♻️ Recovered',orphans.length,'old call logs into archive');
-        this._clArchCache={};
-      }
-    }catch(e){ console.log('Call log recovery error:',e); }
-  },
   async addCallLog(entry){
     // 1) optimistic local append
     let local=[];
     try{ local=JSON.parse(localStorage.getItem('dninvest_call_logs')||'[]'); }catch(e){ local=[]; }
     if(!local.some(x=>x.id===entry.id)) local.push(entry);
+    if(!this._mem) this._mem={}; this._mem['call_logs']=local;
     try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(local)); }catch(e){}
     // 2) transactional merge-write to Firestore (no clobber, retries on conflict)
     if(typeof fdb==='undefined') return;
+    // Permanent month-wise archive (fire-and-forget; daily catch-up covers any miss)
+    this.archiveLogs('call_logs', [entry]).catch(e=>console.log('archive call err',e));
     this._clWriting++;
     try{
       const docRef = fdb.collection('crm_data').doc('call_logs');
@@ -683,33 +769,15 @@ const DB = {
         const byId={};
         latest.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
         if(entry&&entry.id) byId[entry.id]=entry;   // add/replace this entry
-        const all = Object.values(byId);
-        // Trim oldest logs so the document stays under Firestore's 1 MiB cap.
-        // FIX (24-Sep-2026): pehle trimmed logs hamesha ke liye DELETE ho jaate the
-        // (isliye purana calling log gayab ho raha tha). Ab trimmed logs per-client
-        // archive doc (crm_data/cl_arch__<client_id>) mein SAME transaction mein
-        // move hote hain — kuch bhi delete nahi hota.
-        finalData = DB._pruneCallLogs(all, 850000);
-        const keptIds = new Set(finalData.map(x=>x&&x.id));
-        const dropped = all.filter(x=>x && !keptIds.has(x.id));
-        if(dropped.length){
-          const groups = DB._groupLogsByClient(dropped);
-          const cids = Object.keys(groups);
-          const FV = firebase.firestore.FieldValue;
-          cids.forEach((cid,i)=>{
-            if(i<400){
-              tx.set(DB._clArchRef(cid), {data:FV.arrayUnion(...DB._clean(groups[cid])), updated:new Date().toISOString()}, {merge:true});
-            } else {
-              finalData.push(...groups[cid]);   // too many for one tx — keep live, archived on a later write
-            }
-          });
-        }
+        finalData = Object.values(byId);
+        // Trim oldest logs so the document stays under Firestore's 1 MiB cap
+        finalData = DB._pruneCallLogs(finalData, 850000);
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
       if(finalData){
+        if(!this._mem) this._mem={}; this._mem['call_logs']=finalData;
         try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
       }
-      this._clArchCache={};   // archive may have grown
       console.log('Call log transaction-synced');
     }catch(e){
       console.log('Call log sync error:',e);
@@ -1143,8 +1211,6 @@ const DB = {
               const byId={};
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-              // Is browser mein bache purane (server se trim hue) logs ko archive mein bachao
-              DB.recoverTrimmedCallLogs(d, existing);
               localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
               console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
             } else if(key==='activity_logs'){
@@ -2165,6 +2231,7 @@ DB.syncFromFirebase().then(()=>{
       checkFollowupAlert();
       syncAdminSeenFromRemote().then(()=>{ updateMsgBadge(); checkRmReply(); });
       refreshHolidaySet().then(runAutoSchedule); // Load holidays, then run auto-schedule on load
+      setTimeout(()=>DB.archiveCatchUp(), 8000); // month-wise log archive safety net (once/day/device)
       cleanExpiredTempAccess(); // Clean expired temp access
       loadCallLimits(); // admin-configured call date locks
 
@@ -2856,6 +2923,13 @@ function getCurrentPageId(){
   return el ? el.id.replace('page-','') : '';
 }
 function showPage(id){
+  // Leaving the Activity Log page drops any past-month view, so every other
+  // page keeps seeing the live (recent) activity log.
+  if(id!=='activity-log' && DB._logView && DB._logView.activity_logs){
+    delete DB._logView.activity_logs;
+    const ms=document.getElementById('al-month'); if(ms) ms.value='';
+    const mn=document.getElementById('al-month-note'); if(mn) mn.textContent='';
+  }
   if(typeof BULK!=='undefined' && BULK.clearAll) BULK.clearAll();
   if(typeof MFTBULK!=='undefined' && MFTBULK.clearSel) MFTBULK.clearSel();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -2880,7 +2954,7 @@ function showPage(id){
   else if(id==='mf-prospects'){ mfpPage=1; renderMfProspects(); }
   else if(id==='eq-demat'){ renderEqDematPage(); }
   else if(id==='reports') renderReports();
-  else if(id==='activity-log') renderActivityLog();
+  else if(id==='activity-log'){ alPopulateMonths(); renderActivityLog(); }
   else if(id==='duplicates') DUP.scan();
   else if(id==='admin'){ renderAdmin(); populateCallLimitInputs(); }
   else if(id==='announcements'){ renderAnnouncementAdmin(); renderInbox(); populateOfferTarget(); renderOffersAdmin(); renderCommHistory(); const of=document.getElementById('offer-from'); if(of && !of.value) of.value=today(); }
@@ -7243,39 +7317,19 @@ function viewClient(id,seg){
     </div>`;
   }
 
-  body+=`<div id="vcCallLogBox">${renderClientCallLogs(logs, false)}</div>`;
+  body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
+  if(logs.length){
+    body+=logs.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
+      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — ${l.seg==='equity'?'Equity':'MF'}</div>
+      <div class="call-note">${l.note||'—'}</div>
+      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status}</span>
+        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
+      </div></div>`).join('');
+  } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
+  body+=`<div id="oldCallsBox" style="margin-top:10px"><button class="btn btn-outline" style="padding:5px 14px" onclick="loadOlderCalls('${id}','${seg}')">📂 View older calls (all months)</button></div>`;
 
   document.getElementById('viewModalBody').innerHTML=body;
   document.getElementById('viewModal').classList.add('open');
-
-  // Purane (archived) logs Firebase se laa kar merge karo
-  window._vcCallLogFor=id;
-  DB.fetchArchivedCallLogs(id).then(arch=>{
-    if(window._vcCallLogFor!==id) return;
-    const box=document.getElementById('vcCallLogBox'); if(!box) return;
-    box.innerHTML=renderClientCallLogs(mergeCallLogs(logs, arch), true);
-  });
-}
-
-function mergeCallLogs(live, arch){
-  const byId={};
-  (arch||[]).forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-  (live||[]).forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-  return Object.values(byId).sort((a,b)=>
-    String((b.date||'')+(b.ts||'')).localeCompare(String((a.date||'')+(a.ts||''))));
-}
-
-function renderClientCallLogs(logs, archDone){
-  let h=`<div class="form-section">📋 Calling Log (${logs.length})${archDone?'':' <small style="font-weight:400;color:var(--gray)">· purane logs load ho rahe hain…</small>'}</div>`;
-  if(logs.length){
-    h+=logs.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
-      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — ${l.seg==='equity'?'Equity':(l.seg==='lead'?'Lead':'MF')}${l.by?' · by '+l.by:''}</div>
-      <div class="call-note">${l.note||l.remarks||'—'}</div>
-      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
-        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
-      </div></div>`).join('');
-  } else h+=`<p style="color:var(--gray);font-size:.82rem">${archDone?'No call logs yet.':'Loading…'}</p>`;
-  return h;
 }
 
 function di(label,val){
@@ -7365,14 +7419,17 @@ function viewLeadCalls(id){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
       ${di('RM',c.rm)}${di('Last Call',fmtDate(c.last_call))}${di('Next Call',fmtDate(c.next_call))}
     </div>`;
-  body+=`<div id="vcCallLogBox">${renderClientCallLogs(logs, false)}</div>`;
+  body+=`<div class="form-section">📋 Calling Log (${logs.length})</div>`;
+  if(logs.length){
+    body+=logs.map(l=>`<div class="call-log-item mf">
+      <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — by ${l.by||l.rm||'—'}</div>
+      <div class="call-note">${l.note||'—'}</div>
+      <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
+        ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}
+      </div></div>`).join('');
+  } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
+  body+=`<div id="oldCallsBox" style="margin-top:10px"><button class="btn btn-outline" style="padding:5px 14px" onclick="loadOlderCalls('${id}','lead')">📂 View older calls (all months)</button></div>`;
   document.getElementById('viewModalBody').innerHTML=body;
-  window._vcCallLogFor=id;
-  DB.fetchArchivedCallLogs(id).then(arch=>{
-    if(window._vcCallLogFor!==id) return;
-    const box=document.getElementById('vcCallLogBox'); if(!box) return;
-    box.innerHTML=renderClientCallLogs(mergeCallLogs(logs, (arch||[]).filter(l=>l.seg==='lead')), true);
-  });
   document.getElementById('viewModal').classList.add('open');
 }
 
@@ -15701,3 +15758,75 @@ window.checkFollowups = function(){
   });
 })();
 
+
+
+// ══════════════════════════════════════════
+// MONTH-WISE LOG ARCHIVE — UI (27-Sep-2026)
+// ══════════════════════════════════════════
+const _MN_FULL=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+function _monthLabel(m){ const [y,mo]=String(m).split('-'); return (_MN_FULL[+mo]||mo)+' '+y; }
+
+// Fill the Activity Log "Month" dropdown from the archive index
+async function alPopulateMonths(){
+  const sel=document.getElementById('al-month'); if(!sel) return;
+  const cur=sel.value;
+  try{
+    const list=await DB.listLogMonths('activity_logs');
+    sel.innerHTML='<option value="">🕐 Recent (latest)</option>'+
+      list.map(x=>`<option value="${x.month}">📅 ${_monthLabel(x.month)} (${x.count})</option>`).join('');
+    if(cur && list.some(x=>x.month===cur)) sel.value=cur;
+  }catch(e){ console.log('alPopulateMonths error',e); }
+}
+
+// Switch the Activity Log between live recent data and one archived month
+async function alMonthChange(){
+  const sel=document.getElementById('al-month'); if(!sel) return;
+  const m=sel.value;
+  const note=document.getElementById('al-month-note');
+  if(!DB._logView) DB._logView={};
+  if(!m){
+    delete DB._logView.activity_logs;
+    if(note) note.textContent='';
+    renderActivityLog();
+    return;
+  }
+  if(note) note.textContent='⏳ Loading '+_monthLabel(m)+'...';
+  try{
+    const data=await DB.fetchLogMonth('activity_logs', m);
+    if(sel.value!==m) return;           // user switched again meanwhile
+    DB._logView.activity_logs=data;
+    if(note) note.textContent='📅 Showing '+_monthLabel(m)+' — '+data.length+' entries (full month from archive)';
+    renderActivityLog();
+  }catch(e){
+    if(note) note.textContent='';
+    toast('Could not load '+_monthLabel(m)+': '+(e.message||e),'error');
+  }
+}
+
+// Client / lead view → pull that client's older calls from every archived month
+async function loadOlderCalls(id, seg){
+  const box=document.getElementById('oldCallsBox'); if(!box) return;
+  box.innerHTML='<p style="color:var(--gray);font-size:.82rem">⏳ Loading older calls...</p>';
+  try{
+    const liveIds=new Set((DB.get('call_logs')||[]).filter(l=>l.client_id===id).map(l=>l.id));
+    const all=await DB.fetchAllLogMonths('call_logs');
+    const seen=new Set();
+    const older=all.filter(l=>{
+      if(!l || l.client_id!==id || liveIds.has(l.id) || seen.has(l.id)) return false;
+      if(seg==='lead' ? l.seg!=='lead' : l.seg==='lead') return false;
+      seen.add(l.id); return true;
+    }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    if(!older.length){
+      box.innerHTML='<p style="color:var(--gray);font-size:.82rem">No older calls found in the archive — everything is already shown above.</p>';
+      return;
+    }
+    box.innerHTML=`<div class="form-section">📂 Older Calls — Archive (${older.length})</div>`+
+      older.map(l=>`<div class="call-log-item ${l.seg==='equity'?'eq':'mf'}">
+        <div class="call-date">${fmtDate(l.date)}${fmtTime(l.ts)?' · '+fmtTime(l.ts):''} — ${l.by||l.rm||'—'}</div>
+        <div class="call-note">${escapeHtml(l.note||'—')}</div>
+        <div class="call-status"><span class="badge ${l.status==='Done'?'b-done':'b-pending'}">${l.status||'—'}</span>
+          ${l.next_call?`→ Next: ${fmtDate(l.next_call)}`:''}</div></div>`).join('');
+  }catch(e){
+    box.innerHTML='<p style="color:var(--red);font-size:.82rem">Could not load the archive: '+escapeHtml(String(e.message||e))+'</p>';
+  }
+}
