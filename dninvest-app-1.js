@@ -2193,6 +2193,8 @@ function pushAdminSeenToRemote(){
 // clicks or delay anything; just hides itself once the sync resolves.
 function showSyncBanner(){ const b=document.getElementById('syncBanner'); if(b) b.style.display='block'; }
 function hideSyncBanner(){ const b=document.getElementById('syncBanner'); if(b) b.style.display='none'; }
+window.syncAdminSeenFromRemote = syncAdminSeenFromRemote;
+window.pushAdminSeenToRemote = pushAdminSeenToRemote;
 showSyncBanner();
 DB.syncFromFirebase().then(()=>{
       hideSyncBanner();
@@ -12779,7 +12781,7 @@ function switchInboxTab(rmUsername){
   // Trim seen list to last 500 IDs
   const newSeen = [...seenSet].slice(-500);
   localStorage.setItem(adminSeenKey, JSON.stringify(newSeen));
-  pushAdminSeenToRemote();
+  try{ if(typeof pushAdminSeenToRemote==='function') pushAdminSeenToRemote(); }catch(e){}
   // Remove highlight animation from seen messages
   if(panel) panel.querySelectorAll('.msg-new').forEach(el => el.classList.remove('msg-new'));
   if(panel) panel.querySelectorAll('.new-msg').forEach(el => el.classList.remove('new-msg'));
@@ -12863,10 +12865,10 @@ function showAdminMsgNotif(msg){
         (t.messages||[]).forEach(m => { if(!m.isAdmin) seenSet.add(m.id); });
       });
       localStorage.setItem('dninvest_admin_seen_msgs', JSON.stringify([...seenSet].slice(-500)));
-      pushAdminSeenToRemote();
       popup.classList.remove('open');
+      try{ if(typeof pushAdminSeenToRemote==='function') pushAdminSeenToRemote(); }catch(e){ console.log('seen sync err',e); }
       updateMsgBadge();
-      if(getCurrentPageId()==='admin') renderInbox();
+      if(getCurrentPageId()==='admin' || getCurrentPageId()==='announcements') renderInbox();
     };
   }
   popup.classList.add('open');
