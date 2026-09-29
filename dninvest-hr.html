@@ -1093,11 +1093,28 @@ input:focus, select:focus, textarea:focus{
 // Uses the SAME Firestore project as DNInvest CRM, but its OWN collection ('hr_data')
 // so it never clashes with CRM's 'crm_data' collection.
 const DB = {
+  // 29-Sep-2026 fix: in-memory copy (JSON string) — localStorage full ho jaaye
+  // (CRM ka bada client cache same browser storage share karta hai) tab bhi
+  // fresh data dikhe. String store karte hain taaki get() pehle jaisa har
+  // baar NAYI copy de (callers object mutate karte hain).
+  _mem:{},
   get(key, fallback){
-    try{ const v=localStorage.getItem('dnihr_'+key); return v?JSON.parse(v):fallback; }catch(e){ return fallback; }
+    try{
+      const v = (this._mem[key]!==undefined) ? this._mem[key] : localStorage.getItem('dnihr_'+key);
+      return v?JSON.parse(v):fallback;
+    }catch(e){ return fallback; }
   },
   setLocal(key, val){
-    try{ localStorage.setItem('dnihr_'+key, JSON.stringify(val)); }catch(e){}
+    let s; try{ s=JSON.stringify(val); }catch(e){ return; }
+    this._mem[key]=s;                                   // memory hamesha fresh
+    try{ localStorage.setItem('dnihr_'+key, s); }
+    catch(e){
+      // CRM ke bade cache keys hata ke retry (wo Firestore se dobara aa jaate hain)
+      ['dninvest_eq_clients','dninvest_mf_clients','dninvest_activity_logs','dninvest_call_logs','dninvest_mf_change_log','dninvest_eq_activity_snapshots','dninvest_mf_aum_snapshots']
+        .forEach(k=>{ try{ localStorage.removeItem(k); }catch(_){} });
+      try{ localStorage.setItem('dnihr_'+key, s); }
+      catch(e2){ try{ localStorage.removeItem('dnihr_'+key); }catch(_){} console.log('HR localStorage full — cache skipped:', key); }
+    }
   },
   set(key, val){
     this.setLocal(key, val);

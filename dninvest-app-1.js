@@ -70,6 +70,34 @@ const SHARD_CFG = {
   mf_clients: 8,
 };
 
+// ── localStorage quota guard (29-Sep-2026) ──────────────────────────────
+// Problem: eq_clients / mf_clients ka cache itna bada hai ki browser ki
+// localStorage limit (~5-10 MB, CRM + HR Portal dono ke liye EK hi) bhar
+// jaati thi. Uske baad chhote keys (users, leads, mf_business, HR attendance…)
+// save hona band ho jaate the aur screen purana data dikhati thi — sirf
+// "browsing data clear" karne se theek hota tha.
+// Fix: har localStorage write lsSet() se hota hai. Storage full ho to bade /
+// dobara-fetch-ho-sakne-wale cache keys hata ke ek baar retry karta hai.
+// Kabhi throw nahi karta. Firestore + DB._mem hi source of truth hai.
+const LS_EVICTABLE = ['dninvest_eq_clients','dninvest_mf_clients','dninvest_activity_logs','dninvest_call_logs','dninvest_mf_change_log','dninvest_eq_activity_snapshots','dninvest_mf_aum_snapshots'];
+function lsFreeSpace(exceptKey){
+  LS_EVICTABLE.forEach(k=>{ if(k!==exceptKey){ try{ localStorage.removeItem(k); }catch(e){} } });
+}
+function lsSet(key, str){
+  try{ localStorage.setItem(key, str); return true; }
+  catch(e){
+    lsFreeSpace(key);
+    try{ localStorage.setItem(key, str); return true; }
+    catch(e2){
+      // Ab bhi jagah nahi — is key ki PURANI (stale) copy bhi hata do, taaki
+      // koi galti se purana data na padhe. Memory (DB._mem) me fresh data hai.
+      try{ localStorage.removeItem(key); }catch(e3){}
+      console.log('localStorage full — cache skipped for', key);
+      return false;
+    }
+  }
+}
+
 const DB = {
   // ── shard helpers ──────────────────────────────────────────
   _shardCache: {},   // { key: [shard0Array, shard1Array, ...] }
@@ -248,7 +276,7 @@ const DB = {
     }
     if(this._mem) this._mem[key] = val;   // update cache immediately with new value
     try{
-      localStorage.setItem('dninvest_'+key,JSON.stringify(val));
+      lsSet('dninvest_'+key,JSON.stringify(val));
     }catch(e){}
     // Sharded keys: a whole-array replace must rewrite every shard
     if(this._isSharded(key) && typeof fdb!=='undefined'){
@@ -269,7 +297,7 @@ const DB = {
   // Set just the local copy without writing to Firebase
   setLocal(key,val){
     if(this._mem) this._mem[key] = val;   // keep cache in sync
-    try{ localStorage.setItem('dninvest_'+key,JSON.stringify(val)); }catch(e){}
+    try{ lsSet('dninvest_'+key,JSON.stringify(val)); }catch(e){}
     // getCrmSchemeNames() (fund-name dropdown source) caches its scan of
     // every mf_clients[].sip_details[]/aum_schemes[] scheme name, since
     // scanning ~1000+ clients on every keystroke would be slow — but that
@@ -377,7 +405,7 @@ const DB = {
     const lById={}; local.forEach(x=>{ if(x&&x.id) lById[x.id]=x; });
     entries.forEach(e=>{ if(e&&e.id) lById[e.id]=e; });
     { const _opt=capSort(Object.values(lById)); if(!this._mem) this._mem={}; this._mem['activity_logs']=_opt;
-      try{ localStorage.setItem('dninvest_activity_logs', JSON.stringify(_opt)); }catch(e){} }
+      try{ lsSet('dninvest_activity_logs', JSON.stringify(_opt)); }catch(e){} }
     // 2) transactional merge-write
     if(typeof fdb==='undefined') return;
     // Permanent month-wise archive (fire-and-forget; daily catch-up covers any miss)
@@ -395,7 +423,7 @@ const DB = {
         finalData = capSort(Object.values(byId));
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
-      if(finalData){ if(!this._mem) this._mem={}; this._mem['activity_logs']=finalData; try{ localStorage.setItem('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
+      if(finalData){ if(!this._mem) this._mem={}; this._mem['activity_logs']=finalData; try{ lsSet('dninvest_activity_logs',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
       console.log('Activity log sync error:',e);
     }finally{
@@ -418,7 +446,7 @@ const DB = {
     byId[rowId]=entry;
     const capSort = arr => arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
     const merged = capSort(Object.values(byId));
-    try{ localStorage.setItem('dninvest_eq_activity_snapshots', JSON.stringify(merged)); }catch(e){}
+    try{ lsSet('dninvest_eq_activity_snapshots', JSON.stringify(merged)); }catch(e){}
     if(typeof fdb==='undefined') return merged;
     this._easWriting++;
     try{
@@ -432,7 +460,7 @@ const DB = {
         finalData = capSort(Object.values(byId2));
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
-      if(finalData){ try{ localStorage.setItem('dninvest_eq_activity_snapshots',JSON.stringify(finalData)); }catch(e){} }
+      if(finalData){ try{ lsSet('dninvest_eq_activity_snapshots',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
     }catch(e){
       console.log('Eq activity snapshot sync error:',e);
@@ -458,7 +486,7 @@ const DB = {
       const byId={}; local.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
       remote.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
       const merged = Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
-      try{ localStorage.setItem('dninvest_eq_activity_snapshots', JSON.stringify(merged)); }catch(e){}
+      try{ lsSet('dninvest_eq_activity_snapshots', JSON.stringify(merged)); }catch(e){}
       return merged;
     }catch(e){ console.log('Eq activity snapshot fetch error:',e); return null; }
   },
@@ -473,7 +501,7 @@ const DB = {
     byId[rowId]=entry;
     const capSort = arr => arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
     const merged = capSort(Object.values(byId));
-    try{ localStorage.setItem('dninvest_mf_aum_snapshots', JSON.stringify(merged)); }catch(e){}
+    try{ lsSet('dninvest_mf_aum_snapshots', JSON.stringify(merged)); }catch(e){}
     if(typeof fdb==='undefined') return merged;
     this._masWriting++;
     try{
@@ -487,7 +515,7 @@ const DB = {
         finalData = capSort(Object.values(byId2));
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
-      if(finalData){ try{ localStorage.setItem('dninvest_mf_aum_snapshots',JSON.stringify(finalData)); }catch(e){} }
+      if(finalData){ try{ lsSet('dninvest_mf_aum_snapshots',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
     }catch(e){
       console.log('MF AUM snapshot sync error:',e);
@@ -507,7 +535,7 @@ const DB = {
       const byId={}; local.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
       remote.forEach(x=>{ if(x&&x.date&&x.scope) byId[x.date+'__'+x.scope]=x; });
       const merged = Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,400);
-      try{ localStorage.setItem('dninvest_mf_aum_snapshots', JSON.stringify(merged)); }catch(e){}
+      try{ lsSet('dninvest_mf_aum_snapshots', JSON.stringify(merged)); }catch(e){}
       return merged;
     }catch(e){ console.log('MF AUM snapshot fetch error:',e); return null; }
   },
@@ -536,7 +564,7 @@ const DB = {
     try{ local=JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ local=[]; }
     const byId={}; local.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
     entries.forEach(entry=>{ byId[entry.id]=entry; });
-    try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(Object.values(byId))); }catch(e){}
+    try{ lsSet('dninvest_mf_change_log', JSON.stringify(Object.values(byId))); }catch(e){}
     if(typeof fdb==='undefined') return;
     this._mclWriting++;
     try{
@@ -550,7 +578,7 @@ const DB = {
         finalData = DB._pruneCallLogs(Object.values(byId2), 850000); // same date-priority pruning as call_logs
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
-      if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
+      if(finalData){ try{ lsSet('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
     }catch(e){
       console.log('MF change log batch sync error:',e);
       try{ toast('⚠️ Some Invested Amount changes may not have saved — please re-import if the Additions/Redemptions list looks incomplete','error'); }catch(e2){}
@@ -569,7 +597,7 @@ const DB = {
       const byId={}; local.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
       remote.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
       const merged = Object.values(byId);
-      try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(merged)); }catch(e){}
+      try{ lsSet('dninvest_mf_change_log', JSON.stringify(merged)); }catch(e){}
       return merged;
     }catch(e){ console.log('MF change log fetch error:',e); return null; }
   },
@@ -581,7 +609,7 @@ const DB = {
     let local=[];
     try{ local=JSON.parse(localStorage.getItem('dninvest_mf_change_log')||'[]'); }catch(e){ local=[]; }
     local = local.filter(x=>!(x&&idSet.has(x.id)));
-    try{ localStorage.setItem('dninvest_mf_change_log', JSON.stringify(local)); }catch(e){}
+    try{ lsSet('dninvest_mf_change_log', JSON.stringify(local)); }catch(e){}
     if(typeof fdb==='undefined') return local;
     try{
       const docRef = fdb.collection('crm_data').doc('mf_change_log');
@@ -592,7 +620,7 @@ const DB = {
         finalData = latest.filter(x=>!(x&&idSet.has(x.id)));
         tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
       });
-      if(finalData){ try{ localStorage.setItem('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
+      if(finalData){ try{ lsSet('dninvest_mf_change_log',JSON.stringify(finalData)); }catch(e){} }
       return finalData;
     }catch(e){
       console.log('MF change log remove error:',e);
@@ -754,7 +782,7 @@ const DB = {
     try{ local=JSON.parse(localStorage.getItem('dninvest_call_logs')||'[]'); }catch(e){ local=[]; }
     if(!local.some(x=>x.id===entry.id)) local.push(entry);
     if(!this._mem) this._mem={}; this._mem['call_logs']=local;
-    try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(local)); }catch(e){}
+    try{ lsSet('dninvest_call_logs',JSON.stringify(local)); }catch(e){}
     // 2) transactional merge-write to Firestore (no clobber, retries on conflict)
     if(typeof fdb==='undefined') return;
     // Permanent month-wise archive (fire-and-forget; daily catch-up covers any miss)
@@ -776,7 +804,7 @@ const DB = {
       });
       if(finalData){
         if(!this._mem) this._mem={}; this._mem['call_logs']=finalData;
-        try{ localStorage.setItem('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
+        try{ lsSet('dninvest_call_logs',JSON.stringify(finalData)); }catch(e){}
       }
       console.log('Call log transaction-synced');
     }catch(e){
@@ -1178,7 +1206,7 @@ const DB = {
             this._mem[key] = merged;
             if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
             try{
-              localStorage.setItem('dninvest_'+key, JSON.stringify(merged));
+              lsSet('dninvest_'+key, JSON.stringify(merged));
               console.log('Loaded from Firebase (sharded):',key, merged.length,'records',
                           this._shardCache[key].map(p=>p.length));
             }catch(e){
@@ -1190,6 +1218,7 @@ const DB = {
         const doc=await fdb.collection('crm_data').doc(key).get();
         if(doc.exists && doc.data() && Object.prototype.hasOwnProperty.call(doc.data(),'data')){
           const d = doc.data().data;
+          if(!this._mem) this._mem = {};
           if(key==='eq_risk'){
             // eq_risk Firestore me COMPACT form me rehta hai: {codeJson:string, updated, count}.
             // Yahan wapas normal shape {code:{...}, updated, count} me rehydrate karte hain
@@ -1199,7 +1228,8 @@ const DB = {
             if(d && typeof d.codeJson==='string'){ try{ codeObj=JSON.parse(d.codeJson)||{}; }catch(_){ codeObj={}; } }
             else if(d && d.code && typeof d.code==='object'){ codeObj=d.code; }
             const norm={ code:codeObj, updated:(d&&d.updated)||'', count:(d&&d.count)||Object.keys(codeObj).length };
-            localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
+            this._mem.eq_risk = norm;   // 29-Sep-2026: memory hamesha fresh
+            lsSet('dninvest_eq_risk', JSON.stringify(norm));
             console.log('Loaded from Firebase: eq_risk (compact)', norm.count);
             return;
           }
@@ -1211,7 +1241,8 @@ const DB = {
               const byId={};
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
-              localStorage.setItem('dninvest_call_logs', JSON.stringify(Object.values(byId)));
+              this._mem.call_logs = Object.values(byId);
+              lsSet('dninvest_call_logs', JSON.stringify(this._mem.call_logs));
               console.log('Loaded+merged from Firebase: call_logs', Object.values(byId).length);
             } else if(key==='activity_logs'){
               let existing=[];
@@ -1220,14 +1251,17 @@ const DB = {
               existing.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               d.forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
               const merged=Object.values(byId).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,2000);
-              localStorage.setItem('dninvest_activity_logs', JSON.stringify(merged));
+              this._mem.activity_logs = merged;
+              lsSet('dninvest_activity_logs', JSON.stringify(merged));
               console.log('Loaded+merged from Firebase: activity_logs', merged.length);
             } else if(d.length>0){
-              localStorage.setItem('dninvest_'+key,JSON.stringify(d));
+              this._mem[key] = d;
+              lsSet('dninvest_'+key,JSON.stringify(d));
               console.log('Loaded from Firebase:',key, d.length,'records');
             }
           } else {
-            localStorage.setItem('dninvest_'+key,JSON.stringify(d));
+            this._mem[key] = d;
+            lsSet('dninvest_'+key,JSON.stringify(d));
             console.log('Loaded from Firebase:',key, 'object');
           }
         }
@@ -1292,7 +1326,7 @@ try{
   if(_ss.leadsField!==undefined && _ss.leadsField!==null){ leadsSortField=_ss.leadsField; leadsSortDir=_ss.leadsDir||1; }
 }catch(e){}
 function _saveSortState(){
-  try{ localStorage.setItem('dninvest_sort_state', JSON.stringify({eqField:eqSortField,eqDir:eqSortDir,mfField:mfSortField,mfDir:mfSortDir,leadsField:leadsSortField,leadsDir:leadsSortDir})); }catch(e){}
+  try{ lsSet('dninvest_sort_state', JSON.stringify({eqField:eqSortField,eqDir:eqSortDir,mfField:mfSortField,mfDir:mfSortDir,leadsField:leadsSortField,leadsDir:leadsSortDir})); }catch(e){}
 }
 let eqFiltered=[], mfFiltered=[], leadsFiltered=[];
 let currentCallTarget = null;
@@ -1441,7 +1475,7 @@ async function doLogin(){
     }
     CU = user;
     CU._loginAt = Date.now();
-    localStorage.setItem('dninvest_session', JSON.stringify({username:u, password:p, at:Date.now()}));
+    lsSet('dninvest_session', JSON.stringify({username:u, password:p, at:Date.now()}));
     document.getElementById('lerr').style.display='none';
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
@@ -1913,7 +1947,7 @@ async function tryAutoLogin(){
   let saved = localStorage.getItem('dninvest_session');
   if(!saved){
     const oldSess = sessionStorage.getItem('dninvest_session');
-    if(oldSess){ localStorage.setItem('dninvest_session', oldSess); sessionStorage.removeItem('dninvest_session'); saved = oldSess; }
+    if(oldSess){ lsSet('dninvest_session', oldSess); sessionStorage.removeItem('dninvest_session'); saved = oldSess; }
   }
   if(saved){
     try{
@@ -2174,7 +2208,7 @@ async function syncAdminSeenFromRemote(){
     const remoteIds = (doc.exists && doc.data() && Array.isArray(doc.data().ids)) ? doc.data().ids : [];
     const local = new Set(JSON.parse(localStorage.getItem('dninvest_admin_seen_msgs')||'[]'));
     remoteIds.forEach(id=>local.add(id));
-    localStorage.setItem('dninvest_admin_seen_msgs', JSON.stringify([...local].slice(-500)));
+    lsSet('dninvest_admin_seen_msgs', JSON.stringify([...local].slice(-500)));
   }catch(e){ console.log('syncAdminSeenFromRemote failed', e); }
 }
 function pushAdminSeenToRemote(){
@@ -2334,7 +2368,7 @@ DB.syncFromFirebase().then(()=>{
             // scratch) — because that's exactly what was happening.
             if(!DB._mem) DB._mem={};
             DB._mem['rm_messages'] = newData;
-            localStorage.setItem('dninvest_rm_messages', JSON.stringify(newData));
+            lsSet('dninvest_rm_messages', JSON.stringify(newData));
             console.log('Real-time update: rm_messages');
             updateMsgBadge();
             if(getCurrentPageId()==='admin'||getCurrentPageId()==='announcements') renderInbox();
@@ -2361,7 +2395,7 @@ DB.syncFromFirebase().then(()=>{
               if(JSON.stringify(merged)!==JSON.stringify(existing)){
                 if(!DB._mem) DB._mem={};
                 DB._mem[key]=merged;
-                try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded):',e); }
+                try{ lsSet('dninvest_'+key, JSON.stringify(merged)); }catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded):',e); }
                 console.log('Real-time merge:', key);
                 if(key==='call_logs' && getCurrentPageId()==='leads') renderLeadsTable();
                 if(getCurrentPageId()==='activity-log') renderActivityLog();
@@ -2372,7 +2406,7 @@ DB.syncFromFirebase().then(()=>{
             if(JSON.stringify(newData) !== JSON.stringify(existing)){
               if(!DB._mem) DB._mem={};
               DB._mem[key]=newData;
-              try{ localStorage.setItem('dninvest_'+key, JSON.stringify(newData)); }catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded):',e); }
+              try{ lsSet('dninvest_'+key, JSON.stringify(newData)); }catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded):',e); }
               console.log('Real-time update:', key);
               if(key==='users'){
                 populateRmDropdowns();
@@ -2423,7 +2457,7 @@ DB.syncFromFirebase().then(()=>{
         // being updated here.
         if(!DB._mem) DB._mem={};
         DB._mem['eq_risk'] = norm;
-        localStorage.setItem('dninvest_eq_risk', JSON.stringify(norm));
+        lsSet('dninvest_eq_risk', JSON.stringify(norm));
         console.log('Real-time update: eq_risk (compact,', norm.count, 'clients)');
         if(typeof clearEqRiskCache==='function') clearEqRiskCache();
         if(getCurrentPageId()==='eq-clients' && typeof renderEqTable==='function') renderEqTable();
@@ -2496,7 +2530,7 @@ DB.syncFromFirebase().then(()=>{
               if(!DB._mem) DB._mem = {};
               DB._mem[key] = merged;
               if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
-              try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }
+              try{ lsSet('dninvest_'+key, JSON.stringify(merged)); }
               catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
               _afterRealtime(key);
             }catch(e){ console.log('poll failed for',key,e); }
@@ -2527,7 +2561,7 @@ DB.syncFromFirebase().then(()=>{
                 if(!DB._mem) DB._mem = {};
                 DB._mem[key] = merged;
                 if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
-                try{ localStorage.setItem('dninvest_'+key, JSON.stringify(merged)); }
+                try{ lsSet('dninvest_'+key, JSON.stringify(merged)); }
                 catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
                 _afterRealtime(key);
               });
@@ -2572,7 +2606,7 @@ DB.syncFromFirebase().then(()=>{
               // by anyone else only ever showed up after a manual refresh.
               if(!DB._mem) DB._mem={};
               DB._mem[key] = newData;
-              localStorage.setItem('dninvest_'+key, JSON.stringify(newData));
+              lsSet('dninvest_'+key, JSON.stringify(newData));
               _afterRealtime(key);
             }
           }
@@ -4548,7 +4582,7 @@ function getColW(tid){
   cfg.keys.forEach(k=>{ w[k]=(saved[k]&&saved[k]>=24)?saved[k]:cfg.def[k]; });
   return w;
 }
-function saveColW(tid,w){ try{ localStorage.setItem('dninvest_colw_'+tid, JSON.stringify(w)); }catch(e){} }
+function saveColW(tid,w){ try{ lsSet('dninvest_colw_'+tid, JSON.stringify(w)); }catch(e){} }
 // Returns "<colgroup>...</colgroup>" plus the total table width, for a table.
 function colGroup(tid, hasCheckbox){
   const cfg=COL_CFG[tid]; const W=getColW(tid);
@@ -12508,7 +12542,7 @@ function showAnnouncementPopup(ann){
 function closeAnnouncementPopup(){
   const el = document.getElementById('announcementPopup');
   const id = el.dataset.annId;
-  if(id && CU){ localStorage.setItem('dninvest_ann_seen_' + CU.username, id); }
+  if(id && CU){ lsSet('dninvest_ann_seen_' + CU.username, id); }
   el.classList.remove('open');
 }
 
@@ -12864,7 +12898,7 @@ function showAdminMsgNotif(msg){
       allThreads.forEach(t => {
         (t.messages||[]).forEach(m => { if(!m.isAdmin) seenSet.add(m.id); });
       });
-      localStorage.setItem('dninvest_admin_seen_msgs', JSON.stringify([...seenSet].slice(-500)));
+      lsSet('dninvest_admin_seen_msgs', JSON.stringify([...seenSet].slice(-500)));
       popup.classList.remove('open');
       try{ if(typeof pushAdminSeenToRemote==='function') pushAdminSeenToRemote(); }catch(e){ console.log('seen sync err',e); }
       updateMsgBadge();
@@ -12891,7 +12925,7 @@ function showRmReplyNotif(msg){
       const thread2 = getMyThread();
       if(thread2){
         const lastAdminMsg = thread2.messages.filter(m=>m.isAdmin).slice(-1)[0];
-        if(lastAdminMsg) localStorage.setItem('dninvest_msg_seen_' + CU.username, lastAdminMsg.id);
+        if(lastAdminMsg) lsSet('dninvest_msg_seen_' + CU.username, lastAdminMsg.id);
       }
       popup.classList.remove('open');
       updateMsgBadge();
@@ -13053,8 +13087,8 @@ async function saveChangeCred(){
   if(!r.ok || r.aborted){ toast('User not found','error'); return; }
 
   // Update persistent session so auto-login keeps working with the new credential
-  if(newPass){ CU.password = newPass; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPass, at:Date.now()})); }
-  if(newPin && CU.role==='rm'){ CU.pin = newPin; localStorage.setItem('dninvest_session', JSON.stringify({username:CU.username, password:newPin, at:Date.now()})); }
+  if(newPass){ CU.password = newPass; lsSet('dninvest_session', JSON.stringify({username:CU.username, password:newPass, at:Date.now()})); }
+  if(newPin && CU.role==='rm'){ CU.pin = newPin; lsSet('dninvest_session', JSON.stringify({username:CU.username, password:newPin, at:Date.now()})); }
 
   closeModal('changeCredModal');
   toast('✅ Password/PIN updated!', 'success');
@@ -15572,7 +15606,7 @@ function _saveColWidths(tid, table){
   table.querySelectorAll('thead th').forEach((th,i)=>{
     if(th.style.width) widths[i] = th.style.width;
   });
-  try{ localStorage.setItem('dninvest_colw2_'+tid, JSON.stringify(widths)); }catch(e){}
+  try{ lsSet('dninvest_colw2_'+tid, JSON.stringify(widths)); }catch(e){}
 }
 function enableColumnResize(table){
   if(table.dataset.resizableInit) return;
