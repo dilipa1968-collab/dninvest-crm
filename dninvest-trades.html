@@ -646,7 +646,18 @@ async function handleFiles(fileList){
     }
   }
 
-  try{ localStorage.setItem('dninvest_trades_last_upload', new Date().toISOString()); }catch(e){}
+  // 29-Sep-2026 fix: CRM ka bada client cache same browser storage share karta hai —
+  // storage full ho to "Last Upload" time save nahi hota tha (purana time dikhta tha).
+  // Ab full hone par CRM ke bade cache keys hata ke retry (wo Firebase se dobara aa jaate hain).
+  (function(){
+    const v=new Date().toISOString();
+    try{ localStorage.setItem('dninvest_trades_last_upload', v); }
+    catch(e){
+      ['dninvest_eq_clients','dninvest_mf_clients','dninvest_activity_logs','dninvest_call_logs','dninvest_mf_change_log','dninvest_eq_activity_snapshots','dninvest_mf_aum_snapshots']
+        .forEach(k=>{ try{ localStorage.removeItem(k); }catch(_){} });
+      try{ localStorage.setItem('dninvest_trades_last_upload', v); }catch(_){}
+    }
+  })();
 
   const summary = `✅ ${filesOk} file(s) read, ${totalNew} new trade(s) added` +
     (totalEnriched ? `, ${totalEnriched} existing trade(s) updated (e.g. Channel filled in)` : '') +
