@@ -1571,7 +1571,7 @@ function perfIncentivePayout(name, month){
   const perf=Number(getPerfIncentive(name))||0;
   if(!perf) return {perf:0, pay:0, absent:0, half:0, cut:0};
   const att=getAtt();
-  const recs=(att[name]||[]).filter(r=>!month || r.date.startsWith(month));
+  const recs=(att[name]||[]).filter(r=>!month || r.date.startsWith(month)).filter(r=>!isHoliday(r.date)); // holiday/Sunday ko cut me mat gino
   const absent=recs.filter(r=>r.status==='Absent').length;
   const half=recs.filter(r=>r.status==='Half day').length;
   const perDay=perf/26;
@@ -3237,7 +3237,7 @@ function renderAttendancePage(){
   const late=myRecs.filter(r=>r.status==='Late').length;
   const holidayRecs=myRecs.filter(r=>r.status==='Holiday');
   const holidayCount=holidayRecs.length;
-  const absent=myRecs.filter(r=>r.status==='Absent').length;
+  const absent=myRecs.filter(r=>r.status==='Absent' && !isHoliday(r.date)).length;
 
   // Month info
   const nowD=new Date();
@@ -3466,7 +3466,7 @@ function renderDateWiseSheet(){
       if(isSun){
         // Sunday — show Off for all
         row += `<td style="text-align:center;background:var(--red-bg)"><span class="badge badge-gray" style="padding:1px 5px;display:block;margin-bottom:2px">Off</span><span style="font-size:10px;color:var(--text3)">Sunday</span></td>`;
-      } else if(isHol && (!r || r.status==='Holiday')){
+      } else if(isHol && (!r || r.status==='Holiday' || r.status==='Absent')){
         // Holiday — show Holiday badge
         row += `<td style="text-align:center;background:#fff8e1"><span class="badge badge-gray" style="padding:1px 5px;display:block;margin-bottom:2px">H</span><span style="font-size:10px;color:#b07d00">${holName}</span></td>`;
       } else if(r){
@@ -3608,7 +3608,7 @@ function downloadAttendanceSheet(){
       if(isSun){
         const offStyle={font:{bold:true,color:{rgb:'FF9C0006'}},fill:{fgColor:{rgb:'FFFCE4EC'}},alignment:{horizontal:'center',vertical:'center'},border};
         row.push({v:'Off',s:offStyle},{v:'',s:offStyle},{v:'',s:offStyle});
-      } else if(isHol && (!r||r.status==='Holiday')){
+      } else if(isHol && (!r||r.status==='Holiday'||r.status==='Absent')){
         const holStyle={font:{bold:true,color:{rgb:'FF808080'}},fill:{fgColor:{rgb:'FFE7E7E7'}},alignment:{horizontal:'center',vertical:'center'},border};
         row.push({v:'H',s:holStyle},{v:'',s:holStyle},{v:'',s:holStyle});
       } else if(r){
@@ -6842,7 +6842,8 @@ function renderEmpMonthModal(){
   for(let d=1;d<=daysInMonth;d++){
     const ds=ym+'-'+String(d).padStart(2,'0');
     const dow=new Date(y,m-1,d).getDay();
-    const rec=byDate[ds];
+    let rec=byDate[ds];
+    if(rec && rec.status==='Absent' && getHolidayName(ds)) rec=null; // holiday pe purana Absent record ignore
     const holName=getHolidayName(ds); // 'Sunday' or holiday name or null
     let badge='', inT='—', outT='—', rowCls='';
     if(ds===td) rowCls='is-today';
