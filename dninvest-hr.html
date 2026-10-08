@@ -916,7 +916,7 @@ input:focus, select:focus, textarea:focus{
               <colgroup>
                 <col style="width:8%"><col style="width:7%"><col style="width:6.5%"><col style="width:6%"><col style="width:6%"><col style="width:3.5%"><col style="width:7.5%"><col style="width:8%"><col style="width:6%"><col style="width:5.5%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:4.5%"><col style="width:6%"><col style="width:4.5%">
               </colgroup>
-              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc. Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th>Demat</th><th>MF</th><th>Net Sales</th><th>SIP</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl. Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc. Salary</th><th>Brokerage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1 Inc.</th><th title="Extra amount calculated at Tier 2 rate, on top of Tier 1 (Upper multiplier and above)">Tier 2 Extra Inc.</th><th title="Demat opening incentive amount">Demat Inc.</th><th title="MF Sale incentive amount">MF Inc.</th><th title="MF Net Sales incentive amount">Net Sales Inc.</th><th title="SIP incentive amount">SIP Inc.</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Bro.Cl. Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late Ded.</th><th>Total Incentive</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -4756,7 +4756,7 @@ function renderIncentivePage(){
         const safeId=e.name.replace(/[^a-zA-Z0-9]/g,'');
         // accumulate column totals
         T.incSal+=(sal+perf); T.brok+=tt.brok; T.tier1+=tt.br.base5; T.tier2+=tt.br.extra2;
-        T.demat+=tt.demat; T.mf+=tt.mf; T.netSales=(T.netSales||0)+tt.netSales; T.sip+=tt.sip; T.broCl+=tt.broClientInc;
+        T.demat+=tt.dematInc; T.mf+=tt.mfInc; T.netSales=(T.netSales||0)+(tt.netSalesInc||0); T.sip+=tt.sipInc; T.broCl+=tt.broClientInc;
         T.other+=(tt.other+tt.perfPay); T.lateDed=(T.lateDed||0)+tt.lateDeductionAmt; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
@@ -4764,10 +4764,10 @@ function renderIncentivePage(){
           <td>${fmt(tt.brok)}</td>
           <td>${fmt(tt.br.base5)}</td>
           <td>${fmt(tt.br.extra2)}</td>
-          <td>${tt.demat}</td>
-          <td>${fmt(tt.mf)}</td>
-          <td style="color:${tt.netSales>0?'var(--navy)':'var(--text3)'}">${tt.netSales>0?fmt(tt.netSales):'—'}</td>
-          <td>${fmt(tt.sip)}</td>
+          <td title="${tt.demat} account(s)">${fmt(tt.dematInc)}</td>
+          <td title="MF Sale: ${fmt(tt.mf)}">${fmt(tt.mfInc)}</td>
+          <td title="Net Sales: ${fmt(tt.netSales)}" style="color:${(tt.netSalesInc||0)>0?'var(--navy)':'var(--text3)'}">${(tt.netSalesInc||0)>0?fmt(tt.netSalesInc):'—'}</td>
+          <td title="SIP: ${fmt(tt.sip)}">${fmt(tt.sipInc)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(incl. perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
           <td title="${tt.lateDays} late day(s) this month = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0" oninput="recalcIncentiveRow('${safeId}')"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDays} late${tt.lateDeductionOverridden?' · edited':''}</small></td>
@@ -4783,7 +4783,7 @@ function renderIncentivePage(){
           <td>${fmt(T.brok)}</td>
           <td>${fmt(T.tier1)}</td>
           <td>${fmt(T.tier2)}</td>
-          <td>${T.demat}</td>
+          <td>${fmt(T.demat)}</td>
           <td>${fmt(T.mf)}</td>
           <td>${fmt(T.netSales||0)}</td>
           <td>${fmt(T.sip)}</td>
