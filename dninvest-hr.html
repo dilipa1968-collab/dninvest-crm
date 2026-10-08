@@ -234,14 +234,25 @@ tr:hover td{background:var(--surface2)}
 .team-inc-table{border-collapse:collapse}
 .team-inc-table th,.team-inc-table td{border:1px solid #d6dbe3!important}
 .team-inc-table thead th{background:#1F3864!important;color:#fff!important;border-color:#2e4a7a!important;border-bottom:2px solid #c9a84c!important;text-align:center!important;vertical-align:middle}
-.team-inc-table tbody tr:nth-child(even) td{background:#F4F7FB}
-.team-inc-table tbody tr:nth-child(odd) td{background:#fff}
-.team-inc-table tbody tr:hover td{box-shadow:none!important;background:#FFF8E1!important}
-.team-inc-table td.ti-gross{background:#EEF4FF!important}
-.team-inc-table td.ti-net{background:#EAF6EE!important}
+.team-inc-table{--text3:#4b5262;--text2:#262a33;--green:#0f7a4f;--red:#b4232a}
+.team-inc-table td{color:#0f172a;font-weight:500;font-size:11.5px}
+.team-inc-table td small{color:#4b5262!important}
+.team-inc-table tbody tr:nth-child(10n+1) td{background:#FDEFF4!important}
+.team-inc-table tbody tr:nth-child(10n+2) td{background:#EAF3FC!important}
+.team-inc-table tbody tr:nth-child(10n+3) td{background:#EAF7EF!important}
+.team-inc-table tbody tr:nth-child(10n+4) td{background:#FFF5E3!important}
+.team-inc-table tbody tr:nth-child(10n+5) td{background:#F2EDFB!important}
+.team-inc-table tbody tr:nth-child(10n+6) td{background:#E7F7F6!important}
+.team-inc-table tbody tr:nth-child(10n+7) td{background:#FDEEEA!important}
+.team-inc-table tbody tr:nth-child(10n+8) td{background:#EEF1FB!important}
+.team-inc-table tbody tr:nth-child(10n+9) td{background:#F4F8E6!important}
+.team-inc-table tbody tr:nth-child(10n+10) td{background:#FBF0F8!important}
+.team-inc-table tbody tr:hover td{box-shadow:none!important;filter:brightness(.96)}
+.team-inc-table td.ti-gross{background-image:linear-gradient(rgba(46,90,135,.10),rgba(46,90,135,.10))}
+.team-inc-table td.ti-net{background-image:linear-gradient(rgba(29,111,66,.12),rgba(29,111,66,.12))}
 .team-inc-table thead th.ti-gross{background:#2E5A87!important}
 .team-inc-table thead th.ti-net{background:#1D6F42!important}
-.team-inc-table tr.ti-total-row td{background:#E3E9F2!important;font-weight:700;border-top:2px solid #1F3864!important;color:#1F3864}
+.team-inc-table tbody tr.ti-total-row td{background:#E3E9F2!important;font-weight:700;border-top:2px solid #1F3864!important;color:#1F3864}
 .team-inc-table td input[type=number]{max-width:56px}
 .team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:10px}
 .team-inc-table input[type=number]{width:100%;max-width:50px;box-sizing:border-box;padding:4px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--text);outline:none;text-align:right}
