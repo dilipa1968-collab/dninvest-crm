@@ -254,6 +254,7 @@ tr:hover td{background:var(--surface2)}
 .team-inc-table thead th.ti-net{background:#1D6F42!important}
 .team-inc-table tbody tr.ti-total-row td{background:#E3E9F2!important;font-weight:700;border-top:2px solid #1F3864!important;color:#1F3864}
 .team-inc-table td input[type=number]{max-width:56px}
+.team-inc-table tbody tr.ti-total-row td{overflow:visible;text-overflow:clip;font-size:11px;padding-left:3px;padding-right:4px}
 .team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:10px}
 .team-inc-table input[type=number]{width:100%;max-width:50px;box-sizing:border-box;padding:4px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--text);outline:none;text-align:right}
 .team-inc-table input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg,rgba(37,99,235,.12))}
@@ -942,7 +943,7 @@ input:focus, select:focus, textarea:focus{
           <div class="tbl-wrap">
             <table class="team-inc-table">
               <colgroup>
-                <col style="width:7.5%"><col style="width:6%"><col style="width:6%"><col style="width:5.5%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:5.5%"><col style="width:5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:6%"><col style="width:5.5%"><col style="width:6%"><col style="width:5%"><col style="width:6%"><col style="width:4.5%">
+                <col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:5.5%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:5%"><col style="width:5.5%"><col style="width:5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:5%"><col style="width:6%"><col style="width:4.5%">
               </colgroup>
               <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.<br>Salary</th><th>Broke-<br>rage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1<br>Inc.</th><th title="Extra amount calculated at Tier 2 rate (Upper multiplier and above)">Tier 2<br>Inc.</th><th title="Demat opening incentive amount">Demat<br>Inc.</th><th title="MF Sale incentive amount">MF<br>Inc.</th><th title="MF Net Sales incentive amount">Net Sales<br>Inc.</th><th title="SIP incentive amount">SIP<br>Inc.</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Client<br>Bonus</th><th>Other</th><th title="Total incentive before late deduction" class="ti-gross">Total<br>Inc.</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late<br>Ded. (−)</th><th title="Total Incentive − Late Deduction" class="ti-net">Net<br>Payable</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
