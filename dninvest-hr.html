@@ -230,7 +230,19 @@ tr:hover td{background:var(--surface2)}
 .team-inc-table td small{white-space:normal;display:block;line-height:1.25}
 .team-inc-table td:nth-child(n+2):not(:last-child){text-align:right}
 .team-inc-table th:nth-child(n+2):not(:last-child){text-align:right}
-.team-inc-table td:last-child{text-align:right;padding-right:10px}
+.team-inc-table td:last-child{text-align:center;padding:4px;overflow:visible}
+.team-inc-table{border-collapse:collapse}
+.team-inc-table th,.team-inc-table td{border:1px solid #d6dbe3!important}
+.team-inc-table thead th{background:#1F3864!important;color:#fff!important;border-color:#2e4a7a!important;border-bottom:2px solid #c9a84c!important;text-align:center!important;vertical-align:middle}
+.team-inc-table tbody tr:nth-child(even) td{background:#F4F7FB}
+.team-inc-table tbody tr:nth-child(odd) td{background:#fff}
+.team-inc-table tbody tr:hover td{box-shadow:none!important;background:#FFF8E1!important}
+.team-inc-table td.ti-gross{background:#EEF4FF!important}
+.team-inc-table td.ti-net{background:#EAF6EE!important}
+.team-inc-table thead th.ti-gross{background:#2E5A87!important}
+.team-inc-table thead th.ti-net{background:#1D6F42!important}
+.team-inc-table tr.ti-total-row td{background:#E3E9F2!important;font-weight:700;border-top:2px solid #1F3864!important;color:#1F3864}
+.team-inc-table td input[type=number]{max-width:56px}
 .team-inc-table td:first-child,.team-inc-table th:first-child{padding-left:10px}
 .team-inc-table input[type=number]{width:100%;max-width:50px;box-sizing:border-box;padding:4px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--text);outline:none;text-align:right}
 .team-inc-table input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg,rgba(37,99,235,.12))}
@@ -919,9 +931,9 @@ input:focus, select:focus, textarea:focus{
           <div class="tbl-wrap">
             <table class="team-inc-table">
               <colgroup>
-                <col style="width:8.5%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:6%"><col style="width:5.5%"><col style="width:6%"><col style="width:6.5%"><col style="width:6%"><col style="width:7%"><col style="width:5%"><col style="width:6.5%"><col style="width:6.5%">
+                <col style="width:7.5%"><col style="width:6%"><col style="width:6%"><col style="width:5.5%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:5.5%"><col style="width:5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:6%"><col style="width:5.5%"><col style="width:6%"><col style="width:5%"><col style="width:6%"><col style="width:4.5%">
               </colgroup>
-              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.<br>Salary</th><th>Broke-<br>rage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1<br>Inc.</th><th title="Extra amount calculated at Tier 2 rate (Upper multiplier and above)">Tier 2<br>Inc.</th><th title="Demat opening incentive amount">Demat<br>Inc.</th><th title="MF Sale incentive amount">MF<br>Inc.</th><th title="MF Net Sales incentive amount">Net Sales<br>Inc.</th><th title="SIP incentive amount">SIP<br>Inc.</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Client<br>Bonus</th><th>Other</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late<br>Ded.</th><th>Total<br>Inc.</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+              <thead><tr><th>Employee</th><th title="Incentive Salary = Basic Salary + Performance Incentive">Inc.<br>Salary</th><th>Broke-<br>rage</th><th title="Amount calculated at Tier 1 rate (Lower–Upper multiplier range)">Tier 1<br>Inc.</th><th title="Extra amount calculated at Tier 2 rate (Upper multiplier and above)">Tier 2<br>Inc.</th><th title="Demat opening incentive amount">Demat<br>Inc.</th><th title="MF Sale incentive amount">MF<br>Inc.</th><th title="MF Net Sales incentive amount">Net Sales<br>Inc.</th><th title="SIP incentive amount">SIP<br>Inc.</th><th title="Flat bonus if ≥ N clients gave brokerage ≥ threshold (from file upload)">Client<br>Bonus</th><th>Other</th><th title="Total incentive before late deduction" class="ti-gross">Total<br>Inc.</th><th title="1% of incentive deducted per late (yellow) attendance day this month — editable, set to 0 to waive it for someone">Late<br>Ded. (−)</th><th title="Total Incentive − Late Deduction" class="ti-net">Net<br>Payable</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
               <tbody id="team-incentive-table"></tbody>
             </table>
           </div>
@@ -4762,7 +4774,7 @@ function renderIncentivePage(){
         // accumulate column totals
         T.incSal+=(sal+perf); T.brok+=tt.brok; T.tier1+=tt.br.base5; T.tier2+=tt.br.extra2;
         T.demat+=tt.dematInc; T.mf+=tt.mfInc; T.netSales=(T.netSales||0)+(tt.netSalesInc||0); T.sip+=tt.sipInc; T.broCl+=tt.broClientInc;
-        T.other+=(tt.other+tt.perfPay); T.lateDed=(T.lateDed||0)+tt.lateDeductionAmt; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
+        T.other+=(tt.other+tt.perfPay); T.lateDed=(T.lateDed||0)+tt.lateDeductionAmt; T.gross=(T.gross||0)+tt.rawTotal; T.total+=tt.total; T.paid+=paid; T.balance+=balance;
         return `<tr>
           <td>${e.name}${tt.broClientRows&&tt.broClientRows.length>0?` <a href="#" onclick="showBroClientDetail('${e.name.replace(/'/g,"\\'")}','${selMonth}');return false" style="font-size:10px;color:var(--accent);margin-left:4px" title="Client-wise detail">📋</a>`:''}</td>
           <td title="Salary ${fmt(sal)}${perf>0?' + Perf. Inc. '+fmt(perf):''}">${fmt(sal+perf)}${perf>0?'<br><small style="font-weight:400;color:var(--text3)">('+fmt(sal)+'+'+fmt(perf)+')</small>':''}</td>
@@ -4775,14 +4787,15 @@ function renderIncentivePage(){
           <td title="SIP: ${fmt(tt.sip)}">${fmt(tt.sipInc)}</td>
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' clients)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(incl. perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
+          <td class="ti-gross" style="font-weight:600">${fmt(tt.rawTotal)}</td>
           <td title="${tt.lateDays} late day(s) this month = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0" oninput="recalcIncentiveRow('${safeId}')"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDays} late${tt.lateDeductionOverridden?' · edited':''}</small></td>
-          <td id="inc-total-${safeId}" data-rawtotal="${tt.rawTotal}" style="font-weight:600;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
+          <td class="ti-net" id="inc-total-${safeId}" data-rawtotal="${tt.rawTotal}" style="font-weight:700;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" min="0" oninput="recalcIncentiveRow('${safeId}')"></td>
           <td id="inc-bal-${safeId}" style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
           <td><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
         </tr>`;
       }).join('');
-      const totalRow=`<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700">
+      const totalRow=`<tr class="ti-total-row">
           <td>TOTAL</td>
           <td>${fmt(T.incSal)}</td>
           <td>${fmt(T.brok)}</td>
@@ -4794,8 +4807,9 @@ function renderIncentivePage(){
           <td>${fmt(T.sip)}</td>
           <td style="color:${T.broCl>0?'var(--green)':'var(--text3)'}">${T.broCl>0?fmt(T.broCl):'—'}</td>
           <td>${fmt(T.other)}</td>
+          <td class="ti-gross">${fmt(T.gross||0)}</td>
           <td id="inc-lateded-ALL" style="color:${T.lateDed>0?'var(--red)':'var(--text3)'}">${T.lateDed>0?'−'+fmt(T.lateDed):'—'}</td>
-          <td id="inc-total-ALL" style="color:var(--green)">${fmt(T.total)}</td>
+          <td class="ti-net" id="inc-total-ALL" style="color:var(--green)">${fmt(T.total)}</td>
           <td id="inc-paid-ALL" style="color:var(--green)">${fmt(T.paid)}</td>
           <td id="inc-bal-ALL" style="color:${T.balance>0?'var(--red)':'var(--green)'}">${fmt(T.balance)}</td>
           <td></td>
@@ -4930,8 +4944,9 @@ function downloadTeamIncentiveReport(){
     {header:'BRO.CL.BONUS', width:13, money:true, color:posGreen},
     {header:'PERF. INC.\n(attendance-adj ÷26)', width:15, money:true, color:posGreen},
     {header:'OTHER', width:10, money:true},
+    {header:'TOTAL INCENTIVE\n(before late ded.)', width:16, money:true},
     {header:'LATE DED.\n(1% / late day)', width:13, money:true, color:v=>{const n=Number(String(v).replace(/[₹,\s]/g,''))||0; return n>0?{bg:'FFFFC7CE',font:'FF9C0006'}:null;}},
-    {header:'TOTAL INCENTIVE', width:15, money:true, color:posGreen},
+    {header:'NET PAYABLE', width:15, money:true, color:posGreen},
     {header:'PAID', width:11, money:true},
     {header:'BALANCE', width:12, money:true, color:balColor}
   ];
@@ -4945,12 +4960,12 @@ function downloadTeamIncentiveReport(){
     T.incSal+=(sal+perf); T.brok+=tt.brok; T.t1+=tt.br.base5; T.t2+=tt.br.extra2;
     T.demat+=tt.demat; T.dInc+=tt.dematInc; T.mf+=tt.mf; T.mfInc+=tt.mfInc;
     T.ns+=tt.netSales; T.nsInc+=(tt.netSalesInc||0); T.sip+=tt.sip; T.sipInc+=tt.sipInc;
-    T.broCl+=tt.broClientInc; T.perf+=tt.perfPay; T.other+=tt.other; T.lateDed+=tt.lateDeductionAmt; T.total+=tt.total; T.paid+=paid; T.bal+=bal;
+    T.broCl+=tt.broClientInc; T.perf+=tt.perfPay; T.other+=tt.other; T.gross=(T.gross||0)+tt.rawTotal; T.lateDed+=tt.lateDeductionAmt; T.total+=tt.total; T.paid+=paid; T.bal+=bal;
     return [e.name, sal+perf, tt.brok, tt.br.base5, tt.br.extra2, tt.demat, tt.dematInc,
             tt.mf, tt.mfInc, tt.netSales, tt.netSalesInc||0, tt.sip, tt.sipInc,
-            tt.broClientInc, tt.perfPay, tt.other, tt.lateDeductionAmt, tt.total, paid, bal];
+            tt.broClientInc, tt.perfPay, tt.other, tt.rawTotal, tt.lateDeductionAmt, tt.total, paid, bal];
   });
-  const totalRow=['TOTAL',T.incSal,T.brok,T.t1,T.t2,T.demat,T.dInc,T.mf,T.mfInc,T.ns,T.nsInc,T.sip,T.sipInc,T.broCl,T.perf,T.other,T.lateDed,T.total,T.paid,T.bal];
+  const totalRow=['TOTAL',T.incSal,T.brok,T.t1,T.t2,T.demat,T.dInc,T.mf,T.mfInc,T.ns,T.nsInc,T.sip,T.sipInc,T.broCl,T.perf,T.other,T.gross,T.lateDed,T.total,T.paid,T.bal];
 
   // Summary sheet
   const summaryRows=[
