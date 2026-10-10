@@ -5281,6 +5281,18 @@ async function saveLead(){
     if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date cannot be before '+_fd(_cl.ncMin),'error'); return; }
              if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date cannot be after '+_fd(_cl.ncMax),'error'); return; } }
   }
+  // 10-Oct-2026: RM can move Next Call only after updating Last Call to TODAY. Admin exempt.
+  if(CU && CU.role!=='admin' && currentEditLeadId){
+    const _old=(DB.get('leads')||[]).find(x=>x.id===currentEditLeadId)||{};
+    const _newNc=(document.getElementById('l_next_call')||{value:''}).value;
+    const _newLc=(document.getElementById('l_last_call')||{value:''}).value;
+    if(_newNc && _newNc!==(_old.next_call||'') && _newLc!==today()){
+      toast('⚠️ To change the Next Call date, first set Last Call to TODAY ('+fmtDate(today())+') — i.e. make the call first.','error');
+      const el=document.getElementById('l_last_call');
+      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',4000); }
+      return;
+    }
+  }
 
   const gv2=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
   const leads=DB.get('leads')||[];
@@ -7094,6 +7106,19 @@ async function saveClient(){
              if(_cl.lcMax && _lc>_cl.lcMax){ toast('Last Call date cannot be after '+_fd(_cl.lcMax),'error'); return; } }
     if(_nc){ if(_cl.ncMin && _nc<_cl.ncMin){ toast('Next Call date cannot be before '+_fd(_cl.ncMin),'error'); return; }
              if(_cl.ncMax && _nc>_cl.ncMax){ toast('Next Call date cannot be after '+_fd(_cl.ncMax),'error'); return; } }
+  }
+  // 10-Oct-2026: RM can move Next Call only after updating Last Call to TODAY
+  // (stops "just push the date to tomorrow" without calling). Admin exempt.
+  if(CU && CU.role!=='admin' && currentEditId && !document.getElementById('f_do_not_call')?.checked){
+    const _old=(DB.get(seg==='equity'?'eq_clients':'mf_clients')||[]).find(x=>x.id===currentEditId)||{};
+    const _newNc=(document.getElementById('f_next_call')||{value:''}).value;
+    const _newLc=(document.getElementById('f_last_call')||{value:''}).value;
+    if(_newNc && _newNc!==(_old.next_call||'') && _newLc!==today()){
+      toast('⚠️ To change the Next Call date, first set Last Call to TODAY ('+fmtDate(today())+') — i.e. make the call first.','error');
+      const el=document.getElementById('f_last_call');
+      if(el){ el.focus(); el.style.border='2px solid var(--red)'; setTimeout(()=>el.style.border='',4000); }
+      return;
+    }
   }
 
   // Mandatory field validation
@@ -10406,6 +10431,7 @@ function renderReports(){
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
     {icon:'🔀',title:'RM Shift History',desc:'Clients moved between RMs — date & RM wise',fn:'rmShiftReport'},
     {icon:'⚠️',title:'Stale Remarks Report',desc:'Remarks unchanged 3+ updates in a row — Equity+MF, RM wise',fn:'staleRemarksReport'},
+    {icon:'🔍',title:'Call Check (RM + Date)',desc:'Why a day\'s calls don\'t match the Last Call filter — every client the RM touched that day, with the reason',fn:'callCheckReport'},
     {icon:'🕵️',title:'Fake Update Report',desc:'Next call date pushed without a real call — blank note, no call log, rapid-fire updates, repeated remarks',fn:'fakeUpdateReport'},
   ];
   document.getElementById('eq-reports').innerHTML=eqCards.map(r=>reportCard(r)).join('');
@@ -16123,4 +16149,128 @@ function _fuRender(onlyWho){
   currentReportData={title:'Fake Update Report — '+onlyWho+' '+rangeLabel,
     headers:['Date','Time','Client','Segment','Next Call','Note','Flags'],
     rows:ev.map(e=>[fmtDate(_fuLocalDate(e.ts)),_fuTime(e.ts),e.client,e.seg,e.next?fmtDate(e.next):'',e.note,e.flags.join(' | ')])};
+}
+
+
+// ══════════════════════════════════════════
+// CALL CHECK (RM + DATE) — 10-Oct-2026
+// Answers: "RM shows 30 calls today, but tomorrow when I filter Last Call =
+// today, only 15 clients show — where are the other 15?"
+// Lists every client the RM touched on that date (call logs + edits) and
+// gives each one a verdict explaining why it does / doesn't match the
+// Last Call filter now.
+// ══════════════════════════════════════════
+async function callCheckReport(rmPick, datePick){
+  if(!CU || CU.role!=='admin'){ toast('This report is for admin only','error'); return; }
+  const date = datePick || today();
+  const rms = [...new Set([...getSegRMs('equity'),...getSegRMs('mf')])].sort((a,b)=>a.localeCompare(b));
+  const rm = rmPick || '';
+  document.getElementById('reportModalTitle').textContent='🔍 Call Check (RM + Date)';
+  const bar = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">
+      <span style="font-size:.72rem;font-weight:700;color:var(--gray)">RM:</span>
+      <select id="ccRm" style="padding:5px;font-size:.78rem"><option value="">— select RM —</option>${rms.map(r=>`<option ${r===rm?'selected':''}>${escapeHtml(r)}</option>`).join('')}</select>
+      <span style="font-size:.72rem;font-weight:700;color:var(--gray)">DATE:</span>
+      <input type="date" id="ccDate" value="${date}" style="padding:5px;font-size:.78rem">
+      <button class="btn btn-sm btn-teal" onclick="callCheckReport(document.getElementById('ccRm').value,document.getElementById('ccDate').value)">Check</button>
+    </div>`;
+  document.getElementById('reportModal').classList.add('open');
+  if(!rm){
+    document.getElementById('reportModalBody').innerHTML = bar+'<p style="color:var(--gray);padding:10px">Select an RM and a date, then press Check.</p>';
+    currentReportData={title:'Call Check',headers:[],rows:[]};
+    return;
+  }
+  document.getElementById('reportModalBody').innerHTML = bar+'<p style="color:var(--gray);padding:10px">⏳ Checking…</p>';
+
+  const RMU = rm.trim().toUpperCase();
+  const mine = x => String(x.by||'').trim().toUpperCase()===RMU || (!x.by && String(x.rm||'').trim().toUpperCase()===RMU);
+  // whole month + next month (later changes to Last Call matter)
+  const nextM = (()=>{ const d=new Date(date+'T00:00:00'); d.setMonth(d.getMonth()+1); return d.toISOString().slice(0,10); })();
+  const calls = await _fuGather('call_logs', date, nextM);
+  const acts  = await _fuGather('activity_logs', date, nextM);
+
+  const dayCalls = calls.filter(l=>mine(l) && (_fuLocalDate(l.ts||l.date)===date));
+  const dayEdits = acts.filter(a=>mine(a) && (a.type==='edit'||a.type==='call_update') && _fuLocalDate(a.date)===date
+    && (a.changes||[]).some(c=>c.field==='next_call'||c.field==='last_call_date'));
+
+  // one row per touch; group by client
+  const eqAll = DB.get('eq_clients')||[], mfAll = DB.get('mf_clients')||[], leadAll = DB.get('leads')||[];
+  const findClient = (id, seg) => {
+    if(seg==='lead') return {rec:leadAll.find(c=>c.id===id), page:'Leads', lastField:'last_call'};
+    if(seg==='mf')   return {rec:mfAll.find(c=>c.id===id),   page:'MF Investors', lastField:'last_call_date'};
+    return {rec:eqAll.find(c=>c.id===id), page:'Equity Clients', lastField:'last_call_date'};
+  };
+  const touches = {};
+  dayCalls.forEach(l=>{
+    const k=l.client_id; (touches[k]=touches[k]||{id:k, seg:l.seg||'equity', name:l.client_name||'—', calls:[], edits:[]}).calls.push(l);
+  });
+  dayEdits.forEach(a=>{
+    const k=a.client_id; (touches[k]=touches[k]||{id:k, seg:a.seg||'equity', name:a.client_name||'—', calls:[], edits:[]}).edits.push(a);
+  });
+
+  const rows=[]; const tally={};
+  Object.values(touches).forEach(t=>{
+    const {rec,page,lastField} = findClient(t.id, t.seg);
+    const curLast = rec ? (rec[lastField]||'') : '';
+    let verdict, color;
+    // Was Last Call changed AFTER this day by anyone?
+    const later = acts.filter(a=>a.client_id===t.id && _fuLocalDate(a.date)>date &&
+      (a.changes||[]).some(c=>c.field==='last_call_date'))
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const laterCall = calls.filter(l=>l.client_id===t.id && _fuLocalDate(l.ts||l.date)>date);
+    const callDates = t.calls.map(l=>l.date).filter(Boolean);
+    const editLast = t.edits.flatMap(a=>(a.changes||[]).filter(c=>c.field==='last_call_date').map(c=>c.new));
+    const editNextOnly = t.edits.length && !editLast.length && !t.calls.length;
+
+    if(!rec){ verdict='🗑 Client deleted / moved — not found'; color='#64748b'; }
+    else if(editNextOnly){ verdict='❌ FAKE — only Next Call moved, Last Call NOT updated, no call logged'; color='#dc2626'; }
+    else if(curLast===date){
+      verdict = t.seg==='equity' ? '✅ Shows in filter' : '✅ Updated — but on '+page+' page, not Equity'; color = t.seg==='equity'?'#16a34a':'#0891b2';
+    }
+    else if(callDates.length && callDates.every(d=>d!==date) && !editLast.includes(date)){
+      verdict='📅 Call logged today but Last Call date set to '+callDates.map(fmtDate).join(', ')+' (backdated/other date)'; color='#d97706';
+    }
+    else if(later.length || laterCall.length){
+      const who = later.length ? (later[later.length-1].by||'—') : (laterCall[laterCall.length-1].by||'—');
+      verdict='➡️ Called again later — Last Call now '+fmtDate(curLast)+' (by '+who+')'; color='#7c3aed';
+    }
+    else if(!curLast){ verdict='❌ Last Call is blank on the client'; color='#dc2626'; }
+    else { verdict='❌ Last Call shows '+fmtDate(curLast)+' — not updated to this date'; color='#dc2626'; }
+
+    const key=verdict.split(' ')[0]+' '+verdict.split(' ')[1];
+    tally[verdict.slice(0,2)]=(tally[verdict.slice(0,2)]||0)+1;
+    const times=[...t.calls.map(l=>l.ts),...t.edits.map(a=>a.date)].sort().map(_fuTime).join(', ');
+    rows.push({name:t.name, seg:t.seg==='equity'?'EQ':t.seg==='mf'?'MF':'Lead', touches:t.calls.length+t.edits.length,
+      calls:t.calls.length, times, curLast, note:(t.calls.map(l=>l.note).filter(Boolean).pop()||''), verdict, color});
+  });
+  rows.sort((a,b)=>a.color.localeCompare(b.color));
+
+  const totalCallLogs = dayCalls.length;
+  const unique = rows.length;
+  const showsEq = rows.filter(r=>r.verdict.startsWith('✅ Shows')).length;
+  const fake = rows.filter(r=>r.verdict.startsWith('❌')).length;
+  const dup = totalCallLogs - rows.filter(r=>r.calls>0).length;
+  const card=(n,l,c)=>`<div style="flex:1;min-width:120px;background:${c}14;border:1.5px solid ${c};border-radius:10px;padding:8px 10px"><div style="font-size:1.3rem;font-weight:900;color:${c}">${n}</div><div style="font-size:.7rem;font-weight:700;color:${c}">${l}</div></div>`;
+  let h = bar + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      ${card(totalCallLogs,'Call logs entered','#1d4ed8')}
+      ${card(unique,'Unique clients touched','#0891b2')}
+      ${card(dup,'Same client logged twice+','#7c3aed')}
+      ${card(showsEq,'Show in Equity Last Call filter','#16a34a')}
+      ${card(fake,'❌ Not updated / fake','#dc2626')}
+    </div>
+    <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
+      <th>Client</th><th>Seg</th><th>Times touched</th><th>Time(s)</th><th>Last Call now</th><th>Note</th><th>Reason</th></tr></thead><tbody>`;
+  if(!rows.length) h+=`<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--gray)">${escapeHtml(rm)} did not log any call or edit on ${fmtDate(date)}</td></tr>`;
+  rows.forEach(r=>{
+    h+=`<tr><td style="font-weight:600">${escapeHtml(r.name)}</td><td>${r.seg}</td>
+      <td style="text-align:center">${r.touches}${r.calls>1?' <span style="color:#7c3aed;font-weight:700">(×'+r.calls+')</span>':''}</td>
+      <td style="font-size:.72rem;white-space:normal">${r.times}</td>
+      <td>${r.curLast?fmtDate(r.curLast):'—'}</td>
+      <td style="max-width:180px;white-space:normal;font-size:.75rem">${r.note?escapeHtml(r.note):'<span style="color:#bbb">—</span>'}</td>
+      <td style="white-space:normal"><span style="color:${r.color};font-weight:700;font-size:.78rem">${escapeHtml(r.verdict)}</span></td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  document.getElementById('reportModalBody').innerHTML=h;
+  currentReportData={title:'Call Check '+rm+' '+date,
+    headers:['Client','Segment','Times touched','Time(s)','Last Call now','Note','Reason'],
+    rows:rows.map(r=>[r.name,r.seg,r.touches,r.times,r.curLast?fmtDate(r.curLast):'',r.note,r.verdict])};
 }
