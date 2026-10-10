@@ -5208,8 +5208,8 @@ function leadForm(c){
   </div>
   <div class="form-section">Follow-up</div>
   <div class="form-row three">
-    <div class="form-field"><label>Last Calling Date</label><input id="l_last_call" type="date" value="${c?.last_call||''}"${_lcAttr()}></div>
-    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()}></div>
+    <div class="form-field"><label>Last Calling Date</label><input id="l_last_call" type="date" value="${c?.last_call||''}" data-orig="${c?.last_call||''}"${_lcAttr()}></div>
+    <div class="form-field"><label>Next Calling Date</label><input id="l_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${(c && CU && CU.role!=='admin' && c.last_call!==today())?'disabled data-nclock="1" title="First set Last Calling Date to today"':''}>${(c && CU && CU.role!=='admin' && c.last_call!==today())?'<div id="l_nc_hint" style="font-size:.7rem;color:var(--red);font-weight:600;margin-top:3px">🔒 First set Last Calling Date to today</div>':''}</div>
     <div class="form-field"><label>Follow-up Status</label><select id="l_followup">
       <option value="">—</option>
       <option ${c?.followup_status==='Pending'?'selected':''}>Pending</option>
@@ -6937,13 +6937,14 @@ function clientForm(seg, c){
     <div class="form-row three">
       <div class="form-field"><label>Last Trade Date ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}" ${(CU&&CU.role==='admin')?'':'disabled title="Only Admin can change the Last Trade Date"'}></div>
       <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
-      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"${_lcAttr()}></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" data-orig="${c?.last_call_date||''}"${_lcAttr()}></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
       <div class="form-field">
         <label>Next Calling Date</label>
-        <input id="f_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${c?.do_not_call?'disabled':''}>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${c?.do_not_call?'disabled':''} ${(c && CU && CU.role!=='admin' && c.last_call_date!==today())?'disabled data-nclock="1" title="First set Last Calling Date to today"':''}>
+        ${(c && CU && CU.role!=='admin' && c.last_call_date!==today())?'<div id="f_nc_hint" style="font-size:.7rem;color:var(--red);font-weight:600;margin-top:3px">🔒 First set Last Calling Date to today</div>':''}
         <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
           <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
           🚫 Do Not Call
@@ -6996,14 +6997,15 @@ function clientForm(seg, c){
     </div>
     <div class="form-row three">
       <div class="form-field"><label>Last Investment Date</label><input id="f_last_invest" type="date" value="${c?.last_invest_date||''}"></div>
-      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}"${_lcAttr()}></div>
+      <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" data-orig="${c?.last_call_date||''}"${_lcAttr()}></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
     <div class="form-section">Follow-up</div>
     <div class="form-row three">
       <div class="form-field">
         <label>Next Calling Date</label>
-        <input id="f_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${c?.do_not_call?'disabled':''}>
+        <input id="f_next_call" type="date" value="${c?.next_call||''}"${_ncAttr()} ${c?.do_not_call?'disabled':''} ${(c && CU && CU.role!=='admin' && c.last_call_date!==today())?'disabled data-nclock="1" title="First set Last Calling Date to today"':''}>
+        ${(c && CU && CU.role!=='admin' && c.last_call_date!==today())?'<div id="f_nc_hint" style="font-size:.7rem;color:var(--red);font-weight:600;margin-top:3px">🔒 First set Last Calling Date to today</div>':''}
         <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.8rem;cursor:pointer">
           <input type="checkbox" id="f_do_not_call" onchange="toggleDNC(this)" ${c?.do_not_call?'checked':''}>
           🚫 Do Not Call
@@ -13180,6 +13182,7 @@ function onUserRoleChange(sel){
 
 
 function toggleDNC(cb){
+  { const _d=document.getElementById('f_next_call'); if(_d && _d.dataset.nclock==='1' && !cb.checked){ _d.disabled=true; return; } }
   const dateInput = document.getElementById('f_next_call');
   if(!dateInput) return;
   if(cb.checked){
@@ -16274,3 +16277,27 @@ async function callCheckReport(rmPick, datePick){
     headers:['Client','Segment','Times touched','Time(s)','Last Call now','Note','Reason'],
     rows:rows.map(r=>[r.name,r.seg,r.touches,r.times,r.curLast?fmtDate(r.curLast):'',r.note,r.verdict])};
 }
+
+
+// ══════════════════════════════════════════
+// NEXT CALL LOCK (10-Oct-2026) — RM can move the Next Calling Date only after
+// updating the Last Calling Date to TODAY in the same Edit form. Admin exempt.
+// ══════════════════════════════════════════
+(function(){
+  function sync(lcId, ncId, hintId){
+    const lc=document.getElementById(lcId), nc=document.getElementById(ncId);
+    if(!lc || !nc || !nc.dataset.nclock) return;
+    const ok = lc.value===today();
+    const dnc = document.getElementById('f_do_not_call');
+    nc.disabled = !ok || (ncId==='f_next_call' && dnc && dnc.checked);
+    nc.dataset.nclock = ok ? '0' : '1';
+    const h=document.getElementById(hintId);
+    if(h){ h.textContent = ok ? '✅ Next Call unlocked' : '🔒 First set Last Calling Date to today';
+           h.style.color = ok ? 'var(--green)' : 'var(--red)'; }
+  }
+  ['input','change'].forEach(ev=>document.addEventListener(ev, e=>{
+    if(!e.target) return;
+    if(e.target.id==='f_last_call') sync('f_last_call','f_next_call','f_nc_hint');
+    if(e.target.id==='l_last_call') sync('l_last_call','l_next_call','l_nc_hint');
+  }, true));
+})();
