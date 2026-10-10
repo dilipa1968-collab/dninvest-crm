@@ -3688,6 +3688,7 @@ function refreshDash(){
     statsHtml+=sc('₹'+fmtNum(totalSIP),'Monthly SIP','purple','mf');
   }
   document.getElementById('dashStats').innerHTML=statsHtml;
+  try{ renderRmFollowupStrip(activeEq, mf); }catch(e){ console.log('fu strip err',e); }
 
   // Equity RM chart
   if(hasEq){
@@ -16301,3 +16302,47 @@ async function callCheckReport(rmPick, datePick){
     if(e.target.id==='l_last_call') sync('l_last_call','l_next_call','l_nc_hint');
   }, true));
 })();
+
+
+// ══════════════════════════════════════════
+// RM-WISE FOLLOW-UP STRIP (10-Oct-2026) — sits just above the EQUITY /
+// MUTUAL FUND headers on the Dashboard. One chip per RM:
+//   RIYA  EQ 12 + MF 8 = 20
+// "Due" = Next Call is today or overdue — same rule as the
+// "Follow-ups Due" card, so the chips add up to that card's number.
+// ══════════════════════════════════════════
+function renderRmFollowupStrip(activeEq, mf){
+  const statsEl=document.getElementById('dashStats');
+  if(!statsEl) return;
+  let el=document.getElementById('rmFuStrip');
+  if(!el){
+    el=document.createElement('div');
+    el.id='rmFuStrip';
+    el.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px';
+    statsEl.parentNode.insertBefore(el, statsEl.nextSibling);
+  }
+  const t=today();
+  const map={};
+  const add=(rm,k)=>{ const n=(rm||'').trim()||'— No RM'; const key=n.toUpperCase();
+    (map[key]=map[key]||{name:n,eq:0,mf:0})[k]++; };
+  (activeEq||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) add(c.rm,'eq'); });
+  (mf||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) add(c.rm,'mf'); });
+  const rows=Object.values(map).map(r=>({...r,tot:r.eq+r.mf})).sort((a,b)=>b.tot-a.tot);
+  if(!rows.length){ el.innerHTML=''; el.style.display='none'; return; }
+  el.style.display='flex';
+  const sumEq=rows.reduce((s,r)=>s+r.eq,0), sumMf=rows.reduce((s,r)=>s+r.mf,0);
+  const chip=(r,isTotal)=>{
+    const c = isTotal ? '#0f1f3d' : (r.tot>=30?'#dc2626':r.tot>=15?'#d97706':'#16a34a');
+    return `<div style="display:flex;align-items:center;gap:6px;background:${isTotal?'#0f1f3d':'#fff'};border:1.5px solid ${c};border-left:5px solid ${c};border-radius:9px;padding:5px 10px;font-size:.78rem;box-shadow:0 1px 4px rgba(10,20,50,.06)">
+      <b style="color:${isTotal?'#f5d98a':'var(--navy)'};text-transform:uppercase">${escapeHtml(r.name)}</b>
+      <span style="color:${isTotal?'#c3cad9':'#1d4ed8'};font-weight:700">EQ ${r.eq}</span>
+      <span style="color:${isTotal?'#c3cad9':'#94a3b8'}">+</span>
+      <span style="color:${isTotal?'#c3cad9':'#0d9488'};font-weight:700">MF ${r.mf}</span>
+      <span style="color:${isTotal?'#c3cad9':'#94a3b8'}">=</span>
+      <b style="color:${isTotal?'#fff':c};font-size:.9rem">${r.tot}</b>
+    </div>`;
+  };
+  el.innerHTML = `<span style="font-size:.72rem;font-weight:800;color:var(--gray);letter-spacing:.5px">📞 FOLLOW-UPS DUE (RM-WISE):</span>`
+    + rows.map(r=>chip(r,false)).join('')
+    + (rows.length>1 ? chip({name:'Total',eq:sumEq,mf:sumMf,tot:sumEq+sumMf},true) : '');
+}
