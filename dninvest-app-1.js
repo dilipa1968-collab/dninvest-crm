@@ -9366,8 +9366,25 @@ const MFTXN_TYPE_COLOR = {
   STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
 };
 const MFTXN_SOURCE_COLOR = {
-  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#059669', NSE:'#0891B2', MFC:'#DB2777', Physical:'#C2410C'
+  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#059669', NSE:'#0891B2', MFC:'#DB2777', Physical:'#C2410C', Sharekhan:'#B91C1C'
 };
+// 10-Oct-2026: "Sharekhan" source added. The Source dropdowns themselves live
+// in index.html, so this adds the option at runtime to every Source select
+// (New Transaction form, filter bar, Edit Business modal) if it isn't there yet.
+(function addSharekhanSource(){
+  function inject(){
+    ['mftxn-source','mftxn-source-filter','biz_source'].forEach(id=>{
+      const sel=document.getElementById(id);
+      if(!sel) return;
+      if([...sel.options].some(o=>o.value==='Sharekhan')) return;
+      const opt=document.createElement('option');
+      opt.value='Sharekhan'; opt.textContent='Sharekhan';
+      const phys=[...sel.options].find(o=>o.value==='Physical');
+      if(phys) sel.insertBefore(opt, phys); else sel.appendChild(opt);
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', inject); else inject();
+})();
 
 function renderMfTxnTable(){
   const wrap=document.getElementById('mftxn-table');
