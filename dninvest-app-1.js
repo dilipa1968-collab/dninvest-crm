@@ -15911,3 +15911,51 @@ async function loadOlderCalls(id, seg){
     box.innerHTML='<p style="color:var(--red);font-size:.82rem">Could not load the archive: '+escapeHtml(String(e.message||e))+'</p>';
   }
 }
+
+// ══════════════════════════════════════════
+// COLUMN FILTER "(Select All)" TOGGLE FIX (10-Oct-2026)
+// Clicking "(Select All)" when every item is already ticked now UNTICKS all
+// of them; otherwise it ticks all. Works for every column-filter dropdown
+// (Equity / MF / Leads / MF Transactions / Demat). Each item checkbox gets a
+// real 'change' event, so the filter's own state stays in sync and Apply
+// works exactly as before.
+// ══════════════════════════════════════════
+(function(){
+  function isSelectAllBox(cb){
+    if(!cb || cb.type!=='checkbox') return false;
+    const host = cb.closest('label') || cb.parentElement;
+    return !!host && /\(\s*select\s*all\s*\)/i.test(host.textContent||'');
+  }
+  function listContainer(cb){
+    let el = cb.parentElement;
+    while(el && el!==document.body){
+      if(el.querySelectorAll('input[type=checkbox]').length > 2) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+  document.addEventListener('click', function(e){
+    const cb = e.target;
+    if(!isSelectAllBox(cb)) return;
+    const box = listContainer(cb);
+    if(!box) return;
+    const items = [...box.querySelectorAll('input[type=checkbox]')]
+      .filter(x => x!==cb && x.offsetParent!==null);   // only visible (respects search)
+    if(!items.length) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const allOn = items.every(x=>x.checked);
+    const want = !allOn;
+    setTimeout(()=>{
+      items.forEach(x=>{
+        if(x.checked!==want){
+          x.checked = want;
+          x.dispatchEvent(new Event('change', {bubbles:true}));
+          x.dispatchEvent(new Event('input',  {bubbles:true}));
+        }
+      });
+      cb.checked = want;
+      cb.indeterminate = false;
+    }, 0);
+  }, true);
+})();
