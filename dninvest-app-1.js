@@ -16318,42 +16318,56 @@ function renderRmFollowupStrip(activeEq, mf){
   if(!el){
     el=document.createElement('div');
     el.id='rmFuStrip';
-    el.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px';
+    el.style.cssText='margin:0 0 12px';
     statsEl.parentNode.insertBefore(el, statsEl.nextSibling);
   }
   const t=today();
   const map={};
-  const add=(rm,k)=>{ const n=(rm||'').trim()||'— No RM'; const key=n.toUpperCase();
-    (map[key]=map[key]||{name:n,eq:0,mf:0})[k]++; };
-  (activeEq||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) add(c.rm,'eq'); });
-  (mf||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) add(c.rm,'mf'); });
-  const rows=Object.values(map).map(r=>({...r,tot:r.eq+r.mf})).sort((a,b)=>b.tot-a.tot);
+  const ensure=n=>{ const nm=(n||'').trim()||'— No RM'; const k=nm.toUpperCase(); return map[k]=map[k]||{name:nm,eq:0,mf:0}; };
+  // Admin: show EVERY active RM (even with 0 due). RM: only themselves.
+  if(CU && CU.role==='admin'){
+    [...new Set([...getSegRMs('equity'),...getSegRMs('mf')])].forEach(ensure);
+  } else if(CU){ ensure(CU.name); }
+  (activeEq||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) ensure(c.rm).eq++; });
+  (mf||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) ensure(c.rm).mf++; });
+  const rows=Object.values(map).map(r=>({...r,tot:r.eq+r.mf})).sort((a,b)=>b.tot-a.tot||a.name.localeCompare(b.name));
   if(!rows.length){ el.innerHTML=''; el.style.display='none'; return; }
-  el.style.display='flex';
+  el.style.display='block';
   const sumEq=rows.reduce((s,r)=>s+r.eq,0), sumMf=rows.reduce((s,r)=>s+r.mf,0);
-  // Each RM gets their own colour; chip = soft watercolour wash of that colour
-  // with a border in the same colour.
-  const RM_COL={ROHIT:'#4338CA',RIYA:'#DB2777',RAJU:'#B91C1C',BHARAT:'#047857',KHOKHAN:'#0F766E',
-    PUJA:'#0369A1',KOMAL:'#7E22CE',MEGHA:'#B45309',ANJALI:'#475569',SHYAM:'#C2410C',ADMIN:'#1E3A8A'};
-  const FALL=['#9333EA','#0891B2','#65A30D','#E11D48','#CA8A04','#2563EB','#059669','#C026D3'];
+
+  // Each RM its own colour — very light watercolour wash + same-colour border
+  const RM_COL={ROHIT:'#6366F1',RIYA:'#EC4899',RAJU:'#EF4444',BHARAT:'#10B981',KHOKHAN:'#14B8A6',
+    PUJA:'#0EA5E9',KOMAL:'#A855F7',MEGHA:'#F59E0B',ANJALI:'#64748B',SHYAM:'#F97316',ADMIN:'#3B82F6'};
+  const FALL=['#8B5CF6','#06B6D4','#84CC16','#F43F5E','#EAB308','#3B82F6','#22C55E','#D946EF'];
   const colFor=n=>{ const k=String(n||'').trim().toUpperCase(); if(RM_COL[k]) return RM_COL[k];
     let h=0; for(let i=0;i<k.length;i++) h=(h*31+k.charCodeAt(i))>>>0; return FALL[h%FALL.length]; };
   const chip=(r,isTotal)=>{
     const c = isTotal ? '#0f1f3d' : colFor(r.name);
     const wash = isTotal ? '#0f1f3d'
-      : `radial-gradient(circle at 18% 30%, ${c}38 0%, transparent 55%),
-         radial-gradient(circle at 82% 70%, ${c}2E 0%, transparent 60%),
-         radial-gradient(circle at 50% 50%, ${c}14 0%, ${c}0A 100%), #fff`;
-    return `<div style="display:flex;align-items:center;gap:6px;background:${wash};border:2px solid ${c};border-radius:12px;padding:6px 12px;font-size:.78rem;box-shadow:0 2px 8px ${c}26">
-      <b style="color:${isTotal?'#f5d98a':c};text-transform:uppercase;letter-spacing:.3px">${escapeHtml(r.name)}</b>
-      <span style="color:${isTotal?'#c3cad9':c};font-weight:700;opacity:.85">EQ ${r.eq}</span>
-      <span style="color:${isTotal?'#c3cad9':c};opacity:.6">+</span>
-      <span style="color:${isTotal?'#c3cad9':c};font-weight:700;opacity:.85">MF ${r.mf}</span>
-      <span style="color:${isTotal?'#c3cad9':c};opacity:.6">=</span>
-      <b style="color:${isTotal?'#fff':'#fff'};background:${isTotal?'transparent':c};border-radius:7px;padding:0 7px;font-size:.88rem">${r.tot}</b>
+      : `radial-gradient(circle at 15% 25%, ${c}22 0%, transparent 55%),
+         radial-gradient(circle at 85% 75%, ${c}1A 0%, transparent 60%),
+         ${c}08`;
+    const tx = isTotal ? '#c3cad9' : c;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;background:${wash};border:1.5px solid ${isTotal?c:c+'99'};border-radius:11px;padding:5px 8px;font-size:clamp(.62rem,.8vw,.78rem);white-space:nowrap;overflow:hidden">
+      <b style="color:${isTotal?'#f5d98a':c};text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;min-width:0">${escapeHtml(r.name)}</b>
+      <span style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+        <span style="color:${tx};font-weight:700;opacity:.8">EQ ${r.eq}</span>
+        <span style="color:${tx};opacity:.5">+</span>
+        <span style="color:${tx};font-weight:700;opacity:.8">MF ${r.mf}</span>
+        <span style="color:${tx};opacity:.5">=</span>
+        <b style="color:#fff;background:${isTotal?'#c9942a':c};border-radius:6px;padding:0 6px">${r.tot}</b>
+      </span>
     </div>`;
   };
-  el.innerHTML = `<span style="font-size:.72rem;font-weight:800;color:var(--gray);letter-spacing:.5px">📞 FOLLOW-UPS DUE (RM-WISE):</span>`
-    + rows.map(r=>chip(r,false)).join('')
-    + (rows.length>1 ? chip({name:'Total',eq:sumEq,mf:sumMf,tot:sumEq+sumMf},true) : '');
+  const items = rows.map(r=>chip(r,false));
+  if(rows.length>1) items.push(chip({name:'Total',eq:sumEq,mf:sumMf,tot:sumEq+sumMf},true));
+  // fit everything into 2 rows: columns = half the chips (rounded up)
+  const cols = Math.max(1, Math.ceil(items.length/2));
+  el.innerHTML = `<div style="font-size:.7rem;font-weight:800;color:var(--gray);letter-spacing:.5px;margin-bottom:5px">📞 FOLLOW-UPS DUE (RM-WISE)</div>
+    <div id="rmFuGrid" style="display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:6px">${items.join('')}</div>`;
+}
+if(!document.getElementById('rmFuStripCss')){
+  const st=document.createElement('style'); st.id='rmFuStripCss';
+  st.textContent='@media(max-width:800px){#rmFuGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}';
+  document.head.appendChild(st);
 }
