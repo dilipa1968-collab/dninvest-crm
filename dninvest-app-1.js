@@ -16351,12 +16351,14 @@ function renderRmFollowupStrip(activeEq, mf){
          radial-gradient(circle at 85% 75%, ${c}1A 0%, transparent 60%),
          ${c}08`;
     const tx = isTotal ? '#c3cad9' : c;
+    // darker shade of the RM colour, just for the numbers
+    const dk = (()=>{ const h=c.replace('#',''); const f=i=>Math.round(parseInt(h.substr(i,2),16)*0.45).toString(16).padStart(2,'0'); return '#'+f(0)+f(2)+f(4); })();
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;background:${wash};border:1.5px solid ${isTotal?c:c+'99'};border-radius:11px;padding:5px 8px;font-size:clamp(.62rem,.8vw,.78rem);white-space:nowrap;overflow:hidden">
       <b style="color:${isTotal?'#f5d98a':c};text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;min-width:0">${escapeHtml(r.name)}</b>
       <span style="display:flex;align-items:center;gap:3px;flex-shrink:0">
-        <span style="color:${tx};font-weight:700;opacity:.8">EQ ${r.eq}</span>
+        <span style="color:${tx};font-weight:700;opacity:.8">EQ <b style="color:${isTotal?'#fff':dk};font-weight:900">${r.eq}</b></span>
         <span style="color:${tx};opacity:.5">+</span>
-        <span style="color:${tx};font-weight:700;opacity:.8">MF ${r.mf}</span>
+        <span style="color:${tx};font-weight:700;opacity:.8">MF <b style="color:${isTotal?'#fff':dk};font-weight:900">${r.mf}</b></span>
         <span style="color:${tx};opacity:.5">=</span>
         <b style="color:#fff;background:${isTotal?'#c9942a':c};border-radius:6px;padding:0 6px">${r.tot}</b>
       </span>
