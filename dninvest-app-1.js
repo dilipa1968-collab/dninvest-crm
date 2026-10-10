@@ -16331,15 +16331,26 @@ function renderRmFollowupStrip(activeEq, mf){
   if(!rows.length){ el.innerHTML=''; el.style.display='none'; return; }
   el.style.display='flex';
   const sumEq=rows.reduce((s,r)=>s+r.eq,0), sumMf=rows.reduce((s,r)=>s+r.mf,0);
+  // Each RM gets their own colour; chip = soft watercolour wash of that colour
+  // with a border in the same colour.
+  const RM_COL={ROHIT:'#4338CA',RIYA:'#DB2777',RAJU:'#B91C1C',BHARAT:'#047857',KHOKHAN:'#0F766E',
+    PUJA:'#0369A1',KOMAL:'#7E22CE',MEGHA:'#B45309',ANJALI:'#475569',SHYAM:'#C2410C',ADMIN:'#1E3A8A'};
+  const FALL=['#9333EA','#0891B2','#65A30D','#E11D48','#CA8A04','#2563EB','#059669','#C026D3'];
+  const colFor=n=>{ const k=String(n||'').trim().toUpperCase(); if(RM_COL[k]) return RM_COL[k];
+    let h=0; for(let i=0;i<k.length;i++) h=(h*31+k.charCodeAt(i))>>>0; return FALL[h%FALL.length]; };
   const chip=(r,isTotal)=>{
-    const c = isTotal ? '#0f1f3d' : (r.tot>=30?'#dc2626':r.tot>=15?'#d97706':'#16a34a');
-    return `<div style="display:flex;align-items:center;gap:6px;background:${isTotal?'#0f1f3d':'#fff'};border:1.5px solid ${c};border-left:5px solid ${c};border-radius:9px;padding:5px 10px;font-size:.78rem;box-shadow:0 1px 4px rgba(10,20,50,.06)">
-      <b style="color:${isTotal?'#f5d98a':'var(--navy)'};text-transform:uppercase">${escapeHtml(r.name)}</b>
-      <span style="color:${isTotal?'#c3cad9':'#1d4ed8'};font-weight:700">EQ ${r.eq}</span>
-      <span style="color:${isTotal?'#c3cad9':'#94a3b8'}">+</span>
-      <span style="color:${isTotal?'#c3cad9':'#0d9488'};font-weight:700">MF ${r.mf}</span>
-      <span style="color:${isTotal?'#c3cad9':'#94a3b8'}">=</span>
-      <b style="color:${isTotal?'#fff':c};font-size:.9rem">${r.tot}</b>
+    const c = isTotal ? '#0f1f3d' : colFor(r.name);
+    const wash = isTotal ? '#0f1f3d'
+      : `radial-gradient(circle at 18% 30%, ${c}38 0%, transparent 55%),
+         radial-gradient(circle at 82% 70%, ${c}2E 0%, transparent 60%),
+         radial-gradient(circle at 50% 50%, ${c}14 0%, ${c}0A 100%), #fff`;
+    return `<div style="display:flex;align-items:center;gap:6px;background:${wash};border:2px solid ${c};border-radius:12px;padding:6px 12px;font-size:.78rem;box-shadow:0 2px 8px ${c}26">
+      <b style="color:${isTotal?'#f5d98a':c};text-transform:uppercase;letter-spacing:.3px">${escapeHtml(r.name)}</b>
+      <span style="color:${isTotal?'#c3cad9':c};font-weight:700;opacity:.85">EQ ${r.eq}</span>
+      <span style="color:${isTotal?'#c3cad9':c};opacity:.6">+</span>
+      <span style="color:${isTotal?'#c3cad9':c};font-weight:700;opacity:.85">MF ${r.mf}</span>
+      <span style="color:${isTotal?'#c3cad9':c};opacity:.6">=</span>
+      <b style="color:${isTotal?'#fff':'#fff'};background:${isTotal?'transparent':c};border-radius:7px;padding:0 7px;font-size:.88rem">${r.tot}</b>
     </div>`;
   };
   el.innerHTML = `<span style="font-size:.72rem;font-weight:800;color:var(--gray);letter-spacing:.5px">📞 FOLLOW-UPS DUE (RM-WISE):</span>`
