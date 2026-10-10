@@ -10406,6 +10406,7 @@ function renderReports(){
     {icon:'📊',title:'RM Performance',desc:'Combined EQ+MF per RM',fn:'rmPerf'},
     {icon:'🔀',title:'RM Shift History',desc:'Clients moved between RMs — date & RM wise',fn:'rmShiftReport'},
     {icon:'⚠️',title:'Stale Remarks Report',desc:'Remarks unchanged 3+ updates in a row — Equity+MF, RM wise',fn:'staleRemarksReport'},
+    {icon:'🕵️',title:'Fake Update Report',desc:'Next call date pushed without a real call — blank note, no call log, rapid-fire updates, repeated remarks',fn:'fakeUpdateReport'},
   ];
   document.getElementById('eq-reports').innerHTML=eqCards.map(r=>reportCard(r)).join('');
   document.getElementById('mf-reports').innerHTML=mfCards.map(r=>reportCard(r)).join('');
@@ -15959,3 +15960,167 @@ async function loadOlderCalls(id, seg){
     }, 0);
   }, true);
 })();
+
+
+// ══════════════════════════════════════════
+// FAKE UPDATE REPORT (10-Oct-2026)
+// Finds updates where an RM most likely just pushed the Next Call date
+// forward without actually calling. The CRM is not connected to the phone,
+// so this cannot PROVE a call didn't happen — it flags the tell-tale signs:
+//   1. NO CALL LOG   – Next Call date changed via Edit with the "call will be
+//                      logged" switch turned OFF (no call log at that moment)
+//   2. BLANK NOTE    – call logged but Call Notes left empty
+//   3. RAPID         – call logged within 40 sec of the same RM's previous
+//                      call log (a real call + typing notes takes longer)
+//   4. SAME REMARK   – exact same note as the previous call on that client
+// Admin only. Reads live logs + the month-wise archive for the chosen range.
+// ══════════════════════════════════════════
+const FU_RAPID_SEC = 40;
+function _fuLocalDate(iso){
+  const d=new Date(iso); if(isNaN(d)) return String(iso||'').slice(0,10);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _fuTime(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+}
+async function _fuGather(key, from, to){
+  const byId={};
+  (DB.get(key)||[]).forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+  // months covered by the range → pull archived entries too
+  const months=[]; let d=new Date(from+'T00:00:00'); const end=new Date(to+'T00:00:00');
+  while(d<=end){ const m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); if(!months.includes(m)) months.push(m); d.setDate(d.getDate()+1); }
+  for(const m of months){
+    try{ (await DB.fetchLogMonth(key, m)).forEach(x=>{ if(x&&x.id&&!byId[x.id]) byId[x.id]=x; }); }catch(e){}
+  }
+  return Object.values(byId);
+}
+
+async function fakeUpdateReport(from, to){
+  if(!CU || CU.role!=='admin'){ toast('This report is for admin only','error'); return; }
+  const td=today();
+  from = from || td; to = to || td;
+  if(from>to){ const t=from; from=to; to=t; }
+  document.getElementById('reportModalTitle').textContent='🕵️ Fake Update Report';
+  document.getElementById('reportModalBody').innerHTML='<p style="padding:20px;color:var(--gray)">⏳ Loading call & activity logs…</p>';
+  document.getElementById('reportModal').classList.add('open');
+
+  const inRange = iso => { const dd=_fuLocalDate(iso); return dd>=from && dd<=to; };
+  const calls = (await _fuGather('call_logs', from, to)).filter(l=>l.ts && inRange(l.ts));
+  const acts  = (await _fuGather('activity_logs', from, to)).filter(a=>a.date && inRange(a.date));
+
+  // ── per-call flags ──
+  const events=[];
+  // rapid: group by who logged it
+  const byWho={};
+  calls.forEach(l=>{ const w=(l.by||l.rm||'—'); (byWho[w]=byWho[w]||[]).push(l); });
+  Object.values(byWho).forEach(list=>{
+    list.sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+    list.forEach((l,i)=>{ l._gap = i ? (new Date(l.ts)-new Date(list[i-1].ts))/1000 : null; });
+  });
+  // previous note per client (across ALL fetched calls, incl. before range would need more history — use what's loaded)
+  const byClient={};
+  calls.slice().sort((a,b)=>String(a.ts).localeCompare(String(b.ts))).forEach(l=>{
+    const prev=byClient[l.client_id];
+    l._prevNote = prev ? (prev.note||'') : null;
+    byClient[l.client_id]=l;
+  });
+  calls.forEach(l=>{
+    const flags=[];
+    const note=(l.note||'').trim();
+    if(!note) flags.push('BLANK NOTE');
+    if(l._gap!==null && l._gap>=0 && l._gap<FU_RAPID_SEC) flags.push('RAPID ('+Math.round(l._gap)+'s)');
+    if(note && l._prevNote!==null && note.toUpperCase()===String(l._prevNote).trim().toUpperCase()) flags.push('SAME REMARK');
+    if(!flags.length) return;
+    events.push({ts:l.ts, who:l.by||l.rm||'—', rm:l.rm||'—', client:l.client_name||'—',
+      seg:l.seg==='equity'?'EQ':l.seg==='mf'?'MF':l.seg==='lead'?'Lead':(l.seg||'—'),
+      next:l.next_call||'', note, flags});
+  });
+
+  // ── Next Call pushed via Edit with NO call log near that moment ──
+  acts.forEach(a=>{
+    if(a.type!=='edit') return;
+    const ch=(a.changes||[]).find(c=>c.field==='next_call');
+    if(!ch) return;
+    const t=new Date(a.date).getTime();
+    const hasCall = calls.some(l=>l.client_id===a.client_id && Math.abs(new Date(l.ts).getTime()-t) < 5*60*1000);
+    if(hasCall) return;
+    events.push({ts:a.date, who:a.by||'—', rm:a.rm||'—', client:a.client_name||'—',
+      seg:a.seg==='equity'?'EQ':a.seg==='mf'?'MF':(a.seg||'—'),
+      next:ch.new==='—'?'':ch.new, note:'', flags:['NO CALL LOG ('+(ch.old==='—'?'blank':fmtDate(ch.old))+' → '+(ch.new==='—'?'blank':fmtDate(ch.new))+')']});
+  });
+
+  events.sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
+  window._fuData={from,to,events,totalCalls:calls.length,callsByWho:byWho};
+  _fuRender(null);
+}
+
+function _fuRender(onlyWho){
+  const D=window._fuData; if(!D) return;
+  const esc=v=>escapeHtml(String(v==null?'':v));
+  const rangeLabel = D.from===D.to ? fmtDate(D.from) : fmtDate(D.from)+' to '+fmtDate(D.to);
+  const bar = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">
+      <span style="font-size:.72rem;font-weight:700;color:var(--gray)">📅 RANGE:</span>
+      <input type="date" id="fuFrom" value="${D.from}" style="padding:5px;font-size:.75rem">
+      <span style="font-size:.72rem;color:var(--gray)">to</span>
+      <input type="date" id="fuTo" value="${D.to}" style="padding:5px;font-size:.75rem">
+      <button class="btn btn-sm btn-outline" onclick="fakeUpdateReport(document.getElementById('fuFrom').value,document.getElementById('fuTo').value)">Apply</button>
+      <button class="btn btn-sm btn-outline" onclick="fakeUpdateReport()">Today</button>
+      <button class="btn btn-sm btn-outline" onclick="fakeUpdateReport(addDays(today(),-6),today())">Last 7 days</button>
+    </div>
+    <div style="font-size:.74rem;color:#7c5e10;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:12px">
+      ⚠️ The CRM is not connected to the phone, so these are <b>warning signs, not proof</b>. Please verify with the RM before taking action.
+      <b>NO CALL LOG</b> = Next Call changed via Edit with call logging turned off · <b>BLANK NOTE</b> = call logged with no notes ·
+      <b>RAPID</b> = logged within ${FU_RAPID_SEC} sec of their previous call · <b>SAME REMARK</b> = same note as the last call on this client.
+    </div>`;
+
+  if(!onlyWho){
+    // RM summary
+    const sum={};
+    Object.entries(D.callsByWho).forEach(([w,l])=>{ sum[w]=sum[w]||{w,calls:0,sus:0,f:{}}; sum[w].calls=l.length; });
+    D.events.forEach(e=>{
+      const s=sum[e.who]=sum[e.who]||{w:e.who,calls:0,sus:0,f:{}};
+      s.sus++;
+      e.flags.forEach(f=>{ const k=f.split(' (')[0]; s.f[k]=(s.f[k]||0)+1; });
+    });
+    const rows=Object.values(sum).sort((a,b)=>b.sus-a.sus);
+    const pctOf=s=>s.calls?Math.round(s.sus/(s.calls+(s.f['NO CALL LOG']||0))*100):(s.sus?100:0);
+    const pctColor=p=>p>=50?'#dc2626':p>=25?'#d97706':'#16a34a';
+    let h=bar+`<div style="font-weight:700;margin-bottom:6px">RM-wise summary — ${esc(rangeLabel)} <span style="font-weight:400;color:var(--gray);font-size:.78rem">(click an RM name for details)</span></div>
+      <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
+      <th>RM (updated by)</th><th>Calls logged</th><th>Suspicious</th><th>%</th><th>No Call Log</th><th>Blank Note</th><th>Rapid</th><th>Same Remark</th></tr></thead><tbody>`;
+    if(!rows.length) h+=`<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--gray)">No call activity in this range</td></tr>`;
+    rows.forEach(s=>{
+      const p=pctOf(s);
+      h+=`<tr><td><span style="text-decoration:underline;cursor:pointer;color:var(--blue);font-weight:700" onclick="_fuRender('${esc(s.w).replace(/'/g,"\\'")}')">${esc(s.w)}</span></td>
+        <td>${s.calls}</td><td style="font-weight:700">${s.sus}</td>
+        <td><span style="background:${pctColor(p)};color:#fff;border-radius:8px;padding:1px 8px;font-weight:700;font-size:.75rem">${p}%</span></td>
+        <td>${s.f['NO CALL LOG']||0}</td><td>${s.f['BLANK NOTE']||0}</td><td>${s.f['RAPID']||0}</td><td>${s.f['SAME REMARK']||0}</td></tr>`;
+    });
+    h+='</tbody></table></div></div>';
+    document.getElementById('reportModalBody').innerHTML=h;
+    currentReportData={title:'Fake Update Report '+rangeLabel,
+      headers:['Date','Time','Updated By','RM','Segment','Client','Next Call','Note','Flags'],
+      rows:D.events.map(e=>[fmtDate(_fuLocalDate(e.ts)),_fuTime(e.ts),e.who,e.rm,e.seg,e.client,e.next?fmtDate(e.next):'',e.note,e.flags.join(' | ')])};
+    return;
+  }
+
+  const ev=D.events.filter(e=>e.who===onlyWho);
+  const flagColor=f=>f.startsWith('NO CALL')?'#dc2626':f.startsWith('RAPID')?'#7c3aed':f.startsWith('BLANK')?'#d97706':'#0891b2';
+  let h=bar+`<div style="margin-bottom:8px"><span style="text-decoration:underline;cursor:pointer;color:var(--blue);font-size:.8rem" onclick="_fuRender(null)">← Back to RM summary</span></div>
+    <div style="font-weight:700;margin-bottom:6px">${esc(onlyWho)} — ${ev.length} suspicious update(s), ${esc(rangeLabel)}</div>
+    <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>
+    <th>Date</th><th>Time</th><th>Client</th><th>Seg</th><th>Next Call</th><th>Note</th><th>Flags</th></tr></thead><tbody>`;
+  if(!ev.length) h+=`<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--green)">✅ Nothing suspicious</td></tr>`;
+  ev.forEach(e=>{
+    h+=`<tr><td>${fmtDate(_fuLocalDate(e.ts))}</td><td style="white-space:nowrap">${_fuTime(e.ts)}</td>
+      <td style="font-weight:600">${esc(e.client)}</td><td>${esc(e.seg)}</td><td>${e.next?fmtDate(e.next):'—'}</td>
+      <td style="max-width:220px;white-space:normal">${e.note?esc(e.note):'<span style="color:#bbb">—</span>'}</td>
+      <td>${e.flags.map(f=>`<span style="display:inline-block;background:${flagColor(f)};color:#fff;border-radius:6px;padding:1px 6px;font-size:.66rem;font-weight:700;margin:1px">${esc(f)}</span>`).join('')}</td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  document.getElementById('reportModalBody').innerHTML=h;
+  currentReportData={title:'Fake Update Report — '+onlyWho+' '+rangeLabel,
+    headers:['Date','Time','Client','Segment','Next Call','Note','Flags'],
+    rows:ev.map(e=>[fmtDate(_fuLocalDate(e.ts)),_fuTime(e.ts),e.client,e.seg,e.next?fmtDate(e.next):'',e.note,e.flags.join(' | ')])};
+}
