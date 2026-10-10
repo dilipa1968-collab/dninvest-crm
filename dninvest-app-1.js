@@ -9366,24 +9366,52 @@ const MFTXN_TYPE_COLOR = {
   STP:'#0891B2', Redemption:'#C0392B', SWP:'#D35400', 'Additional Buy':'#059669', 'SIP Bounce Buy':'#D97706', 'SIP Pause':'#7C3AED'
 };
 const MFTXN_SOURCE_COLOR = {
-  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#059669', NSE:'#0891B2', MFC:'#DB2777', Physical:'#C2410C', Sharekhan:'#B91C1C'
+  CAMS:'#1D4ED8', KFintech:'#7C3AED', BSE:'#059669', NSE:'#0891B2', MFC:'#DB2777',
+  Sharekhan:'#DC2626', Self:'#D97706', Physical:'#C2410C'
 };
-// 10-Oct-2026: "Sharekhan" source added. The Source dropdowns themselves live
-// in index.html, so this adds the option at runtime to every Source select
-// (New Transaction form, filter bar, Edit Business modal) if it isn't there yet.
-(function addSharekhanSource(){
+// 10-Oct-2026: "Sharekhan" + "Self" sources added, and every source made
+// colourful. The Source dropdowns live in index.html, so this adds the missing
+// options at runtime to every Source select (New Transaction form, filter bar,
+// Edit Business modal), colours each option, and tints the select itself to
+// match whatever source is currently chosen.
+(function setupSourceDropdowns(){
+  const IDS=['mftxn-source','mftxn-source-filter','biz_source'];
+  const EXTRA=['Sharekhan','Self'];
+  function paint(sel){
+    const c=MFTXN_SOURCE_COLOR[sel.value];
+    if(c){
+      sel.style.background=c+'1F'; sel.style.color=c;
+      sel.style.borderColor=c; sel.style.fontWeight='700';
+    } else {
+      sel.style.background=''; sel.style.color='';
+      sel.style.borderColor=''; sel.style.fontWeight='';
+    }
+  }
   function inject(){
-    ['mftxn-source','mftxn-source-filter','biz_source'].forEach(id=>{
+    IDS.forEach(id=>{
       const sel=document.getElementById(id);
       if(!sel) return;
-      if([...sel.options].some(o=>o.value==='Sharekhan')) return;
-      const opt=document.createElement('option');
-      opt.value='Sharekhan'; opt.textContent='Sharekhan';
       const phys=[...sel.options].find(o=>o.value==='Physical');
-      if(phys) sel.insertBefore(opt, phys); else sel.appendChild(opt);
+      EXTRA.forEach(v=>{
+        if([...sel.options].some(o=>o.value===v)) return;
+        const opt=document.createElement('option');
+        opt.value=v; opt.textContent=v;
+        if(phys) sel.insertBefore(opt, phys); else sel.appendChild(opt);
+      });
+      [...sel.options].forEach(o=>{
+        const c=MFTXN_SOURCE_COLOR[o.value];
+        if(c){ o.style.color=c; o.style.fontWeight='700'; o.style.background='#fff'; }
+      });
+      if(!sel.dataset.srcPaint){
+        sel.dataset.srcPaint='1';
+        sel.addEventListener('change', ()=>paint(sel));
+      }
+      paint(sel);
     });
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', inject); else inject();
+  // Re-paint after code resets a select's value (e.g. Clear filters, opening Edit popup)
+  setInterval(()=>IDS.forEach(id=>{ const s=document.getElementById(id); if(s) paint(s); }), 800);
 })();
 
 function renderMfTxnTable(){
@@ -9456,7 +9484,7 @@ function renderMfTxnTable(){
           ${INC.cell('mf',e)}
           <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${remarkCell}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
-          <td style="font-size:.65rem;white-space:nowrap">${e.source?`<span class="badge" style="background:${(MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A')}22;color:${MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A'};font-size:.61rem;padding:1px 5px">${escapeHtml(e.source)}</span>`:'<span style="color:var(--gray)">—</span>'}</td>
+          <td style="font-size:.65rem;white-space:nowrap">${e.source?`<span class="badge" style="background:${MFTXN_SOURCE_COLOR[e.source]||'#5D6E8A'};color:#fff;font-size:.61rem;padding:2px 7px;font-weight:700">${escapeHtml(e.source)}</span>`:'<span style="color:var(--gray)">—</span>'}</td>
           <td style="white-space:nowrap">${CU.role==='admin'?`
             ${status!=='Approved'?`<button class="btn-icon" onclick="approveBusinessEntry('${e.id}')" title="Approve" style="color:var(--green)">✅</button>`:''}
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineBusinessEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
