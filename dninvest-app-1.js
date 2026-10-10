@@ -16325,12 +16325,15 @@ function renderRmFollowupStrip(activeEq, mf){
   const map={};
   const ensure=n=>{ const nm=(n||'').trim()||'— No RM'; const k=nm.toUpperCase(); return map[k]=map[k]||{name:nm,eq:0,mf:0}; };
   // Admin: show EVERY active RM (even with 0 due). RM: only themselves.
+  // NOTE: getSegRMs() skips users whose login is currently inactive (auto
+  // schedule / late-absent / manual deactivation) — that's why some RMs went
+  // missing here. Use every RM account that hasn't left the company instead.
   if(CU && CU.role==='admin'){
-    [...new Set([...getSegRMs('equity'),...getSegRMs('mf')])].forEach(ensure);
+    (DB.get('users')||[]).filter(u=>u.role==='rm' && !u.left_company).forEach(u=>ensure(u.name));
   } else if(CU){ ensure(CU.name); }
   (activeEq||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) ensure(c.rm).eq++; });
   (mf||[]).forEach(c=>{ if(c.next_call && c.next_call<=t) ensure(c.rm).mf++; });
-  const rows=Object.values(map).map(r=>({...r,tot:r.eq+r.mf})).sort((a,b)=>b.tot-a.tot||a.name.localeCompare(b.name));
+  const rows=Object.values(map).map(r=>({...r,tot:r.eq+r.mf})).filter(r=>r.tot>0 || (DB.get('users')||[]).some(u=>u.role==='rm' && !u.left_company && (u.name||'').trim().toUpperCase()===r.name.toUpperCase()) || (CU && CU.role!=='admin')).sort((a,b)=>b.tot-a.tot||a.name.localeCompare(b.name));
   if(!rows.length){ el.innerHTML=''; el.style.display='none'; return; }
   el.style.display='block';
   const sumEq=rows.reduce((s,r)=>s+r.eq,0), sumMf=rows.reduce((s,r)=>s+r.mf,0);
