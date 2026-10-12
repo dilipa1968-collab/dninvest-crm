@@ -823,10 +823,14 @@ const DB = {
   _writing: {},
   // Sharded variant: touches ONLY the one shard this record hashes to.
   async _setClientSharded(key, rec){
+    // 12-Oct-2026: guard BEFORE the first await — pehle ye _ensureMigrated ke
+    // baad lagta tha, us gap me koi purana realtime snapshot aa kar abhi-abhi
+    // kiya hua edit screen se mita deta tha (refresh tak purana dikhta tha).
+    this._writing[key] = (this._writing[key]||0) + 1;
+    try{
     await this._ensureMigrated(key);   // guarantee full migration before a targeted write
     const si  = this._shardOf(key, rec.id);
     const ref = this._shardRef(key, si);
-    this._writing[key] = (this._writing[key]||0) + 1;
     try{
       await fdb.runTransaction(async (tx)=>{
         const doc = await tx.get(ref);
@@ -839,8 +843,15 @@ const DB = {
         if(this._shardCache[key]) this._shardCache[key][si] = latest;
       });
       console.log('Firebase shard-synced:',key,'s'+si,rec.id);
-    }catch(e){ console.log('setClient(shard) error:',e); toast('Sync error: '+e.message,'error'); }
-    finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
+      // Make sure the saved record is what this screen shows, even if a
+      // snapshot slipped in while the write was in flight.
+      const _arr = this.get(key)||[];
+      const _i = _arr.findIndex(c=>c.id===rec.id);
+      if(_i>=0) _arr[_i]=rec; else _arr.push(rec);
+      this.setLocal(key, _arr);
+      return {ok:true};
+    }catch(e){ console.log('setClient(shard) error:',e); toast('Sync error: '+e.message,'error'); return {ok:false, error:e.message}; }
+    }finally{ this._writing[key] = Math.max(0,(this._writing[key]||1)-1); }
   },
   async setClient(key, rec){
     // update local copy immediately for responsiveness
@@ -2521,12 +2532,14 @@ DB.syncFromFirebase().then(()=>{
               const parts = await DB._ensureMigrated(key);
               DB._shardCache[key] = parts.map(p=>p||[]);
               const merged = DB._mergeShards(key);
-              let existingArr = null;
-              try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
-              if(Array.isArray(existingArr) && existingArr.length===merged.length){
-                const ex=existingArr;
-                if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) continue;
-              }
+              // 12-Oct-2026 fix: pehle sirf length + pehla/aakhri id compare hota tha —
+              // kisi client ka EDIT (length same) hamesha "no change" maan liya jata
+              // tha, isliye update sirf Refresh ke baad dikhta tha. Ab poore data ka
+              // signature compare hota hai.
+              if(DB._writing[key]>0) continue;
+              const _sig = JSON.stringify(merged);
+              if(DB._polledSig && DB._polledSig[key]===_sig) continue;
+              DB._polledSig = DB._polledSig||{}; DB._polledSig[key]=_sig;
               if(!DB._mem) DB._mem = {};
               DB._mem[key] = merged;
               if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
@@ -2548,16 +2561,18 @@ DB.syncFromFirebase().then(()=>{
                 if(doc.metadata.hasPendingWrites) return;
                 if(DB._writing[key]>0) return;
                 if(!(doc.exists && doc.data() && Array.isArray(doc.data().data))) return;
-                DB._shardCache[key][i] = doc.data().data;
+                // 12-Oct-2026 fix: shard-level content compare (pehle sirf length +
+                // first/last id dekhta tha, isliye client EDIT kabhi live nahi dikhta tha)
+                const _newShard = doc.data().data;
+                const _newSig = JSON.stringify(_newShard);
+                DB._shardSig = DB._shardSig||{}; DB._shardSig[key] = DB._shardSig[key]||{};
+                const _wasSeen = DB._shardSeen[key].has(i);
+                DB._shardCache[key][i] = _newShard;
                 DB._shardSeen[key].add(i);
-                if(DB._shardSeen[key].size < n) return;   // wait for every shard to report in once
+                if(DB._shardSeen[key].size < n){ DB._shardSig[key][i]=_newSig; return; }   // wait for every shard to report in once
+                if(_wasSeen && DB._shardSig[key][i]===_newSig) return;   // this shard truly unchanged
+                DB._shardSig[key][i]=_newSig;
                 const merged = DB._mergeShards(key);
-                let existingArr = null;
-                try{ existingArr = JSON.parse(localStorage.getItem('dninvest_'+key)||'[]'); }catch(e){}
-                if(Array.isArray(existingArr) && existingArr.length===merged.length){
-                  const ex=existingArr;
-                  if(ex[0]&&merged[0]&&ex[0].id===merged[0].id&&ex[ex.length-1]&&merged[merged.length-1]&&ex[ex.length-1].id===merged[merged.length-1].id) return;
-                }
                 if(!DB._mem) DB._mem = {};
                 DB._mem[key] = merged;
                 if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
@@ -7328,7 +7343,22 @@ async function saveClient(){
       updateBadges();
     }catch(_){}
   }, 0);
-  _savePromise.catch(()=>{});
+  // 12-Oct-2026: server write poora hone ke baad visible page dobara render
+  // karo — taaki edit bina Refresh dabaye turant dikhe.
+  _savePromise.then(()=>{
+    try{
+      const p2 = getCurrentPageId();
+      if(p2==='eq-followup') renderFollowup('eqf');
+      else if(p2==='mf-followup') renderFollowup('mff');
+      else if(p2==='eq-clients') renderEqTable();
+      else if(p2==='mf-clients') renderMfTable();
+      else if(p2==='eq-nocall') renderNoCall('equity');
+      else if(p2==='mf-nocall') renderNoCall('mf');
+      else if(p2==='eq-notrade') renderNoTrade();
+      else if(p2==='dashboard') refreshDash();
+      updateBadges();
+    }catch(_){}
+  }).catch(()=>{});
 }
 
 // ══════════════════════════════════════════
