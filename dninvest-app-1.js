@@ -10855,9 +10855,9 @@ function renderSquareoff(){
   });
   const acTotal=clients.reduce((s,c)=>s+(c.acbal||0),0);
   html+=`<th style="min-width:130px;padding-top:8px;padding-bottom:8px;text-align:center;box-shadow:inset 0 3px 0 #c9942a">
-      <div class="sq-date-pill" style="justify-content:center;color:#f5d98a">💰 AS ON DATE BAL</div>
-      <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:2px;text-align:center">₹${Math.round(acTotal).toLocaleString('en-IN')}</div>
-      <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;margin-top:1px;text-align:center">ledger balance</div>
+      <div class="sq-date-pill" style="justify-content:center;color:#f5d98a">💰 LEDGER DEBIT BALANCE</div>
+      <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:2px;text-align:center">(₹${Math.round(acTotal).toLocaleString('en-IN')})</div>
+      <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;margin-top:1px;text-align:center">as on date</div>
     </th>`;
   html+='</tr></thead><tbody>';
   clients.forEach(c=>{
@@ -10880,7 +10880,7 @@ function renderSquareoff(){
       html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt-empty">—</span></td>`;
     }else{
       const neg=c.acbal<0;
-      html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt" style="color:${neg?'#dc2626':'#132039'}">${neg?'−':''}₹${Math.abs(c.acbal).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+      html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt" style="color:${neg?'#dc2626':'#132039'}">${neg?'−':''}(₹${Math.abs(c.acbal).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})})</span></td>`;
     }
     html+=`</tr>`;
   });
@@ -10917,7 +10917,7 @@ function sqExport(){
 
   const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32},{header:'RM',width:12}]
     .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
-    .concat([{header:'As on Date Bal',money:true,width:16}]);
+    .concat([{header:'Ledger Debit Balance',money:true,width:18}]);
   const data=clients.map(c=>{
     const row=[c.code,c.name,c.dealer];
     dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
