@@ -10683,10 +10683,13 @@ function sqUpload(input){
           const t5=sqToISO(pick('t590daydate','f590date','t590date','t5date','90daydate','tminus5','t5day'));
           // sq date — 'Square Off Days' (count) se bachne ke liye bare 'squareoff' nahi
           const sqDate=sqToISO(pick('squareoffdate','sqroffdate','sqoffdate','sqrdate','sqdate'));
+          // As on date Ac Bal — client ka aaj ka ledger balance
+          const acRaw=pick('asondateacbal','asondateac','asondatebal','asondatebalance','asondate');
+          const acbal=(acRaw===''||acRaw==null) ? null : (parseFloat(String(acRaw).replace(/[,\s₹]/g,''))||0);
           if(!code && !name) return;
           // ₹100 se neeche (99.99 tak) ka debit ignore — chhoti amount pe square-off nahi
           if(debit < 100) return;
-          out.push({code,name,dealer,debit,t5,sqDate});
+          out.push({code,name,dealer,debit,t5,sqDate,acbal});
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
@@ -10775,8 +10778,9 @@ function renderSquareoff(){
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{}};
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},acbal:null,acDate:''};
     byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
+    if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     // keep freshest name/dealer if it varies between files
     byClient[key].name = r.name || byClient[key].name;
     byClient[key].dealer = r.dealer || byClient[key].dealer;
@@ -10837,7 +10841,7 @@ function renderSquareoff(){
 
   // Header stays on-brand navy for every column; each date column gets a thin
   // coloured top accent bar + coloured dot/amount instead of a flooded tint.
-  let html='<thead><tr><th style="min-width:100px">Client Code</th><th style="min-width:180px">Client Name</th><th style="min-width:110px;text-align:center">RM</th>';
+  let html='<thead><tr><th style="min-width:85px">Client Code</th><th style="min-width:150px">Client Name</th><th style="min-width:80px;text-align:center">RM</th>';
   dateKeys.forEach(dk=>{
     const isToday=dk===todayStr;
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
@@ -10849,6 +10853,12 @@ function renderSquareoff(){
       <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;letter-spacing:0;margin-top:1px;text-align:center">${dCount} clients</div>
     </th>`;
   });
+  const acTotal=clients.reduce((s,c)=>s+(c.acbal||0),0);
+  html+=`<th style="min-width:130px;padding-top:8px;padding-bottom:8px;text-align:center;box-shadow:inset 0 3px 0 #c9942a">
+      <div class="sq-date-pill" style="justify-content:center;color:#f5d98a">💰 AS ON DATE BAL</div>
+      <div style="font-size:1.02rem;font-weight:800;color:#fff;margin-top:2px;text-align:center">₹${Math.round(acTotal).toLocaleString('en-IN')}</div>
+      <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;margin-top:1px;text-align:center">ledger balance</div>
+    </th>`;
   html+='</tr></thead><tbody>';
   clients.forEach(c=>{
     const rc=rmColorFor(c.dealer);
@@ -10866,6 +10876,12 @@ function renderSquareoff(){
           <span class="sq-amt${big?' sq-big':''}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
       }
     });
+    if(c.acbal==null){
+      html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt-empty">—</span></td>`;
+    }else{
+      const neg=c.acbal<0;
+      html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt" style="color:${neg?'#dc2626':'#132039'}">${neg?'−':''}₹${Math.abs(c.acbal).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+    }
     html+=`</tr>`;
   });
   html+='</tbody>';
@@ -10889,8 +10905,9 @@ function sqExport(){
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{}};
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},acbal:null,acDate:''};
     byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
+    if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     byClient[key].name=r.name||byClient[key].name;
     byClient[key].dealer=r.dealer||byClient[key].dealer;
   });
@@ -10899,13 +10916,16 @@ function sqExport(){
   clients.sort((a,b)=>b.total-a.total);
 
   const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32},{header:'RM',width:12}]
-    .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})));
+    .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
+    .concat([{header:'As on Date Bal',money:true,width:16}]);
   const data=clients.map(c=>{
     const row=[c.code,c.name,c.dealer];
     dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
+    row.push(c.acbal!=null?c.acbal:'');
     return row;
   });
-  const totalRow=['','','TOTAL'].concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)));
+  const totalRow=['','','TOTAL'].concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)))
+    .concat([clients.reduce((s,c)=>s+(c.acbal||0),0)]);
   dnXlsx('Square-off_'+today()+'.xlsx','Square-off (T+5)',cols,data,totalRow);
 }
 function ntReport(d){
