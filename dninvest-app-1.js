@@ -15878,6 +15878,18 @@ window.checkFollowups = function(){
     if(!th.closest('thead')) return;
     const table=th.closest('table'); if(!table) return;
     if(th.hasAttribute('onclick')) return;                 // has its own sorter
+    // Ignore clicks on the column filter button and the resize handle
+    if(e.target.closest('.col-filter-wrap,.col-filter-dd,.col-filter-btn,.eqrz,.col-resize-handle')) return;
+    // If the header contains a FULL-DATA sorter (sortEqTable / sortMfTable /
+    // sortLeadsTable / setMfTxnSort / clickSort), a click anywhere on the header
+    // runs that one — all filtered data is sorted first, then the first 50 show.
+    const fullSorter = th.querySelector('[onclick*="sort" i]');
+    if(fullSorter){
+      if(!fullSorter.contains(e.target)) fullSorter.click();
+      return;
+    }
+    // Paginated tables never use the page-only sort
+    if(table.closest('#eq-table,#mf-table,#leads-table,#mftxn-table')) return;
     const ths=Array.from(th.parentElement.children);
     const col=ths.indexOf(th); if(col<0) return;
     if(!th.textContent.replace(/[▲▼⇅]/g,'').trim()) return; // empty / action column
