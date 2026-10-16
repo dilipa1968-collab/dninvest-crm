@@ -10363,7 +10363,12 @@ function renderMfProspects(){
   }
 
   const rows = data.slice((mfpPage-1)*PG_SIZE, mfpPage*PG_SIZE);
-  let h=`<table><thead><tr>
+  // Fixed column widths that always fit the page (no horizontal scroll).
+  // New table id = fresh column-width memory, so widths saved for the old
+  // 5-column layout don't squeeze Last Trade / Actions any more.
+  let h=`<table id="mfp-tbl-v3" style="width:100%;table-layout:fixed">
+    <colgroup><col style="width:19%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:11%"><col style="width:24%"><col style="width:18%"></colgroup>
+    <thead><tr>
     <th>${_mfpTh('name','Name')}</th><th>${_mfpTh('code','Client Code')}</th><th>${_mfpTh('mobile','Mobile')}</th><th>${_mfpTh('rm','Equity RM')}</th><th style="text-align:right">${_mfpTh('asset','Asset Value')}</th><th>${_mfpTh('trade','Last Trade')}</th><th>Actions</th>
     </tr></thead><tbody>`;
   rows.forEach(c=>{
@@ -10376,13 +10381,13 @@ function renderMfProspects(){
       ago=`<span style="display:inline-block;margin-left:6px;font-size:.66rem;font-weight:700;color:${col};background:${col}1a;border-radius:10px;padding:1px 7px">${txt}</span>`;
     }
     h+=`<tr>
-      <td style="font-weight:600">${c.name}${_isHniEq(c)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
+      <td style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(c.name||'')}">${c.name}${_isHniEq(c)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
       <td style="font-family:monospace;font-size:.82rem;color:#334155">${c.code?escapeHtml(String(c.code)):'<span style="color:var(--gray)">—</span>'}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="text-align:right;font-weight:${av>=500000?'700':'400'};color:${av>=500000?'#7c3aed':'inherit'}">${av?'₹'+Math.round(av).toLocaleString('en-IN'):'—'}</td>
       <td style="white-space:nowrap">${fmtDate(c.last_trade_date)||'<span style="color:var(--gray)">Never traded</span>'}${ago}</td>
-      <td><button class="btn btn-outline" style="font-size:.72rem;padding:5px 10px" onclick="addAsMfInvestor('${c.id}')">➕ Add as MF Investor</button></td>
+      <td><button class="btn btn-outline" style="font-size:.72rem;padding:5px 10px;white-space:nowrap" onclick="addAsMfInvestor('${c.id}')">➕ Add as MF</button></td>
     </tr>`;
   });
   h+='</tbody></table>';
