@@ -1933,6 +1933,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div class="filters">
           <input type="text" placeholder="🔍 Search name / mobile..." oninput="filterMfpDebounced()" id="mfp-search" autocomplete="off" name="mfp-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterMfp()" id="mfp-rm" style="background:#FDF8FA;border:1px solid #F0C4D3;border-radius:8px;color:#1F2937;font-weight:500;max-width:150px"><option value="">All Equity RMs</option></select>
+          <select onchange="filterMfp()" id="mfp-hni" title="HNI = Equity Asset Value ≥ ₹5L" style="background:#F7F7FD;border:1px solid #D6D6F0;border-radius:8px;color:#1F2937;font-weight:500;max-width:165px;max-width:130px"><option value="">🏷️ All</option><option value="H">🟣 HNI only</option><option value="NH">Non-HNI</option></select>
+          <select onchange="filterMfp()" id="mfp-trade" title="Filter by last trade date" style="background:#F7F7FD;border:1px solid #D6D6F0;border-radius:8px;color:#1F2937;font-weight:500;max-width:165px"><option value="">📅 Any Last Trade</option><option value="30">Traded ≤ 30 days</option><option value="90">Traded ≤ 3 months</option><option value="365">Traded ≤ 1 year</option><option value="never">Never traded</option></select>
+          <select onchange="filterMfp()" id="mfp-sort" title="Sort order" style="background:#F7F7FD;border:1px solid #D6D6F0;border-radius:8px;color:#1F2937;font-weight:500;max-width:165px"><option value="name">↕ Name A–Z</option><option value="trade_new">Last Trade — Newest first</option><option value="trade_old">Last Trade — Oldest first</option><option value="asset">Asset Value — High → Low</option></select>
           <select onchange="changePageSize('mfp',this.value)" id="mfp-pagesize" style="max-width:98px;background:#FBF9FE;border:1px solid #D8C2F0;color:#1F2937;font-weight:500">
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
@@ -3293,7 +3296,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-10-13-v2"></script>
+<script src="dninvest-app-1.js?v=2026-10-16-v1"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 

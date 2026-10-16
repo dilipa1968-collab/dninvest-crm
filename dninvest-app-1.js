@@ -10314,11 +10314,39 @@ function renderMfProspects(){
   const rmFilter=(document.getElementById('mfp-rm')||{value:''}).value;
   if(rmFilter){ data=data.filter(c=>String(c.rm||'').trim().toUpperCase()===rmFilter.trim().toUpperCase()); }
 
-  data = data.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  // HNI filter — same rule as the Equity Clients page "H" badge (Asset Value ≥ ₹5L)
+  const _isHniEq = c => (Number(c.asset_value)||0) >= 500000;
+  const hniFilter=(document.getElementById('mfp-hni')||{value:''}).value;
+  if(hniFilter==='H') data=data.filter(_isHniEq);
+  else if(hniFilter==='NH') data=data.filter(c=>!_isHniEq(c));
+
+  // Last Trade filter (days since last trade)
+  const trFilter=(document.getElementById('mfp-trade')||{value:''}).value;
+  if(trFilter){
+    data=data.filter(c=>{
+      const d=daysDiff(c.last_trade_date);
+      if(trFilter==='never') return d===null;
+      return d!==null && d<=Number(trFilter);
+    });
+  }
+
+  // Sort: Name (default) / Last Trade newest / oldest / Asset Value high→low
+  const sortBy=(document.getElementById('mfp-sort')||{value:'name'}).value||'name';
+  const _dd=c=>{ const d=daysDiff(c.last_trade_date); return d===null?Infinity:d; };
+  data = data.slice().sort((a,b)=>{
+    if(sortBy==='trade_new'){ const x=_dd(a)-_dd(b); if(x) return x; }
+    else if(sortBy==='trade_old'){ const da=_dd(a), db=_dd(b);
+      // never-traded (blank) clients last, oldest real trade first
+      if(da===Infinity && db!==Infinity) return 1; if(db===Infinity && da!==Infinity) return -1;
+      const x=db-da; if(x) return x; }
+    else if(sortBy==='asset'){ const x=(Number(b.asset_value)||0)-(Number(a.asset_value)||0); if(x) return x; }
+    return (a.name||'').localeCompare(b.name||'');
+  });
+  const hniCount=data.filter(_isHniEq).length;
 
   const cont=document.getElementById('mfp-table');
   const nb=document.getElementById('nb-mfprospects'); if(nb) nb.textContent=data.length;
-  document.getElementById('mfp-count').textContent = data.length+' prospects';
+  document.getElementById('mfp-count').textContent = data.length+' prospects'+(hniCount?` · ${hniCount} HNI`:'');
 
   if(!data.length){
     cont.innerHTML = `<div style="text-align:center;padding:48px;color:var(--green)">✅ No equity clients left to convert${q?' matching "'+q+'"':''}</div>`;
@@ -10328,14 +10356,23 @@ function renderMfProspects(){
 
   const rows = data.slice((mfpPage-1)*PG_SIZE, mfpPage*PG_SIZE);
   let h=`<table><thead><tr>
-    <th>Name</th><th>Mobile</th><th>Equity RM</th><th>Last Trade</th><th>Actions</th>
+    <th>Name</th><th>Mobile</th><th>Equity RM</th><th style="text-align:right">Asset Value</th><th>Last Trade</th><th>Actions</th>
     </tr></thead><tbody>`;
   rows.forEach(c=>{
+    const av=Number(c.asset_value)||0;
+    const dd=daysDiff(c.last_trade_date);
+    let ago='';
+    if(dd!==null){
+      const txt = dd<=0?'today': dd<30? dd+' days ago' : dd<365? Math.floor(dd/30)+' mo ago' : Math.floor(dd/365)+' yr ago';
+      const col = dd<=30?'#059669': dd<=90?'#2563eb': dd<=365?'#d97706':'#9ca3af';
+      ago=`<span style="display:inline-block;margin-left:6px;font-size:.66rem;font-weight:700;color:${col};background:${col}1a;border-radius:10px;padding:1px 7px">${txt}</span>`;
+    }
     h+=`<tr>
-      <td style="font-weight:600">${c.name}</td>
+      <td style="font-weight:600">${c.name}${_isHniEq(c)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
-      <td>${fmtDate(c.last_trade_date)||'—'}</td>
+      <td style="text-align:right;font-weight:${av>=500000?'700':'400'};color:${av>=500000?'#7c3aed':'inherit'}">${av?'₹'+Math.round(av).toLocaleString('en-IN'):'—'}</td>
+      <td style="white-space:nowrap">${fmtDate(c.last_trade_date)||'<span style="color:var(--gray)">Never traded</span>'}${ago}</td>
       <td><button class="btn btn-outline" style="font-size:.72rem;padding:5px 10px" onclick="addAsMfInvestor('${c.id}')">➕ Add as MF Investor</button></td>
     </tr>`;
   });
@@ -10362,6 +10399,8 @@ function gpMfp(p){ if(p<1) return; mfpPage=p; renderMfProspects(); }
 function resetMfpFilters(){
   const s=document.getElementById('mfp-search'); if(s) s.value='';
   const r=document.getElementById('mfp-rm'); if(r) r.value='';
+  ['mfp-hni','mfp-trade'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  const so=document.getElementById('mfp-sort'); if(so) so.value='name';
   mfpPage=1;
   renderMfProspects();
 }
