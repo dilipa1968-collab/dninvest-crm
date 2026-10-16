@@ -10330,17 +10330,25 @@ function renderMfProspects(){
     });
   }
 
-  // Sort: Name (default) / Last Trade newest / oldest / Asset Value high→low
-  const sortBy=(document.getElementById('mfp-sort')||{value:'name'}).value||'name';
+  // Sort — applies to the FULL filtered list (all pages), not just the 50
+  // rows on screen. State is shared by the Sort dropdown and the column headers.
   const _dd=c=>{ const d=daysDiff(c.last_trade_date); return d===null?Infinity:d; };
+  const {key:sk, dir:sd} = _mfpSort;
   data = data.slice().sort((a,b)=>{
-    if(sortBy==='trade_new'){ const x=_dd(a)-_dd(b); if(x) return x; }
-    else if(sortBy==='trade_old'){ const da=_dd(a), db=_dd(b);
-      // never-traded (blank) clients last, oldest real trade first
-      if(da===Infinity && db!==Infinity) return 1; if(db===Infinity && da!==Infinity) return -1;
-      const x=db-da; if(x) return x; }
-    else if(sortBy==='asset'){ const x=(Number(b.asset_value)||0)-(Number(a.asset_value)||0); if(x) return x; }
-    return (a.name||'').localeCompare(b.name||'');
+    let x=0;
+    if(sk==='trade'){
+      const da=_dd(a), db=_dd(b);
+      if(da===Infinity && db!==Infinity) return 1;        // never-traded always at bottom
+      if(db===Infinity && da!==Infinity) return -1;
+      x = sd===1 ? da-db : db-da;                         // 1 = newest first
+    } else if(sk==='asset'){
+      x = ((Number(a.asset_value)||0)-(Number(b.asset_value)||0)) * sd;
+    } else if(sk==='mobile'||sk==='rm'){
+      x = String(a[sk]||'').localeCompare(String(b[sk]||''),undefined,{numeric:true}) * sd;
+    } else {
+      x = (a.name||'').localeCompare(b.name||'') * sd;
+    }
+    return x || (a.name||'').localeCompare(b.name||'');
   });
   const hniCount=data.filter(_isHniEq).length;
 
@@ -10356,7 +10364,7 @@ function renderMfProspects(){
 
   const rows = data.slice((mfpPage-1)*PG_SIZE, mfpPage*PG_SIZE);
   let h=`<table><thead><tr>
-    <th>Name</th><th>Mobile</th><th>Equity RM</th><th style="text-align:right">Asset Value</th><th>Last Trade</th><th>Actions</th>
+    <th>${_mfpTh('name','Name')}</th><th>${_mfpTh('mobile','Mobile')}</th><th>${_mfpTh('rm','Equity RM')}</th><th style="text-align:right">${_mfpTh('asset','Asset Value')}</th><th>${_mfpTh('trade','Last Trade')}</th><th>Actions</th>
     </tr></thead><tbody>`;
   rows.forEach(c=>{
     const av=Number(c.asset_value)||0;
@@ -10393,6 +10401,32 @@ function renderMfProspects(){
   }
 }
 function filterMfp(){ mfpPage=1; renderMfProspects(); }
+// ── MF Prospects full-data sort state (dropdown + clickable headers) ──
+let _mfpSort = {key:'name', dir:1};
+const _MFP_DD = { name:{key:'name',dir:1}, trade_new:{key:'trade',dir:1}, trade_old:{key:'trade',dir:-1}, asset:{key:'asset',dir:-1} };
+function mfpSortFromDropdown(){
+  const v=(document.getElementById('mfp-sort')||{value:'name'}).value;
+  if(_MFP_DD[v]) _mfpSort={..._MFP_DD[v]};
+  mfpPage=1; renderMfProspects();
+}
+function sortMfpTable(key){
+  if(_mfpSort.key===key) _mfpSort={key, dir:-_mfpSort.dir};
+  else _mfpSort={key, dir:(key==='asset'?-1:1)};      // asset: high first, trade: newest first
+  const sel=document.getElementById('mfp-sort');
+  if(sel){
+    const hit=Object.keys(_MFP_DD).find(k=>_MFP_DD[k].key===_mfpSort.key && _MFP_DD[k].dir===_mfpSort.dir);
+    sel.value = hit || 'custom';
+  }
+  mfpPage=1; renderMfProspects();
+}
+function _mfpTh(key,label){
+  let arrow='';
+  if(_mfpSort.key===key){
+    const up = key==='trade' ? _mfpSort.dir===-1 : _mfpSort.dir===1;   // trade: ▼ = newest first
+    arrow = `<span style="font-size:.75em;margin-left:3px">${up?'▲':'▼'}</span>`;
+  }
+  return `<span onclick="sortMfpTable('${key}')" style="cursor:pointer;user-select:none;white-space:nowrap">${label}${arrow}</span>`;
+}
 let _filterMfpT;
 function filterMfpDebounced(){ clearTimeout(_filterMfpT); _filterMfpT=setTimeout(filterMfp,200); }
 function gpMfp(p){ if(p<1) return; mfpPage=p; renderMfProspects(); }
@@ -10401,6 +10435,7 @@ function resetMfpFilters(){
   const r=document.getElementById('mfp-rm'); if(r) r.value='';
   ['mfp-hni','mfp-trade'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   const so=document.getElementById('mfp-sort'); if(so) so.value='name';
+  _mfpSort={key:'name',dir:1};
   mfpPage=1;
   renderMfProspects();
 }
