@@ -10309,7 +10309,7 @@ function renderMfProspects(){
   }
 
   const q=(document.getElementById('mfp-search')||{value:''}).value.trim().toLowerCase();
-  if(q){ data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)); }
+  if(q){ data=data.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.mobile||'').includes(q)||String(c.code||'').toLowerCase().includes(q)); }
 
   const rmFilter=(document.getElementById('mfp-rm')||{value:''}).value;
   if(rmFilter){ data=data.filter(c=>String(c.rm||'').trim().toUpperCase()===rmFilter.trim().toUpperCase()); }
@@ -10343,7 +10343,7 @@ function renderMfProspects(){
       x = sd===1 ? da-db : db-da;                         // 1 = newest first
     } else if(sk==='asset'){
       x = ((Number(a.asset_value)||0)-(Number(b.asset_value)||0)) * sd;
-    } else if(sk==='mobile'||sk==='rm'){
+    } else if(sk==='mobile'||sk==='rm'||sk==='code'){
       x = String(a[sk]||'').localeCompare(String(b[sk]||''),undefined,{numeric:true}) * sd;
     } else {
       x = (a.name||'').localeCompare(b.name||'') * sd;
@@ -10364,7 +10364,7 @@ function renderMfProspects(){
 
   const rows = data.slice((mfpPage-1)*PG_SIZE, mfpPage*PG_SIZE);
   let h=`<table><thead><tr>
-    <th>${_mfpTh('name','Name')}</th><th>${_mfpTh('mobile','Mobile')}</th><th>${_mfpTh('rm','Equity RM')}</th><th style="text-align:right">${_mfpTh('asset','Asset Value')}</th><th>${_mfpTh('trade','Last Trade')}</th><th>Actions</th>
+    <th>${_mfpTh('name','Name')}</th><th>${_mfpTh('code','Client Code')}</th><th>${_mfpTh('mobile','Mobile')}</th><th>${_mfpTh('rm','Equity RM')}</th><th style="text-align:right">${_mfpTh('asset','Asset Value')}</th><th>${_mfpTh('trade','Last Trade')}</th><th>Actions</th>
     </tr></thead><tbody>`;
   rows.forEach(c=>{
     const av=Number(c.asset_value)||0;
@@ -10377,6 +10377,7 @@ function renderMfProspects(){
     }
     h+=`<tr>
       <td style="font-weight:600">${c.name}${_isHniEq(c)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
+      <td style="font-family:monospace;font-size:.82rem;color:#334155">${c.code?escapeHtml(String(c.code)):'<span style="color:var(--gray)">—</span>'}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="text-align:right;font-weight:${av>=500000?'700':'400'};color:${av>=500000?'#7c3aed':'inherit'}">${av?'₹'+Math.round(av).toLocaleString('en-IN'):'—'}</td>
