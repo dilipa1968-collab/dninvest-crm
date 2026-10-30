@@ -10932,14 +10932,38 @@ function sqClear(){
 }
 // Alag button: saved HISTORY delete. Dropdown me date chuni ho → sirf wo date,
 // warna saari dates. Live data par koi asar nahi.
-function sqClearHistory(){
-  if(!canUploadSquareoff()) return;
+// Red warning popup (Clear History ke liye) — Promise<boolean>
+function sqDangerConfirm(title, msg, okText){
+  return new Promise(res=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML=`<div style="background:#fff;max-width:420px;width:100%;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);border:2px solid #dc2626;font-family:inherit">
+      <div style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.6rem;line-height:1">⚠️</span>
+        <div style="font-weight:800;font-size:1.02rem;letter-spacing:.3px">${title}</div>
+      </div>
+      <div style="padding:16px 18px;color:#1e293b;font-size:.9rem;line-height:1.5">${msg}
+        <div style="margin-top:10px;padding:8px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#b91c1c;font-weight:700;font-size:.8rem">This cannot be undone. Deleted history cannot be recovered.</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding:0 18px 16px">
+        <button data-a="no" style="padding:8px 18px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">Cancel</button>
+        <button data-a="yes" style="padding:8px 18px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:800;cursor:pointer">${okText||'Delete'}</button>
+      </div></div>`;
+    const done=v=>{ ov.remove(); document.removeEventListener('keydown',kd); res(v); };
+    const kd=e=>{ if(e.key==='Escape') done(false); };
+    ov.addEventListener('click',e=>{ const a=e.target.getAttribute&&e.target.getAttribute('data-a'); if(a) done(a==='yes'); else if(e.target===ov) done(false); });
+    document.addEventListener('keydown',kd);
+    document.body.appendChild(ov);
+    const nb=ov.querySelector('[data-a="no"]'); if(nb) nb.focus();
+  });
+}
+async function sqClearHistory(){
+  if(!(CU && CU.role==='admin')){ toast('Only Admin can clear history','error'); return; }
   const d=_sqHistDate;
-  if(d){
-    if(!confirm('Delete saved history of '+fmtDate(d)+'?\n(Live data is not affected)')) return;
-  }else{
-    if(!confirm('Delete ALL saved square-off history (every date)?\n(Live data is not affected)')) return;
-  }
+  const ok = d
+    ? await sqDangerConfirm('Delete History — '+fmtDate(d), 'Saved square-off history of <b>'+fmtDate(d)+'</b> will be permanently deleted.<br>Live data is not affected.', 'Delete '+fmtDate(d))
+    : await sqDangerConfirm('Delete ALL History', 'Saved square-off history of <b>every date</b> will be permanently deleted.<br>Live data is not affected.', 'Delete All History');
+  if(!ok) return;
   sqArchiveDeleteDates(d?[d]:null).then(()=>{
     _sqHistDate=''; _sqHistRows=null;
     const sel=document.getElementById('sq-hist'); if(sel) sel.value='';
@@ -10977,6 +11001,7 @@ async function sqArchiveDeleteDates(dates){
 function renderSquareoff(){
   const canUpload=canUploadSquareoff();
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=canUpload?'inline-flex':'none');
+  { const hb=document.getElementById('sq-histclrbtn'); if(hb) hb.style.display=(CU&&CU.role==='admin')?'inline-flex':'none'; }   // Clear History: sirf Admin
 
   // History dropdown (injected once, next to the RM filter)
   if(!document.getElementById('sq-hist')){
@@ -11169,7 +11194,7 @@ function renderSquareoff(){
           sub=`<div class="sq-rec" title="Earlier due ${f2(o)}"><span class="up">▲ ${f2(-diff)} added</span></div>`;
         }
         html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}" data-sort="${v}">
-          <span class="sq-amt${big?' sq-big':''}"${st?' style="opacity:.55;text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</td>`;
+          <div class="sq-cellbox${big?' big':''}"${st?' style="opacity:.55"':''}><span class="sq-amt${big?' sq-big':''}"${st?' style="text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</div></td>`;
       }
     });
     if(c.acbal==null){
