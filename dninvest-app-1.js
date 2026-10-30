@@ -10716,7 +10716,8 @@ async function sqArchiveRows(rows){
       const d=docs[i];
       const old=(d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[];
       const map=new Map(); old.forEach(r=>map.set(keyOf(r),r));
-      byMonth[m].forEach(r=>map.set(keyOf(r),{code:r.code||'',name:r.name||'',dealer:r.dealer||'',debit:r.debit||0,t5:r.t5||'',sqDate:r.sqDate,acbal:r.acbal==null?null:r.acbal}));
+      byMonth[m].forEach(r=>map.set(keyOf(r),{code:r.code||'',name:r.name||'',dealer:r.dealer||'',debit:r.debit||0,t5:r.t5||'',sqDate:r.sqDate,acbal:r.acbal==null?null:r.acbal,
+        orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||''}));
       const arr=[...map.values()];
       tx.set(_sqArchRef(m),{data:DB._clean(arr),month:m,count:arr.length,updated:now});
       Object.keys(dates).forEach(k=>{ if(k.slice(0,7)===m) delete dates[k]; });
@@ -10848,9 +10849,25 @@ function sqUpload(input){
       // purani dates jama na hon.
       const keyOf = r => String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
       const merged = new Map();
-      (DB.get('squareoff')||[]).forEach(r=>merged.set(keyOf(r), r));   // old rows first
-      out.forEach(r=>merged.set(keyOf(r), r));                          // new rows on top
       const todayISO = today();
+      (DB.get('squareoff')||[]).forEach(r=>merged.set(keyOf(r), r));   // old rows first
+      // AAYA / KATA tracking (30-Oct-2026): same client+date ki row overwrite
+      // hone se pehle uska pehli baar aaya amount (orig) aur pichhle din ka
+      // amount (prevDebit) naye row me copy kar lo — taaki dikhe ki T+5 me
+      // kitna aaya tha, client ne kitna kata aur ab kitna baki hai.
+      out.forEach(r=>{
+        const old = merged.get(keyOf(r));
+        if(old){
+          r.orig   = (old.orig!=null) ? old.orig : old.debit;
+          r.origOn = old.origOn || old.upOn || '';
+          if((old.upOn||'') < todayISO){ r.prevDebit = old.debit; r.prevOn = old.upOn||''; }
+          else { if(old.prevDebit!=null) r.prevDebit = old.prevDebit; if(old.prevOn) r.prevOn = old.prevOn; }
+        }else{
+          r.orig = r.debit; r.origOn = todayISO;
+        }
+        r.upOn = todayISO;
+        merged.set(keyOf(r), r);                                        // new rows on top
+      });
       // Har date permanent history me save (purani dates bhi, drop hone se pehle)
       sqArchiveRows([...merged.values()]).then(sqFillHistDates).catch(e=>{ console.log('sq archive err',e); toast('⚠️ History save failed: '+(e.message||e),'error'); });
       const finalRows = [...merged.values()].filter(r=>!r.sqDate || r.sqDate >= todayISO);
@@ -10944,12 +10961,18 @@ function renderSquareoff(){
   const palette=['#dc2626','#ea580c','#ca8a04','#0891b2','#7c3aed','#be185d'];
   const dateColor={}; dateKeys.forEach((d,i)=>dateColor[d]=palette[i%palette.length]);
 
+  // Latest upload date across ALL live rows (not just visible) — stale detection
+  const sqLatestUp = isHist ? '' : (getSquareoff().map(r=>r.upOn||'').sort().pop()||'');
   // Pivot: one row per client code (fallback name if code blank)
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},acbal:null,acDate:''};
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:{},origOn:{},stale:{},acbal:null,acDate:''};
     byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
+    byClient[key].orig[r.sqDate] = (byClient[key].orig[r.sqDate]||0) + (r.orig!=null ? r.orig : (r.debit||0));
+    if(r.origOn) byClient[key].origOn[r.sqDate] = r.origOn;
+    // Live view: row aaj ki upload me refresh nahi hui (jabki aaj upload hua hai) → shayad clear ho gaya
+    if(!isHist && sqLatestUp && r.upOn && r.upOn < sqLatestUp) byClient[key].stale[r.sqDate] = r.upOn;
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     // keep freshest name/dealer if it varies between files
     byClient[key].name = r.name || byClient[key].name;
@@ -10998,6 +11021,14 @@ function renderSquareoff(){
       <span class="n">${clients.length}</span><span class="l">Clients</span></div>
     <div class="sq-stat-chip" style="--chip-accent:#0d9488">
       <span class="n">₹${Math.round(total).toLocaleString('en-IN')}</span><span class="l">Total Debit</span></div>`;
+  {
+    let recAmt=0, recCnt=0, origAmt=0;
+    clients.forEach(c=>{ let got=0; dateKeys.forEach(dk=>{ if(c.vals[dk]==null) return; origAmt+=c.orig[dk]||0; const d=(c.orig[dk]||0)-(c.vals[dk]||0); if(d>0.5) got+=d; }); if(got>0){ recAmt+=got; recCnt++; } });
+    stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:#64748b">
+      <span class="n" style="color:#475569">₹${Math.round(origAmt).toLocaleString('en-IN')}</span><span class="l">Aaya tha (T+5)</span></div>
+    <div class="sq-stat-chip" style="--chip-accent:#16a34a">
+      <span class="n" style="color:#15803d">₹${Math.round(recAmt).toLocaleString('en-IN')}</span><span class="l">✅ Kata — ${recCnt} clients</span></div>`;
+  }
   dateKeys.forEach(dk=>{
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
@@ -11042,8 +11073,20 @@ function renderSquareoff(){
         html+=`<td style="text-align:center"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
+        const f2=x=>'₹'+Math.round(x).toLocaleString('en-IN');
+        const o=c.orig[dk], diff=(o!=null)?o-v:0, st=c.stale[dk];
+        let sub='';
+        if(st){
+          sub=`<div style="font-size:.7rem;color:#64748b;margin-top:2px;font-weight:600">⏳ ${sqFmtD(st)} ke baad ki file me nahi — cleared?</div>`;
+        }else if(diff>0.5){
+          sub=`<div style="font-size:.7rem;margin-top:2px;line-height:1.35;font-weight:600">
+            <span style="color:#64748b">Aaya ${f2(o)}${c.origOn[dk]?' ('+sqFmtD(c.origOn[dk])+')':''}</span><br>
+            <span style="color:#15803d">✅ Kata ${f2(diff)}</span> · <span style="color:#b91c1c">Baki ${f2(v)}</span></div>`;
+        }else if(diff<-0.5){
+          sub=`<div style="font-size:.7rem;margin-top:2px;font-weight:600;color:#b91c1c">Pehle ${f2(o)} · ↑ ${f2(-diff)} badha</div>`;
+        }
         html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}">
-          <span class="sq-amt${big?' sq-big':''}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+          <span class="sq-amt${big?' sq-big':''}"${st?' style="opacity:.55;text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</td>`;
       }
     });
     if(c.acbal==null){
@@ -11075,8 +11118,9 @@ function sqExport(){
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},acbal:null,acDate:''};
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:0,acbal:null,acDate:''};
     byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
+    byClient[key].orig+=(r.orig!=null?r.orig:(r.debit||0));
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     byClient[key].name=r.name||byClient[key].name;
     byClient[key].dealer=r.dealer||byClient[key].dealer;
@@ -11087,14 +11131,17 @@ function sqExport(){
 
   const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32},{header:'RM',width:12}]
     .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
+    .concat([{header:'Aaya tha (T+5)',money:true,width:16},{header:'Kata',money:true,width:14},{header:'Baki',money:true,width:14}])
     .concat([{header:'Ledger Debit Balance',money:true,width:18}]);
   const data=clients.map(c=>{
     const row=[c.code,c.name,c.dealer];
     dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
+    row.push(c.orig, Math.max(0,c.orig-c.total), c.total);
     row.push(c.acbal!=null?c.acbal:'');
     return row;
   });
   const totalRow=['','','TOTAL'].concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)))
+    .concat([clients.reduce((s,c)=>s+c.orig,0), clients.reduce((s,c)=>s+Math.max(0,c.orig-c.total),0), clients.reduce((s,c)=>s+c.total,0)])
     .concat([clients.reduce((s,c)=>s+(c.acbal||0),0)]);
   dnXlsx('Square-off_'+(_sqHistDate||today())+'.xlsx','Square-off (T+5)'+(_sqHistDate?' — History '+fmtDate(_sqHistDate):''),cols,data,totalRow);
 }
