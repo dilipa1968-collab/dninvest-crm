@@ -4420,7 +4420,7 @@ function updateBadges(){
     if(daysDiff(c.last_call_date)!==null) return false;
     const sinceAdded=daysDiff(c.created); return sinceAdded===null||sinceAdded>=60;
   }).length;
-  try{ const sqb=document.getElementById('nb-eqsq'); if(sqb){ const n=sqMyRows().length; sqb.textContent=n; sqb.style.display=n>0?'':'none'; } if(typeof sqUpdateBell==='function') sqUpdateBell(); }catch(e){}
+  try{ const sqb=document.getElementById('nb-eqsq'); if(sqb){ const n=sqMyRows().filter(r=>!r.cleared).length; sqb.textContent=n; sqb.style.display=n>0?'':'none'; } if(typeof sqUpdateBell==='function') sqUpdateBell(); }catch(e){}
 
   // Admin-only: Pending counts for MF Transactions and Demat (nav badge + dashboard card)
   if(CU && CU.role==='admin'){
@@ -10717,7 +10717,7 @@ async function sqArchiveRows(rows){
       const old=(d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[];
       const map=new Map(); old.forEach(r=>map.set(keyOf(r),r));
       byMonth[m].forEach(r=>map.set(keyOf(r),{code:r.code||'',name:r.name||'',dealer:r.dealer||'',debit:r.debit||0,t5:r.t5||'',sqDate:r.sqDate,acbal:r.acbal==null?null:r.acbal,
-        orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||''}));
+        orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||'',cleared:r.cleared||''}));
       const arr=[...map.values()];
       tx.set(_sqArchRef(m),{data:DB._clean(arr),month:m,count:arr.length,updated:now});
       Object.keys(dates).forEach(k=>{ if(k.slice(0,7)===m) delete dates[k]; });
@@ -10905,6 +10905,19 @@ function sqUpload(input){
       // hone se pehle uska pehli baar aaya amount (orig) aur pichhle din ka
       // amount (prevDebit) naye row me copy kar lo — taaki dikhe ki T+5 me
       // kitna aaya tha, client ne kitna kata aur ab kitna baki hai.
+      // CLEARED detection (30-Oct-2026): purani row jo nayi file me nahi aayi,
+      // jabki usi RM/dealer ki file upload hui hai → client ne pay kar diya
+      // (₹100 se kam bacha ya poora clear). Row hatti nahi, 'cleared' mark hoti
+      // hai taaki Paid amount dikhe aur pending total me na jude.
+      {
+        const dU = r => String(r.dealer||'').trim().toUpperCase();
+        const newKeys = new Set(out.map(keyOf));
+        const newDealers = new Set(out.map(dU));
+        [...merged.entries()].forEach(([k,old])=>{
+          if(newKeys.has(k) || old.cleared || !newDealers.has(dU(old))) return;
+          merged.set(k, {...old, cleared: todayISO, orig: (old.orig!=null?old.orig:old.debit), origOn: old.origOn||old.upOn||''});
+        });
+      }
       out.forEach(r=>{
         const old = merged.get(keyOf(r));
         if(old){
@@ -10924,7 +10937,8 @@ function sqUpload(input){
       const dropped = merged.size - finalRows.length;
       DB.set('squareoff', finalRows);
       const uploadedDates = [...new Set(out.map(r=>r.sqDate).filter(Boolean))];
-      let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), total '+finalRows.length+' clients';
+      const clrN = finalRows.filter(r=>r.cleared).length;
+      let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), pending '+(finalRows.length-clrN)+(clrN?', ✓ cleared '+clrN:'');
       if(dropped) msg += ', '+dropped+' old-date rows moved to 📅 History';
       toast(msg,'success');
       renderSquareoff(); updateBadges(); sqUpdateBell();
@@ -11057,17 +11071,19 @@ function renderSquareoff(){
   const dateColor={}; dateKeys.forEach((d,i)=>dateColor[d]=palette[i%palette.length]);
 
   // Latest upload date across ALL live rows (not just visible) — stale detection
-  const sqLatestUp = isHist ? '' : (getSquareoff().map(r=>r.upOn||'').sort().pop()||'');
   // Pivot: one row per client code (fallback name if code blank)
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:{},origOn:{},stale:{},acbal:null,acDate:''};
-    byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
-    byClient[key].orig[r.sqDate] = (byClient[key].orig[r.sqDate]||0) + (r.orig!=null ? r.orig : (r.debit||0));
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:{},origOn:{},clr:{},acbal:null,acDate:''};
+    const _o = (r.orig!=null ? r.orig : (r.debit||0));
+    if(r.cleared){
+      byClient[key].clr[r.sqDate] = (byClient[key].clr[r.sqDate]||0) + _o;   // poora paid — pending me nahi
+    }else{
+      byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
+      byClient[key].orig[r.sqDate] = (byClient[key].orig[r.sqDate]||0) + _o;
+    }
     if(r.origOn) byClient[key].origOn[r.sqDate] = r.origOn;
-    // Live view: row aaj ki upload me refresh nahi hui (jabki aaj upload hua hai) → shayad clear ho gaya
-    if(!isHist && sqLatestUp && r.upOn && r.upOn < sqLatestUp) byClient[key].stale[r.sqDate] = r.upOn;
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     // keep freshest name/dealer if it varies between files
     byClient[key].name = r.name || byClient[key].name;
@@ -11112,13 +11128,17 @@ function renderSquareoff(){
   };
 
   // Stat strip — clean cards with a thin top accent bar instead of flooded colour
+  const pendingCnt=clients.filter(c=>c.total>0.5).length;
+  const clearedCnt=clients.length-pendingCnt;
   let stripHtml=`<div class="sq-stat-chip" style="--chip-accent:#132039">
-      <span class="n">${clients.length}</span><span class="l">Clients</span></div>
+      <span class="n">${pendingCnt}</span><span class="l">Pending Clients${clearedCnt?' · '+clearedCnt+' cleared':''}</span></div>
     <div class="sq-stat-chip" style="--chip-accent:#0d9488">
       <span class="n">₹${Math.round(total).toLocaleString('en-IN')}</span><span class="l">Total Debit</span></div>`;
   {
     let recAmt=0, recCnt=0, origAmt=0;
-    clients.forEach(c=>{ let got=0; dateKeys.forEach(dk=>{ if(c.vals[dk]==null) return; origAmt+=c.orig[dk]||0; const d=(c.orig[dk]||0)-(c.vals[dk]||0); if(d>0.5) got+=d; }); if(got>0){ recAmt+=got; recCnt++; } });
+    clients.forEach(c=>{ let got=0; dateKeys.forEach(dk=>{
+      if(c.clr[dk]){ origAmt+=c.clr[dk]; got+=c.clr[dk]; }
+      if(c.vals[dk]==null) return; origAmt+=c.orig[dk]||0; const d=(c.orig[dk]||0)-(c.vals[dk]||0); if(d>0.5) got+=d; }); if(got>0){ recAmt+=got; recCnt++; } });
     stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:#64748b">
       <span class="n" style="color:#475569">₹${Math.round(origAmt).toLocaleString('en-IN')}</span><span class="l">Original Due (T+5)</span></div>
     <div class="sq-stat-chip" style="--chip-accent:#16a34a">
@@ -11164,12 +11184,14 @@ function renderSquareoff(){
       <td style="text-align:center"><span class="sq-rm-pill" style="color:${rc};background:${rc}14;border-color:${rc}">${c.dealer||'—'}</span></td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
-      if(v==null){
+      if(v==null && c.clr[dk]){
+        html+=`<td style="text-align:center"><span class="sq-clr">✓ Cleared</span><div class="sq-rec"><span class="ok">Paid ₹${Math.round(c.clr[dk]).toLocaleString('en-IN')}</span></div></td>`;
+      }else if(v==null){
         html+=`<td style="text-align:center"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
         const f2=x=>'₹'+Math.round(x).toLocaleString('en-IN');
-        const o=c.orig[dk], diff=(o!=null)?o-v:0, st=c.stale[dk];
+        const o=c.orig[dk], diff=(o!=null)?o-v:0, st='';
         let sub='';
         if(st){
           sub=`<div class="sq-rec" style="color:#94a3b8">Not in latest file</div>`;
@@ -11194,7 +11216,7 @@ function renderSquareoff(){
   tbl.innerHTML=html;
 }
 function sqUpdateBell(){
-  const rows=sqMyRows();
+  const rows=sqMyRows().filter(r=>!r.cleared);
   const n=new Set(rows.map(r=>(r.code||'').trim()||('N:'+(r.name||'').trim().toLowerCase()))).size;
   const mBadge=document.getElementById('mnav-sq-badge');
   if(mBadge){ mBadge.textContent=n>99?'99+':n; mBadge.style.display=n>0?'':'none'; }
@@ -11212,7 +11234,7 @@ function sqExport(){
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
     if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:0,acbal:null,acDate:''};
-    byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
+    if(!r.cleared) byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
     byClient[key].orig+=(r.orig!=null?r.orig:(r.debit||0));
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     byClient[key].name=r.name||byClient[key].name;
@@ -11228,7 +11250,7 @@ function sqExport(){
     .concat([{header:'Ledger Debit Balance',money:true,width:18}]);
   const data=clients.map(c=>{
     const row=[c.code,c.name,c.dealer];
-    dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
+    dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:(c.total<0.5?'Cleared':'')));
     row.push(c.orig, Math.max(0,c.orig-c.total), c.total);
     row.push(c.acbal!=null?c.acbal:'');
     return row;
