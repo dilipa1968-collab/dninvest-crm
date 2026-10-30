@@ -1651,7 +1651,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="sqExport()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-sq" id="sq-clrbtn" style="display:none" onclick="sqClear()">🗑️ Clear</button>
-            <button class="btn btn-outline admin-only-sq" id="sq-basebtn" style="display:none" title="Kal/pichhli date ki file upload karo — live data nahi badlega, sirf 'Aaya tha' amount set hoga" onclick="sqBasePick()">📂 Pichhli File (Aaya tha)</button>
+            <button class="btn btn-outline admin-only-sq" id="sq-histclrbtn" style="display:none" title="Saved date-wise history delete karo — dropdown me date chuni ho to sirf wo date, warna saari dates. Live data nahi badlega." onclick="sqClearHistory()">🗂️ Clear History</button>
             <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" title="Each branch's file can be uploaded separately — data will be merged, not overwritten" onclick="document.getElementById('sq-file').click()">⬆️ Upload File (Merge)</button>
             <input type="file" id="sq-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sqUpload(this)">
           </div>
@@ -3300,7 +3300,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-10-30-v6"></script>
+<script src="dninvest-app-1.js?v=2026-10-30-v10"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 

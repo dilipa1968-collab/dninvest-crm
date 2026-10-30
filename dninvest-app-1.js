@@ -10799,44 +10799,6 @@ function sqToISO(v){
   if(!isNaN(d)) return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
   return s;
 }
-// ── PICHHLI FILE SE "AAYA THA" SET KARO (30-Oct-2026) ──
-// Purani (jaise kal ki) file upload karo — live data NAHI badalta. Sirf
-// matching client+date wali live rows ka 'orig' (Aaya tha) amount us file ke
-// amount se set hota hai, taaki Aaya / Kata / Baki dikhe.
-let _sqBaseMode=false;
-function sqBasePick(){
-  if(!canUploadSquareoff()) return;
-  _sqBaseMode=true;
-  const f=document.getElementById('sq-file'); if(f){ f.value=''; f.click(); }
-  setTimeout(()=>{ window.addEventListener('focus',()=>setTimeout(()=>{ const f2=document.getElementById('sq-file'); if(f2 && !(f2.files&&f2.files.length)) _sqBaseMode=false; },800),{once:true}); },0);
-}
-function sqApplyBase(baseRows){
-  const keyOf=r=>String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
-  const codeOf=r=>String(r.code||r.name||'').trim().toUpperCase();
-  const byKey=new Map(), byCode=new Map();
-  baseRows.forEach(r=>{
-    byKey.set(keyOf(r),(byKey.get(keyOf(r))||0)+(r.debit||0));
-    byCode.set(codeOf(r),(byCode.get(codeOf(r))||0)+(r.debit||0));
-  });
-  const live=DB.get('squareoff')||[];
-  // Kitni live rows har client ki hain — date match na ho to code se tabhi lo jab client ki ek hi row ho
-  const liveCnt={}; live.forEach(r=>{ const c=codeOf(r); liveCnt[c]=(liveCnt[c]||0)+1; });
-  let hit=0, kata=0;
-  const upd=live.map(r=>{
-    let b=byKey.get(keyOf(r));
-    if(b==null && liveCnt[codeOf(r)]===1) b=byCode.get(codeOf(r));
-    if(b==null) return r;
-    hit++;
-    const nr={...r, orig:b, origOn:''};
-    if(b>(r.debit||0)) kata+=b-(r.debit||0);
-    return nr;
-  });
-  DB.set('squareoff',upd);
-  sqArchiveRows(upd).catch(e=>console.log('sq archive err',e));
-  if(_sqHistDate){ _sqHistRows=null; const s=document.getElementById('sq-hist'); if(s){ s.value=''; } _sqHistDate=''; }
-  toast(`Pichhli file se ${hit} clients ka "Aaya tha" set hua — total Kata ₹${Math.round(kata).toLocaleString('en-IN')}`,'success');
-  renderSquareoff();
-}
 function sqUpload(input){
   if(!canUploadSquareoff()){ toast('Only admin/back-office/risk-upload RMs can upload','error'); input.value=''; return; }
   const file=input.files[0]; if(!file){ return; }
@@ -10891,7 +10853,6 @@ function sqUpload(input){
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
-      if(_sqBaseMode){ _sqBaseMode=false; sqApplyBase(out); input.value=''; return; }
       // MERGE mode: purana data mitta nahi. Key = Client Code + Square-off Date.
       // Same key wali row nayi file se overwrite ho jati hai, baaki add hoti hain.
       // Isse alag-alag office ki files alag-alag upload ki ja sakti hain.
@@ -10935,27 +10896,28 @@ function sqUpload(input){
 }
 function sqClear(){
   if(!canUploadSquareoff()) return;
-  // History date selected → sirf us date ki history delete
-  if(_sqHistDate){
-    const d=_sqHistDate;
-    if(!confirm('Delete saved history of '+fmtDate(d)+'?\n(Live data is not affected)')) return;
-    sqArchiveDeleteDates([d]).then(()=>{
-      _sqHistDate=''; _sqHistRows=null;
-      const sel=document.getElementById('sq-hist'); if(sel) sel.value='';
-      sqFillHistDates(); renderSquareoff();
-      toast('History of '+fmtDate(d)+' deleted','success');
-    }).catch(e=>toast('Delete failed: '+(e.message||e),'error'));
-    return;
-  }
-  if(!confirm('Clear all LIVE square-off data?')) return;
-  const alsoHist=confirm('Saari saved HISTORY (sab dates) bhi delete karein?\n\nOK = History bhi delete\nCancel = Sirf live data clear');
+  if(!confirm('Clear all LIVE square-off data?\n(Saved date-wise history is not affected)')) return;
   DB.set('squareoff', []);
   try{ localStorage.setItem('dninvest_sqarch_catchup', today()); }catch(e){}
-  if(alsoHist){
-    sqArchiveDeleteDates(null).then(()=>{ sqFillHistDates(); toast('Square-off + all history cleared','success'); })
-      .catch(e=>toast('History delete failed: '+(e.message||e),'error'));
-  }else toast('Square-off cleared','success');
-  renderSquareoff(); updateBadges(); sqUpdateBell();
+  renderSquareoff(); updateBadges(); sqUpdateBell(); toast('Square-off cleared','success');
+}
+// Alag button: saved HISTORY delete. Dropdown me date chuni ho → sirf wo date,
+// warna saari dates. Live data par koi asar nahi.
+function sqClearHistory(){
+  if(!canUploadSquareoff()) return;
+  const d=_sqHistDate;
+  if(d){
+    if(!confirm('Delete saved history of '+fmtDate(d)+'?\n(Live data is not affected)')) return;
+  }else{
+    if(!confirm('Delete ALL saved square-off history (every date)?\n(Live data is not affected)')) return;
+  }
+  sqArchiveDeleteDates(d?[d]:null).then(()=>{
+    _sqHistDate=''; _sqHistRows=null;
+    const sel=document.getElementById('sq-hist'); if(sel) sel.value='';
+    try{ localStorage.setItem('dninvest_sqarch_catchup', today()); }catch(e){}
+    sqFillHistDates(); renderSquareoff();
+    toast(d?('History of '+fmtDate(d)+' deleted'):'All square-off history deleted','success');
+  }).catch(e=>toast('History delete failed: '+(e.message||e),'error'));
 }
 // dates=null → poori history delete; warna sirf diye gaye dates
 async function sqArchiveDeleteDates(dates){
