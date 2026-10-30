@@ -11066,7 +11066,7 @@ function renderSquareoff(){
     stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:#64748b">
       <span class="n" style="color:#475569">₹${Math.round(origAmt).toLocaleString('en-IN')}</span><span class="l">Original Due (T+5)</span></div>
     <div class="sq-stat-chip" style="--chip-accent:#16a34a">
-      <span class="n" style="color:#15803d">₹${Math.round(recAmt).toLocaleString('en-IN')}</span><span class="l">Recovered · ${recCnt} clients${origAmt>0?' · '+Math.round(recAmt/origAmt*100)+'%':''}</span></div>`;
+      <span class="n" style="color:#15803d">₹${Math.round(recAmt).toLocaleString('en-IN')}</span><span class="l">Received · ${recCnt} clients</span></div>`;
   }
   dateKeys.forEach(dk=>{
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
@@ -11116,20 +11116,11 @@ function renderSquareoff(){
         const o=c.orig[dk], diff=(o!=null)?o-v:0, st=c.stale[dk];
         let sub='';
         if(st){
-          sub=`<div class="sq-rec sq-rec-stale"><span class="sq-rec-tag">Not in latest file</span><span class="sq-rec-note">Last seen ${sqFmtD(st)} · likely cleared</span></div>`;
+          sub=`<div class="sq-rec" style="color:#94a3b8">Not in latest file</div>`;
         }else if(diff>0.5){
-          const pct=Math.min(100,Math.max(0,Math.round(diff/o*100)));
-          sub=`<div class="sq-rec">
-            <div class="sq-rec-bar" title="${pct}% recovered"><span style="width:${pct}%"></span></div>
-            <div class="sq-rec-grid">
-              <div><em>Due</em><b>${f2(o)}</b></div>
-              <div class="ok"><em>Received</em><b>${f2(diff)}</b></div>
-              <div class="due"><em>Balance</em><b>${f2(v)}</b></div>
-            </div>
-            <div class="sq-rec-note">${pct}% recovered${c.origOn[dk]?' · since '+sqFmtD(c.origOn[dk]):''}</div>
-          </div>`;
+          sub=`<div class="sq-rec" title="Original due ${f2(o)} · Received ${f2(diff)} · Balance ${f2(v)}">Due ${f2(o)} · <span class="ok">Paid ${f2(diff)}</span></div>`;
         }else if(diff<-0.5){
-          sub=`<div class="sq-rec sq-rec-up"><span class="sq-rec-tag">▲ Increased ${f2(-diff)}</span><span class="sq-rec-note">Earlier due ${f2(o)}</span></div>`;
+          sub=`<div class="sq-rec" title="Earlier due ${f2(o)}"><span class="up">▲ ${f2(-diff)} added</span></div>`;
         }
         html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}">
           <span class="sq-amt${big?' sq-big':''}"${st?' style="opacity:.55;text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</td>`;
