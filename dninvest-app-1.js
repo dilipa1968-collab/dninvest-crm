@@ -10715,10 +10715,10 @@ async function sqArchiveRows(rows, replaceDates){
     months.forEach((m,i)=>{
       const d=docs[i];
       let old=(d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[];
-      if(replaceDates && replaceDates.size) old=old.filter(r=>!replaceDates.has(r.sqDate));   // us date ki purani list hata ke nayi
+      if(replaceDates && replaceDates.size) old=old.filter(r=>!(r.grp && replaceDates.has(r.grp) && replaceDates.get(r.grp).has(r.sqDate)));   // usi office+date ki purani list hata ke nayi
       const map=new Map(); old.forEach(r=>map.set(keyOf(r),r));
       byMonth[m].forEach(r=>map.set(keyOf(r),{code:r.code||'',name:r.name||'',dealer:r.dealer||'',debit:r.debit||0,t5:r.t5||'',sqDate:r.sqDate,acbal:r.acbal==null?null:r.acbal,
-        orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||''}));
+        orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||'',grp:r.grp||''}));
       const arr=[...map.values()];
       tx.set(_sqArchRef(m),{data:DB._clean(arr),month:m,count:arr.length,updated:now});
       Object.keys(dates).forEach(k=>{ if(k.slice(0,7)===m) delete dates[k]; });
@@ -10860,7 +10860,9 @@ function sqUpload(input){
           if(!code && !name) return;
           // ₹100 se neeche (99.99 tak) ka debit ignore — chhoti amount pe square-off nahi
           if(debit < 100) return;
-          out.push({code,name,dealer,debit,t5,sqDate,acbal});
+          // Office pehchaan: GroupCode (437 / 1278 …) — date-wise replace sirf usi office par
+          const grp=String(pick('groupcode','grpcode','branchcode')||'').trim();
+          out.push({code,name,dealer,debit,t5,sqDate,acbal,grp});
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
@@ -10894,12 +10896,16 @@ function sqUpload(input){
       // ki list file wali hi maani jaati hai. Us date ka jo client file me nahi
       // hai (pura paisa jama kar diya), uski purani row hata do — warna wo
       // pending me judta rehta tha (jaise Vinay Madia ₹41.26L, 30-Oct).
-      const newDates = new Set(out.map(r=>r.sqDate).filter(Boolean));
+      // Do office (GroupCode 437 / 1278) — replace sirf USI office + USI date
+      // ki rows par. Bina GroupCode wali file / purani rows par replace nahi
+      // (purana merge behaviour), taaki doosre office ka data na mite.
+      const newDates = new Map();                       // grp -> Set(sqDate)
+      out.forEach(r=>{ if(r.grp && r.sqDate){ if(!newDates.has(r.grp)) newDates.set(r.grp,new Set()); newDates.get(r.grp).add(r.sqDate); } });
       const newKeys  = new Set(out.map(keyOf));
       let removedPaid = 0;
       [...merged.keys()].forEach(k=>{
         const r = merged.get(k);
-        if(r.sqDate && newDates.has(r.sqDate) && !newKeys.has(k)){ merged.delete(k); removedPaid++; }
+        if(r.grp && r.sqDate && newDates.has(r.grp) && newDates.get(r.grp).has(r.sqDate) && !newKeys.has(k)){ merged.delete(k); removedPaid++; }
       });
       // Har date permanent history me save (purani dates bhi, drop hone se pehle)
       sqArchiveRows([...merged.values()], newDates).then(sqFillHistDates).catch(e=>{ console.log('sq archive err',e); toast('⚠️ History save failed: '+(e.message||e),'error'); });
