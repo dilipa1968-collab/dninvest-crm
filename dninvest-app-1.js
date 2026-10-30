@@ -11155,7 +11155,7 @@ function renderSquareoff(){
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
       if(v==null){
-        html+=`<td style="text-align:center"><span class="sq-amt-empty">—</span></td>`;
+        html+=`<td style="text-align:center" data-sort="0"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
         const f2=x=>'₹'+Math.round(x).toLocaleString('en-IN');
@@ -11168,15 +11168,15 @@ function renderSquareoff(){
         }else if(diff<-0.5){
           sub=`<div class="sq-rec" title="Earlier due ${f2(o)}"><span class="up">▲ ${f2(-diff)} added</span></div>`;
         }
-        html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}">
+        html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}" data-sort="${v}">
           <span class="sq-amt${big?' sq-big':''}"${st?' style="opacity:.55;text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</td>`;
       }
     });
     if(c.acbal==null){
-      html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt-empty">—</span></td>`;
+      html+=`<td style="text-align:center;background:#fdf8ec" data-sort="0"><span class="sq-amt-empty">—</span></td>`;
     }else{
       const neg=c.acbal<0;
-      html+=`<td style="text-align:center;background:#fdf8ec"><span class="sq-amt" style="color:${neg?'#dc2626':'#132039'}">${neg?'−':''}(₹${Math.abs(c.acbal).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})})</span></td>`;
+      html+=`<td style="text-align:center;background:#fdf8ec" data-sort="${Math.abs(c.acbal)}"><span class="sq-amt" style="color:${neg?'#dc2626':'#132039'}">${neg?'−':''}(₹${Math.abs(c.acbal).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})})</span></td>`;
     }
     html+=`</tr>`;
   });
@@ -16209,8 +16209,11 @@ window.checkFollowups = function(){
       else list.push(r);
     });
     list.sort((a,b)=>{
-      const pa=parse((a.cells[col]?a.cells[col].textContent:'').trim());
-      const pb=parse((b.cells[col]?b.cells[col].textContent:'').trim());
+      // data-sort attribute (agar cell me ho) = asli sort value — jaise
+      // Square-off cell jisme amount ke neeche "Due · Paid" line bhi hai
+      const cv=c=>{ if(!c) return ''; const ds=c.getAttribute('data-sort'); return (ds!=null?ds:c.textContent).trim(); };
+      const pa=parse(cv(a.cells[col]));
+      const pb=parse(cv(b.cells[col]));
       let c;
       if(pa.t==='num'&&pb.t==='num') c=pa.v-pb.v;
       else c=String(pa.v).localeCompare(String(pb.v),undefined,{numeric:true});
