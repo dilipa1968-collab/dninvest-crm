@@ -11171,9 +11171,11 @@ function renderSquareoff(){
       <div style="font-size:.68rem;font-weight:500;color:#8fa0bd;text-transform:none;margin-top:1px;text-align:center">as on date</div>
     </th>`;
   html+='</tr></thead><tbody>';
-  clients.forEach(c=>{
+  // Har client row ka halka water-colour tint (corporate pastel, rotate)
+  const rowTint=['#f3f7fd','#f3faf6','#fdf8f2','#f7f4fc','#f1f9fa','#fcf4f7'];
+  clients.forEach((c,ci)=>{
     const rc=rmColorFor(c.dealer);
-    html+=`<tr>
+    html+=`<tr style="background:${rowTint[ci%rowTint.length]}">
       <td><span class="sq-code">${c.code||'—'}</span></td>
       <td><span class="sq-name">${c.name||'—'}</span></td>
       <td style="text-align:center"><span class="sq-rm-pill" style="color:${rc};background:${rc}14;border-color:${rc}">${c.dealer||'—'}</span></td>`;
