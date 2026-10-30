@@ -10783,7 +10783,18 @@ function sqToISO(v){
   let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if(m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); // DD/MM/YYYY
-  if(m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  if(m){
+    const dm=`${m[3]}-${pad(m[2])}-${pad(m[1])}`;          // DD/MM (default)
+    const md=`${m[3]}-${pad(m[1])}-${pad(m[2])}`;          // MM/DD (US style)
+    // Square-off date hamesha aaj ke aas-paas hoti hai. Agar DD/MM wali date
+    // 45 din se zyada door ho aur MM/DD wali paas ho, to file US format me hai
+    // (jaise "11/02/2026" = 2-Nov, na ki 11-Feb). 30-Oct-2026 fix.
+    const away=iso=>{ const t=Date.parse(iso+'T00:00:00Z'), n=Date.parse(today()+'T00:00:00Z'); return isNaN(t)?1e12:Math.abs(t-n)/864e5; };
+    const okMD=+m[1]<=12;
+    if(okMD && +m[2]<=12 && away(dm)>45 && away(md)<=45) return md;
+    if(+m[2]>12 && okMD) return md;                          // middle part >12 → must be MM/DD/YYYY
+    return dm;
+  }
   const d=new Date(s);
   if(!isNaN(d)) return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
   return s;
@@ -10924,8 +10935,53 @@ function sqUpload(input){
 }
 function sqClear(){
   if(!canUploadSquareoff()) return;
-  if(!confirm('Clear all square-off data?')) return;
-  DB.set('squareoff', []); renderSquareoff(); updateBadges(); toast('Square-off cleared','success');
+  // History date selected → sirf us date ki history delete
+  if(_sqHistDate){
+    const d=_sqHistDate;
+    if(!confirm('Delete saved history of '+fmtDate(d)+'?\n(Live data is not affected)')) return;
+    sqArchiveDeleteDates([d]).then(()=>{
+      _sqHistDate=''; _sqHistRows=null;
+      const sel=document.getElementById('sq-hist'); if(sel) sel.value='';
+      sqFillHistDates(); renderSquareoff();
+      toast('History of '+fmtDate(d)+' deleted','success');
+    }).catch(e=>toast('Delete failed: '+(e.message||e),'error'));
+    return;
+  }
+  if(!confirm('Clear all LIVE square-off data?')) return;
+  const alsoHist=confirm('Saari saved HISTORY (sab dates) bhi delete karein?\n\nOK = History bhi delete\nCancel = Sirf live data clear');
+  DB.set('squareoff', []);
+  try{ localStorage.setItem('dninvest_sqarch_catchup', today()); }catch(e){}
+  if(alsoHist){
+    sqArchiveDeleteDates(null).then(()=>{ sqFillHistDates(); toast('Square-off + all history cleared','success'); })
+      .catch(e=>toast('History delete failed: '+(e.message||e),'error'));
+  }else toast('Square-off cleared','success');
+  renderSquareoff(); updateBadges(); sqUpdateBell();
+}
+// dates=null → poori history delete; warna sirf diye gaye dates
+async function sqArchiveDeleteDates(dates){
+  if(typeof fdb==='undefined') return;
+  const idxDoc=await _sqArchIdxRef().get();
+  const all=(idxDoc.exists&&idxDoc.data()&&idxDoc.data().data&&idxDoc.data().data.dates)||{};
+  if(!dates){
+    const months=[...new Set(Object.keys(all).map(k=>k.slice(0,7)))];
+    for(const m of months) await _sqArchRef(m).delete();
+    await _sqArchIdxRef().set({data:{dates:{}},updated:new Date().toISOString()});
+    return;
+  }
+  const months=[...new Set(dates.map(d=>d.slice(0,7)))];
+  await fdb.runTransaction(async tx=>{
+    const idx=await tx.get(_sqArchIdxRef());
+    const docs=[]; for(const m of months) docs.push(await tx.get(_sqArchRef(m)));
+    const dd={...((idx.exists&&idx.data()&&idx.data().data&&idx.data().data.dates)||{})};
+    months.forEach((m,i)=>{
+      const d=docs[i];
+      const arr=((d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[]).filter(r=>!dates.includes(r.sqDate));
+      if(arr.length) tx.set(_sqArchRef(m),{data:DB._clean(arr),month:m,count:arr.length,updated:new Date().toISOString()});
+      else tx.delete(_sqArchRef(m));
+    });
+    dates.forEach(k=>delete dd[k]);
+    tx.set(_sqArchIdxRef(),{data:{dates:dd},updated:new Date().toISOString()});
+  });
 }
 function renderSquareoff(){
   const canUpload=canUploadSquareoff();
