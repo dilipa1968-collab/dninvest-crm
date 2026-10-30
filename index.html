@@ -437,6 +437,19 @@ tbody tr:hover{background:var(--blue2)!important;box-shadow:inset 3px 0 0 var(--
 .sq-date-pill{display:inline-flex;align-items:center;gap:6px;font-weight:800;letter-spacing:.5px;font-size:.88rem;
   text-transform:uppercase;color:#e2e8f0;}
 .sq-date-dot{width:7px;height:7px;border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(255,255,255,.08);}
+.sq-rec{margin:6px auto 0;max-width:230px;background:#f8fafc;border:1px solid #e5e9f0;border-radius:8px;padding:6px 8px 5px;text-align:left;font-variant-numeric:tabular-nums}
+.sq-rec-bar{height:4px;background:#fde2e2;border-radius:4px;overflow:hidden;margin-bottom:5px}
+.sq-rec-bar span{display:block;height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:4px}
+.sq-rec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.sq-rec-grid div{display:flex;flex-direction:column;line-height:1.15}
+.sq-rec-grid em{font-style:normal;font-size:.58rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#8592a6}
+.sq-rec-grid b{font-size:.74rem;font-weight:700;color:#334155}
+.sq-rec-grid .ok b{color:#15803d}
+.sq-rec-grid .due b{color:#b91c1c}
+.sq-rec-note{font-size:.6rem;color:#8592a6;margin-top:3px;font-weight:600;letter-spacing:.2px}
+.sq-rec-stale,.sq-rec-up{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px}
+.sq-rec-tag{font-size:.62rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 8px;border-radius:20px;background:#e2e8f0;color:#475569}
+.sq-rec-up .sq-rec-tag{background:#fee2e2;color:#b91c1c}
 .sq-stat-strip{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px 3px;margin:0;}
 .sq-stat-chip{background:linear-gradient(180deg,#fff,#fafbfe);border:1px solid #e8ecf3;border-radius:10px;padding:6px 16px;
   box-shadow:0 1px 2px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:2px;min-width:130px;position:relative;}
@@ -1648,6 +1661,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="sqExport()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-sq" id="sq-clrbtn" style="display:none" onclick="sqClear()">🗑️ Clear</button>
+            <button class="btn btn-outline admin-only-sq" id="sq-basebtn" style="display:none" title="Kal/pichhli date ki file upload karo — live data nahi badlega, sirf 'Aaya tha' amount set hoga" onclick="sqBasePick()">📂 Pichhli File (Aaya tha)</button>
             <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" title="Each branch's file can be uploaded separately — data will be merged, not overwritten" onclick="document.getElementById('sq-file').click()">⬆️ Upload File (Merge)</button>
             <input type="file" id="sq-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sqUpload(this)">
           </div>
@@ -3296,7 +3310,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-10-30-v2"></script>
+<script src="dninvest-app-1.js?v=2026-10-30-v4"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 

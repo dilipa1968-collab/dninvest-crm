@@ -10788,6 +10788,44 @@ function sqToISO(v){
   if(!isNaN(d)) return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
   return s;
 }
+// ── PICHHLI FILE SE "AAYA THA" SET KARO (30-Oct-2026) ──
+// Purani (jaise kal ki) file upload karo — live data NAHI badalta. Sirf
+// matching client+date wali live rows ka 'orig' (Aaya tha) amount us file ke
+// amount se set hota hai, taaki Aaya / Kata / Baki dikhe.
+let _sqBaseMode=false;
+function sqBasePick(){
+  if(!canUploadSquareoff()) return;
+  _sqBaseMode=true;
+  const f=document.getElementById('sq-file'); if(f){ f.value=''; f.click(); }
+  setTimeout(()=>{ window.addEventListener('focus',()=>setTimeout(()=>{ const f2=document.getElementById('sq-file'); if(f2 && !(f2.files&&f2.files.length)) _sqBaseMode=false; },800),{once:true}); },0);
+}
+function sqApplyBase(baseRows){
+  const keyOf=r=>String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
+  const codeOf=r=>String(r.code||r.name||'').trim().toUpperCase();
+  const byKey=new Map(), byCode=new Map();
+  baseRows.forEach(r=>{
+    byKey.set(keyOf(r),(byKey.get(keyOf(r))||0)+(r.debit||0));
+    byCode.set(codeOf(r),(byCode.get(codeOf(r))||0)+(r.debit||0));
+  });
+  const live=DB.get('squareoff')||[];
+  // Kitni live rows har client ki hain — date match na ho to code se tabhi lo jab client ki ek hi row ho
+  const liveCnt={}; live.forEach(r=>{ const c=codeOf(r); liveCnt[c]=(liveCnt[c]||0)+1; });
+  let hit=0, kata=0;
+  const upd=live.map(r=>{
+    let b=byKey.get(keyOf(r));
+    if(b==null && liveCnt[codeOf(r)]===1) b=byCode.get(codeOf(r));
+    if(b==null) return r;
+    hit++;
+    const nr={...r, orig:b, origOn:''};
+    if(b>(r.debit||0)) kata+=b-(r.debit||0);
+    return nr;
+  });
+  DB.set('squareoff',upd);
+  sqArchiveRows(upd).catch(e=>console.log('sq archive err',e));
+  if(_sqHistDate){ _sqHistRows=null; const s=document.getElementById('sq-hist'); if(s){ s.value=''; } _sqHistDate=''; }
+  toast(`Pichhli file se ${hit} clients ka "Aaya tha" set hua — total Kata ₹${Math.round(kata).toLocaleString('en-IN')}`,'success');
+  renderSquareoff();
+}
 function sqUpload(input){
   if(!canUploadSquareoff()){ toast('Only admin/back-office/risk-upload RMs can upload','error'); input.value=''; return; }
   const file=input.files[0]; if(!file){ return; }
@@ -10842,6 +10880,7 @@ function sqUpload(input){
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
+      if(_sqBaseMode){ _sqBaseMode=false; sqApplyBase(out); input.value=''; return; }
       // MERGE mode: purana data mitta nahi. Key = Client Code + Square-off Date.
       // Same key wali row nayi file se overwrite ho jati hai, baaki add hoti hain.
       // Isse alag-alag office ki files alag-alag upload ki ja sakti hain.
@@ -11025,9 +11064,9 @@ function renderSquareoff(){
     let recAmt=0, recCnt=0, origAmt=0;
     clients.forEach(c=>{ let got=0; dateKeys.forEach(dk=>{ if(c.vals[dk]==null) return; origAmt+=c.orig[dk]||0; const d=(c.orig[dk]||0)-(c.vals[dk]||0); if(d>0.5) got+=d; }); if(got>0){ recAmt+=got; recCnt++; } });
     stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:#64748b">
-      <span class="n" style="color:#475569">₹${Math.round(origAmt).toLocaleString('en-IN')}</span><span class="l">Aaya tha (T+5)</span></div>
+      <span class="n" style="color:#475569">₹${Math.round(origAmt).toLocaleString('en-IN')}</span><span class="l">Original Due (T+5)</span></div>
     <div class="sq-stat-chip" style="--chip-accent:#16a34a">
-      <span class="n" style="color:#15803d">₹${Math.round(recAmt).toLocaleString('en-IN')}</span><span class="l">✅ Kata — ${recCnt} clients</span></div>`;
+      <span class="n" style="color:#15803d">₹${Math.round(recAmt).toLocaleString('en-IN')}</span><span class="l">Recovered · ${recCnt} clients${origAmt>0?' · '+Math.round(recAmt/origAmt*100)+'%':''}</span></div>`;
   }
   dateKeys.forEach(dk=>{
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
@@ -11077,13 +11116,20 @@ function renderSquareoff(){
         const o=c.orig[dk], diff=(o!=null)?o-v:0, st=c.stale[dk];
         let sub='';
         if(st){
-          sub=`<div style="font-size:.7rem;color:#64748b;margin-top:2px;font-weight:600">⏳ ${sqFmtD(st)} ke baad ki file me nahi — cleared?</div>`;
+          sub=`<div class="sq-rec sq-rec-stale"><span class="sq-rec-tag">Not in latest file</span><span class="sq-rec-note">Last seen ${sqFmtD(st)} · likely cleared</span></div>`;
         }else if(diff>0.5){
-          sub=`<div style="font-size:.7rem;margin-top:2px;line-height:1.35;font-weight:600">
-            <span style="color:#64748b">Aaya ${f2(o)}${c.origOn[dk]?' ('+sqFmtD(c.origOn[dk])+')':''}</span><br>
-            <span style="color:#15803d">✅ Kata ${f2(diff)}</span> · <span style="color:#b91c1c">Baki ${f2(v)}</span></div>`;
+          const pct=Math.min(100,Math.max(0,Math.round(diff/o*100)));
+          sub=`<div class="sq-rec">
+            <div class="sq-rec-bar" title="${pct}% recovered"><span style="width:${pct}%"></span></div>
+            <div class="sq-rec-grid">
+              <div><em>Due</em><b>${f2(o)}</b></div>
+              <div class="ok"><em>Received</em><b>${f2(diff)}</b></div>
+              <div class="due"><em>Balance</em><b>${f2(v)}</b></div>
+            </div>
+            <div class="sq-rec-note">${pct}% recovered${c.origOn[dk]?' · since '+sqFmtD(c.origOn[dk]):''}</div>
+          </div>`;
         }else if(diff<-0.5){
-          sub=`<div style="font-size:.7rem;margin-top:2px;font-weight:600;color:#b91c1c">Pehle ${f2(o)} · ↑ ${f2(-diff)} badha</div>`;
+          sub=`<div class="sq-rec sq-rec-up"><span class="sq-rec-tag">▲ Increased ${f2(-diff)}</span><span class="sq-rec-note">Earlier due ${f2(o)}</span></div>`;
         }
         html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}">
           <span class="sq-amt${big?' sq-big':''}"${st?' style="opacity:.55;text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</td>`;
@@ -11131,7 +11177,7 @@ function sqExport(){
 
   const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32},{header:'RM',width:12}]
     .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
-    .concat([{header:'Aaya tha (T+5)',money:true,width:16},{header:'Kata',money:true,width:14},{header:'Baki',money:true,width:14}])
+    .concat([{header:'Original Due (T+5)',money:true,width:18},{header:'Received',money:true,width:14},{header:'Balance',money:true,width:14}])
     .concat([{header:'Ledger Debit Balance',money:true,width:18}]);
   const data=clients.map(c=>{
     const row=[c.code,c.name,c.dealer];
