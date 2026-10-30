@@ -11164,7 +11164,7 @@ function renderSquareoff(){
         if(st){
           sub=`<div class="sq-rec" style="color:#94a3b8">Not in latest file</div>`;
         }else if(diff>0.5){
-          sub=`<div class="sq-rec" title="Original due ${f2(o)} · Received ${f2(diff)} · Balance ${f2(v)}">Due ${f2(o)} · <span class="ok">Paid ${f2(diff)}</span></div>`;
+          sub=`<div class="sq-rec" title="Original due ${f2(o)} · Received ${f2(diff)} · Balance ${f2(v)}"><span class="due">Due ${f2(o)}</span> · <span class="ok">Paid ${f2(diff)}</span></div>`;
         }else if(diff<-0.5){
           sub=`<div class="sq-rec" title="Earlier due ${f2(o)}"><span class="up">▲ ${f2(-diff)} added</span></div>`;
         }
