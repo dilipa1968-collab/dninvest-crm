@@ -10700,7 +10700,7 @@ function sqMyRows(src){
 let _sqHistDate='', _sqHistRows=null;
 function _sqArchRef(m){ return fdb.collection('crm_data').doc('sqarch_'+m); }
 function _sqArchIdxRef(){ return fdb.collection('crm_data').doc('sqarch_index'); }
-async function sqArchiveRows(rows){
+async function sqArchiveRows(rows, replaceDates){
   if(typeof fdb==='undefined') return;
   const keyOf=r=>String(r.code||r.name||'').trim().toUpperCase()+'|'+r.sqDate;
   const byMonth={};
@@ -10714,7 +10714,8 @@ async function sqArchiveRows(rows){
     const now=new Date().toISOString();
     months.forEach((m,i)=>{
       const d=docs[i];
-      const old=(d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[];
+      let old=(d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[];
+      if(replaceDates && replaceDates.size) old=old.filter(r=>!replaceDates.has(r.sqDate));   // us date ki purani list hata ke nayi
       const map=new Map(); old.forEach(r=>map.set(keyOf(r),r));
       byMonth[m].forEach(r=>map.set(keyOf(r),{code:r.code||'',name:r.name||'',dealer:r.dealer||'',debit:r.debit||0,t5:r.t5||'',sqDate:r.sqDate,acbal:r.acbal==null?null:r.acbal,
         orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||''}));
@@ -10768,15 +10769,25 @@ function sqToISO(v){
   const pad=n=>String(n).padStart(2,'0');
   // 1) Raw Excel serial number (what we get since we read WITHOUT cellDates) —
   //    pure UTC-days arithmetic, zero dependency on browser timezone.
+  // Excel cell me hi din/mahina ulta save ho sakta hai (jaise SQUP02NOV file
+  // me "02/11/2026" Excel ne 11-Feb bana diya). Square-off date hamesha aaj ke
+  // aas-paas hoti hai, isliye door wali date ka din/mahina swap karke dekho.
+  const nearFix=iso=>{
+    const away=x=>{ const t=Date.parse(x+'T00:00:00Z'), n=Date.parse(today()+'T00:00:00Z'); return isNaN(t)?1e12:Math.abs(t-n)/864e5; };
+    const m2=iso.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m2) return iso;
+    if(+m2[3]>12 || away(iso)<=45) return iso;
+    const sw=`${m2[1]}-${m2[3]}-${m2[2]}`;
+    return away(sw)<=45 ? sw : iso;
+  };
   if(typeof v==='number' && !isNaN(v)){
     const utcDays = Math.floor(v - 25569); // days since Unix epoch (handles 1900 leap-bug correctly)
     const d = new Date(utcDays*86400*1000);
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+    return nearFix(`${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`);
   }
   // 2) Already a JS Date object — read it back via UTC getters (matches how it was built)
   if(v instanceof Date){
     if(isNaN(v)) return '';
-    return `${v.getUTCFullYear()}-${pad(v.getUTCMonth()+1)}-${pad(v.getUTCDate())}`;
+    return nearFix(`${v.getUTCFullYear()}-${pad(v.getUTCMonth()+1)}-${pad(v.getUTCDate())}`);
   }
   // 3) Plain text — pull Y-M-D straight out of the string, no Date() timezone parsing
   const s=String(v).trim();
@@ -10879,13 +10890,25 @@ function sqUpload(input){
         r.upOn = todayISO;
         merged.set(keyOf(r), r);                                        // new rows on top
       });
+      // DATE-WISE REPLACE (30-Oct-2026): file me jo sq-date aayi hai, us date
+      // ki list file wali hi maani jaati hai. Us date ka jo client file me nahi
+      // hai (pura paisa jama kar diya), uski purani row hata do — warna wo
+      // pending me judta rehta tha (jaise Vinay Madia ₹41.26L, 30-Oct).
+      const newDates = new Set(out.map(r=>r.sqDate).filter(Boolean));
+      const newKeys  = new Set(out.map(keyOf));
+      let removedPaid = 0;
+      [...merged.keys()].forEach(k=>{
+        const r = merged.get(k);
+        if(r.sqDate && newDates.has(r.sqDate) && !newKeys.has(k)){ merged.delete(k); removedPaid++; }
+      });
       // Har date permanent history me save (purani dates bhi, drop hone se pehle)
-      sqArchiveRows([...merged.values()]).then(sqFillHistDates).catch(e=>{ console.log('sq archive err',e); toast('⚠️ History save failed: '+(e.message||e),'error'); });
+      sqArchiveRows([...merged.values()], newDates).then(sqFillHistDates).catch(e=>{ console.log('sq archive err',e); toast('⚠️ History save failed: '+(e.message||e),'error'); });
       const finalRows = [...merged.values()].filter(r=>!r.sqDate || r.sqDate >= todayISO);
       const dropped = merged.size - finalRows.length;
       DB.set('squareoff', finalRows);
       const uploadedDates = [...new Set(out.map(r=>r.sqDate).filter(Boolean))];
       let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), total '+finalRows.length+' clients';
+      if(removedPaid) msg += ', '+removedPaid+' cleared (file me nahi) removed';
       if(dropped) msg += ', '+dropped+' old-date rows moved to 📅 History';
       toast(msg,'success');
       renderSquareoff(); updateBadges(); sqUpdateBell();
@@ -11029,7 +11052,6 @@ function renderSquareoff(){
     byClient[key].orig[r.sqDate] = (byClient[key].orig[r.sqDate]||0) + (r.orig!=null ? r.orig : (r.debit||0));
     if(r.origOn) byClient[key].origOn[r.sqDate] = r.origOn;
     // Live view: row aaj ki upload me refresh nahi hui (jabki aaj upload hua hai) → shayad clear ho gaya
-    if(!isHist && sqLatestUp && r.upOn && r.upOn < sqLatestUp) byClient[key].stale[r.sqDate] = r.upOn;
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     // keep freshest name/dealer if it varies between files
     byClient[key].name = r.name || byClient[key].name;
