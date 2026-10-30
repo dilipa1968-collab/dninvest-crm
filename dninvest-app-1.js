@@ -4420,7 +4420,7 @@ function updateBadges(){
     if(daysDiff(c.last_call_date)!==null) return false;
     const sinceAdded=daysDiff(c.created); return sinceAdded===null||sinceAdded>=60;
   }).length;
-  try{ const sqb=document.getElementById('nb-eqsq'); if(sqb){ const n=sqMyRows().filter(r=>!r.cleared).length; sqb.textContent=n; sqb.style.display=n>0?'':'none'; } if(typeof sqUpdateBell==='function') sqUpdateBell(); }catch(e){}
+  try{ const sqb=document.getElementById('nb-eqsq'); if(sqb){ const n=sqMyRows().length; sqb.textContent=n; sqb.style.display=n>0?'':'none'; } if(typeof sqUpdateBell==='function') sqUpdateBell(); }catch(e){}
 
   // Admin-only: Pending counts for MF Transactions and Demat (nav badge + dashboard card)
   if(CU && CU.role==='admin'){
@@ -10657,9 +10657,8 @@ function sqCodeRmMap(){
   });
   return m;
 }
-function getSquareoff(){ return sqResolveRm(DB.get('squareoff')||[]); }
-function sqResolveRm(rows){
-  rows = rows||[];
+function getSquareoff(){
+  const rows = DB.get('squareoff')||[];
   if(!rows.length) return rows;
   const codeMap = sqCodeRmMap();
   if(!codeMap.size) return rows;                 // clients not synced yet — leave as-is
@@ -10675,8 +10674,8 @@ function sqResolveRm(rows){
     return r;
   });
 }
-function sqMyRows(src){
-  const rows=src||getSquareoff();
+function sqMyRows(){
+  const rows=getSquareoff();
   if(!(CU) ) return [];
   // VIEW scope stays "own clients only" even for RMs granted upload rights
   // (risk_upload / backoffice_access) — that permission lets them upload the
@@ -10687,80 +10686,6 @@ function sqMyRows(src){
   const tempDealers = (typeof getTempAccessDealers==='function') ? getTempAccessDealers('eq') : [];
   const myRMs=[...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),...tempDealers])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
   return rows.filter(r=>myRMs.includes(String(r.dealer||'').trim().toUpperCase()));
-}
-// ══════════════════════════════════════════
-// SQUARE-OFF DATE-WISE HISTORY (30-Oct-2026)
-// Live 'squareoff' doc me sirf aaj/aage ki dates rehti hain — beeti date ki
-// rows upload ke time hat jaati thin. Ab har row (har date) ek permanent
-// month-wise archive me bhi save hoti hai, kabhi delete nahi hoti:
-//    crm_data/sqarch_<YYYY-MM>   {data:[rows]}
-//    crm_data/sqarch_index       {data:{dates:{'2026-10-30':49,...}}}
-// Square-off page par "📅 History" dropdown se koi bhi purani date dekh sakte ho.
-// ══════════════════════════════════════════
-let _sqHistDate='', _sqHistRows=null;
-function _sqArchRef(m){ return fdb.collection('crm_data').doc('sqarch_'+m); }
-function _sqArchIdxRef(){ return fdb.collection('crm_data').doc('sqarch_index'); }
-async function sqArchiveRows(rows){
-  if(typeof fdb==='undefined') return;
-  const keyOf=r=>String(r.code||r.name||'').trim().toUpperCase()+'|'+r.sqDate;
-  const byMonth={};
-  (rows||[]).forEach(r=>{ if(r && /^\d{4}-\d{2}-\d{2}$/.test(r.sqDate||'')) (byMonth[r.sqDate.slice(0,7)]=byMonth[r.sqDate.slice(0,7)]||[]).push(r); });
-  const months=Object.keys(byMonth); if(!months.length) return;
-  await fdb.runTransaction(async tx=>{
-    const idxDoc=await tx.get(_sqArchIdxRef());               // ALL reads first
-    const docs=[]; for(const m of months) docs.push(await tx.get(_sqArchRef(m)));
-    const idx=(idxDoc.exists&&idxDoc.data()&&idxDoc.data().data)||{};
-    const dates={...(idx.dates||{})};
-    const now=new Date().toISOString();
-    months.forEach((m,i)=>{
-      const d=docs[i];
-      const old=(d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[];
-      const map=new Map(); old.forEach(r=>map.set(keyOf(r),r));
-      byMonth[m].forEach(r=>map.set(keyOf(r),{code:r.code||'',name:r.name||'',dealer:r.dealer||'',debit:r.debit||0,t5:r.t5||'',sqDate:r.sqDate,acbal:r.acbal==null?null:r.acbal,
-        orig:r.orig==null?null:r.orig,origOn:r.origOn||'',prevDebit:r.prevDebit==null?null:r.prevDebit,prevOn:r.prevOn||'',upOn:r.upOn||'',cleared:r.cleared||''}));
-      const arr=[...map.values()];
-      tx.set(_sqArchRef(m),{data:DB._clean(arr),month:m,count:arr.length,updated:now});
-      Object.keys(dates).forEach(k=>{ if(k.slice(0,7)===m) delete dates[k]; });
-      arr.forEach(r=>{ dates[r.sqDate]=(dates[r.sqDate]||0)+1; });
-    });
-    tx.set(_sqArchIdxRef(),{data:{dates},updated:now});
-  });
-}
-// Ek baar per din per device: live doc ka sab kuch archive me copy (seed + recovery)
-function sqArchiveCatchUp(){
-  if(!canUploadSquareoff() || typeof fdb==='undefined') return;
-  const flag='dninvest_sqarch_catchup';
-  try{ if(localStorage.getItem(flag)===today()) return; }catch(e){}
-  sqArchiveRows(DB.get('squareoff')||[])
-    .then(()=>{ try{ localStorage.setItem(flag,today()); }catch(e){} sqFillHistDates(); })
-    .catch(e=>console.log('sq archive catch-up failed',e));
-}
-async function sqFillHistDates(){
-  const sel=document.getElementById('sq-hist'); if(!sel || typeof fdb==='undefined') return;
-  try{
-    const d=await _sqArchIdxRef().get();
-    const dates=(d.exists&&d.data()&&d.data().data&&d.data().data.dates)||{};
-    const keys=Object.keys(dates).sort().reverse();
-    const cur=sel.value;
-    sel.innerHTML='<option value="">🔴 Live (current)</option>'+
-      keys.map(k=>`<option value="${k}">📅 ${fmtDate(k)} (${dates[k]})</option>`).join('');
-    if(keys.includes(cur)) sel.value=cur;
-  }catch(e){ console.log('sq history dates load failed',e); }
-}
-async function sqHistChange(){
-  const sel=document.getElementById('sq-hist'); if(!sel) return;
-  const d=sel.value;
-  if(!d){ _sqHistDate=''; _sqHistRows=null; renderSquareoff(); return; }
-  try{
-    const doc=await _sqArchRef(d.slice(0,7)).get();
-    const arr=(doc.exists&&doc.data()&&Array.isArray(doc.data().data))?doc.data().data:[];
-    if(sel.value!==d) return;
-    _sqHistDate=d; _sqHistRows=arr.filter(r=>r.sqDate===d);
-    renderSquareoff();
-  }catch(e){ toast('History load failed: '+(e.message||e),'error'); }
-}
-function sqViewRows(){
-  return _sqHistDate ? sqMyRows(sqResolveRm(_sqHistRows||[])) : sqMyRows();
 }
 function sqFmtD(d){ if(!d) return '—'; const x=new Date(d); return isNaN(x)?String(d):x.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
 function sqToISO(v){
@@ -10798,44 +10723,6 @@ function sqToISO(v){
   const d=new Date(s);
   if(!isNaN(d)) return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
   return s;
-}
-// ── PICHHLI FILE SE "AAYA THA" SET KARO (30-Oct-2026) ──
-// Purani (jaise kal ki) file upload karo — live data NAHI badalta. Sirf
-// matching client+date wali live rows ka 'orig' (Aaya tha) amount us file ke
-// amount se set hota hai, taaki Aaya / Kata / Baki dikhe.
-let _sqBaseMode=false;
-function sqBasePick(){
-  if(!canUploadSquareoff()) return;
-  _sqBaseMode=true;
-  const f=document.getElementById('sq-file'); if(f){ f.value=''; f.click(); }
-  setTimeout(()=>{ window.addEventListener('focus',()=>setTimeout(()=>{ const f2=document.getElementById('sq-file'); if(f2 && !(f2.files&&f2.files.length)) _sqBaseMode=false; },800),{once:true}); },0);
-}
-function sqApplyBase(baseRows){
-  const keyOf=r=>String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
-  const codeOf=r=>String(r.code||r.name||'').trim().toUpperCase();
-  const byKey=new Map(), byCode=new Map();
-  baseRows.forEach(r=>{
-    byKey.set(keyOf(r),(byKey.get(keyOf(r))||0)+(r.debit||0));
-    byCode.set(codeOf(r),(byCode.get(codeOf(r))||0)+(r.debit||0));
-  });
-  const live=DB.get('squareoff')||[];
-  // Kitni live rows har client ki hain — date match na ho to code se tabhi lo jab client ki ek hi row ho
-  const liveCnt={}; live.forEach(r=>{ const c=codeOf(r); liveCnt[c]=(liveCnt[c]||0)+1; });
-  let hit=0, kata=0;
-  const upd=live.map(r=>{
-    let b=byKey.get(keyOf(r));
-    if(b==null && liveCnt[codeOf(r)]===1) b=byCode.get(codeOf(r));
-    if(b==null) return r;
-    hit++;
-    const nr={...r, orig:b, origOn:''};
-    if(b>(r.debit||0)) kata+=b-(r.debit||0);
-    return nr;
-  });
-  DB.set('squareoff',upd);
-  sqArchiveRows(upd).catch(e=>console.log('sq archive err',e));
-  if(_sqHistDate){ _sqHistRows=null; const s=document.getElementById('sq-hist'); if(s){ s.value=''; } _sqHistDate=''; }
-  toast(`Pichhli file se ${hit} clients ka "Aaya tha" set hua — total Kata ₹${Math.round(kata).toLocaleString('en-IN')}`,'success');
-  renderSquareoff();
 }
 function sqUpload(input){
   if(!canUploadSquareoff()){ toast('Only admin/back-office/risk-upload RMs can upload','error'); input.value=''; return; }
@@ -10891,7 +10778,6 @@ function sqUpload(input){
         });
       });
       if(!out.length){ toast('No rows found in file','error'); input.value=''; return; }
-      if(_sqBaseMode){ _sqBaseMode=false; sqApplyBase(out); input.value=''; return; }
       // MERGE mode: purana data mitta nahi. Key = Client Code + Square-off Date.
       // Same key wali row nayi file se overwrite ho jati hai, baaki add hoti hain.
       // Isse alag-alag office ki files alag-alag upload ki ja sakti hain.
@@ -10899,47 +10785,15 @@ function sqUpload(input){
       // purani dates jama na hon.
       const keyOf = r => String(r.code||r.name||'').trim().toUpperCase()+'|'+(r.sqDate||'');
       const merged = new Map();
-      const todayISO = today();
       (DB.get('squareoff')||[]).forEach(r=>merged.set(keyOf(r), r));   // old rows first
-      // AAYA / KATA tracking (30-Oct-2026): same client+date ki row overwrite
-      // hone se pehle uska pehli baar aaya amount (orig) aur pichhle din ka
-      // amount (prevDebit) naye row me copy kar lo — taaki dikhe ki T+5 me
-      // kitna aaya tha, client ne kitna kata aur ab kitna baki hai.
-      // CLEARED detection (30-Oct-2026): purani row jo nayi file me nahi aayi,
-      // jabki usi RM/dealer ki file upload hui hai → client ne pay kar diya
-      // (₹100 se kam bacha ya poora clear). Row hatti nahi, 'cleared' mark hoti
-      // hai taaki Paid amount dikhe aur pending total me na jude.
-      {
-        const dU = r => String(r.dealer||'').trim().toUpperCase();
-        const newKeys = new Set(out.map(keyOf));
-        const newDealers = new Set(out.map(dU));
-        [...merged.entries()].forEach(([k,old])=>{
-          if(newKeys.has(k) || old.cleared || !newDealers.has(dU(old))) return;
-          merged.set(k, {...old, cleared: todayISO, orig: (old.orig!=null?old.orig:old.debit), origOn: old.origOn||old.upOn||''});
-        });
-      }
-      out.forEach(r=>{
-        const old = merged.get(keyOf(r));
-        if(old){
-          r.orig   = (old.orig!=null) ? old.orig : old.debit;
-          r.origOn = old.origOn || old.upOn || '';
-          if((old.upOn||'') < todayISO){ r.prevDebit = old.debit; r.prevOn = old.upOn||''; }
-          else { if(old.prevDebit!=null) r.prevDebit = old.prevDebit; if(old.prevOn) r.prevOn = old.prevOn; }
-        }else{
-          r.orig = r.debit; r.origOn = todayISO;
-        }
-        r.upOn = todayISO;
-        merged.set(keyOf(r), r);                                        // new rows on top
-      });
-      // Har date permanent history me save (purani dates bhi, drop hone se pehle)
-      sqArchiveRows([...merged.values()]).then(sqFillHistDates).catch(e=>{ console.log('sq archive err',e); toast('⚠️ History save failed: '+(e.message||e),'error'); });
+      out.forEach(r=>merged.set(keyOf(r), r));                          // new rows on top
+      const todayISO = today();
       const finalRows = [...merged.values()].filter(r=>!r.sqDate || r.sqDate >= todayISO);
       const dropped = merged.size - finalRows.length;
       DB.set('squareoff', finalRows);
       const uploadedDates = [...new Set(out.map(r=>r.sqDate).filter(Boolean))];
-      const clrN = finalRows.filter(r=>r.cleared).length;
-      let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), pending '+(finalRows.length-clrN)+(clrN?', ✓ cleared '+clrN:'');
-      if(dropped) msg += ', '+dropped+' old-date rows moved to 📅 History';
+      let msg = 'Square-off merged — file se '+out.length+' rows ('+uploadedDates.map(sqFmtD).join(', ')+'), total '+finalRows.length+' clients';
+      if(dropped) msg += ', '+dropped+' with an old date removed';
       toast(msg,'success');
       renderSquareoff(); updateBadges(); sqUpdateBell();
     }catch(err){ console.error(err); toast('Upload failed: '+err.message,'error'); }
@@ -10949,74 +10803,14 @@ function sqUpload(input){
 }
 function sqClear(){
   if(!canUploadSquareoff()) return;
-  // History date selected → sirf us date ki history delete
-  if(_sqHistDate){
-    const d=_sqHistDate;
-    if(!confirm('Delete saved history of '+fmtDate(d)+'?\n(Live data is not affected)')) return;
-    sqArchiveDeleteDates([d]).then(()=>{
-      _sqHistDate=''; _sqHistRows=null;
-      const sel=document.getElementById('sq-hist'); if(sel) sel.value='';
-      sqFillHistDates(); renderSquareoff();
-      toast('History of '+fmtDate(d)+' deleted','success');
-    }).catch(e=>toast('Delete failed: '+(e.message||e),'error'));
-    return;
-  }
-  if(!confirm('Clear all LIVE square-off data?')) return;
-  const alsoHist=confirm('Saari saved HISTORY (sab dates) bhi delete karein?\n\nOK = History bhi delete\nCancel = Sirf live data clear');
-  DB.set('squareoff', []);
-  try{ localStorage.setItem('dninvest_sqarch_catchup', today()); }catch(e){}
-  if(alsoHist){
-    sqArchiveDeleteDates(null).then(()=>{ sqFillHistDates(); toast('Square-off + all history cleared','success'); })
-      .catch(e=>toast('History delete failed: '+(e.message||e),'error'));
-  }else toast('Square-off cleared','success');
-  renderSquareoff(); updateBadges(); sqUpdateBell();
-}
-// dates=null → poori history delete; warna sirf diye gaye dates
-async function sqArchiveDeleteDates(dates){
-  if(typeof fdb==='undefined') return;
-  const idxDoc=await _sqArchIdxRef().get();
-  const all=(idxDoc.exists&&idxDoc.data()&&idxDoc.data().data&&idxDoc.data().data.dates)||{};
-  if(!dates){
-    const months=[...new Set(Object.keys(all).map(k=>k.slice(0,7)))];
-    for(const m of months) await _sqArchRef(m).delete();
-    await _sqArchIdxRef().set({data:{dates:{}},updated:new Date().toISOString()});
-    return;
-  }
-  const months=[...new Set(dates.map(d=>d.slice(0,7)))];
-  await fdb.runTransaction(async tx=>{
-    const idx=await tx.get(_sqArchIdxRef());
-    const docs=[]; for(const m of months) docs.push(await tx.get(_sqArchRef(m)));
-    const dd={...((idx.exists&&idx.data()&&idx.data().data&&idx.data().data.dates)||{})};
-    months.forEach((m,i)=>{
-      const d=docs[i];
-      const arr=((d.exists&&d.data()&&Array.isArray(d.data().data))?d.data().data:[]).filter(r=>!dates.includes(r.sqDate));
-      if(arr.length) tx.set(_sqArchRef(m),{data:DB._clean(arr),month:m,count:arr.length,updated:new Date().toISOString()});
-      else tx.delete(_sqArchRef(m));
-    });
-    dates.forEach(k=>delete dd[k]);
-    tx.set(_sqArchIdxRef(),{data:{dates:dd},updated:new Date().toISOString()});
-  });
+  if(!confirm('Clear all square-off data?')) return;
+  DB.set('squareoff', []); renderSquareoff(); updateBadges(); toast('Square-off cleared','success');
 }
 function renderSquareoff(){
   const canUpload=canUploadSquareoff();
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=canUpload?'inline-flex':'none');
 
-  // History dropdown (injected once, next to the RM filter)
-  if(!document.getElementById('sq-hist')){
-    const anchor=document.getElementById('sq-search');
-    if(anchor){
-      const s=document.createElement('select');
-      s.id='sq-hist'; s.title='Purani date ka square-off data dekho';
-      s.style.cssText='min-width:180px;font-weight:600';
-      s.innerHTML='<option value="">🔴 Live (current)</option>';
-      s.onchange=sqHistChange;
-      anchor.parentNode.insertBefore(s, anchor);
-      sqFillHistDates();
-      sqArchiveCatchUp();
-    }
-  }
-  const isHist=!!_sqHistDate;
-  let rows=sqViewRows();
+  let rows=sqMyRows();
   const search=((document.getElementById('sq-search')||{value:''}).value||'').toLowerCase().trim();
 
   // Full office-wide VIEW (see + filter by every RM) is reserved for actual
@@ -11038,7 +10832,7 @@ function renderSquareoff(){
   if(rmSel && showRmSel){
     const prev=rmSel.value;
     const optList = isFullView
-      ? [...new Set((isHist?sqResolveRm(_sqHistRows||[]):getSquareoff()).map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort()
+      ? [...new Set(getSquareoff().map(r=>String(r.dealer||'').trim().toUpperCase()).filter(Boolean))].sort()
       : myRMsInData;
     rmSel.innerHTML='<option value="">All RMs</option>'+optList.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
   }
@@ -11048,12 +10842,7 @@ function renderSquareoff(){
 
   const tbl=document.getElementById('sq-table'); if(!tbl) return;
   const stripElEmpty=document.getElementById('sq-stat-strip');
-  if(isHist && !(_sqHistRows||[]).length){
-    tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">No saved data for ${fmtDate(_sqHistDate)}.</td></tr>`;
-    if(stripElEmpty) stripElEmpty.innerHTML='';
-    return;
-  }
-  if(!isHist && !getSquareoff().length){
+  if(!getSquareoff().length){
     tbl.innerHTML=`<tr><td style="text-align:center;padding:32px;color:var(--gray)">No square-off file uploaded yet.${canUpload?" Upload today's file above.":''}</td></tr>`;
     if(stripElEmpty) stripElEmpty.innerHTML='';
     return;
@@ -11070,20 +10859,12 @@ function renderSquareoff(){
   const palette=['#dc2626','#ea580c','#ca8a04','#0891b2','#7c3aed','#be185d'];
   const dateColor={}; dateKeys.forEach((d,i)=>dateColor[d]=palette[i%palette.length]);
 
-  // Latest upload date across ALL live rows (not just visible) — stale detection
   // Pivot: one row per client code (fallback name if code blank)
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:{},origOn:{},clr:{},acbal:null,acDate:''};
-    const _o = (r.orig!=null ? r.orig : (r.debit||0));
-    if(r.cleared){
-      byClient[key].clr[r.sqDate] = (byClient[key].clr[r.sqDate]||0) + _o;   // poora paid — pending me nahi
-    }else{
-      byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
-      byClient[key].orig[r.sqDate] = (byClient[key].orig[r.sqDate]||0) + _o;
-    }
-    if(r.origOn) byClient[key].origOn[r.sqDate] = r.origOn;
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},acbal:null,acDate:''};
+    byClient[key].vals[r.sqDate] = (byClient[key].vals[r.sqDate]||0) + (r.debit||0);
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     // keep freshest name/dealer if it varies between files
     byClient[key].name = r.name || byClient[key].name;
@@ -11128,22 +10909,10 @@ function renderSquareoff(){
   };
 
   // Stat strip — clean cards with a thin top accent bar instead of flooded colour
-  const pendingCnt=clients.filter(c=>c.total>0.5).length;
-  const clearedCnt=clients.length-pendingCnt;
   let stripHtml=`<div class="sq-stat-chip" style="--chip-accent:#132039">
-      <span class="n">${pendingCnt}</span><span class="l">Pending Clients${clearedCnt?' · '+clearedCnt+' cleared':''}</span></div>
+      <span class="n">${clients.length}</span><span class="l">Clients</span></div>
     <div class="sq-stat-chip" style="--chip-accent:#0d9488">
       <span class="n">₹${Math.round(total).toLocaleString('en-IN')}</span><span class="l">Total Debit</span></div>`;
-  {
-    let recAmt=0, recCnt=0, origAmt=0;
-    clients.forEach(c=>{ let got=0; dateKeys.forEach(dk=>{
-      if(c.clr[dk]){ origAmt+=c.clr[dk]; got+=c.clr[dk]; }
-      if(c.vals[dk]==null) return; origAmt+=c.orig[dk]||0; const d=(c.orig[dk]||0)-(c.vals[dk]||0); if(d>0.5) got+=d; }); if(got>0){ recAmt+=got; recCnt++; } });
-    stripHtml+=`<div class="sq-stat-chip" style="--chip-accent:#64748b">
-      <span class="n" style="color:#475569">₹${Math.round(origAmt).toLocaleString('en-IN')}</span><span class="l">Original Due (T+5)</span></div>
-    <div class="sq-stat-chip" style="--chip-accent:#16a34a">
-      <span class="n" style="color:#15803d">₹${Math.round(recAmt).toLocaleString('en-IN')}</span><span class="l">Received · ${recCnt} clients</span></div>`;
-  }
   dateKeys.forEach(dk=>{
     const dTotal=clients.reduce((s,c)=>s+(c.vals[dk]||0),0);
     const dCount=clients.filter(c=>c.vals[dk]!=null).length;
@@ -11184,24 +10953,12 @@ function renderSquareoff(){
       <td style="text-align:center"><span class="sq-rm-pill" style="color:${rc};background:${rc}14;border-color:${rc}">${c.dealer||'—'}</span></td>`;
     dateKeys.forEach(dk=>{
       const v=c.vals[dk];
-      if(v==null && c.clr[dk]){
-        html+=`<td style="text-align:center"><span class="sq-clr">✓ Cleared</span><div class="sq-rec"><span class="ok">Paid ₹${Math.round(c.clr[dk]).toLocaleString('en-IN')}</span></div></td>`;
-      }else if(v==null){
+      if(v==null){
         html+=`<td style="text-align:center"><span class="sq-amt-empty">—</span></td>`;
       }else{
         const big=v>=50000;
-        const f2=x=>'₹'+Math.round(x).toLocaleString('en-IN');
-        const o=c.orig[dk], diff=(o!=null)?o-v:0, st='';
-        let sub='';
-        if(st){
-          sub=`<div class="sq-rec" style="color:#94a3b8">Not in latest file</div>`;
-        }else if(diff>0.5){
-          sub=`<div class="sq-rec" title="Original due ${f2(o)} · Received ${f2(diff)} · Balance ${f2(v)}">Due ${f2(o)} · <span class="ok">Paid ${f2(diff)}</span></div>`;
-        }else if(diff<-0.5){
-          sub=`<div class="sq-rec" title="Earlier due ${f2(o)}"><span class="up">▲ ${f2(-diff)} added</span></div>`;
-        }
         html+=`<td style="text-align:center;${big?'background:#fdf6e8':''}">
-          <span class="sq-amt${big?' sq-big':''}"${st?' style="opacity:.55;text-decoration:line-through"':''}>₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${sub}</td>`;
+          <span class="sq-amt${big?' sq-big':''}">₹${v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
       }
     });
     if(c.acbal==null){
@@ -11216,7 +10973,7 @@ function renderSquareoff(){
   tbl.innerHTML=html;
 }
 function sqUpdateBell(){
-  const rows=sqMyRows().filter(r=>!r.cleared);
+  const rows=sqMyRows();
   const n=new Set(rows.map(r=>(r.code||'').trim()||('N:'+(r.name||'').trim().toLowerCase()))).size;
   const mBadge=document.getElementById('mnav-sq-badge');
   if(mBadge){ mBadge.textContent=n>99?'99+':n; mBadge.style.display=n>0?'':'none'; }
@@ -11227,15 +10984,14 @@ function sqUpdateBell(){
 }
 function sqExport(){
   const isAdmin=canUploadSquareoff();
-  let rows=sqViewRows();
+  let rows=sqMyRows();
   if(!rows.length){ toast('No data to export','error'); return; }
   const dateKeys=[...new Set(rows.map(r=>r.sqDate).filter(Boolean))].sort();
   const byClient={};
   rows.forEach(r=>{
     const key=(r.code||'').trim() || ('N:'+(r.name||'').trim().toLowerCase());
-    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},orig:0,acbal:null,acDate:''};
-    if(!r.cleared) byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
-    byClient[key].orig+=(r.orig!=null?r.orig:(r.debit||0));
+    if(!byClient[key]) byClient[key]={code:r.code,name:r.name,dealer:r.dealer,vals:{},acbal:null,acDate:''};
+    byClient[key].vals[r.sqDate]=(byClient[key].vals[r.sqDate]||0)+(r.debit||0);
     if(r.acbal!=null && (r.sqDate||'')>=byClient[key].acDate){ byClient[key].acbal=r.acbal; byClient[key].acDate=r.sqDate||''; }
     byClient[key].name=r.name||byClient[key].name;
     byClient[key].dealer=r.dealer||byClient[key].dealer;
@@ -11246,19 +11002,16 @@ function sqExport(){
 
   const cols=[{header:'Client Code',width:14},{header:'Client Name',width:32},{header:'RM',width:12}]
     .concat(dateKeys.map(dk=>({header:sqFmtD(dk),money:true,width:15})))
-    .concat([{header:'Original Due (T+5)',money:true,width:18},{header:'Received',money:true,width:14},{header:'Balance',money:true,width:14}])
     .concat([{header:'Ledger Debit Balance',money:true,width:18}]);
   const data=clients.map(c=>{
     const row=[c.code,c.name,c.dealer];
-    dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:(c.total<0.5?'Cleared':'')));
-    row.push(c.orig, Math.max(0,c.orig-c.total), c.total);
+    dateKeys.forEach(dk=>row.push(c.vals[dk]!=null?c.vals[dk]:''));
     row.push(c.acbal!=null?c.acbal:'');
     return row;
   });
   const totalRow=['','','TOTAL'].concat(dateKeys.map(dk=>clients.reduce((s,c)=>s+(c.vals[dk]||0),0)))
-    .concat([clients.reduce((s,c)=>s+c.orig,0), clients.reduce((s,c)=>s+Math.max(0,c.orig-c.total),0), clients.reduce((s,c)=>s+c.total,0)])
     .concat([clients.reduce((s,c)=>s+(c.acbal||0),0)]);
-  dnXlsx('Square-off_'+(_sqHistDate||today())+'.xlsx','Square-off (T+5)'+(_sqHistDate?' — History '+fmtDate(_sqHistDate):''),cols,data,totalRow);
+  dnXlsx('Square-off_'+today()+'.xlsx','Square-off (T+5)',cols,data,totalRow);
 }
 function ntReport(d){
   const rows=getActiveEqClients().filter(c=>daysDiff(c.last_trade_date)>=d)

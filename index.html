@@ -437,10 +437,6 @@ tbody tr:hover{background:var(--blue2)!important;box-shadow:inset 3px 0 0 var(--
 .sq-date-pill{display:inline-flex;align-items:center;gap:6px;font-weight:800;letter-spacing:.5px;font-size:.88rem;
   text-transform:uppercase;color:#e2e8f0;}
 .sq-date-dot{width:7px;height:7px;border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(255,255,255,.08);}
-.sq-clr{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.4px;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:20px;padding:2px 10px}
-.sq-rec{font-size:.68rem;font-weight:600;color:#8592a6;margin-top:1px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.sq-rec .ok{color:#15803d}
-.sq-rec .up{color:#b91c1c}
 .sq-stat-strip{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px 3px;margin:0;}
 .sq-stat-chip{background:linear-gradient(180deg,#fff,#fafbfe);border:1px solid #e8ecf3;border-radius:10px;padding:6px 16px;
   box-shadow:0 1px 2px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:2px;min-width:130px;position:relative;}
@@ -1652,7 +1648,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="sqExport()">⬇️ Export</button>
             <button class="btn btn-outline admin-only-sq" id="sq-clrbtn" style="display:none" onclick="sqClear()">🗑️ Clear</button>
-            <button class="btn btn-outline admin-only-sq" id="sq-basebtn" style="display:none" title="Kal/pichhli date ki file upload karo — live data nahi badlega, sirf 'Aaya tha' amount set hoga" onclick="sqBasePick()">📂 Pichhli File (Aaya tha)</button>
             <button class="btn btn-teal admin-only-sq" id="sq-upbtn" style="display:none" title="Each branch's file can be uploaded separately — data will be merged, not overwritten" onclick="document.getElementById('sq-file').click()">⬆️ Upload File (Merge)</button>
             <input type="file" id="sq-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sqUpload(this)">
           </div>
@@ -3301,7 +3296,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-10-30-v7"></script>
+<script src="dninvest-app-1.js?v=2026-10-30-v8"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
