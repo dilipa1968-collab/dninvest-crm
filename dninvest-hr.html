@@ -1600,11 +1600,39 @@ function getIncentiveSalary(name, ref){
 // Performance Incentive PAYOUT — paid every month under "Other incentives" in the
 // incentive sheet, prorated by attendance with the same ÷26 logic as salary:
 // Absent day = 1 full per-day cut (perf/26), Half day = half per-day cut.
+// Attendance records for a month (holidays/Sundays excluded) PLUS a synthetic
+// "Absent" record for every BLANK working day — a past working day with no
+// attendance record at all (e.g. RM never logged in and the 10 AM auto-absent
+// never ran). Previously such days were silently ignored, so no salary was cut.
+// Blank days are only counted when: the month has at least one record for that
+// employee (so old, untracked months aren't treated as fully absent), the date
+// is before today, and it falls within the employee's joining/leaving dates.
+function attRecsWithBlanks(name, monthPrefix){
+  const all=(getAtt()[name]||[]);
+  const recs=all.filter(r=>!monthPrefix || r.date.startsWith(monthPrefix)).filter(r=>!isHoliday(r.date));
+  if(!monthPrefix || !/^\d{4}-\d{2}$/.test(monthPrefix)) return recs;
+  if(!all.some(r=>r.date && r.date.startsWith(monthPrefix))) return recs;
+  const have=new Set(all.filter(r=>r.date && r.date.startsWith(monthPrefix)).map(r=>r.date));
+  const [y,m]=monthPrefix.split('-').map(Number);
+  const dim=new Date(y,m,0).getDate();
+  const td=today();
+  const joined=getJoinedDate(name), left=getLeftDate(name);
+  const out=recs.slice();
+  for(let d=1; d<=dim; d++){
+    const ds=monthPrefix+'-'+String(d).padStart(2,'0');
+    if(ds>=td) break;
+    if(have.has(ds) || isHoliday(ds)) continue;
+    if(joined && /^\d{4}-\d{2}-\d{2}$/.test(joined) && ds<joined) continue;
+    if(left && /^\d{4}-\d{2}-\d{2}$/.test(left) && ds>left) continue;
+    out.push({date:ds, in:'', out:'', status:'Absent', blank:true});
+  }
+  return out;
+}
 function perfIncentivePayout(name, month){
   const perf=Number(getPerfIncentive(name))||0;
   if(!perf) return {perf:0, pay:0, absent:0, half:0, cut:0};
   const att=getAtt();
-  const recs=(att[name]||[]).filter(r=>!month || r.date.startsWith(month)).filter(r=>!isHoliday(r.date)); // holiday/Sunday ko cut me mat gino
+  const recs=attRecsWithBlanks(name, month); // holiday/Sunday excluded, blank working days = Absent
   const absent=recs.filter(r=>r.status==='Absent').length;
   const half=recs.filter(r=>r.status==='Half day').length;
   const perDay=perf/26;
@@ -3512,6 +3540,8 @@ function renderDateWiseSheet(){
           <span style="font-size:10px;color:var(--text2);display:block">${inT}</span>
           <span style="font-size:10px;color:var(--text3);display:block">${outT}</span>
         </td>`;
+      } else if(attRecsWithBlanks(e.name, ym).some(x=>x.blank && x.date===dateStr)){
+        row += `<td style="text-align:center;padding:3px 4px" title="No attendance record — counted as Absent in salary"><span class="badge badge-red" style="padding:1px 5px;display:block;margin-bottom:2px">A</span><span style="font-size:9px;color:var(--red)">no record</span></td>`;
       } else {
         row += `<td style="text-align:center;color:var(--text3)">·</td>`;
       }
@@ -3949,7 +3979,7 @@ function calcMonthlySalary(name, monthPrefix){
   // at calculation time, means salary is always correct against the
   // CURRENT holiday list, without needing to hunt down and edit old
   // attendance records by hand.
-  const recs=(att[name]||[]).filter(r=>!monthPrefix || r.date.startsWith(monthPrefix)).filter(r=>!isHoliday(r.date));
+  const recs=attRecsWithBlanks(name, monthPrefix); // blank working days count as Absent
   const presentDays=recs.filter(r=>r.status==='Present'||r.status==='Late').length;
   const absentDays=recs.filter(r=>r.status==='Absent').length;
   const halfDays=recs.filter(r=>r.status==='Half day').length;
@@ -4303,7 +4333,7 @@ function calcSalary(){
   if(salMonthEl && salMonthEl.value && absentEl && !absentEl.dataset.touched){
     const m=salMonthEl.value;
     const att=getAtt();
-    const recs=(att[name]||[]).filter(r=>r.date.startsWith(m)).filter(r=>!isHoliday(r.date));
+    const recs=attRecsWithBlanks(name, m);
     const autoAbsent=recs.filter(r=>r.status==='Absent').length;
     absentEl.value=autoAbsent;
   }
