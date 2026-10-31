@@ -987,7 +987,10 @@ input:focus, select:focus, textarea:focus{
           <div id="mm-summary"></div>
           <div class="field-inline" style="margin-top:10px"><label>Paying now (₹)</label><input type="number" id="mm-pay-amount" value="0" min="0" onchange="previewMultiMonthSplit()"></div>
           <div id="mm-split-preview" style="margin-top:8px"></div>
-          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="applyMultiMonthPayment()">Save Combined Payment</button>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary" style="flex:1" onclick="applyMultiMonthPayment()">Save Combined Payment</button>
+            <button class="btn" style="flex:1;background:#16a34a;color:#fff;border:none" onclick="payFullMultiMonth()">✓ Pay Full Balance (all months)</button>
+          </div>
         </div>
       </div>
     </div>
@@ -4177,7 +4180,7 @@ function renderSalaryPage(){
           <td style="font-weight:600;color:var(--green)">${fmt(netAfterAdv)}</td>
           <td><input type="number" id="sal-paid-${safeId}" value="${paid}" style="width:80px" min="0"></td>
           <td style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
-          <td><button class="btn btn-sm" onclick="markSalaryPaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
+          <td style="white-space:nowrap"><button class="btn btn-sm" onclick="markSalaryPaid('${e.name.replace(/'/g,"\\'")}')">Save</button><button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;padding:4px 8px;margin-left:4px" title="Full amount paid — ek click me" onclick="markSalaryFullPaid('${e.name.replace(/'/g,"\\'")}')">✓ Full</button></td>
         </tr>`;
       }).join('');
       const totalRow=`<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700">
@@ -4206,6 +4209,15 @@ async function markSalaryPaid(name){
   const input=document.getElementById('sal-paid-'+safeId);
   const amount=input?parseInt(input.value)||0:0;
   await setPaidAmount(name, month, 'salaryPaid', amount);
+  renderSalaryPage();
+}
+
+// One-click "full paid": sets Paid = Net payable for that month (no typing needed).
+async function markSalaryFullPaid(name){
+  const month=viewSalMonth();
+  const r=calcMonthlySalary(name,month);
+  const net=Math.max(0, Math.round(r.net-getAdvanceAdjustedForMonth(name, month)));
+  await setPaidAmount(name, month, 'salaryPaid', net);
   renderSalaryPage();
 }
 
@@ -4805,7 +4817,7 @@ function renderIncentivePage(){
           <td class="ti-net" id="inc-total-${safeId}" data-rawtotal="${tt.rawTotal}" style="font-weight:700;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" min="0" oninput="recalcIncentiveRow('${safeId}')"></td>
           <td id="inc-bal-${safeId}" style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
-          <td><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button></td>
+          <td style="white-space:nowrap"><button class="btn btn-sm" onclick="markIncentivePaid('${e.name.replace(/'/g,"\\'")}')">Save</button><button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;padding:4px 8px;margin-left:4px" title="Full amount paid — ek click me" onclick="markIncentiveFullPaid('${e.name.replace(/'/g,"\\'")}')">✓ Full</button></td>
         </tr>`;
       }).join('');
       const totalRow=`<tr class="ti-total-row">
@@ -4901,6 +4913,20 @@ function recalcIncentiveRow(safeId){
   if(totAll) totAll.textContent = fmt(sumTotal);
   if(paidAll) paidAll.textContent = fmt(sumPaid);
   if(balAll){ balAll.textContent = fmt(sumBal); balAll.style.color = sumBal>0 ? 'var(--red)' : 'var(--green)'; }
+}
+
+// One-click "full paid": Paid = Net Payable (Total − Late Ded. as currently shown in the row).
+async function markIncentiveFullPaid(name){
+  const month=viewIncMonth();
+  const safeId=name.replace(/[^a-zA-Z0-9]/g,'');
+  const totalCell=document.getElementById('inc-total-'+safeId);
+  const ldInput=document.getElementById('inc-lateded-'+safeId);
+  const rawTotal=totalCell?Number(totalCell.dataset.rawtotal)||0:0;
+  const lateDed=ldInput?Math.max(0,parseInt(ldInput.value)||0):0;
+  const net=Math.max(0, Math.round(rawTotal-lateDed));
+  if(ldInput) await setPaidAmount(name, month, 'lateDedOverride', lateDed);
+  await setPaidAmount(name, month, 'incPaid', net);
+  renderIncentivePage();
 }
 
 async function markIncentivePaid(name){
@@ -5059,15 +5085,15 @@ function renderAllRmMultiMonth(){
   box.innerHTML=`
     <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--accent)">📊 All RMs — combined (${months.length} months: ${months[0]} → ${months[months.length-1]})</div>
     <table style="font-size:12.5px;width:100%">
-      <thead><tr><th style="text-align:left">RM</th><th style="text-align:right">Total Incentive</th><th style="text-align:right">Already Paid</th><th style="text-align:right">Balance</th></tr></thead>
+      <thead><tr><th style="text-align:left">RM</th><th style="text-align:right">Total Incentive</th><th style="text-align:right">Already Paid</th><th style="text-align:right">Balance</th><th></th></tr></thead>
       <tbody>
-        ${rows.map(r=>`<tr><td>${r.name}</td><td style="text-align:right">${fmt(r.total)}</td><td style="text-align:right;color:var(--green)">${fmt(r.paid)}</td><td style="text-align:right;color:${r.balance>0?'var(--red)':'var(--green)'}">${fmt(r.balance)}</td></tr>`).join('')}
+        ${rows.map(r=>`<tr><td>${r.name}</td><td style="text-align:right">${fmt(r.total)}</td><td style="text-align:right;color:var(--green)">${fmt(r.paid)}</td><td style="text-align:right;color:${r.balance>0?'var(--red)':'var(--green)'}">${fmt(r.balance)}</td><td style="text-align:right">${r.balance>0?`<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;padding:2px 8px" onclick="payFullMultiMonth('${r.name.replace(/'/g,"\\'")}').then(renderAllRmMultiMonth)">✓ Pay full</button>`:'<span style="color:var(--green);font-size:11px">✓ Paid</span>'}</td></tr>`).join('')}
       </tbody>
       <tfoot><tr style="border-top:1px solid var(--border)">
         <td style="padding-top:6px;font-weight:700">TOTAL (all RMs)</td>
         <td style="text-align:right;padding-top:6px;font-weight:700">${fmt(gt.total)}</td>
         <td style="text-align:right;padding-top:6px;font-weight:700;color:var(--green)">${fmt(gt.paid)}</td>
-        <td style="text-align:right;padding-top:6px;font-weight:700;color:var(--red)">${fmt(gt.balance)}</td>
+        <td style="text-align:right;padding-top:6px;font-weight:700;color:var(--red)">${fmt(gt.balance)}</td><td></td>
       </tr></tfoot>
     </table>`;
 }
@@ -5170,6 +5196,25 @@ function previewMultiMonthSplit(){
       </tbody>
     </table>
     ${leftover>0?`<p style="font-size:11.5px;color:var(--accent);margin-top:6px">Extra ${fmt(leftover)} remaining (all months' balance cleared). This will not be allocated.</p>`:''}`;
+}
+
+// One-click: clears the FULL balance of every month in the range for the selected RM.
+async function payFullMultiMonth(nameArg){
+  const from=document.getElementById('mm-from');
+  const to=document.getElementById('mm-to');
+  const months=monthsInRange(from.value, to.value);
+  if(months.length===0){ alert('Please select From and To month first'); return; }
+  const name=nameArg||document.getElementById('mm-emp').value;
+  const rows=months.map(m=>getMonthIncentiveInfo(name,m));
+  const totalBal=rows.reduce((s,r)=>s+r.balance,0);
+  if(totalBal<=0){ alert(name+' ka in months me koi balance baaki nahi hai.'); return; }
+  const mLabel=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+  if(!confirm(name+' — '+mLabel(months[0])+' se '+mLabel(months[months.length-1])+' tak ka pura balance '+fmt(totalBal)+' PAID mark karein?')) return;
+  for(const r of rows){
+    if(r.balance>0) await setPaidAmount(name, r.month, 'incPaid', r.paid+r.balance);
+  }
+  renderMultiMonthSummary();
+  renderIncentivePage();
 }
 
 async function applyMultiMonthPayment(){
