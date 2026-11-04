@@ -2681,6 +2681,8 @@ DB.syncFromFirebase().then(()=>{
   if(dupNav) dupNav.style.display=CU.role==='admin'?'flex':'none';
   const rmBackupNav=document.getElementById('nav-rm-backup');
   if(rmBackupNav) rmBackupNav.style.display=(CU.role==='admin'||CU.backup_access)?'flex':'none';
+  const sqHistNav=document.getElementById('nav-sq-histclr');            // Clear SQ History — sirf Admin
+  if(sqHistNav) sqHistNav.style.display=(CU.role==='admin')?'flex':'none';
 
   // MF Desk — a scoped "mini admin" role for MF back-office staff. They can see
   // and enter MF Transactions for ANY RM (to backfill ones RMs forget to log),
@@ -10959,7 +10961,8 @@ function sqDangerConfirm(title, msg, okText){
 }
 async function sqClearHistory(){
   if(!(CU && CU.role==='admin')){ toast('Only Admin can clear history','error'); return; }
-  const d=_sqHistDate;
+  const onSq = (typeof getCurrentPageId==='function') && getCurrentPageId()==='eq-squareoff';
+  const d = onSq ? _sqHistDate : '';
   const ok = d
     ? await sqDangerConfirm('Delete History — '+fmtDate(d), 'Saved square-off history of <b>'+fmtDate(d)+'</b> will be permanently deleted.<br>Live data is not affected.', 'Delete '+fmtDate(d))
     : await sqDangerConfirm('Delete ALL History', 'Saved square-off history of <b>every date</b> will be permanently deleted.<br>Live data is not affected.', 'Delete All History');
@@ -11001,7 +11004,6 @@ async function sqArchiveDeleteDates(dates){
 function renderSquareoff(){
   const canUpload=canUploadSquareoff();
   document.querySelectorAll('.admin-only-sq').forEach(el=>el.style.display=canUpload?'inline-flex':'none');
-  { const hb=document.getElementById('sq-histclrbtn'); if(hb) hb.style.display=(CU&&CU.role==='admin')?'inline-flex':'none'; }   // Clear History: sirf Admin
 
   // History dropdown (injected once, next to the RM filter)
   if(!document.getElementById('sq-hist')){
