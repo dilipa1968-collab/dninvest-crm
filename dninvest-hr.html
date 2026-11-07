@@ -2114,7 +2114,7 @@ async function doLogin(){
       const snap = await fdb.collection('hr_data').doc('attendance').get();
       if(snap.exists && snap.data() && snap.data().data){
         attFresh = snap.data().data;
-        DB.set('attendance', attFresh); // sync cache
+        DB.setLocal('attendance', attFresh); // sync cache (local only — full-doc write CRM ka record mita deta tha)
       }
     }catch(e){ /* fallback to cache */ }
   }
@@ -2176,12 +2176,25 @@ async function healTodayAttendanceIfNeeded(name){
         const snap = await fdb.collection('hr_data').doc('attendance').get();
         if(snap.exists && snap.data() && snap.data().data){
           attFresh = snap.data().data;
-          DB.set('attendance', attFresh);
+          DB.setLocal('attendance', attFresh); // local only — whole-doc overwrite se CRM ka Present mit jata tha
         }
       }catch(e){ /* fallback to cache */ }
     }
     const already=(attFresh[name]||[]).find(r=>r.date===td);
-    if(!already) return;
+    if(!already){
+      // CRM se aaye / session resume — aaj ka record hi nahi hai to abhi bana do
+      const holidayName=getHolidayName(td);
+      await saveAttRecord(name, {date:td, in:attTime5(), out:'', status: holidayName?'Holiday':'Present'});
+      if(typeof renderDashboard==='function') renderDashboard();
+      return;
+    }
+    if(already.status==='Absent'){
+      // Auto-absent ke baad login → Late
+      const _a=new Date(); const t=String(_a.getHours()).padStart(2,'0')+':'+String(_a.getMinutes()).padStart(2,'0');
+      await saveAttRecord(name, {date:td, in:t, out:'', status:'Late'});
+      if(typeof renderDashboard==='function') renderDashboard();
+      return;
+    }
     const _n=new Date(); const nowIst=new Date(_n.getTime()+_n.getTimezoneOffset()*60000+5.5*3600000);
     const dow=nowIst.getDay(); const nowH=nowIst.getHours()+nowIst.getMinutes()/60;
     let cut=null; if(dow>=1&&dow<=5)cut=18.25; else if(dow===6)cut=14.25;
