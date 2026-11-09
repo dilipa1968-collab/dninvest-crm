@@ -2002,9 +2002,10 @@ function nowTime(){
   const n=new Date();
   return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
 }
-function attTime5(){
-  // login time minus 5 minutes
-  const n=new Date(Date.now()-5*60*1000);
+function attTime5(at){
+  // login time minus 5 minutes. `at` = login-click time (captured before any
+  // network wait) so a slow connection doesn't push the in-time later.
+  const n=new Date((Number(at)||Date.now())-5*60*1000);
   return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
 }
 
@@ -2037,6 +2038,7 @@ document.getElementById('login-name').addEventListener('keydown',e=>{ if(e.key==
 document.getElementById('login-name').addEventListener('blur', ()=>{ if(typeof updateOfficeStatusBanner==='function') updateOfficeStatusBanner(); });
 
 async function doLogin(){
+  const loginClickAt = Date.now(); // attendance in-time base — before any fetch
   const username = document.getElementById('login-name').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value.trim();
   const errBox=document.getElementById('att-notice');
@@ -2121,13 +2123,14 @@ async function doLogin(){
   const already=(attFresh[name]||[]).find(r=>r.date===td);
   if(already && already.status==='Absent'){
     // Delayed login after 10 AM auto-absent mark — flip to Late
-    const nowTime=String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0');
+    const _ld=new Date(loginClickAt);
+    const nowTime=String(_ld.getHours()).padStart(2,'0')+':'+String(_ld.getMinutes()).padStart(2,'0');
     await saveAttRecord(name, {date:td,in:nowTime,out:'',status:'Late'});
     await reactivateCrmUser(user.id);
     if(errBox){errBox.style.display='block';errBox.textContent='⏰ Marked "Late" — in time: '+nowTime;}
   } else if(!already){
     // No record at all — first login of the day
-    const inTime=attTime5();
+    const inTime=attTime5(loginClickAt);
     const holidayName=getHolidayName(td);
     if(holidayName){
       await saveAttRecord(name, {date:td,in:inTime,out:'',status:'Holiday'});
@@ -2167,7 +2170,8 @@ async function doLogin(){
 // "Half day") followed by the employee simply reopening/relogging via those
 // paths never took effect — nothing ever re-ran the heal. Now all three
 // entry points (normal login, session resume, CRM autologin) call this.
-async function healTodayAttendanceIfNeeded(name){
+async function healTodayAttendanceIfNeeded(name, at){
+  const baseAt = Number(at) || Date.now(); // before the Firestore read below
   try{
     const td=today();
     let attFresh = getAtt();
@@ -2184,7 +2188,7 @@ async function healTodayAttendanceIfNeeded(name){
     if(!already){
       // CRM se aaye / session resume — aaj ka record hi nahi hai to abhi bana do
       const holidayName=getHolidayName(td);
-      await saveAttRecord(name, {date:td, in:attTime5(), out:'', status: holidayName?'Holiday':'Present'});
+      await saveAttRecord(name, {date:td, in:attTime5(baseAt), out:'', status: holidayName?'Holiday':'Present'});
       if(typeof renderDashboard==='function') renderDashboard();
       return;
     }
@@ -2540,9 +2544,10 @@ async function doLogout(){
 
 // Check persisted session
 (async function(){
+  const pageOpenAt = Date.now(); // attendance base for session-resume / CRM→HR autologin
   try{
     const s=JSON.parse(localStorage.getItem(KEY_USER)||'null');
-    if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp(); if(!s.isAdmin) healTodayAttendanceIfNeeded(s.name); return;}
+    if(s&&s.name){currentUser=s.name;isAdmin=s.isAdmin;startApp(); if(!s.isAdmin) healTodayAttendanceIfNeeded(s.name, pageOpenAt); return;}
   }catch{}
 
   // Auto-login: CRM passes ?autologin=<token> when opening HR from the HR button.
@@ -2577,7 +2582,7 @@ async function doLogout(){
         if(empName){
           currentUser=empName; isAdmin=empIsAdmin;
           console.log('[HRLOGIN] currentUser set to '+JSON.stringify(currentUser));
-          startApp(); if(!empIsAdmin) healTodayAttendanceIfNeeded(empName); return;
+          startApp(); if(!empIsAdmin) healTodayAttendanceIfNeeded(empName, pageOpenAt); return;
         }
       }
       localStorage.removeItem('dnihr_autologin_token');

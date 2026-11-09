@@ -1402,10 +1402,20 @@ function isMobileDevice(){
 }
 
 async function doLogin(){
+  // 09-Nov-2026: capture the click time FIRST — attendance in-time is based
+  // on this, not on whenever the (slow) network calls below finish.
+  const loginClickAt = Date.now();
   const u = document.getElementById('lusr').value.trim().toLowerCase();
   const p = document.getElementById('lpwd').value;
+  // 09-Nov-2026: was a full DB.syncFromFirebase() (17 collections incl. all
+  // client shards) BEFORE the password check — this made login slow on weak
+  // connections. Login only needs the users list; initApp() runs the full
+  // sync right after login anyway.
   if(typeof fdb!=='undefined'){
-    try{ await DB.syncFromFirebase(); }catch(e){}
+    try{
+      const doc = await fdb.collection('crm_data').doc('users').get();
+      if(doc.exists && doc.data() && Array.isArray(doc.data().data)) DB.setLocal('users', doc.data().data);
+    }catch(e){}
   }
   // The active/inactive flag is flipped by runAutoSchedule(), which until now
   // only ran inside an already logged-in session. If nobody was logged in when
@@ -1490,10 +1500,12 @@ async function doLogin(){
     document.getElementById('lerr').style.display='none';
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
-    initApp();
     // Silently record HR attendance in the background (same as HR Portal login),
     // so RMs don't need to open the HR Portal separately just to be marked present.
-    if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user); startCrmHeartbeat(user); }
+    // Started BEFORE initApp() so it isn't queued behind the heavy data sync,
+    // and uses the login-click time (not the time the write finally happens).
+    if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user, loginClickAt); startCrmHeartbeat(user); }
+    initApp();
   } else {
     document.getElementById('lerr').style.display='block';
   }
@@ -1628,7 +1640,8 @@ function bindCrmHbEdgePings(){
 // ('hr_data', doc 'attendance') that the HR Portal reads, so both stay in sync.
 // On Sunday or a Stock Exchange holiday (HR Portal's holiday calendar), the
 // status is recorded as "Holiday" instead of "Present".
-async function recordHrAttendanceOnCrmLogin(user){
+async function recordHrAttendanceOnCrmLogin(user, loginAt){
+  const baseAt = Number(loginAt) || Date.now(); // login-click time, captured before any network wait
   try{
     // If Firebase isn't ready yet (slow mobile load), wait for it rather than
     // silently skipping — otherwise a first login on a bad connection records
@@ -1656,7 +1669,7 @@ async function recordHrAttendanceOnCrmLogin(user){
     // a delayed login — flip it to "Late" and reactivate the user immediately,
     // instead of leaving them deactivated/absent for the rest of the day.
     if(todayRec && todayRec.status==='Absent'){
-      const inDate = new Date();
+      const inDate = new Date(baseAt);
       const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
       const record = {date:td, in:inTime, out:'', status:'Late'};
       // Retry with exponential backoff (3 attempts)
@@ -1725,7 +1738,7 @@ async function recordHrAttendanceOnCrmLogin(user){
     }
 
     // Determine in-time (login time - 2 min)
-    const inDate = new Date(Date.now() - 2*60*1000);
+    const inDate = new Date(baseAt - 2*60*1000);
     const inTime = String(inDate.getHours()).padStart(2,'0')+':'+String(inDate.getMinutes()).padStart(2,'0');
 
     // Check holiday calendar (Sunday or Stock Exchange holiday set from HR Portal)
@@ -1946,6 +1959,7 @@ async function doResetPassword(){
 // Auto-login if session exists (persistent — survives browser/app close).
 // Session is cleared only by Logout, wrong/changed credentials, or RM-on-mobile.
 async function tryAutoLogin(){
+  const attClickAt = Date.now(); // in-time base for attendance (before any waits)
   // Client "player mode" (?play in URL): skip CRM login entirely — the quiz
   // player overlay handles everything. Guard so RM/admin auto-login never runs.
   if(typeof QUIZ!=='undefined' && ((QUIZ.isPlayMode && QUIZ.isPlayMode()) || (QUIZ.isScreenMode && QUIZ.isScreenMode()))) return;
@@ -2018,12 +2032,12 @@ async function tryAutoLogin(){
         CU._loginAt = Number(at)||Date.now();
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').style.display='block';
-        initApp();
         // Restart heartbeat pings after page refresh (session restore skips doLogin)
         // AND mark today's HR attendance — with persistent auto-login an RM may
         // never hit doLogin() on a new day. The function is idempotent: it skips
         // if today is already marked, and flips a 10 AM "Absent" to "Late".
-        if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user); startCrmHeartbeat(user); }
+        if(user.role!=='admin'){ recordHrAttendanceOnCrmLogin(user, attClickAt); startCrmHeartbeat(user); }
+        initApp();
         return;
       }
     }catch(e){}
