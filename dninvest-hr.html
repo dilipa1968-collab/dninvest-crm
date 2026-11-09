@@ -2003,9 +2003,9 @@ function nowTime(){
   return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
 }
 function attTime5(at){
-  // login time minus 5 minutes. `at` = login-click time (captured before any
+  // login time minus 2 minutes (same as CRM login). `at` = login-click time (captured before any
   // network wait) so a slow connection doesn't push the in-time later.
-  const n=new Date((Number(at)||Date.now())-5*60*1000);
+  const n=new Date((Number(at)||Date.now())-2*60*1000);
   return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
 }
 
