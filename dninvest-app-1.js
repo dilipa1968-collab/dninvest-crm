@@ -2543,7 +2543,13 @@ DB.syncFromFirebase().then(()=>{
         async function _pollShardedClientData(){
           for(const key of SHARD_KEYS){
             try{
-              const parts = await DB._ensureMigrated(key);
+              // 09-Nov-2026: _ensureMigrated() caches its promise, so it always
+              // returned the FIRST-load data — this "poll" never fetched anything
+              // new and just re-wrote stale shards over the live cache. Now: make
+              // sure migration ran once, then do a real fresh read.
+              await DB._ensureMigrated(key);
+              const parts = await DB._readShards(key);
+              if(DB._writing[key]>0) continue;
               DB._shardCache[key] = parts.map(p=>p||[]);
               const merged = DB._mergeShards(key);
               // 12-Oct-2026 fix: pehle sirf length + pehla/aakhri id compare hota tha —
@@ -2590,8 +2596,15 @@ DB.syncFromFirebase().then(()=>{
                 if(!DB._mem) DB._mem = {};
                 DB._mem[key] = merged;
                 if(key==='mf_clients' && typeof _crmSchemeNamesCache!=='undefined') _crmSchemeNamesCache=null;
-                try{ lsSet('dninvest_'+key, JSON.stringify(merged)); }
-                catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
+                // 09-Nov-2026 PERF: localStorage is only a warm-start cache (DB._mem is
+                // the source of truth), and writing MBs of JSON synchronously froze the
+                // screen on every live update. Write it once, a moment later, instead.
+                DB._lsTimers = DB._lsTimers || {};
+                clearTimeout(DB._lsTimers[key]);
+                DB._lsTimers[key] = setTimeout(()=>{
+                  try{ lsSet('dninvest_'+key, JSON.stringify(DB._mem[key])); }
+                  catch(e){ console.log('localStorage cache skipped for',key,'(quota exceeded) — using in-memory only:',e); }
+                }, 2000);
                 _afterRealtime(key);
               });
               window._shardUnsubs.push(unsub);
@@ -2605,14 +2618,25 @@ DB.syncFromFirebase().then(()=>{
           SHARD_KEYS.forEach(key=>{ DB._shardSeen[key] = new Set(); });   // re-arm the "wait for all shards" gate for next attach
         }
 
+        // 09-Nov-2026 PERF: RMs switch tabs constantly (broker terminal, mail…).
+        // Earlier, EVERY switch-back re-downloaded all client shards twice (a poll
+        // + re-attaching 16 listeners) and re-rendered — a visible freeze each time.
+        // Now: listeners stay attached for a 10-min grace period after the tab is
+        // hidden, so a quick switch costs nothing. Only after 10 min hidden are
+        // they detached (to save billed reads); on return they simply re-attach —
+        // the listener's first snapshot already brings fresh data, so no extra poll.
+        // (First load also skips the poll — syncFromFirebase just fetched it all.)
+        window._shardDetachTimer = window._shardDetachTimer || null;
         function _applyVisibilityMode(){
+          if(window._shardBgTimer){ clearInterval(window._shardBgTimer); window._shardBgTimer=null; }
           if(document.visibilityState==='visible'){
-            if(window._shardBgTimer){ clearInterval(window._shardBgTimer); window._shardBgTimer=null; }
-            _pollShardedClientData();   // catch up immediately on whatever happened while hidden
-            _attachShardedRealtime();
-          } else {
-            _detachShardedRealtime();
-            if(!window._shardBgTimer) window._shardBgTimer = setInterval(_pollShardedClientData, 4*60000); // every 4 min while hidden
+            if(window._shardDetachTimer){ clearTimeout(window._shardDetachTimer); window._shardDetachTimer=null; }
+            _attachShardedRealtime();   // no-op if still attached
+          } else if(!window._shardDetachTimer){
+            window._shardDetachTimer = setTimeout(()=>{
+              window._shardDetachTimer = null;
+              if(document.visibilityState!=='visible') _detachShardedRealtime();
+            }, 10*60000);
           }
         }
 

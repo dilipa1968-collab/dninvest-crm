@@ -2280,20 +2280,28 @@ function startApp(){
 
   startClock();
   populateEmpDropdowns();
-  renderDashboard();
-  renderAttendancePage();
-  renderLeavePage();
-  renderSalaryPage();
-  renderIncentivePage();
+  // 09-Nov-2026 PERF: paint the page the user actually sees FIRST; the other
+  // (hidden) pages are pre-rendered just after, so the screen shows up at once
+  // instead of waiting for ~15 renders. showPage() re-renders on visit anyway.
+  refreshCurrentPage();
   fetchCrmSalesSummary();
-  if(isAdmin) renderEmployees();
-  calcSalary();
-  renderAdvanceBox();
-  renderAdvanceHistory();
-  loadEsiSettingsIntoUI();
-  renderEsiBox();
-  renderExtraDeductionBox();
-  if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); }
+  setTimeout(()=>{
+    try{
+      renderDashboard();
+      renderAttendancePage();
+      renderLeavePage();
+      renderSalaryPage();
+      renderIncentivePage();
+      if(isAdmin) renderEmployees();
+      calcSalary();
+      renderAdvanceBox();
+      renderAdvanceHistory();
+      loadEsiSettingsIntoUI();
+      renderEsiBox();
+      renderExtraDeductionBox();
+      if(isAdmin){ renderEsiOverrideTable(); populateEsiFileMonth(); renderEsiFileEmpList(); }
+    }catch(e){ console.log('deferred startup render error:', e); }
+  }, 30);
 
   // Real-time sync: whenever Admin (or anyone, on any device) changes data in
   // Firestore, this fires and we re-render the relevant pages immediately —
@@ -2305,7 +2313,11 @@ function startApp(){
     // re-render the ONE page the user is actually looking at, plus the couple of
     // side-effects that don't belong to any single page.
     if(changedKey==='employee_changes') populateEmpDropdowns();
-    refreshCurrentPage();
+    // 09-Nov-2026 PERF: on startup ~18 listeners fire within a second, and
+    // 'heartbeats' changes every few minutes per RM — each used to trigger its
+    // own full page re-render. Batch them: one render per 250 ms burst.
+    clearTimeout(window._hrRcpTimer);
+    window._hrRcpTimer = setTimeout(refreshCurrentPage, 250);
   });
 
   // BELT-AND-SUSPENDERS: don't rely only on the realtime listener to fill data
