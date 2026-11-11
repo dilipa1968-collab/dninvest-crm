@@ -885,6 +885,15 @@ input:focus, select:focus, textarea:focus{
             <div class="field-inline"><label>Flat bonus if qualified (₹)</label><input type="number" id="br-client-bonus" placeholder="e.g. 700"></div>
           </div>
           <button class="btn btn-primary" style="width:100%;margin-top:6px" onclick="saveRates()">Save Rates</button>
+
+          <hr class="divider">
+          <p style="font-size:11.5px;font-weight:600;color:var(--text2);margin:14px 0 6px">Late fine waiver rules (based on average In time)</p>
+          <p style="font-size:10.5px;color:var(--text3);margin:0 0 8px">Normal fine = 1% of incentive per late day. If an RM's average In time for the month meets a rule below, that many late days carry no fine. If more than one rule matches, the rule with the most free days applies. Average counts Present/Late days only.</p>
+          <div id="late-rules-list"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <button class="btn btn-sm" onclick="addLateRule()">+ Add rule</button>
+            <button class="btn btn-primary btn-sm" onclick="saveLateRules()">Save Late Rules</button>
+          </div>
         </div>
         <div class="card admin-only" style="display:none">
           <div class="card-title">Monthly business figures (data entry)</div>
@@ -3450,7 +3459,7 @@ function attAvgTimings(name, ym){
       if(o!==null && (i===null || o>i)){ b.outS+=o; b.outN++; }
     }
   });
-  const fin=b=>({days:b.inN, in:b.inN?_attHmStr(b.inS/b.inN):'—', out:b.outN?_attHmStr(b.outS/b.outN):'—'});
+  const fin=b=>({days:b.inN, inMins:b.inN?Math.round(b.inS/b.inN):null, in:b.inN?_attHmStr(b.inS/b.inN):'—', out:b.outN?_attHmStr(b.outS/b.outN):'—'});
   return {wd:fin(acc.wd), sat:fin(acc.sat)};
 }
 // Two-line HTML block used on the dashboard rows
@@ -4794,6 +4803,67 @@ function lateDaysInMonth(name, month){
   }).length;
 }
 
+// ─── LATE-FINE WAIVER RULES (admin-configurable) ─────────────────────────────
+// Each rule: {basis:'wd'|'sat', before:'HH:MM', waive:N}
+//   "If the month's average In time (Mon–Fri or Saturday) is BEFORE hh:mm,
+//    the first N late days of that month carry no fine."
+// Stored inside inc_rates.lateRules (already synced to Firestore). If several
+// rules match, the one waiving the MOST days applies (rules do not add up).
+// The comparison uses the same rounded average shown on the dashboard/report.
+const DEFAULT_LATE_RULES=[{basis:'wd', before:'08:55', waive:5}];
+function getLateRules(){
+  const r=getIncRates().lateRules;
+  return Array.isArray(r) ? r : DEFAULT_LATE_RULES.map(x=>({...x}));
+}
+function lateRuleText(r){
+  return 'Avg '+(r.basis==='sat'?'Saturday':'Mon–Fri')+' In before '+r.before+' → '+r.waive+' late day'+(r.waive==1?'':'s')+' free';
+}
+function lateWaiver(name, month){
+  const avg=attAvgTimings(name, month);
+  let best=null;
+  getLateRules().forEach(r=>{
+    const a = r.basis==='sat' ? avg.sat : avg.wd;
+    const lim=_attHm(r.before), n=Number(r.waive)||0;
+    if(a.inMins===null || lim===null || n<=0) return;
+    if(a.inMins<lim && (!best || n>(Number(best.waive)||0))) best=r;
+  });
+  return best ? {waived:Number(best.waive)||0, rule:best, text:lateRuleText(best)} : {waived:0, rule:null, text:''};
+}
+function renderLateRules(rules){
+  const box=document.getElementById('late-rules-list'); if(!box) return;
+  const list = rules || getLateRules();
+  box.innerHTML = list.length ? list.map(r=>`<div class="late-rule-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:12px">
+      <span>If average</span>
+      <select class="lr-basis" style="width:auto"><option value="wd"${r.basis!=='sat'?' selected':''}>Mon–Fri</option><option value="sat"${r.basis==='sat'?' selected':''}>Saturday</option></select>
+      <span>In time is before</span>
+      <input type="time" class="lr-before" value="${r.before||''}" style="width:auto">
+      <span>→ first</span>
+      <input type="number" class="lr-waive" value="${r.waive}" min="0" style="width:64px">
+      <span>late days: no fine</span>
+      <button class="btn btn-sm" onclick="this.closest('.late-rule-row').remove()" style="background:#fee2e2;color:#b91c1c;border:1px solid #f3b4b4">✕</button>
+    </div>`).join('') : '<p style="font-size:11.5px;color:var(--text3);margin:0 0 6px">No rule — every late day is fined.</p>';
+}
+function readLateRulesForm(){
+  return Array.from(document.querySelectorAll('#late-rules-list .late-rule-row')).map(row=>({
+    basis: row.querySelector('.lr-basis').value==='sat'?'sat':'wd',
+    before: row.querySelector('.lr-before').value,
+    waive: Math.max(0, parseInt(row.querySelector('.lr-waive').value)||0)
+  }));
+}
+function addLateRule(){
+  const cur=readLateRulesForm();
+  cur.push({basis:'wd', before:'08:55', waive:5});
+  renderLateRules(cur);
+}
+async function saveLateRules(){
+  const rules=readLateRulesForm();
+  if(rules.some(r=>!/^\d{2}:\d{2}$/.test(r.before))){ alert('Please fill the time in every rule (or remove the empty rule).'); return; }
+  await saveIncRates({...getIncRates(), lateRules:rules});
+  renderLateRules();
+  renderIncentivePage();
+  alert('Late-fine rules saved!\n\n'+(rules.length?rules.map(lateRuleText).join('\n'):'No rule — every late day is fined.')+'\n\nNote: rows where Late Ded. was already saved/edited keep their saved amount.');
+}
+
 function totalIncentive(name, salary, month){
   // Prefer month-specific data; fall back to legacy single-bucket data if present.
   const monthData = month ? getMfSipForMonth(month) : {};
@@ -4829,7 +4899,12 @@ function totalIncentive(name, salary, month){
   // Admin can override this per employee/month (e.g. waive it to ₹0) from the
   // Team Incentive table — that override, once saved, always wins over the
   // auto-calculated figure.
-  const lateDays = month ? lateDaysInMonth(name, month) : 0;
+  // Waiver rules (see getLateRules) can make the first N late days free.
+  const lateDaysAll = month ? lateDaysInMonth(name, month) : 0;
+  const lw = (month && lateDaysAll>0) ? lateWaiver(name, month) : {waived:0, text:''};
+  const lateWaived = Math.min(lateDaysAll, lw.waived);
+  const lateRuleTxt = lateWaived>0 ? lw.text : '';
+  const lateDays = lateDaysAll - lateWaived;   // chargeable late days
   const lateDeductionPct = Math.min(lateDays*1, 100);
   const autoLateDeductionAmt = Math.round(rawTotal * lateDeductionPct/100);
   const payMonth = month ? getPaymentsForMonth(month) : {};
@@ -4838,7 +4913,7 @@ function totalIncentive(name, salary, month){
   const lateDeductionAmt = lateDeductionOverridden ? Math.max(0, Number(lateDedOverride)||0) : autoLateDeductionAmt;
   const total = rawTotal - lateDeductionAmt;
 
-  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, rawTotal, lateDays, lateDeductionPct, autoLateDeductionAmt, lateDeductionOverridden, lateDeductionAmt, total, tier2Eligible: br.tier2Eligible};
+  return {brok, demat, mf, netSales, sip, other, otherRemark, br, dematInc, mfInc, netSalesInc, sipInc, broClientInc, broClientEligible, broClientCount, broClientTotal, broClientRows, perfPay:pp.pay, perfBase:pp.perf, perfCut:pp.cut, perfAbsent:pp.absent, perfHalf:pp.half, rawTotal, lateDays, lateDaysAll, lateWaived, lateRuleTxt, lateDeductionPct, autoLateDeductionAmt, lateDeductionOverridden, lateDeductionAmt, total, tier2Eligible: br.tier2Eligible};
 }
 
 function viewIncMonth(){
@@ -4906,7 +4981,7 @@ function renderIncentivePage(){
         <tr><td style="color:var(--text2);padding:4px 0">Other / Special${t.otherRemark?' <span style="color:var(--text3);font-size:11px">('+t.otherRemark+')</span>':''}</td><td style="text-align:right">${fmt(t.other)}</td></tr>
         ${t.broClientInc>0?`<tr><td style="color:var(--text2);padding:4px 0">Bro. client bonus <span style="color:var(--text3);font-size:11px">(${t.broClientCount} eligible clients)</span></td><td style="text-align:right;color:var(--green);font-weight:600">${fmt(t.broClientInc)}</td></tr>`:''}
         ${t.broClientRows&&t.broClientRows.length>0?'<tr><td colspan="2" style="padding:4px 0"><button onclick="showBroClientDetail(\''+currentUser+'\',\''+selMonth+'\')" style="font-size:11.5px;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer;width:100%">📋 Client-wise brokerage detail ('+t.broClientTotal+' clients, '+t.broClientCount+' eligible)</button></td></tr>':''}
-        ${t.lateDeductionAmt>0?`<tr><td style="color:var(--red);padding:4px 0">Late-coming deduction <span style="color:var(--text3);font-size:11px">(${t.lateDays} late day${t.lateDays>1?'s':''} × 1%)</span></td><td style="text-align:right;color:var(--red)">−${fmt(t.lateDeductionAmt)}</td></tr>`:''}
+        ${t.lateDeductionAmt>0?`<tr><td style="color:var(--red);padding:4px 0">Late-coming deduction <span style="color:var(--text3);font-size:11px">(${t.lateDays} late day${t.lateDays>1?'s':''} × 1%${t.lateWaived>0?' · '+t.lateWaived+' waived':''})</span></td><td style="text-align:right;color:var(--red)">−${fmt(t.lateDeductionAmt)}</td></tr>`:(t.lateWaived>0?`<tr><td style="color:var(--green);padding:4px 0">Late fine waived <span style="color:var(--text3);font-size:11px">(${t.lateWaived} late day${t.lateWaived>1?'s':''} — ${t.lateRuleTxt})</span></td><td style="text-align:right;color:var(--green)">₹0</td></tr>`:'')}
         <tr style="border-top:1px solid var(--border)"><td style="padding:8px 0;font-weight:600">Total Incentive</td><td style="text-align:right;font-size:18px;font-weight:700;color:var(--green)">${fmt(t.total)}</td></tr>
         <tr><td style="color:var(--text2);padding:4px 0">Paid</td><td style="text-align:right;color:var(--green)">${fmt(myIncPaid)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:600">Balance</td><td style="text-align:right;font-weight:700;color:${myIncBalance>0?'var(--red)':'var(--green)'}">${fmt(myIncBalance)}</td></tr>
@@ -4947,7 +5022,7 @@ function renderIncentivePage(){
           <td style="font-weight:${tt.broClientInc>0?'700':'400'};color:${tt.broClientInc>0?'var(--green)':'var(--text3)'}">${tt.broClientInc>0?fmt(tt.broClientInc)+'<br><small style="font-weight:400;color:var(--text3)">('+tt.broClientCount+' cl.)</small>':'—'}</td>
           <td title="${tt.otherRemark?tt.otherRemark.replace(/"/g,'&quot;'):''}">${fmt(tt.other+tt.perfPay)}${tt.perfPay>0?'<br><small style="font-weight:400;color:var(--text3)">(perf '+fmt(tt.perfPay)+(tt.perfCut>0?', cut '+fmt(tt.perfCut):'')+')</small>':''}${tt.otherRemark?' <span style="color:var(--text3);font-size:11px">('+tt.otherRemark+')</span>':''}</td>
           <td class="ti-gross" style="font-weight:600">${fmt(tt.rawTotal)}</td>
-          <td title="${tt.lateDays} late day(s) this month = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0" oninput="recalcIncentiveRow('${safeId}')"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDays} late${tt.lateDeductionOverridden?' · edited':''}</small></td>
+          <td title="${tt.lateDaysAll} late day(s) this month${tt.lateWaived>0?', '+tt.lateWaived+' waived ('+tt.lateRuleTxt+')':''} = ${tt.autoLateDeductionAmt} auto${tt.lateDeductionOverridden?' — overridden by admin':''}"><input type="number" id="inc-lateded-${safeId}" value="${tt.lateDeductionAmt}" min="0" oninput="recalcIncentiveRow('${safeId}')"><small style="display:block;color:var(--text3);font-weight:400;margin-top:2px">${tt.lateDaysAll} late${tt.lateWaived>0?' · <span style="color:var(--green);font-weight:700">'+tt.lateWaived+' free</span>':''}${tt.lateDeductionOverridden?' · edited':''}</small></td>
           <td class="ti-net" id="inc-total-${safeId}" data-rawtotal="${tt.rawTotal}" style="font-weight:700;color:${tt.total>0?'var(--green)':'var(--text3)'}">${fmt(tt.total)}</td>
           <td><input type="number" id="inc-paid-${safeId}" value="${paid}" min="0" oninput="recalcIncentiveRow('${safeId}')"></td>
           <td id="inc-bal-${safeId}" style="font-weight:600;color:${balance>0?'var(--red)':'var(--green)'}">${fmt(balance)}</td>
@@ -4977,6 +5052,7 @@ function renderIncentivePage(){
     }
 
     // rate inputs
+    if(!document.querySelector('#late-rules-list .late-rule-row')) renderLateRules();
     const mfr=document.getElementById('mf-rate'); if(mfr && !mfr.value) mfr.value=rates.mfRate||'';
   const aumr=document.getElementById('net-sales-rate'); if(aumr && !aumr.value) aumr.value=rates.netSalesRate||'';
     const sipr=document.getElementById('sip-rate'); if(sipr && !sipr.value) sipr.value=rates.sipRate||'';
@@ -5390,7 +5466,7 @@ async function saveRates(){
   const tier2MinLumpsum=parseInt(document.getElementById('tier2-min-lumpsum').value)||10000;
   if(highMult<lowMult){ alert('Upper multiplier must be greater than or equal to the lower multiplier'); return; }
   if(tier2Rate<tier1Rate){ alert('Tier 2 rate must be greater than or equal to Tier 1 rate'); return; }
-  await saveIncRates({mfRate,sipRate,netSalesRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus,tier2MinDemat,tier2MinSip,tier2MinLumpsum});
+  await saveIncRates({...(Array.isArray(getIncRates().lateRules)?{lateRules:getIncRates().lateRules}:{}),mfRate,sipRate,netSalesRate,lowMult,highMult,dematRate,tier1Rate,tier2Rate,broClientMin,broClientThreshold,broClientBonus,tier2MinDemat,tier2MinSip,tier2MinLumpsum});
   renderIncentivePage();
   alert('Rates & formula saved!\n\nTier 2 needs: ≥'+tier2MinDemat+' Demat + ₹'+tier2MinSip+' SIP + ₹'+tier2MinLumpsum+' Lumpsum\nBro client bonus: ≥'+broClientMin+' clients (≥₹'+broClientThreshold+') → ₹'+broClientBonus);
 }
