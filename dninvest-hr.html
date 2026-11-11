@@ -336,6 +336,10 @@ tr:hover td{background:var(--surface2)}
 .aac-name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aac-cnt{flex:1;text-align:center;font-size:12.5px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:2px 10px;white-space:nowrap}
 .aac-time{flex:1;text-align:center;font-size:12.5px;color:var(--text2);white-space:nowrap;padding:2px 10px}
+.aac-avg{flex:1.15;font-size:11.5px;line-height:1.35;color:var(--text2);white-space:nowrap;padding:0 10px;border-right:1px dashed #d5dbe3}
+.aac-avg b{color:var(--text);font-weight:700}
+.aac-avg-lbl{display:inline-block;min-width:48px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.3px}
+.aac-avg-n{font-size:10px;color:var(--text3)}
 .aac-badge{flex:0 0 auto;padding-left:10px}
 .aac-badge .badge{font-size:11px;padding:3px 10px}
 @media(max-width:680px){
@@ -345,6 +349,7 @@ tr:hover td{background:var(--surface2)}
   .aac-badge{order:2;padding-left:0}
   .aac-cnt{order:3;flex:1 1 100%;border:none;border-top:1px dashed #d5dbe3;padding:8px 0 0;text-align:left;font-size:14px}
   .aac-time{order:4;flex:1 1 100%;padding:2px 0 0;text-align:left;font-size:14px}
+  .aac-avg{order:5;flex:1 1 100%;border:none;padding:2px 0 0;font-size:13px}
   .aac-name{font-size:16px}
   .aac .avatar,.aac-strip .avatar{width:38px !important;height:38px !important;font-size:13px !important}
   .aac-badge .badge,.aac-strip .badge{font-size:12px;padding:4px 10px}
@@ -534,7 +539,7 @@ input:focus, select:focus, textarea:focus{
 
       <div class="grid2">
         <div class="card">
-          <div class="card-title">Today's Attendance</div>
+          <div class="card-title" style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Today's Attendance</span><span style="font-size:11px;font-weight:400;color:var(--text3)">Avg timing = this month so far · In → Out · Mon–Fri / Sat</span></div>
           <div id="today-att-list"></div>
         </div>
         <div>
@@ -3141,6 +3146,7 @@ function renderDashboard(){
         </div>
         <div class="aac-cnt" style="font-size:16px">${monthBadges}</div>
         <div class="aac-time" style="font-size:16px">In: <b style="color:var(--text)">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
+        <div class="aac-avg" style="font-size:13px;border-right:none;border-left:1px dashed #d5dbe3" title="Average In → Out this month so far">${attAvgHtml(currentUser, td.slice(0,7))}</div>
         <div class="aac-badge">${badge}</div>
       </div>`;
     } else {
@@ -3171,6 +3177,7 @@ function renderDashboard(){
       const monthBadges=`<span style="font-size:10px;color:#555;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber}${mHalf>0?' 🟠H'+mHalf:''} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
       const canOpen = isAdmin || e.name===currentUser;
+      const avgT=attAvgTimings(e.name, td.slice(0,7));
       const clickAttr = canOpen ? `onclick="openEmpMonthModal('${e.name.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Click to view full month"` : '';
       if(isAdmin){
         // Admin: decorated card-style row for every RM (mobile-responsive via .aac classes)
@@ -3189,11 +3196,12 @@ function renderDashboard(){
             <div class="aac-name">${e.name}</div>
           </div>
           <div class="aac-cnt">🟢${mGreen} &nbsp;🔵${mBlue} &nbsp;🟡${mAmber}${mHalf>0?' &nbsp;🟠H'+mHalf:''} &nbsp;<span style="font-weight:800;color:#333">= ${mTotal}</span></div>
+          <div class="aac-avg" title="Average In → Out this month so far">${attAvgHtml(e.name, td.slice(0,7))}</div>
           <div class="aac-time">In: <b style="color:${accent}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:var(--text)">${outT}</b></div>
           <div class="aac-badge">${badge}</div>
         </div>`;
       } else {
-        tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div></div></div>${badge}</div>`;
+        tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="emp-sub">In: ${inT} &nbsp;|&nbsp; Out: ${outT}</div><div class="emp-sub" style="font-size:10.5px" title="Average In → Out this month so far">Avg Mon–Fri ${avgT.wd.in}→${avgT.wd.out} &nbsp;·&nbsp; Sat ${avgT.sat.in}→${avgT.sat.out}</div></div></div>${badge}</div>`;
       }
     });
   }
@@ -3409,6 +3417,49 @@ function renderAttendancePage(){
   }
 }
 
+// ─── AVERAGE TIMINGS (Mon–Fri vs Saturday) ───────────────────────────────────
+// Average In / Out time for one employee in a month (ym = "2026-11"), split by
+// Mon–Fri and Saturday. Counts only Present/Late days (Half day, Absent, Holiday
+// and Sunday are skipped so they don't distort the average). Today's Out is
+// skipped too because it is still moving with the live heartbeat.
+function _attHm(t){
+  if(!t||typeof t!=='string') return null;
+  const [h,m]=t.split(':').map(Number);
+  if(isNaN(h)||isNaN(m)) return null;
+  return h*60+m;
+}
+function _attHmStr(mins){
+  if(mins===null||mins===undefined) return '—';
+  const r=Math.round(mins);
+  return String(Math.floor(r/60)).padStart(2,'0')+':'+String(r%60).padStart(2,'0');
+}
+function attAvgTimings(name, ym){
+  const td=today();
+  const mk=()=>({inS:0,inN:0,outS:0,outN:0});
+  const acc={wd:mk(), sat:mk()};
+  (getAtt()[name]||[]).forEach(r=>{
+    if(!r.date || !r.date.startsWith(ym)) return;
+    if(r.status!=='Present' && r.status!=='Late') return;
+    const dow=new Date(r.date+'T00:00:00').getDay();
+    if(dow===0) return;
+    const b = dow===6 ? acc.sat : acc.wd;
+    const i=_attHm(r.in);
+    if(i!==null){ b.inS+=i; b.inN++; }
+    if(r.date!==td){
+      const o=_attHm(r.out);
+      if(o!==null && (i===null || o>i)){ b.outS+=o; b.outN++; }
+    }
+  });
+  const fin=b=>({days:b.inN, in:b.inN?_attHmStr(b.inS/b.inN):'—', out:b.outN?_attHmStr(b.outS/b.outN):'—'});
+  return {wd:fin(acc.wd), sat:fin(acc.sat)};
+}
+// Two-line HTML block used on the dashboard rows
+function attAvgHtml(name, ym){
+  const a=attAvgTimings(name, ym);
+  const line=(lbl,x)=>`<div><span class="aac-avg-lbl">${lbl}</span> <b>${x.in}</b> → <b>${x.out}</b> <span class="aac-avg-n">(${x.days}d)</span></div>`;
+  return line('Mon–Fri',a.wd)+line('Sat',a.sat);
+}
+
 function calcHrs(inT,outT){
   if(!inT||!outT) return '—';
   const [ih,im]=inT.split(':').map(Number);
@@ -3579,6 +3630,18 @@ function renderDateWiseSheet(){
     row += '</tr>';
     rows += row;
   }
+  // Average timing rows (Mon–Fri / Saturday) for the selected month
+  [['wd','Avg Mon–Fri','#eef4ff','#1e40af'],['sat','Avg Saturday','#f3efff','#5b21b6']].forEach(([k,lbl,bg,fg])=>{
+    let row=`<tr style="background:${bg}"><td style="position:sticky;left:0;background:${bg};font-weight:700;white-space:nowrap;color:${fg};border-top:2px solid var(--border)">${lbl}<br><span style="font-size:9px;font-weight:400;color:var(--text3)">In / Out</span></td>`;
+    emps.forEach(e=>{
+      const a=attAvgTimings(e.name, ym)[k];
+      row+=`<td style="text-align:center;padding:3px 4px;border-top:2px solid var(--border)" title="${a.days} day(s) counted">
+        <span style="font-size:11px;font-weight:700;color:${fg};display:block">${a.in}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--text2);display:block">${a.out}</span>
+        <span style="font-size:9px;color:var(--text3);display:block">${a.days}d</span></td>`;
+    });
+    rows += row+'</tr>';
+  });
   body.innerHTML = rows;
 }
 
@@ -3718,17 +3781,28 @@ function downloadAttendanceSheet(){
     rows.push(row);
   }
 
+  // Average timing rows (Mon–Fri / Saturday) — Days | Avg In | Avg Out per RM
+  [['wd','Avg Mon–Fri (Days / In / Out)','FFDDEBF7','FF1F4E78'],['sat','Avg Saturday (Days / In / Out)','FFE4DFEC','FF403151']].forEach(([k,lbl,bg,fg])=>{
+    const st={font:{bold:true,sz:10,color:{rgb:fg}},fill:{fgColor:{rgb:bg}},alignment:{horizontal:'center',vertical:'center'},border};
+    const row=[{v:lbl, s:{...st, alignment:{horizontal:'left',vertical:'center'}}}];
+    emps.forEach(e=>{
+      const a=attAvgTimings(e.name, ym)[k];
+      row.push({v:a.days,s:st},{v:a.in,s:st},{v:a.out,s:st});
+    });
+    rows.push(row);
+  });
+
   // ── Build worksheet ──
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!merges']=merges;
 
   // Column widths: Date wide, then Status(5)/In(7)/Out(7) per RM
-  const cols=[{wch:18}];
+  const cols=[{wch:30}];
   emps.forEach(()=>{ cols.push({wch:6},{wch:7},{wch:7}); });
   ws['!cols']=cols;
 
   // Row heights
-  ws['!rows']=[{hpt:24},{hpt:18},{hpt:15}].concat(Array(numDays).fill({hpt:18}));
+  ws['!rows']=[{hpt:24},{hpt:18},{hpt:15}].concat(Array(numDays+2).fill({hpt:18}));
 
   // Freeze top 3 rows + first column
   ws['!freeze']={xSplit:1, ySplit:3, topLeftCell:'B4', activePane:'bottomRight', state:'frozen'};
