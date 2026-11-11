@@ -3176,7 +3176,17 @@ async function markBdayWished(clientId, clientKey, via){
   const stamp = {y:yr, by:CU.name, at:new Date().toISOString(), via:via||'wish'};
   ex.bday_wish = stamp;
   ex.updated = today();
-  try{ await DB.setClient(clientKey, ex); }catch(e){ console.log('bday stamp sync error',e); }
+  // 11-Nov-2026 fix: "RM ne card bhej diya, Admin ko phir bhi pending dikh raha".
+  // Card/Wish bhejte hi phone WhatsApp par chala jaata hai → CRM tab background
+  // me jaakar freeze/band ho jaata hai, aur Firestore write beech me hi reh
+  // jaata tha (stamp sirf us phone ke local cache me rehta tha). Ab stamp pehle
+  // ek chhoti "pending" list me likha jaata hai aur server confirm hone par hi
+  // hatta hai — CRM dobara khulte/saamne aate hi flushBdayPending() use bhej deta hai.
+  _bdayPendAdd({id:clientId, key:clientKey, stamp});
+  let _res=null;
+  try{ _res = await DB.setClient(clientKey, ex); }catch(e){ console.log('bday stamp sync error',e); }
+  if(_res && _res.ok) _bdayPendRemove(clientId, clientKey);
+  else { try{ toast('Birthday "Sent" mark abhi sync nahi hua — net aate hi apne aap ho jayega','error'); }catch(e){} }
   if(!already){
     try{
       await DB.addActivityLog([{
@@ -3189,6 +3199,46 @@ async function markBdayWished(clientId, clientKey, via){
   }
   refreshDash();
 }
+
+// ── Pending birthday stamps (server par confirm hone tak yahan rehte hain) ──
+const _BDAY_PEND_KEY='dninvest_bday_pending';
+function _bdayPendGet(){
+  try{ const a=JSON.parse(localStorage.getItem(_BDAY_PEND_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; }
+}
+function _bdayPendSet(a){ try{ localStorage.setItem(_BDAY_PEND_KEY, JSON.stringify(a)); }catch(e){} }
+function _bdayPendAdd(p){
+  const a=_bdayPendGet().filter(x=>!(x.id===p.id && x.key===p.key));
+  a.push(p); _bdayPendSet(a);
+}
+function _bdayPendRemove(id, key){ _bdayPendSet(_bdayPendGet().filter(x=>!(x.id===id && x.key===key))); }
+let _bdayFlushing=false, _bdayFlushTimer=null;
+// Thoda ruk kar chalta hai (4s) taaki pehle fresh data sync ho jaye.
+function scheduleBdayFlush(){
+  if(_bdayFlushTimer || !_bdayPendGet().length) return;
+  _bdayFlushTimer=setTimeout(()=>{ _bdayFlushTimer=null; flushBdayPending(); }, 4000);
+}
+async function flushBdayPending(){
+  if(_bdayFlushing || !CU) return;
+  const cutoff=Date.now()-36*3600*1000;   // purane (36 ghante+) stamps chhod do
+  const q=_bdayPendGet().filter(p=>p && p.id && p.key && p.stamp && new Date(p.stamp.at).getTime()>cutoff);
+  _bdayPendSet(q);
+  if(!q.length || typeof fdb==='undefined' || navigator.onLine===false) return;
+  _bdayFlushing=true;
+  let done=0;
+  try{
+    for(const p of q){
+      const ex=(DB.get(p.key)||[]).find(c=>c.id===p.id);
+      if(!ex) continue;                      // data abhi load nahi hua — agli baar
+      if(!(ex.bday_wish && ex.bday_wish.y===p.stamp.y)) ex.bday_wish=p.stamp;
+      let res=null;
+      try{ res=await DB.setClient(p.key, ex); }catch(e){}
+      if(res && res.ok){ _bdayPendRemove(p.id, p.key); done++; }
+    }
+  }finally{ _bdayFlushing=false; }
+  if(done){ try{ refreshDash(); }catch(e){} }
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') scheduleBdayFlush(); });
+window.addEventListener('online', scheduleBdayFlush);
 
 function wishAllBirthdays(){
   const btn=document.getElementById('wishAllBtn');
@@ -3365,6 +3415,7 @@ function _drawBirthdayCard(emblemImg, name, num, first, clientId, clientKey){
         (num?'<button id="_bcSend" style="padding:12px 20px;border:0;border-radius:10px;background:#25D366;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📲 Send to '+first+'</button>':'')+
         (canShare?'<button id="_bcShare" style="padding:12px 20px;border:0;border-radius:10px;background:#128C7E;color:#fff;font-weight:800;font-size:15px;cursor:pointer">📤 Share</button>':'')+
         '<button id="_bcDl" style="padding:12px 20px;border:0;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;font-size:15px;cursor:pointer">⬇️ Download</button>'+
+        '<button id="_bcMark" style="padding:12px 20px;border:0;border-radius:10px;background:#16a34a;color:#fff;font-weight:800;font-size:15px;cursor:pointer">✅ Mark as Sent</button>'+
         '<button id="_bcCl" style="padding:12px 20px;border:0;border-radius:10px;background:#374151;color:#fff;font-weight:800;font-size:15px;cursor:pointer">✖ Close</button>'+
       '</div>'+
 '</div>'+
@@ -3378,6 +3429,8 @@ function _drawBirthdayCard(emblemImg, name, num, first, clientId, clientKey){
     const hint=ov.querySelector('#_bcHint');
     function close(){ URL.revokeObjectURL(url); ov.remove(); }
     ov.querySelector('#_bcCl').onclick=close;
+    // Card kisi aur tareeke se bheja (long-press / screenshot / doosra phone) → yahan se Sent mark karo
+    ov.querySelector('#_bcMark').onclick=function(){ markBdayWished(clientId,clientKey,'card'); try{ toast('✅ '+first+' — marked as sent','success'); }catch(e){} close(); };
     ov.querySelector('#_bcDl').onclick=function(){ const a=document.createElement('a'); a.href=url; a.download='Birthday_'+first+'.png'; a.click(); markBdayWished(clientId,clientKey,'card'); };
     const shr=ov.querySelector('#_bcShare');
     if(shr) shr.onclick=async function(){ try{ await navigator.share({files:[file], title:'Happy Birthday', text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'}); markBdayWished(clientId,clientKey,'card'); }catch(e){} };
@@ -3390,7 +3443,10 @@ function _drawBirthdayCard(emblemImg, name, num, first, clientId, clientKey){
           text:'Happy Birthday '+first+'! 🎉🎂 — D N Investment'})
           .then(function(){ markBdayWished(clientId,clientKey,'card');
             hint.innerHTML='✅ Share sheet me WhatsApp chunkar '+first+' ko bhej do. 🎉'; })
-          .catch(function(){});
+          .catch(function(e){
+            if(e && e.name==='AbortError') return;   // user ne share cancel kiya
+            hint.innerHTML='⚠️ Share nahi khula — <b>Download</b> karke WhatsApp par bhejo, phir <b>✅ Mark as Sent</b> dabao.';
+          });
         return;
       }
       // ── DESKTOP: clipboard.write ko gesture ke andar hi START karo (await
@@ -3704,6 +3760,7 @@ function dashShowMoreToggle(extraId, btnWrapId, extraCount){
 }
 
 function refreshDash(){
+  try{ scheduleBdayFlush(); }catch(e){}   // un-synced birthday "Sent" stamps dobara bhejo
   const eq = getMyEqClients();
   const activeEq = getActiveEqClients();
   const mf = getMyMfClients();
