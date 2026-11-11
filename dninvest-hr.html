@@ -337,22 +337,18 @@ tr:hover td{background:var(--surface2)}
 .aac-cnt{flex:1;text-align:center;font-size:12.5px;color:#555;border-left:1px dashed #d5dbe3;border-right:1px dashed #d5dbe3;padding:2px 10px;white-space:nowrap}
 .aac-time{flex:1;text-align:center;font-size:12.5px;color:var(--text2);white-space:nowrap;padding:2px 10px}
 .aac-avg{flex:1.15;font-size:11.5px;line-height:1.35;color:var(--text2);white-space:nowrap;padding:0 10px;border-right:1px dashed #d5dbe3}
-.aac-avg{color:#334155}
-.aac-avg b{font-weight:800}
-.aac-avg>div:first-child b{color:#1d4ed8}
-.aac-avg>div:last-child b{color:#7c3aed}
-.aac-avg-lbl{display:inline-block;min-width:50px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:1px 6px;border-radius:6px;text-align:center;margin-right:2px}
-.aac-avg>div:first-child .aac-avg-lbl{background:#dbeafe;color:#1e40af}
-.aac-avg>div:last-child .aac-avg-lbl{background:#ede9fe;color:#5b21b6}
-.aac-avg>div+div{margin-top:2px}
-.aac-avg-n{font-size:10px;color:#64748b;font-weight:600}
-.att-io{font-size:12.5px;color:#334155;margin-top:2px}
-.att-io b{font-weight:800}
-.att-avg{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
-.att-chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
-.att-chip b{font-weight:800}
-.att-chip-wd{background:#dbeafe;color:#1e40af}
-.att-chip-sat{background:#ede9fe;color:#5b21b6}
+.aac-avg{color:#64748b}
+.aac-avg b{font-weight:600;color:#1e293b}
+.aac-avg-lbl{display:inline-block;min-width:48px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.3px}
+.aac-avg-n{font-size:10px;color:#94a3b8}
+.att-io{font-size:12px;color:#64748b;margin-top:2px}
+.att-io b{font-weight:600}
+.att-avg{font-size:11px;color:#64748b;margin-top:2px}
+.att-avg b{font-weight:600;color:#334155}
+.att-chip{white-space:nowrap}
+.att-chip+.att-chip:before{content:"·";margin:0 7px;color:#cbd5e1}
+.att-chip-wd b{color:#1e40af}
+.att-chip-sat b{color:#6d28d9}
 .aac-badge{flex:0 0 auto;padding-left:10px}
 .aac-badge .badge{font-size:11px;padding:3px 10px}
 @media(max-width:680px){
@@ -3199,7 +3195,7 @@ function renderDashboard(){
       const mAmber=monthRecs.filter(r=>r.status==='Present'&&presentBadgeClass(r)==='badge-amber').length;
       const mHalf=monthRecs.filter(r=>r.status==='Half day').length;
       const mTotal=mGreen+mBlue+mAmber+mHalf;
-      const monthBadges=`<span style="font-size:12px;color:#1f2937;font-weight:600;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber}${mHalf>0?' 🟠H'+mHalf:''} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
+      const monthBadges=`<span style="font-size:11px;color:#475569;margin-left:4px">🟢${mGreen} 🔵${mBlue} 🟡${mAmber}${mHalf>0?' 🟠H'+mHalf:''} <span style="font-weight:700;color:#333">=${mTotal}</span></span>`;
       const outT=(rec&&rec.out)?rec.out:'—';
       const canOpen = isAdmin || e.name===currentUser;
       const avgT=attAvgTimings(e.name, td.slice(0,7));
@@ -3234,7 +3230,7 @@ function renderDashboard(){
           <div class="aac-badge">${badge}</div>
         </div>`;
       } else {
-        tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px;border:2px solid ${inCol}">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="att-io">In: <b style="color:${inCol}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:#0f172a">${outT}</b></div><div class="att-avg" title="Average In → Out this month so far"><span class="att-chip att-chip-wd">Mon–Fri <b>${avgT.wd.in}</b> → <b>${avgT.wd.out}</b></span><span class="att-chip att-chip-sat">Sat <b>${avgT.sat.in}</b> → <b>${avgT.sat.out}</b></span></div></div></div>${badge}</div>`;
+        tal.innerHTML+=`<div class="att-entry" ${clickAttr}><div class="emp-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(e.name)}</div><div><div class="emp-name">${e.name} ${monthBadges}</div><div class="att-io">In: <b style="color:${inCol}">${inT}</b> &nbsp;|&nbsp; Out: <b style="color:#334155">${outT}</b></div><div class="att-avg" title="Average In → Out this month so far"><span class="att-chip att-chip-wd">Mon–Fri <b>${avgT.wd.in}</b> → <b>${avgT.wd.out}</b></span><span class="att-chip att-chip-sat">Sat <b>${avgT.sat.in}</b> → <b>${avgT.sat.out}</b></span></div></div></div>${badge}</div>`;
       }
     });
   }
