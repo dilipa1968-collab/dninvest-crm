@@ -3413,6 +3413,15 @@ function renderAttendancePage(){
     if(myRecs.length===0){al.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2)">No records this month</td></tr>'}
     else al.innerHTML=myRecs.map(r=>{
       const hrs=r.in&&r.out?calcHrs(r.in,r.out):'—';
+      // 13-Nov-2026: holiday list hi final hai. Auto-absent ne holiday declare hone se
+      // pehle "Absent" likh diya ho to bhi RM ko wo din Holiday dikhe (admin grid aur
+      // salary pehle se aisa hi karte hain) — saved record ka purana status nahi.
+      const holNm=getHolidayName(r.date);
+      if(holNm && (r.status==='Absent' || r.status==='Holiday')){
+        const lbl=holNm==='Sunday'?'Off':'Holiday';
+        const sub=`<span style="font-size:10px;color:var(--text3);margin-left:4px">${holNm}</span>`;
+        return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge badge-gray">${lbl}</span>${sub}</td></tr>`;
+      }
       const badge=r.status==='Present'?presentBadgeClass(r):r.status==='Late'?'badge-amber':r.status==='Half day'?'badge-orange':'badge-red';
       return `<tr><td>${r.date}</td><td><span class="time-chip">${r.in||'—'}</span></td><td><span class="time-chip">${r.out||'—'}</span></td><td>${hrs}</td><td><span class="badge ${badge}">${r.status}</span></td></tr>`;
     }).join('');
