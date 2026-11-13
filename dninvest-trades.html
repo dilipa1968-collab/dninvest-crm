@@ -114,7 +114,7 @@
 
   <div class="card">
     <div class="filters">
-      <input type="text" id="fSearch" placeholder="🔍 Client name..." oninput="renderTable()">
+      <input type="text" id="fSearch" placeholder="🔍 Client name / S2K ID..." oninput="renderTable()" style="min-width:190px" title="Client ka naam ya S2K ID — dono se search hota hai">
       <select id="fRm" onchange="renderTable()"><option value="">All RMs</option></select>
       <select id="fSeg" onchange="renderTable()">
         <option value="">All Segments</option>
@@ -150,6 +150,7 @@
       <input type="date" id="fFrom" onchange="onDateInputChange()">
       <input type="date" id="fTo" onchange="onDateInputChange()">
       <button class="btn btn-outline" onclick="clearFilters()">🔄 Clear</button>
+      <button class="btn" style="background:#0f7a45;color:#fff" onclick="exportTrades()" title="Abhi table me jo trades dikh rahi hain (client / S2K ID / RM / date / status filter ke hisaab se) unhe Excel me download kare — saath me Client-wise aur Date-wise summary sheet bhi">📥 Export Excel</button>
       <button class="btn" style="background:#c0392b;color:#fff" onclick="deleteByDateRange()" title="Currently selected From/To date range ki saari trades permanently delete kare">🗑️ Delete This Date Range</button>
       <span id="resultCount" style="font-size:.78rem;color:var(--gray);margin-left:auto"></span>
     </div>
@@ -1136,7 +1137,9 @@ function sortTrades(field){
   renderTable();
 }
 
-function renderTable(){
+// 13-Nov-2026: filtering + sorting pulled out of renderTable() into its own
+// function so the Excel export uses EXACTLY the same rows the table shows.
+function getFilteredRows(){
   const data = monthCache[currentMonth] || {equity:[], fo:[]};
   let rows = [
     ...data.equity.map(r=>({...r, seg:'EQ'})),
@@ -1150,7 +1153,8 @@ function renderTable(){
   const from = document.getElementById('fFrom').value;
   const to = document.getElementById('fTo').value;
 
-  if(q) rows = rows.filter(r=>r.client.toLowerCase().includes(q));
+  // 13-Nov-2026: search box ab client NAME ya S2K ID — dono se match karta hai
+  if(q) rows = rows.filter(r=>String(r.client||'').toLowerCase().includes(q) || String(r.s2kId||'').toLowerCase().includes(q));
   if(rm==='__unknown__') rows = rows.filter(r=>!r.rm);
   else if(rm) rows = rows.filter(r=>r.rm===rm);
   if(seg) rows = rows.filter(r=>r.seg===seg);
@@ -1166,6 +1170,12 @@ function renderTable(){
     va = String(va||''); vb = String(vb||'');
     return sd * va.localeCompare(vb);
   });
+  return rows;
+}
+
+function renderTable(){
+  const rows = getFilteredRows();
+  const sf = sortState.field, sd = sortState.dir;
 
   // Update the sort arrows in the header to reflect current state
   document.querySelectorAll('.sort-arrow').forEach(el=>el.textContent='');
@@ -1203,6 +1213,112 @@ function renderTable(){
       <td>${esc(r.time)}</td>
     </tr>`;
   }).join('');
+}
+
+// ── Excel export (13-Nov-2026) ──
+// Exports whatever the table is currently showing (same filters: client
+// name / S2K ID search, RM, segment, status, channel, date range, month).
+// Workbook has 3 sheets: "Trades" (every row), "Client Wise" and "Date Wise"
+// summaries. Buy/Sell VALUE in the summaries counts only Fully/Partly
+// Executed orders — Cancelled/Rejected/Pending have no executed value.
+function exportTrades(){
+  const rows = getFilteredRows();
+  if(!rows.length){ alert('Export karne ke liye koi trade nahi hai — filters check karo.'); return; }
+  const isExec = r => r.status==='Fully Executed' || r.status==='Partly Executed';
+  const isBuy = r => String(r.buySell||'').toUpperCase().startsWith('B');
+  const r2 = n => Math.round((Number(n)||0)*100)/100;
+  const val = r => isExec(r) ? (Number(r.qty)||0) * (Number(r.price)||0) : 0;
+
+  const tradeRows = rows.map(r=>({
+    'Date': r.date||'',
+    'Segment': r.seg,
+    'RM': r.rm||'Unknown',
+    'Client': r.client||'',
+    'S2K ID': r.s2kId||'',
+    'Scrip/Contract': r.scrip||'',
+    'Exchange': r.exchange||'',
+    'Option Type': r.optType||'',
+    'Strike': r.strike||'',
+    'Expiry': r.expiry||'',
+    'Buy/Sell': isBuy(r) ? 'BUY' : 'SELL',
+    'Order Qty': Number(r.orderQty)||0,
+    'Order Price': Number(r.orderPrice)||0,
+    'Qty': Number(r.qty)||0,
+    'Price': Number(r.price)||0,
+    'Value': r2(val(r)),
+    'Channel': r.channel||'',
+    'Status': r.status||'',
+    'SK Order Date Time': r.skOrderDateTime||'',
+    'Last Modify Time': r.lastModTime||'',
+    'Exch Date/Time': r.time||''
+  }));
+
+  // Client-wise summary — grouped by S2K ID (falls back to name if a row has no S2K ID)
+  const cMap = new Map();
+  rows.forEach(r=>{
+    const key = r.s2kId ? 'id:'+r.s2kId : 'nm:'+normName(r.client);
+    let c = cMap.get(key);
+    if(!c){ c = {client:r.client||'', s2k:r.s2kId||'', rm:r.rm||'Unknown', orders:0, exec:0, bq:0, bv:0, sq:0, sv:0}; cMap.set(key, c); }
+    c.orders++;
+    if(isExec(r)){
+      c.exec++;
+      if(isBuy(r)){ c.bq += Number(r.qty)||0; c.bv += val(r); } else { c.sq += Number(r.qty)||0; c.sv += val(r); }
+    }
+  });
+  const clientRows = [...cMap.values()].sort((a,b)=>a.client.localeCompare(b.client)).map(c=>({
+    'Client': c.client, 'S2K ID': c.s2k, 'RM': c.rm,
+    'Total Orders': c.orders, 'Executed Trades': c.exec,
+    'Buy Qty': c.bq, 'Buy Value': r2(c.bv), 'Sell Qty': c.sq, 'Sell Value': r2(c.sv),
+    'Net (Sell - Buy)': r2(c.sv - c.bv)
+  }));
+
+  // Date-wise summary
+  const dMap = new Map();
+  rows.forEach(r=>{
+    const key = r.date||'';
+    let d = dMap.get(key);
+    if(!d){ d = {date:key, orders:0, exec:0, eq:0, fo:0, clients:new Set(), bv:0, sv:0}; dMap.set(key, d); }
+    d.orders++;
+    d.clients.add(r.s2kId || normName(r.client));
+    if(isExec(r)){
+      d.exec++;
+      if(r.seg==='EQ') d.eq++; else d.fo++;
+      if(isBuy(r)) d.bv += val(r); else d.sv += val(r);
+    }
+  });
+  const dateRows = [...dMap.values()].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
+    'Date': d.date, 'Clients': d.clients.size, 'Total Orders': d.orders, 'Executed Trades': d.exec,
+    'Equity Executed': d.eq, 'F&O Executed': d.fo,
+    'Buy Value': r2(d.bv), 'Sell Value': r2(d.sv)
+  }));
+
+  const mkSheet = data => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const keys = Object.keys(data[0]||{});
+    ws['!cols'] = keys.map(k=>({wch: Math.min(40, Math.max(k.length+2, ...data.slice(0,500).map(x=>String(x[k]==null?'':x[k]).length+2)))}));
+    return ws;
+  };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, mkSheet(tradeRows), 'Trades');
+  XLSX.utils.book_append_sheet(wb, mkSheet(clientRows), 'Client Wise');
+  XLSX.utils.book_append_sheet(wb, mkSheet(dateRows), 'Date Wise');
+
+  // File name reflects what was filtered: Trades_<client/S2K or RM>_<from>_to_<to>.xlsx
+  const q = document.getElementById('fSearch').value.trim();
+  const rm = document.getElementById('fRm').value;
+  const from = document.getElementById('fFrom').value, to = document.getElementById('fTo').value;
+  const parts = ['Trades'];
+  if(q) parts.push(q.replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30));
+  else if(cMap.size===1) parts.push(clientRows[0]['Client'].replace(/[^A-Za-z0-9]+/g,'_').slice(0,30));
+  if(rm) parts.push(rm==='__unknown__' ? 'UnknownRM' : rm);
+  if(from && to) parts.push(from===to ? from : from+'_to_'+to);
+  else if(from) parts.push('from_'+from);
+  else if(to) parts.push('upto_'+to);
+  else parts.push(currentMonth||'all');
+  XLSX.writeFile(wb, parts.filter(Boolean).join('_')+'.xlsx');
+
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = `✅ ${rows.length} trade(s) Excel me export ho gayi — ${cMap.size} client(s), ${dMap.size} din.`;
 }
 
 async function updateDashboardStats(){
