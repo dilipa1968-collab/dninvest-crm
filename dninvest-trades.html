@@ -1219,106 +1219,239 @@ function renderTable(){
 // Exports whatever the table is currently showing (same filters: client
 // name / S2K ID search, RM, segment, status, channel, date range, month).
 // Workbook has 3 sheets: "Trades" (every row), "Client Wise" and "Date Wise"
-// summaries. Buy/Sell VALUE in the summaries counts only Fully/Partly
-// Executed orders — Cancelled/Rejected/Pending have no executed value.
-function exportTrades(){
+// summaries. Buy/Sell VALUE counts only Fully/Partly Executed orders —
+// Cancelled/Rejected/Pending have no executed value.
+//
+// COLOURS: the normal SheetJS build loaded at the top of this page cannot
+// write cell colours at all. "xlsx-js-style" is the same 0.18.5 library with
+// styling added — it's loaded ONLY when Export is clicked (so the daily
+// upload flow never depends on it). If it can't be loaded (no internet /
+// CDN blocked) the export still works, just as a plain uncoloured sheet.
+function loadStyledXlsx(){
+  return new Promise(resolve=>{
+    if(window.XLSX && XLSX.style_version) return resolve(true);
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    sc.onload = ()=>resolve(!!(window.XLSX && XLSX.style_version));
+    sc.onerror = ()=>resolve(false);
+    document.head.appendChild(sc);
+  });
+}
+
+const XL = {
+  navy:'0F1F3D', gold:'C9942A', goldLight:'FBEFD0', white:'FFFFFF',
+  buyBg:'E3F7EE', buyBgAlt:'D3F0E2', buyTx:'0F7A45', buyHead:'0F7A45',
+  sellBg:'FDECEA', sellBgAlt:'FADBD7', sellTx:'C0392B', sellHead:'C0392B',
+  mutedBg:'F1F3F6', mutedTx:'7A869C', border:'D5DCE8', text:'1F2937'
+};
+function xlBorder(){ const b={style:'thin',color:{rgb:XL.border}}; return {top:b,bottom:b,left:b,right:b}; }
+function xlStyle(o){
+  return {
+    font:{name:'Calibri', sz:o.sz||10, bold:!!o.bold, italic:!!o.italic, color:{rgb:o.color||XL.text}},
+    fill:o.bg ? {patternType:'solid', fgColor:{rgb:o.bg}} : undefined,
+    alignment:{horizontal:o.align||'left', vertical:'center', wrapText:!!o.wrap},
+    border:o.noBorder ? undefined : xlBorder()
+  };
+}
+
+// Builds one formatted sheet.
+//  title/sub : heading lines (merged across the sheet)
+//  banners   : [{text, span, kind:'buy'|'sell'|'net'}] — coloured summary boxes in one row
+//  headers   : column names;  headKinds[i] 'buy'/'sell' tints that header
+//  rows      : array of arrays;  rowKinds[i] = 'buy' | 'sell' | 'muted' | ''
+//  colKinds  : per-column 'buy'/'sell' tint used when the row itself has no kind
+//  fmts      : {colIndex: numberFormat};  totals: optional last row
+function xlSheet(o){
+  const nCols = o.headers.length;
+  const aoa = [], merges = [], rowsMeta = [];
+  const pad = arr => { const x = arr.slice(); while(x.length<nCols) x.push(''); return x; };
+  aoa.push(pad([o.title])); merges.push({s:{r:0,c:0},e:{r:0,c:nCols-1}}); rowsMeta.push({hpt:26});
+  aoa.push(pad([o.sub||''])); merges.push({s:{r:1,c:0},e:{r:1,c:nCols-1}}); rowsMeta.push({hpt:18});
+  let bannerRow = -1;
+  if(o.banners && o.banners.length){
+    bannerRow = aoa.length;
+    const line = pad([]); let c = 0;
+    o.banners.forEach(bn=>{
+      const span = Math.min(bn.span, nCols-c); if(span<=0) return;
+      line[c] = bn.text; merges.push({s:{r:bannerRow,c:c},e:{r:bannerRow,c:c+span-1}}); bn._c = c; bn._span = span; c += span;
+    });
+    aoa.push(line); rowsMeta.push({hpt:24});
+  }
+  aoa.push(pad([])); rowsMeta.push({hpt:6});
+  const headRow = aoa.length;
+  aoa.push(o.headers); rowsMeta.push({hpt:22});
+  const firstData = aoa.length;
+  o.rows.forEach(r=>aoa.push(r));
+  let totalRow = -1;
+  if(o.totals){ totalRow = aoa.length; aoa.push(pad(o.totals)); }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const cell = (r,c) => { const ref = XLSX.utils.encode_cell({r,c}); if(!ws[ref]) ws[ref] = {t:'s', v:''}; return ws[ref]; };
+  const fmts = o.fmts||{}, colKinds = o.colKinds||[], headKinds = o.headKinds||[];
+  const isNum = c => fmts[c]!==undefined;
+
+  for(let c=0;c<nCols;c++){
+    cell(0,c).s = xlStyle({bg:XL.navy, color:XL.white, bold:true, sz:14, noBorder:true});
+    cell(1,c).s = xlStyle({bg:XL.goldLight, color:XL.navy, sz:10, noBorder:true});
+    const hk = headKinds[c];
+    cell(headRow,c).s = xlStyle({bg: hk==='buy'?XL.buyHead : hk==='sell'?XL.sellHead : XL.navy, color:XL.white, bold:true, align:isNum(c)?'right':'left'});
+  }
+  if(bannerRow>=0) o.banners.forEach(bn=>{
+    if(bn._c===undefined) return;
+    const st = bn.kind==='buy' ? {bg:XL.buyBgAlt, color:XL.buyTx} : bn.kind==='sell' ? {bg:XL.sellBgAlt, color:XL.sellTx} : {bg:XL.goldLight, color:XL.navy};
+    for(let c=bn._c;c<bn._c+bn._span;c++) cell(bannerRow,c).s = xlStyle({...st, bold:true, sz:11, align:'center'});
+  });
+
+  o.rows.forEach((r,i)=>{
+    const kind = (o.rowKinds||[])[i]||'';
+    const alt = i%2===1;
+    for(let c=0;c<nCols;c++){
+      let k = kind || colKinds[c] || '';
+      let st;
+      if(k==='buy') st = {bg: alt?XL.buyBgAlt:XL.buyBg};
+      else if(k==='sell') st = {bg: alt?XL.sellBgAlt:XL.sellBg};
+      else if(k==='muted') st = {bg:XL.mutedBg, color:XL.mutedTx, italic:true};
+      else st = {bg: alt?'F8FAFF':XL.white};
+      if(o.boldCols && o.boldCols.includes(c) && k!=='muted'){ st.bold = true; if(k==='buy') st.color = XL.buyTx; if(k==='sell') st.color = XL.sellTx; }
+      if(o.signCols && o.signCols.includes(c)){ const v = Number(r[c])||0; st.bold = true; st.color = v>0?XL.buyTx : v<0?XL.sellTx : XL.text; }
+      st.align = isNum(c) ? 'right' : 'left';
+      const ce = cell(firstData+i,c);
+      ce.s = xlStyle(st);
+      if(isNum(c) && typeof ce.v==='number') ce.z = fmts[c];
+    }
+  });
+  if(totalRow>=0) for(let c=0;c<nCols;c++){
+    const ce = cell(totalRow,c);
+    const k = colKinds[c];
+    ce.s = xlStyle({bg:XL.gold, color:XL.white, bold:true, align:isNum(c)?'right':'left'});
+    if(isNum(c) && typeof ce.v==='number') ce.z = fmts[c];
+  }
+
+  ws['!merges'] = merges;
+  ws['!rows'] = rowsMeta;
+  ws['!cols'] = o.headers.map((h,c)=>{
+    let w = String(h).length+3;
+    for(let i=0;i<Math.min(o.rows.length,800);i++){ const v = o.rows[i][c]; const l = String(v==null?'':v).length+3; if(l>w) w = l; }
+    if(isNum(c)) w = Math.max(w, 12);
+    return {wch: Math.min(42, w)};
+  });
+  if(o.rows.length) ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:headRow,c:0}, e:{r:firstData+o.rows.length-1,c:nCols-1}})};
+  return ws;
+}
+
+async function exportTrades(){
   const rows = getFilteredRows();
   if(!rows.length){ alert('Export karne ke liye koi trade nahi hai — filters check karo.'); return; }
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = 'Excel report ban rahi hai...';
+  const styled = await loadStyledXlsx();
+
   const isExec = r => r.status==='Fully Executed' || r.status==='Partly Executed';
   const isBuy = r => String(r.buySell||'').toUpperCase().startsWith('B');
   const r2 = n => Math.round((Number(n)||0)*100)/100;
   const val = r => isExec(r) ? (Number(r.qty)||0) * (Number(r.price)||0) : 0;
+  const inr = n => '₹' + r2(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const NUM = '#,##0.00', INT = '#,##0';
 
-  const tradeRows = rows.map(r=>({
-    'Date': r.date||'',
-    'Segment': r.seg,
-    'RM': r.rm||'Unknown',
-    'Client': r.client||'',
-    'S2K ID': r.s2kId||'',
-    'Scrip/Contract': r.scrip||'',
-    'Exchange': r.exchange||'',
-    'Option Type': r.optType||'',
-    'Strike': r.strike||'',
-    'Expiry': r.expiry||'',
-    'Buy/Sell': isBuy(r) ? 'BUY' : 'SELL',
-    'Order Qty': Number(r.orderQty)||0,
-    'Order Price': Number(r.orderPrice)||0,
-    'Qty': Number(r.qty)||0,
-    'Price': Number(r.price)||0,
-    'Value': r2(val(r)),
-    'Channel': r.channel||'',
-    'Status': r.status||'',
-    'SK Order Date Time': r.skOrderDateTime||'',
-    'Last Modify Time': r.lastModTime||'',
-    'Exch Date/Time': r.time||''
-  }));
+  // Overall buy / sell totals (executed only)
+  let bN=0, bQ=0, bV=0, sN=0, sQ=0, sV=0;
+  rows.forEach(r=>{ if(!isExec(r)) return; if(isBuy(r)){ bN++; bQ+=Number(r.qty)||0; bV+=val(r); } else { sN++; sQ+=Number(r.qty)||0; sV+=val(r); } });
+  const net = sV - bV;
 
-  // Client-wise summary — grouped by S2K ID (falls back to name if a row has no S2K ID)
+  // Heading text describing what was filtered
+  const q = document.getElementById('fSearch').value.trim();
+  const rmSel = document.getElementById('fRm').value;
+  const from = document.getElementById('fFrom').value, to = document.getElementById('fTo').value;
+  const dmy = d => d ? d.slice(8,10)+'-'+d.slice(5,7)+'-'+d.slice(0,4) : '';
+  const uniqClients = [...new Set(rows.map(r=>r.s2kId || normName(r.client)))];
+  const single = uniqClients.length===1 ? rows[0] : null;
+  const dateLabel = from && to ? (from===to ? dmy(from) : dmy(from)+' se '+dmy(to)) : from ? dmy(from)+' se aage' : to ? dmy(to)+' tak' : 'Month '+(currentMonth||'');
+  const sub = [
+    single ? `Client: ${single.client}${single.s2kId ? ' (S2K ID '+single.s2kId+')' : ''}` : `${uniqClients.length} clients`,
+    rmSel ? 'RM: '+(rmSel==='__unknown__'?'Unknown':rmSel) : (single && single.rm ? 'RM: '+single.rm : ''),
+    'Date: '+dateLabel,
+    rows.length+' orders',
+    'Report: '+new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
+  ].filter(Boolean).join('   |   ');
+  const banners = span => [
+    {text:`BUY  —  ${bN} trades  |  Qty ${bQ.toLocaleString('en-IN')}  |  ${inr(bV)}`, span, kind:'buy'},
+    {text:`SELL  —  ${sN} trades  |  Qty ${sQ.toLocaleString('en-IN')}  |  ${inr(sV)}`, span, kind:'sell'},
+    {text:`NET (Sell − Buy)  ${net<0?'−':''}${inr(Math.abs(net))}`, span, kind:'net'}
+  ];
+
+  // ── Sheet 1: Trades — green rows = BUY, red rows = SELL, grey = not executed ──
+  const tHead = ['Date','Seg','RM','Client','S2K ID','Scrip/Contract','Exchange','Opt Type','Strike','Expiry','Buy/Sell','Order Qty','Order Price','Qty','Price','Value','Channel','Status','SK Order Date Time','Last Modify Time','Exch Date/Time'];
+  const tRows = rows.map(r=>[
+    r.date||'', r.seg, r.rm||'Unknown', r.client||'', r.s2kId||'', r.scrip||'', r.exchange||'', r.optType||'', r.strike||'', r.expiry||'',
+    isBuy(r)?'BUY':'SELL', Number(r.orderQty)||0, Number(r.orderPrice)||0, Number(r.qty)||0, Number(r.price)||0, r2(val(r)),
+    r.channel||'', r.status||'', r.skOrderDateTime||'', r.lastModTime||'', r.time||''
+  ]);
+  const tKinds = rows.map(r=> !isExec(r) ? 'muted' : (isBuy(r) ? 'buy' : 'sell'));
+  const tTotals = ['TOTAL (executed)']; tTotals[10] = `B ${bN} / S ${sN}`; tTotals[13] = bQ+sQ; tTotals[15] = r2(bV+sV);
+  const wsTrades = xlSheet({
+    title:'D N Investment — Trade Report', sub, banners: banners(7),
+    headers:tHead, rows:tRows, rowKinds:tKinds, boldCols:[10],
+    fmts:{11:INT, 12:NUM, 13:INT, 14:NUM, 15:NUM}, totals:tTotals
+  });
+
+  // ── Sheet 2: Client Wise — Buy columns green, Sell columns red ──
   const cMap = new Map();
   rows.forEach(r=>{
     const key = r.s2kId ? 'id:'+r.s2kId : 'nm:'+normName(r.client);
     let c = cMap.get(key);
-    if(!c){ c = {client:r.client||'', s2k:r.s2kId||'', rm:r.rm||'Unknown', orders:0, exec:0, bq:0, bv:0, sq:0, sv:0}; cMap.set(key, c); }
+    if(!c){ c = {client:r.client||'', s2k:r.s2kId||'', rm:r.rm||'Unknown', orders:0, bn:0, bq:0, bv:0, sn:0, sq:0, sv:0}; cMap.set(key, c); }
     c.orders++;
-    if(isExec(r)){
-      c.exec++;
-      if(isBuy(r)){ c.bq += Number(r.qty)||0; c.bv += val(r); } else { c.sq += Number(r.qty)||0; c.sv += val(r); }
-    }
+    if(isExec(r)){ if(isBuy(r)){ c.bn++; c.bq += Number(r.qty)||0; c.bv += val(r); } else { c.sn++; c.sq += Number(r.qty)||0; c.sv += val(r); } }
   });
-  const clientRows = [...cMap.values()].sort((a,b)=>a.client.localeCompare(b.client)).map(c=>({
-    'Client': c.client, 'S2K ID': c.s2k, 'RM': c.rm,
-    'Total Orders': c.orders, 'Executed Trades': c.exec,
-    'Buy Qty': c.bq, 'Buy Value': r2(c.bv), 'Sell Qty': c.sq, 'Sell Value': r2(c.sv),
-    'Net (Sell - Buy)': r2(c.sv - c.bv)
-  }));
+  const cList = [...cMap.values()].sort((a,b)=>a.client.localeCompare(b.client));
+  const cHead = ['Client','S2K ID','RM','Total Orders','Buy Trades','Buy Qty','Buy Value','Sell Trades','Sell Qty','Sell Value','Net (Sell − Buy)'];
+  const cRows = cList.map(c=>[c.client, c.s2k, c.rm, c.orders, c.bn, c.bq, r2(c.bv), c.sn, c.sq, r2(c.sv), r2(c.sv-c.bv)]);
+  const bsKinds = ['','','','','buy','buy','buy','sell','sell','sell',''];
+  const wsClient = xlSheet({
+    title:'D N Investment — Client Wise Summary', sub, banners: banners(4),
+    headers:cHead, rows:cRows, colKinds:bsKinds, headKinds:bsKinds, signCols:[10],
+    fmts:{3:INT, 4:INT, 5:INT, 6:NUM, 7:INT, 8:INT, 9:NUM, 10:NUM},
+    totals:['TOTAL','','', rows.length, bN, bQ, r2(bV), sN, sQ, r2(sV), r2(net)]
+  });
 
-  // Date-wise summary
+  // ── Sheet 3: Date Wise ──
   const dMap = new Map();
   rows.forEach(r=>{
     const key = r.date||'';
     let d = dMap.get(key);
-    if(!d){ d = {date:key, orders:0, exec:0, eq:0, fo:0, clients:new Set(), bv:0, sv:0}; dMap.set(key, d); }
-    d.orders++;
-    d.clients.add(r.s2kId || normName(r.client));
-    if(isExec(r)){
-      d.exec++;
-      if(r.seg==='EQ') d.eq++; else d.fo++;
-      if(isBuy(r)) d.bv += val(r); else d.sv += val(r);
-    }
+    if(!d){ d = {date:key, orders:0, clients:new Set(), bn:0, bq:0, bv:0, sn:0, sq:0, sv:0}; dMap.set(key, d); }
+    d.orders++; d.clients.add(r.s2kId || normName(r.client));
+    if(isExec(r)){ if(isBuy(r)){ d.bn++; d.bq += Number(r.qty)||0; d.bv += val(r); } else { d.sn++; d.sq += Number(r.qty)||0; d.sv += val(r); } }
   });
-  const dateRows = [...dMap.values()].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
-    'Date': d.date, 'Clients': d.clients.size, 'Total Orders': d.orders, 'Executed Trades': d.exec,
-    'Equity Executed': d.eq, 'F&O Executed': d.fo,
-    'Buy Value': r2(d.bv), 'Sell Value': r2(d.sv)
-  }));
+  const dList = [...dMap.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  const dHead = ['Date','Clients','Total Orders','','Buy Trades','Buy Qty','Buy Value','Sell Trades','Sell Qty','Sell Value','Net (Sell − Buy)'];
+  dHead[3] = 'Executed';
+  const dRows = dList.map(d=>[d.date, d.clients.size, d.orders, d.bn+d.sn, d.bn, d.bq, r2(d.bv), d.sn, d.sq, r2(d.sv), r2(d.sv-d.bv)]);
+  const wsDate = xlSheet({
+    title:'D N Investment — Date Wise Summary', sub, banners: banners(4),
+    headers:dHead, rows:dRows, colKinds:bsKinds, headKinds:bsKinds, signCols:[10],
+    fmts:{1:INT, 2:INT, 3:INT, 4:INT, 5:INT, 6:NUM, 7:INT, 8:INT, 9:NUM, 10:NUM},
+    totals:['TOTAL', uniqClients.length, rows.length, bN+sN, bN, bQ, r2(bV), sN, sQ, r2(sV), r2(net)]
+  });
 
-  const mkSheet = data => {
-    const ws = XLSX.utils.json_to_sheet(data);
-    const keys = Object.keys(data[0]||{});
-    ws['!cols'] = keys.map(k=>({wch: Math.min(40, Math.max(k.length+2, ...data.slice(0,500).map(x=>String(x[k]==null?'':x[k]).length+2)))}));
-    return ws;
-  };
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, mkSheet(tradeRows), 'Trades');
-  XLSX.utils.book_append_sheet(wb, mkSheet(clientRows), 'Client Wise');
-  XLSX.utils.book_append_sheet(wb, mkSheet(dateRows), 'Date Wise');
+  XLSX.utils.book_append_sheet(wb, wsTrades, 'Trades');
+  XLSX.utils.book_append_sheet(wb, wsClient, 'Client Wise');
+  XLSX.utils.book_append_sheet(wb, wsDate, 'Date Wise');
 
   // File name reflects what was filtered: Trades_<client/S2K or RM>_<from>_to_<to>.xlsx
-  const q = document.getElementById('fSearch').value.trim();
-  const rm = document.getElementById('fRm').value;
-  const from = document.getElementById('fFrom').value, to = document.getElementById('fTo').value;
+  const clean = x => String(x).replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30);
   const parts = ['Trades'];
-  if(q) parts.push(q.replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30));
-  else if(cMap.size===1) parts.push(clientRows[0]['Client'].replace(/[^A-Za-z0-9]+/g,'_').slice(0,30));
-  if(rm) parts.push(rm==='__unknown__' ? 'UnknownRM' : rm);
+  if(single) parts.push(clean(single.client)); else if(q) parts.push(clean(q));
+  if(rmSel) parts.push(rmSel==='__unknown__' ? 'UnknownRM' : rmSel);
   if(from && to) parts.push(from===to ? from : from+'_to_'+to);
   else if(from) parts.push('from_'+from);
   else if(to) parts.push('upto_'+to);
   else parts.push(currentMonth||'all');
   XLSX.writeFile(wb, parts.filter(Boolean).join('_')+'.xlsx');
 
-  const statusEl = document.getElementById('uploadStatus');
-  statusEl.textContent = `✅ ${rows.length} trade(s) Excel me export ho gayi — ${cMap.size} client(s), ${dMap.size} din.`;
+  statusEl.textContent = `✅ ${rows.length} order(s) Excel me export ho gaye — ${cMap.size} client(s), ${dMap.size} din.` +
+    (styled ? '' : ' ⚠️ Colour wali library load nahi hui (internet/CDN check karo) — report bina colour ke bani hai.');
 }
 
 async function updateDashboardStats(){
