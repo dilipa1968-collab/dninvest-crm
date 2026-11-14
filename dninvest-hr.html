@@ -5841,11 +5841,34 @@ function renderBroUploadResult(results, minClients, threshold, bonus, unmatchedR
     html += `</tbody></table></div></div>`;
   }
 
-  html += `<div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn" style="flex:0 0 130px;padding:12px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db" onclick="cancelBrokerageUpload()">✖ Cancel</button>
-      <button class="btn btn-primary" style="flex:1;padding:12px" onclick="applyBroClientIncentive()">✅ Apply to Selected Month's Incentive Data</button>
+  // Second group file (14-Nov-2026): if this month already has brokerage
+  // applied for any RM in this file, offer "Add" (combine both groups) next
+  // to "Replace" — earlier Apply always overwrote, so an RM present in both
+  // group files lost the first group's brokerage.
+  const _selM = (document.getElementById('bro-upload-month')||{}).value || '';
+  const _exM  = _selM ? (getMfSipByMonth()[_selM] || {}) : {};
+  const _hasBro = e => e && (((e.broClientRows||[]).length>0) || (Number(e.brok)||0)>0);
+  const _existingRms = results.filter(r => r.empName && _hasBro(_exM[r.empName])).map(r => r.empName);
+  const _anyExisting = Object.values(_exM).some(_hasBro);
+  if(_anyExisting){
+    html += `<div style="margin-top:16px;background:#FFF8E1;border:1px solid #F0D58A;border-radius:8px;padding:10px 14px;font-size:12px;color:#7A5B00">
+      <b>Brokerage is already applied for this month.</b>
+      ${_existingRms.length ? 'RMs in both files: <b>'+_existingRms.map(escapeHtml).join(', ')+'</b>. ' : ''}
+      If this is the <b>second group's file</b>, use <b>Add to Existing</b> — brokerage of both groups will be combined for each RM. Use <b>Replace</b> only to correct a wrong upload.
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn" style="flex:0 0 110px;padding:12px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db" onclick="cancelBrokerageUpload()">✖ Cancel</button>
+      <button class="btn" style="flex:1;min-width:180px;padding:12px;background:#fee2e2;color:#b91c1c;border:1px solid #f3b4b4" onclick="applyBroClientIncentive('replace')">♻ Replace Existing</button>
+      <button class="btn btn-primary" style="flex:2;min-width:220px;padding:12px" onclick="applyBroClientIncentive('add')">➕ Add to Existing (2nd Group File)</button>
     </div>
   </div>`;
+  } else {
+  html += `<div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn" style="flex:0 0 130px;padding:12px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db" onclick="cancelBrokerageUpload()">✖ Cancel</button>
+      <button class="btn btn-primary" style="flex:1;padding:12px" onclick="applyBroClientIncentive('replace')">✅ Apply to Selected Month's Incentive Data</button>
+    </div>
+  </div>`;
+  }
 
   overlay.innerHTML = html;
   // Also update the inline result div for quick status
@@ -6504,7 +6527,33 @@ function showClientBrokerageHistory(scopeEmpName){
   });
 }
 
-async function applyBroClientIncentive(){
+// Combine an RM's already-saved client rows with a new file's rows.
+// Same client (same code, or same name when the code is blank) in both
+// files → brokerage is summed into one row; eligibility re-checked on the
+// combined amount.
+function mergeBroClientRows(oldRows, newRows, threshold){
+  const out = [], idx = {};
+  const keyOf = c => { const k=_normBrkCode(c.code); return k ? 'c:'+k : (c.name ? 'n:'+_normBrkName(c.name) : ''); };
+  const add = c => {
+    const bro = Math.round((Number(c.bro)||0)*100)/100;
+    const k = keyOf(c);
+    if(k && idx[k]!==undefined){
+      const o = out[idx[k]];
+      o.bro = Math.round((o.bro+bro)*100)/100;
+      if(!o.name && c.name) o.name = c.name;
+    } else {
+      if(k) idx[k] = out.length;
+      out.push({code:c.code||'', name:c.name||'', bro});
+    }
+  };
+  (oldRows||[]).forEach(add);
+  (newRows||[]).forEach(add);
+  out.forEach(o => { o.eligible = o.bro >= threshold; });
+  return out;
+}
+
+async function applyBroClientIncentive(mode){
+  mode = (mode==='add') ? 'add' : 'replace';
   if(!_broParseResult){ alert('No file parsed yet.'); return; }
   const monthEl = document.getElementById('bro-upload-month');
   const month   = monthEl ? monthEl.value : '';
@@ -6545,14 +6594,56 @@ async function applyBroClientIncentive(){
   const unmatched = workingResults.filter(r => !r.empName);
   if(!matched.length){ alert('No RM names could be matched to employees. Check the file.'); return; }
 
+  const all = getMfSipByMonth();
+  if(!all[month]) all[month] = {};
+
+  // ADD mode (second group's file): combine with what is already applied
+  // for this month instead of overwriting it.
+  const combinedNames = [];
+  if(mode==='add'){
+    // Safety: same file applied twice would double the brokerage.
+    let incoming=0, dup=0;
+    matched.forEach(r => {
+      const oldRows = (all[month][r.empName] && all[month][r.empName].broClientRows) || [];
+      const oldByCode = {};
+      oldRows.forEach(o => { const k=_normBrkCode(o.code); if(k) oldByCode[k]=Number(o.bro)||0; });
+      (r.clients||[]).forEach(c => {
+        incoming++;
+        const k=_normBrkCode(c.code);
+        if(k && oldByCode[k]!==undefined && Math.abs(oldByCode[k]-(Number(c.bro)||0))<0.01) dup++;
+      });
+    });
+    if(incoming>0 && dup >= incoming*0.5){
+      if(!confirm('⚠️ '+dup+' of '+incoming+' client rows in this file are ALREADY applied for this month with the same brokerage amount.\n\nThis looks like the SAME file uploaded again — adding it will DOUBLE the brokerage.\n\nAdd anyway?')) return;
+    }
+    matched.forEach(r => {
+      const ex = all[month][r.empName];
+      const oldRows = (ex && ex.broClientRows) || [];
+      const oldBrok = ex ? (Number(ex.brok)||0) : 0;
+      if(!oldRows.length && !oldBrok) return;   // nothing applied earlier for this RM
+      const merged = mergeBroClientRows(oldRows, r.clients, threshold);
+      // brokerage typed in manually earlier (no client rows saved) is carried forward as-is
+      const carry = oldRows.length ? 0 : oldBrok;
+      r.clients         = merged;
+      r.totalClients    = merged.length;
+      r.eligibleClients = merged.filter(c=>c.eligible).length;
+      r.totalBrokerage  = merged.reduce((s,c)=>s+c.bro,0) + carry;
+      r.eligible        = r.eligibleClients >= minClients;
+      r.bonus           = r.eligible ? bonus : 0;
+      combinedNames.push(r.empName);
+    });
+  }
+
   const mLabel = new Date(month+'-01T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   const summary = matched.map(r => `${r.empName}: ${r.eligible ? '₹'+r.bonus+' bonus ('+r.eligibleClients+' clients)' : 'No bonus ('+r.eligibleClients+'/'+minClients+' clients)'}`).join('\n');
   const unmSummary = unmatched.length ? '\n\nUnmatched RMs (skipped): '+unmatched.map(r=>r.rm).join(', ') : '';
   const stillUnSummary = stillUnassigned.length ? '\n\n'+stillUnassigned.length+' client(s) left un-assigned — still not counted anywhere.' : '';
-  if(!confirm('Apply brokerage client bonus for '+mLabel+'?\n\n'+summary+unmSummary+stillUnSummary)) return;
+  const modeLine = mode==='add'
+    ? 'ADD to existing brokerage for '+mLabel+'?\n'+(combinedNames.length ? 'Combined with earlier file: '+combinedNames.join(', ')+'\n(totals below are BOTH groups together)' : '(no RM in this file had brokerage applied earlier)')
+    : 'Apply brokerage client bonus for '+mLabel+'?';
+  const summaryFull = matched.map(r => `${r.empName}: ₹${Math.round(r.totalBrokerage).toLocaleString('en-IN')} — ${r.eligible ? '₹'+r.bonus+' bonus ('+r.eligibleClients+' clients)' : 'No bonus ('+r.eligibleClients+'/'+minClients+' clients)'}`).join('\n');
+  if(!confirm(modeLine+'\n\n'+summaryFull+unmSummary+stillUnSummary)) return;
 
-  const all = getMfSipByMonth();
-  if(!all[month]) all[month] = {};
   matched.forEach(r => {
     if(!all[month][r.empName]) all[month][r.empName] = {brok:0,demat:0,mf:0,sip:0,other:0,otherRemark:''};
     // Save total brokerage from file — fills the Brokerage column in team incentive table
@@ -6571,8 +6662,10 @@ async function applyBroClientIncentive(){
   // "Unmatched Clients" report — independent of mfsip_by_month so it never
   // pollutes the per-employee incentive rows.
   const logAll = getBroUnmatchedLog();
-  logAll[month] = stillUnassigned.map(u => ({code:u.code, name:u.name, bro:u.bro, reason:u.reason, assignedTo:null}))
+  const thisUploadLog = stillUnassigned.map(u => ({code:u.code, name:u.name, bro:u.bro, reason:u.reason, assignedTo:null}))
     .concat(manuallyAssigned.map(u => ({code:u.code, name:u.name, bro:u.bro, reason:u.reason, assignedTo:u.assignedTo})));
+  // ADD mode keeps the first group's unmatched log and appends this file's
+  logAll[month] = (mode==='add') ? (logAll[month]||[]).concat(thisUploadLog) : thisUploadLog;
   await saveBroUnmatchedLog(logAll);
 
   // Close the popup overlay
@@ -6583,11 +6676,16 @@ async function applyBroClientIncentive(){
   const inlineDiv = document.getElementById('bro-upload-result');
   if(inlineDiv){
     const qualNames = matched.filter(r=>r.eligible).map(r=>r.empName+' ₹'+r.bonus).join(', ');
-    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ Applied for ${mLabel}${qualNames ? ' — Bonus: '+qualNames : ' — No one qualified'}</p>`;
+    inlineDiv.innerHTML = `<p style="color:var(--green);font-size:12px;font-weight:600">✅ ${mode==='add'?'Added to existing':'Applied'} for ${mLabel}${qualNames ? ' — Bonus: '+qualNames : ' — No one qualified'}</p>`;
   }
 
   renderIncentivePage();
-  alert('✅ Brokerage client bonus applied for '+mLabel+'!');
+  // reset the file picker so the next group's file can be chosen straight away
+  const _fEl = document.getElementById('bro-file-input'); if(_fEl) _fEl.value = '';
+  _broParseResult = null; window._broParseResult = null;
+  alert(mode==='add'
+    ? '✅ Second file ADDED for '+mLabel+'!'+(combinedNames.length ? '\n\nCombined (both groups): '+combinedNames.join(', ') : '')
+    : '✅ Brokerage client bonus applied for '+mLabel+'!');
 }
 
 function loadIncEmp(){
