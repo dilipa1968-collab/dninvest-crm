@@ -25,6 +25,8 @@ window.BO = (function(){
   const DEFAULT_TYPES=['ARN Transfer','Bank Mandate (OTM) Update','Bank Account Change','Nominee Update',
     'KYC Modification','Mobile / Email Update','Address Change','Transmission','DDPI / POA',
     'Demat Closure','Other'];
+  // "Submitted Via" — request kis platform/mode se submit hui (17-Nov-2026: Ref/Ack No. ki jagah)
+  const MODES=['NSE MF','BSE StAR','CAMS','KFintech','MF Central','Physical','CIS','Web Admin','Mail','Client Login'];
   const STATUSES=['Docs Pending','Submitted','In Process','Completed','Rejected'];
   const ST_COLOR={
     'Docs Pending':{bg:'#fef3c7',fg:'#92400e'},
@@ -184,7 +186,7 @@ window.BO = (function(){
       if(sg && r.seg!==sg) return false;
       if(mo && !(r.date||'').startsWith(mo)) return false;
       if(q){
-        const hay=[r.client_name,r.client_code,r.pan,r.folio,r.ref_no,r.rta,r.remarks,r.type,r.rm].join(' ').toLowerCase();
+        const hay=[r.client_name,r.client_code,r.pan,r.folio,r.mode,r.ref_no,r.rta,r.remarks,r.type,r.rm].join(' ').toLowerCase();
         if(!hay.includes(q)) return false;
       }
       return true;
@@ -219,7 +221,7 @@ window.BO = (function(){
     const cnt=$('bo-count'); if(cnt) cnt.textContent=rows.length+' request'+(rows.length===1?'':'s');
     let h=`<table><thead><tr>
       <th>Date</th><th>Client</th><th>Seg</th><th>Code / Folio</th><th>Request Type</th><th>RTA / AMC</th>
-      <th>Client RM</th><th>Entry By</th><th>Status</th><th>Ref / Ack No.</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
+      <th>Client RM</th><th>Entry By</th><th>Status</th><th>Submitted Via</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
     </tr></thead><tbody>`;
     if(!slice.length) h+=`<tr><td colspan="15" style="text-align:center;color:var(--gray);padding:18px">No back-office requests found</td></tr>`;
     slice.forEach(r=>{
@@ -234,7 +236,7 @@ window.BO = (function(){
         <td><b style="color:var(--navy)">${esc(clientRm(r)||'—')}</b></td>
         <td title="${esc(r.created_at?('Entry: '+r.created_at.slice(0,16).replace('T',' ')):'')}">${esc(r.created_by||'—')}${r.updated_by&&r.updated_by!==r.created_by?`<br><small style="color:var(--gray)">Upd: ${esc(r.updated_by)}</small>`:''}</td>
         <td>${mg?`<select onchange="BO.quickStatus('${r.id}',this.value)" style="padding:2px 4px;font-size:.66rem;border-radius:6px;font-weight:700;background:${(ST_COLOR[r.status]||{}).bg||'#fff'};color:${(ST_COLOR[r.status]||{}).fg||'#333'}">${STATUSES.map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select>`:stBadge(r.status)}</td>
-        <td>${esc(r.ref_no||'—')}</td>
+        <td>${r.mode?`<span class="badge" style="background:#e0f2fe;color:#075985">${esc(r.mode)}</span>`:esc(r.ref_no||'—')}</td>
         <td>${fmtDate(r.submitted_date)||'—'}</td>
         <td>${fmtDate(r.completed_date)||'—'}</td>
         <td style="font-weight:700;color:${od?'#dc2626':isOpen(r)?'var(--navy)':'var(--gray)'}">${age}${od?' ⚠️':''}</td>
@@ -305,7 +307,8 @@ window.BO = (function(){
         <div class="form-field"><label>RTA / AMC / Broker</label><input type="text" id="bo_rta" list="bo_rta_list" value="${esc(r?r.rta:'')}" placeholder="CAMS / KFintech / AMC name">
           <datalist id="bo_rta_list"><option>CAMS</option><option>KFintech</option><option>MF Central</option><option>CDSL</option><option>NSDL</option><option>Broker (Equity)</option></datalist></div>
         <div class="form-field"><label>Folio No. (if any)</label><input type="text" id="bo_folio" value="${esc(r?r.folio:'')}" placeholder="Folio / multiple folios"></div>
-        <div class="form-field"><label>Ref / Ack No.</label><input type="text" id="bo_ref" value="${esc(r?r.ref_no:'')}" ${mg?'':'disabled'}></div>
+        <div class="form-field"><label>Submitted Via</label><select id="bo_mode" ${mg?'':'disabled'}><option value="">— Select —</option>${
+          [...MODES, ...((r&&r.mode&&!MODES.includes(r.mode))?[r.mode]:[])].map(m=>`<option ${r&&r.mode===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
       </div>
       <div class="form-row three" ${mg?'':'style="display:none"'}>
         <div class="form-field"><label>Submitted Date</label><input type="date" id="bo_sub" value="${esc(r?r.submitted_date:'')}"></div>
@@ -366,7 +369,7 @@ window.BO = (function(){
     const fields={
       type, date, status,
       rta:$('bo_rta').value.trim(), folio:$('bo_folio').value.trim(),
-      ref_no: mg ? $('bo_ref').value.trim() : '',
+      mode: mg ? $('bo_mode').value : '',
       submitted_date:sub, completed_date:done,
       remarks:$('bo_remarks').value.trim()
     };
@@ -430,7 +433,7 @@ window.BO = (function(){
         ${di2('Client',r.client_name)}${di2('Segment',r.seg==='equity'?'Equity':'Mutual Fund')}${di2('Code',r.client_code)}
         ${di2('PAN',r.pan)}${di2('Client RM',clientRm(r))}${di2('Status',stBadge(r.status),true)}
         ${di2('Request Date',fmtDate(r.date))}${di2('Submitted',fmtDate(r.submitted_date))}${di2('Completed',fmtDate(r.completed_date))}
-        ${di2('RTA / AMC',r.rta)}${di2('Folio',r.folio)}${di2('Ref / Ack No.',r.ref_no)}
+        ${di2('RTA / AMC',r.rta)}${di2('Folio',r.folio)}${di2('Submitted Via',r.mode)}${r.ref_no?di2('Ref / Ack No. (old)',r.ref_no):''}
         ${di2('Days',ageDays(r)+(isOpen(r)?' (open)':''))}${di2('Entry By',r.created_by)}${di2('Last Updated',r.updated_by?(r.updated_by+' · '+fmtDate((r.updated_at||'').slice(0,10))):'')}
       </div>
       ${r.remarks?`<div class="form-field"><label>Remarks</label><div style="font-size:.85rem;white-space:pre-wrap">${esc(r.remarks)}</div></div>`:''}
@@ -450,7 +453,7 @@ window.BO = (function(){
     if(!list.length) return h+'<p style="color:var(--gray);font-size:.82rem">No back-office requests.</p>';
     return h+list.map(r=>`<div class="call-log-item" style="cursor:pointer;border-left-color:${(ST_COLOR[r.status]||{}).fg||'#999'}" onclick="closeModal('viewModal');BO.openView('${r.id}')">
       <div class="call-date">${fmtDate(r.date)} — ${esc(r.type)}${r.rta?' · '+esc(r.rta):''}</div>
-      <div class="call-status">${stBadge(r.status)} · By: ${esc(r.created_by||'—')} ${r.ref_no?'· Ref: '+esc(r.ref_no):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
+      <div class="call-status">${stBadge(r.status)} · By: ${esc(r.created_by||'—')} ${r.mode?'· Via: '+esc(r.mode):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
       ${r.remarks?`<div class="call-note">${esc(r.remarks)}</div>`:''}</div>`).join('');
   }
 
@@ -479,10 +482,10 @@ window.BO = (function(){
     const rows=filtered();
     const cols=[{header:'Date',width:12},{header:'Client',width:28},{header:'Segment',width:9},{header:'Code',width:12},{header:'PAN',width:12},
       {header:'Request Type',width:24},{header:'RTA / AMC',width:14},{header:'Folio',width:14},{header:'Client RM',width:12},
-      {header:'Status',width:13,color:v=>dnStatusColor(v)},{header:'Ref / Ack No.',width:16},{header:'Submitted',width:12},{header:'Completed',width:12},
+      {header:'Status',width:13,color:v=>dnStatusColor(v)},{header:'Submitted Via',width:14},{header:'Submitted',width:12},{header:'Completed',width:12},
       {header:'Days',width:7,num:true},{header:'Remarks',width:40},{header:'Entry By',width:12}];
     const data=rows.map(r=>[fmtDate(r.date),r.client_name,r.seg==='equity'?'Equity':'MF',r.client_code,r.pan,r.type,r.rta,r.folio,clientRm(r),
-      r.status,r.ref_no,fmtDate(r.submitted_date),fmtDate(r.completed_date),ageDays(r),r.remarks,r.created_by]);
+      r.status,r.mode||r.ref_no||'',fmtDate(r.submitted_date),fmtDate(r.completed_date),ageDays(r),r.remarks,r.created_by]);
     dnXlsx('Back_Office_Requests_'+today()+'.xlsx','D N Investment — Back Office Requests ('+today()+')',cols,data);
   }
 

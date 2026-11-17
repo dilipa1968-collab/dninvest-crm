@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-17-v3';
+  const APP_VERSION = '2026-11-17-v4';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -2241,7 +2241,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
         <div class="sq-stat-strip" id="bo-stats" style="padding:0 0 10px"></div>
         <div class="filters">
-          <input type="text" id="bo-search" placeholder="🔍 Client / code / PAN / folio / ref..." oninput="BO.filter()" autocomplete="off">
+          <input type="text" id="bo-search" placeholder="🔍 Client / code / PAN / folio / via..." oninput="BO.filter()" autocomplete="off">
           <select id="bo-status-filter" onchange="BO.filter()"><option value="">All Status</option></select>
           <select id="bo-type-filter" onchange="BO.filter()"><option value="">All Types</option></select>
           <select id="bo-rm-filter" onchange="BO.filter()"><option value="">All RMs</option></select>
@@ -3356,7 +3356,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
-<script src="dninvest-backoffice.js?v=2026-11-17-v3"></script>
+<script src="dninvest-backoffice.js?v=2026-11-17-v4"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
