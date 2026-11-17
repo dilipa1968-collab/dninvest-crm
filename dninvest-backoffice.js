@@ -140,33 +140,86 @@ window.BO = (function(){
 
   // Transaction-safe mutate of the whole bo_requests array.
   // mutate(arr) mutates in place; return false to abort.
+  // 17-Nov-2026 fix: pehle "optimistic local" save hota tha — server write fail
+  // hone par bhi entry us user ki screen par dikhti rehti thi (jaise saved ho),
+  // par doosron (Admin) tak kabhi nahi pahunchti thi. Ab local copy SIRF server
+  // confirm hone ke baad badalti hai; fail par clear error, kuch fake nahi dikhta.
+  // Deleted ids ka "tombstone" bhi doc me rakha jata hai taaki recovery kabhi
+  // deleted request wapas na laaye.
   async function mutate(fn){
-    // optimistic local
-    const local=JSON.parse(JSON.stringify(all()));
-    if(fn(local)===false) return {ok:false, aborted:true};
-    DB.setLocal(KEY, local);
     if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
-    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to the server'};
     try{
       const ref=fdb.collection('crm_data').doc(KEY);
-      let finalArr=null;
+      let finalArr=null, aborted=false;
       await fdb.runTransaction(async tx=>{
         const doc=await tx.get(ref);
-        const latest=(doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data.slice() : [];
+        const dd=(doc.exists && doc.data()) || {};
+        const latest=Array.isArray(dd.data) ? JSON.parse(JSON.stringify(dd.data)) : [];
+        const deleted=Array.isArray(dd.deleted) ? dd.deleted.slice() : [];
         const before=latest.length;
-        if(fn(latest)===false){ finalArr=null; return; }
+        const beforeIds=new Set(latest.map(x=>x.id));
+        if(fn(latest)===false){ aborted=true; finalArr=null; return; }
+        aborted=false;
         // collapse guard — kabhi bhi healthy list ek jhatke me khaali na ho
-        if(before>=5 && latest.length===0) throw new Error('Blocked: would have wiped all back-office requests');
+        if(before>=5 && latest.length===0) throw new Error('Blocked: this would have wiped all back office requests');
+        const afterIds=new Set(latest.map(x=>x.id));
+        beforeIds.forEach(id=>{ if(!afterIds.has(id) && !deleted.includes(id)) deleted.push(id); });
         finalArr=latest;
-        tx.set(ref,{data:DB._clean(latest), updated:new Date().toISOString()});
+        tx.set(ref,{data:DB._clean(latest), deleted:deleted.slice(-2000), updated:new Date().toISOString()});
       });
-      if(finalArr) DB.setLocal(KEY, finalArr);
-      return {ok:true};
+      if(finalArr){ DB.setLocal(KEY, finalArr); _serverSeen=true; }
+      return {ok:true, aborted};
     }catch(e){
       console.log('bo_requests write error:',e);
       return {ok:false, error:e.message};
     }
   }
+
+  // ── Live sync (realtime listener) ──
+  // Har open tab ko server ka latest data turant milta hai — kisi bhi user ki
+  // nayi entry/status change sab screens par bina refresh ke dikhegi.
+  let _unsub=null, _serverSeen=false, _rescueDone=false;
+  // Is browser me pehle se padi local copy (app-1 ka sync isse overwrite kare,
+  // usse pehle hi yaad rakh lo) — recovery ke liye.
+  let _bootLocal=[];
+  try{ _bootLocal=JSON.parse(localStorage.getItem('dninvest_'+KEY)||'[]')||[]; }catch(_){ _bootLocal=[]; }
+  function startLive(){
+    if(_unsub || typeof fdb==='undefined' || !CU) return;
+    _unsub='starting';   // re-entry guard (snapshot callback khud updateBadge → startLive bulata hai)
+    try{
+      const u=fdb.collection('crm_data').doc(KEY).onSnapshot(doc=>{
+        const dd=(doc.exists && doc.data()) || {};
+        const arr=Array.isArray(dd.data)?dd.data:[];
+        DB.setLocal(KEY, arr); _serverSeen=true;
+        rescueUnsaved(arr, Array.isArray(dd.deleted)?dd.deleted:[]);
+        if(isPageActive()){ populateFilters(); ensureSpecialStatusOptions(); renderStats(); renderTable(); }
+        updateBadge(); renderDashCard();
+        setSync(true);
+      }, err=>{ console.log('bo live sync error',err); setSync(false, err.message); _unsub=null; });
+      _unsub=u;
+    }catch(e){ console.log('bo live start err',e); _unsub=null; }
+  }
+  // Recovery: is user ki jo requests pehle sirf is browser me save hui thi
+  // (server tak nahi pahunchi), unhe ek baar server par bhej do.
+  async function rescueUnsaved(serverArr, deleted){
+    if(_rescueDone || !CU) return; _rescueDone=true;
+    const have=new Set(serverArr.map(x=>x.id)), del=new Set(deleted||[]);
+    const missing=(_bootLocal||[]).filter(r=>r && r.id && r.created_by===CU.name && !have.has(r.id) && !del.has(r.id));
+    if(!missing.length) return;
+    const res=await mutate(arr=>{
+      const ids=new Set(arr.map(x=>x.id)); let added=0;
+      missing.forEach(r=>{ if(!ids.has(r.id)){ arr.push(r); added++; } });
+      if(!added) return false;
+    });
+    if(res.ok && !res.aborted) toast(missing.length+' request(s) that had not reached the server are now saved ✓','success');
+    else if(!res.ok) toast('⚠️ '+missing.length+' request(s) could not be saved to the server — '+(res.error||'please retry'),'error');
+  }
+  function setSync(ok, msg){
+    const el=$('bo-sync'); if(!el) return;
+    el.innerHTML = ok ? '<span style="color:#059669">● Live</span>' : `<span style="color:#dc2626" title="${esc(msg||'')}">● Offline — click Refresh</span>`;
+  }
+
   async function saveTypes(list){
     DB.setLocal(TKEY, list);
     if(typeof fdb==='undefined') return {ok:false,error:'Offline'};
@@ -176,11 +229,13 @@ window.BO = (function(){
   // Page khulte hi Firestore se fresh copy (doosre user ke changes turant dikhein)
   async function refreshFromServer(){
     if(typeof fdb==='undefined') return;
+    startLive();
     try{
       const [a,b]=await Promise.all([fdb.collection('crm_data').doc(KEY).get(), fdb.collection('crm_data').doc(TKEY).get()]);
       if(a.exists && a.data() && Array.isArray(a.data().data)) DB.setLocal(KEY, a.data().data);
       if(b.exists && b.data() && b.data().data) DB.setLocal(TKEY, b.data().data);
-    }catch(e){ console.log('bo refresh err',e); }
+      setSync(true);
+    }catch(e){ console.log('bo refresh err',e); setSync(false, e.message); }
   }
 
   // ── client picker source ──
@@ -409,7 +464,9 @@ window.BO = (function(){
     $('bo_client_search').value='';
     const out=$('bo_client_results'); out.style.display='none'; out.innerHTML='';
   }
+  let _saving=false;
   async function save(){
+    if(_saving) return;
     const editRec = editingId ? all().find(x=>x.id===editingId) : null;
     const segOf = editRec ? editRec.seg : (picked ? picked.seg : null);
     if(segOf && !canSeg(segOf)){ toast('You do not have entry permission for this segment.','error'); return; }
@@ -433,6 +490,7 @@ window.BO = (function(){
     };
     const now=new Date().toISOString();
     let res;
+    _saving=true; { const sb=$('boSaveBtn'); if(sb){ sb.disabled=true; sb.textContent='⏳ Saving...'; } }
     if(editingId){
       const id=editingId;
       res=await mutate(arr=>{
@@ -449,7 +507,8 @@ window.BO = (function(){
         history:[{at:now,by:CU.name,status:fields.status,note:'Request created'}]};
       res=await mutate(arr=>{ if(arr.some(x=>x.id===rec.id)) return false; arr.push(rec); });
     }
-    if(!res.ok && !res.aborted){ toast('⚠️ Save failed — '+(res.error||'please retry'),'error'); return; }
+    _saving=false; const sbtn=$('boSaveBtn'); if(sbtn){ sbtn.disabled=false; sbtn.textContent='💾 Save Request'; }
+    if(!res.ok){ toast('⚠️ NOT SAVED — '+(res.error||'server error')+'. Please check your internet and click Save again.','error'); return; }
     closeModal('boModal');
     toast(editingId?'Request updated successfully ✓':'Request added successfully ✓','success');
     editingId=null; picked=null;
@@ -558,6 +617,7 @@ window.BO = (function(){
 
   // ── Sidebar badge + dashboard card ──
   function updateBadge(){
+    try{ startLive(); }catch(_){}
     const nb=$('nb-bo'); if(!nb || !CU) return;
     const open=visible().filter(isOpen);
     const od=open.filter(r=>ageDays(r)>OVERDUE_DAYS).length;
