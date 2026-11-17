@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-13-v1';
+  const APP_VERSION = '2026-11-17-v1';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -1402,6 +1402,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <span class="icon">🎯</span><span>Other Products</span><span class="badge-num" id="badge-op"></span>
       </div>
 
+      <div class="sidebar-section" id="bo-nav-section">Back Office</div>
+      <div class="nav-item" onclick="showPage('bo-work')" id="nav-bo-work" title="ARN transfer, bank update, nominee, KYC jaise back-office kaam">
+        <span class="icon">🗂️</span> Back Office Work
+        <span class="nav-badge" id="nb-bo" style="display:none">0</span>
+      </div>
+
       <div class="sidebar-section" id="tools-nav-section">Tools</div>
       <div class="nav-item" onclick="showPage('brokerage-calc'); bcApplyRoleAccess(); bcRenderClientDropdown();" id="nav-brokerage-calc">
         <span class="icon">🧮</span> Brokerage Calculator
@@ -1491,6 +1497,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="dash-card"><h3 onclick="showPage('eq-followup')" style="cursor:pointer" title="View all follow-ups">📞 Follow-ups — Today &amp; Overdue <span id="fuHeadCount" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayFollowup"></div></div>
           <div class="dash-card"><h3>🎂 Today's Birthdays <span id="bdayHeadCount" style="background:#e11d8f;color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto"></span></h3><div id="todayBirthday"></div></div>
         </div>
+
+        <div class="dash-card" id="boDashCard" style="display:none;margin-top:10px"></div>
 
         <!-- Hidden containers kept for JS compatibility — alerts still rendered but not shown on dashboard -->
         <div style="display:none"><div id="noTradeAlert"></div><div id="noCallEqAlert"></div><div id="noCallMfAlert"></div><div id="mfAuditTable"></div></div>
@@ -2220,6 +2228,31 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <div id="op-table" style="overflow-x:auto"></div>
       </div>
       <!-- ══════ END OTHER PRODUCTS PAGE ══════ -->
+
+      <!-- ══════ BACK OFFICE WORK PAGE (17-Nov-2026) ══════ -->
+      <div class="page" id="page-bo-work">
+        <div class="page-hdr">
+          <div class="page-title">🗂️ Back Office Work <span id="bo-count"></span></div>
+          <div class="hdr-actions">
+            <button class="btn btn-outline" onclick="BO.exportXlsx()">⬇️ Export</button>
+            <button class="btn btn-outline" id="bo-types-btn" style="display:none" onclick="BO.openTypes()">⚙️ Request Types</button>
+            <button class="btn btn-primary" onclick="BO.openAdd()">+ New Request</button>
+          </div>
+        </div>
+        <div class="sq-stat-strip" id="bo-stats" style="padding:0 0 10px"></div>
+        <div class="filters">
+          <input type="text" id="bo-search" placeholder="🔍 Client / code / PAN / folio / ref..." oninput="BO.filter()" autocomplete="off">
+          <select id="bo-status-filter" onchange="BO.filter()"><option value="">All Status</option></select>
+          <select id="bo-type-filter" onchange="BO.filter()"><option value="">All Types</option></select>
+          <select id="bo-rm-filter" onchange="BO.filter()"><option value="">All RMs</option></select>
+          <select id="bo-seg-filter" onchange="BO.filter()"><option value="">EQ + MF</option><option value="equity">Equity</option><option value="mf">Mutual Fund</option></select>
+          <select id="bo-month-filter" onchange="BO.filter()"><option value="">All Months</option></select>
+          <button class="btn btn-outline" onclick="BO.resetFilters()">✕ Reset</button>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll" id="bo-table"></div></div>
+        <div class="pagination" id="bo-pg"></div>
+      </div>
+      <!-- ══════ END BACK OFFICE WORK PAGE ══════ -->
 
       <!-- ══════ BROKERAGE CALCULATOR PAGE ══════ -->
       <div class="page" id="page-brokerage-calc">
@@ -3299,14 +3332,31 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   </div>
 </div>
 
+<!-- Back Office Request Modal -->
+<div class="modal-overlay" id="boModal" onclick="if(event.target===this)closeModal('boModal')">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h3 id="boModalTitle">Back Office Request</h3>
+      <button class="modal-close" onclick="closeModal('boModal')">×</button>
+    </div>
+    <div class="modal-body" id="boModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('boModal')">Close</button>
+      <button class="btn btn-primary" id="boSaveBtn" onclick="BO.save()">💾 Save Request</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-13-v1"></script>
+<script src="dninvest-app-1.js?v=2026-11-17-v1"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
+
+<script src="dninvest-backoffice.js?v=2026-11-17-v1"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">

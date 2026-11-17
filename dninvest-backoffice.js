@@ -1,0 +1,516 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   BACK OFFICE WORK TRACKER  (17-Nov-2026)
+   ARN Transfer, Bank Mandate/Account update, Nominee, KYC, Mobile/Email,
+   Address change, Transmission, DDPI/POA, Demat closure ... har request ek
+   ticket ki tarah: Docs Pending → Submitted → In Process → Completed/Rejected.
+
+   Firestore:
+     crm_data/bo_requests  → { data:[request,...] }
+     crm_data/bo_types     → { data:["ARN Transfer", ...] }   (admin editable)
+
+   Saare writes TRANSACTION-SAFE hain (latest Firestore copy padh ke sirf
+   apna record badalte hain) — blind full-array overwrite nahi, taaki do log
+   ek saath kaam karein to kisi ka data na ude (mf_business wipe jaisa).
+
+   Access:
+     Admin / Back Office role / RM with backoffice_access → sab requests,
+       add + edit + status change. Delete sirf Admin.
+     RM → sirf apne clients ki requests dekh sakta hai + nayi request daal
+       sakta hai (status "Docs Pending" se shuru). Edit nahi.
+   Depends on app-1.js globals: DB, CU, fdb, uid, today, fmtDate, toast,
+   closeModal, escapeHtml, getMyEqClients, getMyMfClients, getSegRMs.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.BO = (function(){
+  const KEY='bo_requests', TKEY='bo_types';
+  const DEFAULT_TYPES=['ARN Transfer','Bank Mandate (OTM) Update','Bank Account Change','Nominee Update',
+    'KYC Modification','Mobile / Email Update','Address Change','Transmission','DDPI / POA',
+    'Demat Closure','Other'];
+  const STATUSES=['Docs Pending','Submitted','In Process','Completed','Rejected'];
+  const ST_COLOR={
+    'Docs Pending':{bg:'#fef3c7',fg:'#92400e'},
+    'Submitted':{bg:'#dbeafe',fg:'#1e40af'},
+    'In Process':{bg:'#ede9fe',fg:'#6d28d9'},
+    'Completed':{bg:'#d1fae5',fg:'#065f46'},
+    'Rejected':{bg:'#fee2e2',fg:'#991b1b'}
+  };
+  const OVERDUE_DAYS=7;
+  const PAGE=50;
+  let page=1, editingId=null, picked=null;
+
+  const esc = s => (typeof escapeHtml==='function') ? escapeHtml(String(s==null?'':s)) : String(s==null?'':s);
+  const $ = id => document.getElementById(id);
+  const isOpen = r => r.status!=='Completed' && r.status!=='Rejected';
+
+  // ── access ──
+  function canManage(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.backoffice_access===true)); }
+  function canDelete(){ return !!(CU && CU.role==='admin'); }
+  function myDealers(){
+    if(!CU) return [];
+    return [...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),CU.name])]
+      .map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
+  }
+
+  // ── data ──
+  function all(){ const d=DB.get(KEY); return Array.isArray(d)?d:[]; }
+  function types(){ const t=DB.get(TKEY); return (Array.isArray(t)&&t.length)?t:DEFAULT_TYPES.slice(); }
+  function visible(){
+    const list=all();
+    if(canManage()) return list;
+    const ds=myDealers();
+    return list.filter(r=>ds.includes(String(r.rm||'').trim().toUpperCase()) || r.created_by===CU.name);
+  }
+  function ageDays(r){
+    const from = r.date || (r.created_at||'').slice(0,10);
+    const to = isOpen(r) ? today() : (r.completed_date || today());
+    if(!from) return 0;
+    return Math.max(0, Math.round((new Date(to)-new Date(from))/86400000));
+  }
+
+  // Transaction-safe mutate of the whole bo_requests array.
+  // mutate(arr) mutates in place; return false to abort.
+  async function mutate(fn){
+    // optimistic local
+    const local=JSON.parse(JSON.stringify(all()));
+    if(fn(local)===false) return {ok:false, aborted:true};
+    DB.setLocal(KEY, local);
+    if(typeof fdb==='undefined'){ await window.waitForFdb(8000); }
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    try{
+      const ref=fdb.collection('crm_data').doc(KEY);
+      let finalArr=null;
+      await fdb.runTransaction(async tx=>{
+        const doc=await tx.get(ref);
+        const latest=(doc.exists && doc.data() && Array.isArray(doc.data().data)) ? doc.data().data.slice() : [];
+        const before=latest.length;
+        if(fn(latest)===false){ finalArr=null; return; }
+        // collapse guard — kabhi bhi healthy list ek jhatke me khaali na ho
+        if(before>=5 && latest.length===0) throw new Error('Blocked: would have wiped all back-office requests');
+        finalArr=latest;
+        tx.set(ref,{data:DB._clean(latest), updated:new Date().toISOString()});
+      });
+      if(finalArr) DB.setLocal(KEY, finalArr);
+      return {ok:true};
+    }catch(e){
+      console.log('bo_requests write error:',e);
+      return {ok:false, error:e.message};
+    }
+  }
+  async function saveTypes(list){
+    DB.setLocal(TKEY, list);
+    if(typeof fdb==='undefined') return {ok:false,error:'Offline'};
+    try{ await fdb.collection('crm_data').doc(TKEY).set({data:DB._clean(list),updated:new Date().toISOString()}); return {ok:true}; }
+    catch(e){ return {ok:false,error:e.message}; }
+  }
+  // Page khulte hi Firestore se fresh copy (doosre user ke changes turant dikhein)
+  async function refreshFromServer(){
+    if(typeof fdb==='undefined') return;
+    try{
+      const [a,b]=await Promise.all([fdb.collection('crm_data').doc(KEY).get(), fdb.collection('crm_data').doc(TKEY).get()]);
+      if(a.exists && a.data() && Array.isArray(a.data().data)) DB.setLocal(KEY, a.data().data);
+      if(b.exists && b.data() && Array.isArray(b.data().data) && b.data().data.length) DB.setLocal(TKEY, b.data().data);
+    }catch(e){ console.log('bo refresh err',e); }
+  }
+
+  // ── client picker source ──
+  function pickerClients(){
+    let eq, mf;
+    if(canManage()){ eq=DB.get('eq_clients')||[]; mf=DB.get('mf_clients')||[]; }
+    else { eq=getMyEqClients(); mf=getMyMfClients(); }
+    const out=[];
+    eq.forEach(c=>out.push({seg:'equity',id:c.id,name:c.name||'',code:c.code||'',pan:c.pan||'',mobile:c.mobile||'',rm:c.rm||''}));
+    mf.forEach(c=>out.push({seg:'mf',id:c.id,name:c.name||'',code:c.client_id||'',pan:c.pan||'',mobile:c.mobile||'',rm:c.rm||''}));
+    return out;
+  }
+
+  // ── UI helpers ──
+  function stBadge(s){
+    const c=ST_COLOR[s]||{bg:'#f1f5f9',fg:'#475569'};
+    return `<span class="badge" style="background:${c.bg};color:${c.fg}">${esc(s||'—')}</span>`;
+  }
+  function fillSelect(id, values, first){
+    const el=$(id); if(!el) return;
+    const cur=el.value;
+    el.innerHTML=(first?`<option value="">${first}</option>`:'')+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if([...el.options].some(o=>o.value===cur)) el.value=cur;
+  }
+  function populateFilters(){
+    fillSelect('bo-type-filter', types(), 'All Types');
+    fillSelect('bo-status-filter', STATUSES, 'All Status');
+    const rms=[...new Set(visible().map(r=>r.rm).filter(Boolean))].sort();
+    fillSelect('bo-rm-filter', rms, 'All RMs');
+    const rmF=$('bo-rm-filter'); if(rmF) rmF.style.display=canManage()?'':'none';
+    const months=[...new Set(visible().map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    const mEl=$('bo-month-filter');
+    if(mEl){
+      const cur=mEl.value;
+      mEl.innerHTML='<option value="">All Months</option>'+months.map(m=>{
+        const d=new Date(m+'-01'); return `<option value="${m}">${d.toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</option>`;
+      }).join('');
+      if([...mEl.options].some(o=>o.value===cur)) mEl.value=cur;
+    }
+    const typesBtn=$('bo-types-btn'); if(typesBtn) typesBtn.style.display=(CU&&CU.role==='admin')?'inline-flex':'none';
+  }
+
+  function filtered(){
+    const q=($('bo-search')?.value||'').trim().toLowerCase();
+    const st=$('bo-status-filter')?.value||'';
+    const ty=$('bo-type-filter')?.value||'';
+    const rm=$('bo-rm-filter')?.value||'';
+    const sg=$('bo-seg-filter')?.value||'';
+    const mo=$('bo-month-filter')?.value||'';
+    return visible().filter(r=>{
+      if(st==='__OPEN__'){ if(!isOpen(r)) return false; }
+      else if(st==='__OVERDUE__'){ if(!(isOpen(r) && ageDays(r)>OVERDUE_DAYS)) return false; }
+      else if(st && r.status!==st) return false;
+      if(ty && r.type!==ty) return false;
+      if(rm && r.rm!==rm) return false;
+      if(sg && r.seg!==sg) return false;
+      if(mo && !(r.date||'').startsWith(mo)) return false;
+      if(q){
+        const hay=[r.client_name,r.client_code,r.pan,r.folio,r.ref_no,r.rta,r.remarks,r.type,r.rm].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    }).sort((a,b)=>{
+      // open pehle (sabse purani pehle), phir closed (latest pehle)
+      const ao=isOpen(a), bo=isOpen(b);
+      if(ao!==bo) return ao?-1:1;
+      if(ao) return String(a.date||'').localeCompare(String(b.date||''));
+      return String(b.completed_date||b.date||'').localeCompare(String(a.completed_date||a.date||''));
+    });
+  }
+
+  function renderStats(){
+    const v=visible(), open=v.filter(isOpen);
+    const overdue=open.filter(r=>ageDays(r)>OVERDUE_DAYS).length;
+    const docs=open.filter(r=>r.status==='Docs Pending').length;
+    const mo=today().slice(0,7);
+    const doneMonth=v.filter(r=>r.status==='Completed' && (r.completed_date||'').startsWith(mo)).length;
+    const chip=(n,l,c,f)=>`<div class="sq-stat-chip" style="--chip-accent:${c};cursor:pointer" onclick="BO.quickFilter('${f}')"><span class="n">${n}</span><span class="l">${l}</span></div>`;
+    const el=$('bo-stats'); if(!el) return;
+    el.innerHTML=chip(open.length,'Open Requests','#1e40af','__OPEN__')
+      +chip(overdue,'Overdue (>'+OVERDUE_DAYS+' days)','#dc2626','__OVERDUE__')
+      +chip(docs,'Docs Pending','#d97706','Docs Pending')
+      +chip(doneMonth,'Completed this month','#059669','Completed');
+  }
+
+  function renderTable(){
+    const rows=filtered();
+    const pages=Math.max(1,Math.ceil(rows.length/PAGE));
+    if(page>pages) page=pages;
+    const slice=rows.slice((page-1)*PAGE, page*PAGE);
+    const cnt=$('bo-count'); if(cnt) cnt.textContent=rows.length+' request'+(rows.length===1?'':'s');
+    const mg=canManage();
+    let h=`<table><thead><tr>
+      <th>Date</th><th>Client</th><th>Seg</th><th>Code / Folio</th><th>Request Type</th><th>RTA / AMC</th>
+      <th>RM</th><th>Status</th><th>Ref / Ack No.</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
+    </tr></thead><tbody>`;
+    if(!slice.length) h+=`<tr><td colspan="14" style="text-align:center;color:var(--gray);padding:18px">No back-office requests found</td></tr>`;
+    slice.forEach(r=>{
+      const age=ageDays(r), od=isOpen(r)&&age>OVERDUE_DAYS;
+      h+=`<tr${od?' style="background:#fff1f2"':''}>
+        <td>${fmtDate(r.date)}</td>
+        <td title="${esc(r.client_name)}"><b>${esc(r.client_name)}</b>${r.pan?`<br><small style="color:var(--gray)">${esc(r.pan)}</small>`:''}</td>
+        <td><span class="badge ${r.seg==='equity'?'b-eq':'b-mf'}">${r.seg==='equity'?'EQ':'MF'}</span></td>
+        <td>${esc(r.client_code||'')}${r.folio?`<br><small style="color:var(--gray)">F: ${esc(r.folio)}</small>`:''}</td>
+        <td><b>${esc(r.type)}</b></td>
+        <td>${esc(r.rta||'—')}</td>
+        <td>${esc(r.rm||'—')}</td>
+        <td>${mg?`<select onchange="BO.quickStatus('${r.id}',this.value)" style="padding:2px 4px;font-size:.66rem;border-radius:6px;font-weight:700;background:${(ST_COLOR[r.status]||{}).bg||'#fff'};color:${(ST_COLOR[r.status]||{}).fg||'#333'}">${STATUSES.map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select>`:stBadge(r.status)}</td>
+        <td>${esc(r.ref_no||'—')}</td>
+        <td>${fmtDate(r.submitted_date)||'—'}</td>
+        <td>${fmtDate(r.completed_date)||'—'}</td>
+        <td style="font-weight:700;color:${od?'#dc2626':isOpen(r)?'var(--navy)':'var(--gray)'}">${age}${od?' ⚠️':''}</td>
+        <td title="${esc(r.remarks)}" style="max-width:160px">${esc(r.remarks||'')}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-icon" onclick="BO.openView('${r.id}')" title="View / History">👁️</button>
+          ${mg?`<button class="btn-icon" onclick="BO.openEdit('${r.id}')" title="Edit">✏️</button>`:''}
+          ${canDelete()?`<button class="btn-icon" onclick="BO.del('${r.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}
+        </td></tr>`;
+    });
+    h+='</tbody></table>';
+    const t=$('bo-table'); if(t) t.innerHTML=h;
+    // pagination
+    const pg=$('bo-pg');
+    if(pg){
+      if(pages<=1){ pg.innerHTML=''; }
+      else{
+        let p=`<button class="pg-btn" ${page===1?'disabled':''} onclick="BO.go(${page-1})">‹</button>`;
+        for(let i=1;i<=pages;i++){ if(i===1||i===pages||Math.abs(i-page)<=2) p+=`<button class="pg-btn ${i===page?'active':''}" onclick="BO.go(${i})">${i}</button>`; else if(!p.endsWith('…</span>')) p+='<span class="pg-info">…</span>'; }
+        p+=`<button class="pg-btn" ${page===pages?'disabled':''} onclick="BO.go(${page+1})">›</button><span class="pg-info">${page}/${pages} (${rows.length})</span>`;
+        pg.innerHTML=p;
+      }
+    }
+  }
+
+  function render(){
+    populateFilters();
+    ensureSpecialStatusOptions();
+    renderStats(); renderTable();
+    // background me server se fresh copy, phir dobara render
+    refreshFromServer().then(()=>{ if(isPageActive()){ populateFilters(); ensureSpecialStatusOptions(); renderStats(); renderTable(); } updateBadge(); });
+  }
+  function ensureSpecialStatusOptions(){
+    const s=$('bo-status-filter'); if(!s) return;
+    if(![...s.options].some(o=>o.value==='__OPEN__')){
+      const cur=s.value;
+      s.insertAdjacentHTML('beforeend','<option value="__OPEN__">🔵 All Open</option><option value="__OVERDUE__">🔴 Overdue (&gt;'+OVERDUE_DAYS+' days)</option>');
+      s.value=cur;
+    }
+  }
+  function isPageActive(){ return !!document.getElementById('page-bo-work')?.classList.contains('active'); }
+  function filter(){ page=1; renderTable(); }
+  function go(p){ page=p; renderTable(); }
+  function quickFilter(v){ const s=$('bo-status-filter'); if(s){ ensureSpecialStatusOptions(); s.value=v; } filter(); }
+  function resetFilters(){ ['bo-search','bo-status-filter','bo-type-filter','bo-rm-filter','bo-seg-filter','bo-month-filter'].forEach(id=>{ const e=$(id); if(e) e.value=''; }); filter(); }
+
+  // ── Add / Edit modal ──
+  function modalHtml(r){
+    const mg=canManage();
+    const tOpts=types().map(t=>`<option ${r&&r.type===t?'selected':''}>${esc(t)}</option>`).join('');
+    const sOpts=STATUSES.map(s=>`<option ${(r?r.status:'Docs Pending')===s?'selected':''}>${s}</option>`).join('');
+    return `
+      <div class="form-row" ${r?'style="display:none"':''}>
+        <div class="form-field" style="position:relative">
+          <label>Client * (Equity / MF)</label>
+          <input type="text" id="bo_client_search" placeholder="🔍 Name / Code / PAN / Mobile..." autocomplete="off" oninput="BO.searchClient()" onfocus="BO.searchClient()">
+          <div id="bo_client_results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow2);max-height:260px;overflow-y:auto;z-index:60;margin-top:4px"></div>
+        </div>
+        <div class="form-field"><label>Selected Client</label><input type="text" id="bo_client_sel" readonly style="background:#f7f7f7" placeholder="No client selected"></div>
+      </div>
+      ${r?`<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem"><b>${esc(r.client_name)}</b> · ${r.seg==='equity'?'Equity':'MF'} · ${esc(r.client_code||'')} · RM: ${esc(r.rm||'—')}</div>`:''}
+      <div class="form-row three">
+        <div class="form-field"><label>Request Type *</label><select id="bo_type">${tOpts}</select></div>
+        <div class="form-field"><label>Request Date *</label><input type="date" id="bo_date" value="${esc(r?r.date:today())}"></div>
+        <div class="form-field"><label>Status</label><select id="bo_status" ${mg?'':'disabled'}>${sOpts}</select></div>
+      </div>
+      <div class="form-row three">
+        <div class="form-field"><label>RTA / AMC / Broker</label><input type="text" id="bo_rta" list="bo_rta_list" value="${esc(r?r.rta:'')}" placeholder="CAMS / KFintech / AMC name">
+          <datalist id="bo_rta_list"><option>CAMS</option><option>KFintech</option><option>MF Central</option><option>CDSL</option><option>NSDL</option><option>Broker (Equity)</option></datalist></div>
+        <div class="form-field"><label>Folio No. (if any)</label><input type="text" id="bo_folio" value="${esc(r?r.folio:'')}" placeholder="Folio / multiple folios"></div>
+        <div class="form-field"><label>Ref / Ack No.</label><input type="text" id="bo_ref" value="${esc(r?r.ref_no:'')}" ${mg?'':'disabled'}></div>
+      </div>
+      <div class="form-row three" ${mg?'':'style="display:none"'}>
+        <div class="form-field"><label>Submitted Date</label><input type="date" id="bo_sub" value="${esc(r?r.submitted_date:'')}"></div>
+        <div class="form-field"><label>Completed Date</label><input type="date" id="bo_done" value="${esc(r?r.completed_date:'')}"></div>
+        <div class="form-field"></div>
+      </div>
+      <div class="form-row full"><div class="form-field"><label>Remarks</label><textarea id="bo_remarks" placeholder="Kya documents chahiye / kya pending hai...">${esc(r?r.remarks:'')}</textarea></div></div>
+      ${mg?'':'<p style="font-size:.74rem;color:var(--gray)">ℹ️ Request "Docs Pending" status ke saath banegi — aage ka status Back Office update karega.</p>'}`;
+  }
+  function openAdd(){
+    editingId=null; picked=null;
+    $('boModalTitle').textContent='➕ New Back Office Request';
+    $('boModalBody').innerHTML=modalHtml(null);
+    $('boModal').classList.add('open');
+  }
+  function openEdit(id){
+    if(!canManage()){ toast('Only Back Office / Admin can edit','error'); return; }
+    const r=all().find(x=>x.id===id); if(!r) return;
+    editingId=id; picked=null;
+    $('boModalTitle').textContent='✏️ Edit Request — '+r.type;
+    $('boModalBody').innerHTML=modalHtml(r);
+    $('boModal').classList.add('open');
+  }
+  function searchClient(){
+    const q=($('bo_client_search')?.value||'').trim().toLowerCase();
+    const out=$('bo_client_results'); if(!out) return;
+    if(q.length<2){ out.style.display='none'; out.innerHTML=''; return; }
+    const m=pickerClients().filter(c=>(c.name+' '+c.code+' '+c.pan+' '+c.mobile).toLowerCase().includes(q)).slice(0,30);
+    out.innerHTML = m.length ? m.map(c=>`<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="BO.pick('${c.seg}','${c.id}')">
+        <div style="font-weight:600;font-size:.85rem"><span class="badge ${c.seg==='equity'?'b-eq':'b-mf'}">${c.seg==='equity'?'EQ':'MF'}</span> ${esc(c.name)}</div>
+        <div style="font-size:.74rem;color:var(--gray)">${esc(c.code||'—')} · ${esc(c.pan||'—')} · ${esc(c.mobile||'—')} · RM: ${esc(c.rm||'—')}</div></div>`).join('')
+      : '<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found</div>';
+    out.style.display='block';
+  }
+  function pick(seg,id){
+    const c=pickerClients().find(x=>x.seg===seg && x.id===id); if(!c) return;
+    picked=c;
+    $('bo_client_sel').value=c.name+' ('+(seg==='equity'?'EQ':'MF')+(c.code?' · '+c.code:'')+')';
+    $('bo_client_search').value='';
+    const out=$('bo_client_results'); out.style.display='none'; out.innerHTML='';
+  }
+  async function save(){
+    const mg=canManage();
+    const type=$('bo_type').value, date=$('bo_date').value;
+    if(!editingId && !picked){ toast('Please select a client','error'); return; }
+    if(!type){ toast('Please select request type','error'); return; }
+    if(!date){ toast('Please enter request date','error'); return; }
+    let status = mg ? $('bo_status').value : 'Docs Pending';
+    let sub = mg ? $('bo_sub').value : '';
+    let done = mg ? $('bo_done').value : '';
+    if(status==='Submitted' && !sub) sub=today();
+    if((status==='Completed'||status==='Rejected') && !done) done=today();
+    if(done && status!=='Completed' && status!=='Rejected') done='';
+    const fields={
+      type, date, status,
+      rta:$('bo_rta').value.trim(), folio:$('bo_folio').value.trim(),
+      ref_no: mg ? $('bo_ref').value.trim() : '',
+      submitted_date:sub, completed_date:done,
+      remarks:$('bo_remarks').value.trim()
+    };
+    const now=new Date().toISOString();
+    let res;
+    if(editingId){
+      const id=editingId;
+      res=await mutate(arr=>{
+        const r=arr.find(x=>x.id===id); if(!r) return false;
+        const prevStatus=r.status;
+        Object.assign(r, fields, {updated_by:CU.name, updated_at:now});
+        r.history=r.history||[];
+        if(prevStatus!==fields.status) r.history.push({at:now,by:CU.name,status:fields.status,note:'Status: '+prevStatus+' → '+fields.status});
+        else r.history.push({at:now,by:CU.name,status:fields.status,note:'Edited'});
+      });
+    } else {
+      const rec={id:uid(), seg:picked.seg, client_id:picked.id, client_name:picked.name, client_code:picked.code,
+        pan:picked.pan, rm:picked.rm, ...fields, created_by:CU.name, created_at:now,
+        history:[{at:now,by:CU.name,status:fields.status,note:'Request created'}]};
+      res=await mutate(arr=>{ if(arr.some(x=>x.id===rec.id)) return false; arr.push(rec); });
+    }
+    if(!res.ok && !res.aborted){ toast('⚠️ Save failed — '+(res.error||'please retry'),'error'); return; }
+    closeModal('boModal');
+    toast(editingId?'Request updated ✓':'Request added ✓','success');
+    editingId=null; picked=null;
+    afterChange();
+  }
+  async function quickStatus(id,status){
+    if(!canManage()) return;
+    const now=new Date().toISOString();
+    const res=await mutate(arr=>{
+      const r=arr.find(x=>x.id===id); if(!r || r.status===status) return false;
+      const prev=r.status; r.status=status;
+      if(status==='Submitted' && !r.submitted_date) r.submitted_date=today();
+      if((status==='Completed'||status==='Rejected') && !r.completed_date) r.completed_date=today();
+      if(status!=='Completed' && status!=='Rejected') r.completed_date='';
+      r.updated_by=CU.name; r.updated_at=now;
+      (r.history=r.history||[]).push({at:now,by:CU.name,status,note:'Status: '+prev+' → '+status});
+    });
+    if(!res.ok && !res.aborted) toast('⚠️ Update failed — '+(res.error||''),'error');
+    else if(res.ok) toast('Status → '+status,'success');
+    afterChange();
+  }
+  async function del(id){
+    if(!canDelete()) return;
+    const r=all().find(x=>x.id===id); if(!r) return;
+    if(!confirm('Delete this request?\n\n'+r.client_name+' — '+r.type)) return;
+    const res=await mutate(arr=>{ const i=arr.findIndex(x=>x.id===id); if(i<0) return false; arr.splice(i,1); });
+    if(!res.ok && !res.aborted){ toast('⚠️ Delete failed — '+(res.error||''),'error'); return; }
+    toast('Deleted','success'); afterChange();
+  }
+  function afterChange(){ if(isPageActive()){ populateFilters(); ensureSpecialStatusOptions(); renderStats(); renderTable(); } updateBadge(); renderDashCard(); }
+
+  // ── view / history ──
+  function openView(id){
+    const r=all().find(x=>x.id===id); if(!r) return;
+    const hist=(r.history||[]).slice().reverse();
+    $('boModalTitle').textContent='📄 '+r.type+' — '+r.client_name;
+    $('boModalBody').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        ${di2('Client',r.client_name)}${di2('Segment',r.seg==='equity'?'Equity':'Mutual Fund')}${di2('Code',r.client_code)}
+        ${di2('PAN',r.pan)}${di2('RM',r.rm)}${di2('Status',stBadge(r.status),true)}
+        ${di2('Request Date',fmtDate(r.date))}${di2('Submitted',fmtDate(r.submitted_date))}${di2('Completed',fmtDate(r.completed_date))}
+        ${di2('RTA / AMC',r.rta)}${di2('Folio',r.folio)}${di2('Ref / Ack No.',r.ref_no)}
+        ${di2('Days',ageDays(r)+(isOpen(r)?' (open)':''))}${di2('Created By',r.created_by)}${di2('Last Updated',r.updated_by?(r.updated_by+' · '+fmtDate((r.updated_at||'').slice(0,10))):'')}
+      </div>
+      ${r.remarks?`<div class="form-field"><label>Remarks</label><div style="font-size:.85rem;white-space:pre-wrap">${esc(r.remarks)}</div></div>`:''}
+      <div class="form-section">🕐 History (${hist.length})</div>
+      ${hist.map(h=>`<div class="call-log-item"><div class="call-date">${fmtDate((h.at||'').slice(0,10))} ${(h.at||'').slice(11,16)} — ${esc(h.by||'')}</div><div class="call-note">${esc(h.note||'')}</div></div>`).join('')||'<p style="color:var(--gray);font-size:.82rem">No history</p>'}
+      ${canManage()?`<div style="text-align:right;margin-top:10px"><button class="btn btn-primary" onclick="BO.openEdit('${r.id}')">✏️ Edit</button></div>`:''}`;
+    $('boModal').classList.add('open');
+    const sb=$('boSaveBtn'); if(sb) sb.style.display='none';
+  }
+  function di2(l,v,raw){ return `<div class="form-field"><label>${l}</label><div style="font-size:.85rem;font-weight:600;color:var(--navy);padding:3px 0">${v?(raw?v:esc(v)):'<span style="color:#ccc">—</span>'}</div></div>`; }
+
+  // Client View popup me history section
+  function clientHistoryHtml(clientId, seg){
+    const list=all().filter(r=>r.client_id===clientId && r.seg===(seg==='equity'?'equity':'mf'))
+      .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    let h=`<div class="form-section" style="margin-top:14px">🗂️ Back Office Requests (${list.length})</div>`;
+    if(!list.length) return h+'<p style="color:var(--gray);font-size:.82rem">No back-office requests.</p>';
+    return h+list.map(r=>`<div class="call-log-item" style="cursor:pointer;border-left-color:${(ST_COLOR[r.status]||{}).fg||'#999'}" onclick="closeModal('viewModal');BO.openView('${r.id}')">
+      <div class="call-date">${fmtDate(r.date)} — ${esc(r.type)}${r.rta?' · '+esc(r.rta):''}</div>
+      <div class="call-status">${stBadge(r.status)} ${r.ref_no?'· Ref: '+esc(r.ref_no):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
+      ${r.remarks?`<div class="call-note">${esc(r.remarks)}</div>`:''}</div>`).join('');
+  }
+
+  // ── Request types (admin) ──
+  function openTypes(){
+    if(!(CU&&CU.role==='admin')) return;
+    $('boModalTitle').textContent='⚙️ Request Types';
+    $('boModalBody').innerHTML=`<p style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Ek line me ek type. Purani requests par koi asar nahi hoga.</p>
+      <textarea id="bo_types_text" style="width:100%;min-height:260px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.85rem">${esc(types().join('\n'))}</textarea>
+      <div style="display:flex;justify-content:space-between;margin-top:10px">
+        <button class="btn btn-outline" onclick="BO.defaultTypes()">↺ Default list</button>
+        <button class="btn btn-primary" onclick="BO.saveTypesFromModal()">💾 Save Types</button></div>`;
+    const sb=$('boSaveBtn'); if(sb) sb.style.display='none';
+    $('boModal').classList.add('open');
+  }
+  async function saveTypesFromModal(){
+    const list=[...new Set(($('bo_types_text').value||'').split('\n').map(s=>s.trim()).filter(Boolean))];
+    if(!list.length){ toast('At least one type required','error'); return; }
+    const r=await saveTypes(list);
+    if(!r.ok){ toast('⚠️ Save failed — '+(r.error||''),'error'); return; }
+    closeModal('boModal'); toast('Types saved ✓','success'); if(isPageActive()) populateFilters();
+  }
+
+  // ── Excel export ──
+  function exportXlsx(){
+    const rows=filtered();
+    const cols=[{header:'Date',width:12},{header:'Client',width:28},{header:'Segment',width:9},{header:'Code',width:12},{header:'PAN',width:12},
+      {header:'Request Type',width:24},{header:'RTA / AMC',width:14},{header:'Folio',width:14},{header:'RM',width:12},
+      {header:'Status',width:13,color:v=>dnStatusColor(v)},{header:'Ref / Ack No.',width:16},{header:'Submitted',width:12},{header:'Completed',width:12},
+      {header:'Days',width:7,num:true},{header:'Remarks',width:40},{header:'Created By',width:12}];
+    const data=rows.map(r=>[fmtDate(r.date),r.client_name,r.seg==='equity'?'Equity':'MF',r.client_code,r.pan,r.type,r.rta,r.folio,r.rm,
+      r.status,r.ref_no,fmtDate(r.submitted_date),fmtDate(r.completed_date),ageDays(r),r.remarks,r.created_by]);
+    dnXlsx('Back_Office_Requests_'+today()+'.xlsx','D N Investment — Back Office Requests ('+today()+')',cols,data);
+  }
+
+  // ── Sidebar badge + dashboard card ──
+  function updateBadge(){
+    const nb=$('nb-bo'); if(!nb || !CU) return;
+    const open=visible().filter(isOpen);
+    const od=open.filter(r=>ageDays(r)>OVERDUE_DAYS).length;
+    nb.textContent=open.length;
+    nb.style.display=open.length?'':'none';
+    nb.classList.toggle('red', od>0);
+    nb.title=open.length+' open'+(od?', '+od+' overdue':'');
+  }
+  function renderDashCard(){
+    const card=$('boDashCard'); if(!card || !CU) return;
+    const open=visible().filter(isOpen);
+    if(!open.length){ card.style.display='none'; return; }
+    card.style.display='';
+    const od=open.filter(r=>ageDays(r)>OVERDUE_DAYS);
+    const byType={}; open.forEach(r=>{ byType[r.type]=(byType[r.type]||0)+1; });
+    const top=open.slice().sort((a,b)=>ageDays(b)-ageDays(a)).slice(0,5);
+    card.innerHTML=`<h3 onclick="showPage('bo-work')" style="cursor:pointer">🗂️ Pending Back Office Work
+        <span style="background:var(--navy);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem;margin-left:auto">${open.length} open</span>
+        ${od.length?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem">${od.length} overdue</span>`:''}</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`<span class="badge" style="background:var(--blue2);color:var(--navy)">${esc(t)}: ${n}</span>`).join('')}</div>
+      ${top.map(r=>{ const a=ageDays(r), o=a>OVERDUE_DAYS; return `<div class="bar-row" style="cursor:pointer" onclick="BO.openView('${r.id}')">
+        <span class="bar-name" style="max-width:none;flex:1">${esc(r.client_name)} <small style="color:var(--gray)">— ${esc(r.type)}</small></span>
+        ${stBadge(r.status)}<span style="font-size:.72rem;font-weight:700;margin-left:8px;color:${o?'var(--red)':'var(--gray)'}">${a}d</span></div>`; }).join('')}`;
+  }
+
+  // dropdown band karo bahar click par
+  document.addEventListener('click', e=>{
+    const inp=$('bo_client_search'), out=$('bo_client_results');
+    if(inp && out && !inp.contains(e.target) && !out.contains(e.target)) out.style.display='none';
+  });
+  // modal khulte waqt Save button wapas dikhao (view/types me chhupta hai)
+  function resetSaveBtn(){ const sb=$('boSaveBtn'); if(sb) sb.style.display=''; }
+  const _openAdd=openAdd, _openEdit=openEdit;
+
+  return {
+    render, filter, go, quickFilter, resetFilters,
+    openAdd:()=>{ resetSaveBtn(); _openAdd(); },
+    openEdit:id=>{ resetSaveBtn(); _openEdit(id); },
+    openView, searchClient, pick, save, quickStatus, del,
+    openTypes, saveTypesFromModal, exportXlsx,
+    defaultTypes:()=>{ const t=document.getElementById('bo_types_text'); if(t) t.value=DEFAULT_TYPES.join('\n'); },
+    updateBadge, renderDashCard, clientHistoryHtml,
+    STATUSES
+  };
+})();
+// app-1 ka refreshDash/updateBadges is file ke load hone se pehle chal chuka ho sakta hai
+try{ if(typeof CU!=='undefined' && CU){ BO.updateBadge(); BO.renderDashCard(); } }catch(_){}

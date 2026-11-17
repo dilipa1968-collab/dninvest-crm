@@ -1189,7 +1189,7 @@ const DB = {
     // login, page refresh, and the 30-min auto-reload, so a sequential for-loop here
     // directly adds up to slow login/page-open times (each collection = one network
     // round-trip; sequential = sum of all of them, parallel = the slowest single one).
-    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk'].map(async (key)=>{
+    await Promise.all(['eq_clients','mf_clients','leads','seminars','users','call_logs','mf_business','announcement','activity_logs','rm_messages','meeting_agenda','meeting_agenda_archive','learned_fund_names','incentive_config','rm_sales_summary','comm_history','eq_risk','bo_requests','bo_types'].map(async (key)=>{
       try{
         // ── sharded keys: read every shard, auto-migrate on first run ──
         if(this._isSharded(key)){
@@ -3052,6 +3052,7 @@ function showPage(id){
   else if(id==='rm-messages') renderRmMessages();
   else if(id==='dashboard') refreshDash();
   else if(id==='other-products') renderOpPage();
+  else if(id==='bo-work'){ if(window.BO) BO.render(); }
 
   closeSidebar();
 }
@@ -3760,6 +3761,7 @@ function dashShowMoreToggle(extraId, btnWrapId, extraCount){
 }
 
 function refreshDash(){
+  try{ if(window.BO) BO.renderDashCard(); }catch(_){}
   try{ scheduleBdayFlush(); }catch(e){}   // un-synced birthday "Sent" stamps dobara bhejo
   const eq = getMyEqClients();
   const activeEq = getActiveEqClients();
@@ -4492,6 +4494,7 @@ function _safeAutoReload(){
 setInterval(_safeAutoReload, 30*60*1000);
 
 function updateBadges(){
+  try{ if(window.BO) BO.updateBadge(); }catch(_){}
   const eq=getMyEqClients(), mf=getMyMfClients();
   const activeEq=getActiveEqClients();
   document.getElementById('nb-leads').textContent=getMyLeads().length;
@@ -7518,6 +7521,8 @@ function viewClient(id,seg){
       </div></div>`).join('');
   } else body+='<p style="color:var(--gray);font-size:.82rem">No call logs yet.</p>';
   body+=`<div id="oldCallsBox" style="margin-top:10px"><button class="btn btn-outline" style="padding:5px 14px" onclick="loadOlderCalls('${id}','${seg}')">📂 View older calls (all months)</button></div>`;
+  // 17-Nov-2026: is client ki Back Office requests (ARN transfer, bank update...) ki history
+  try{ if(window.BO) body+=BO.clientHistoryHtml(id,seg); }catch(_){}
 
   document.getElementById('viewModalBody').innerHTML=body;
   document.getElementById('viewModal').classList.add('open');
