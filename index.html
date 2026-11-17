@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-17-v5';
+  const APP_VERSION = '2026-11-17-v6';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -1403,7 +1403,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       </div>
 
       <div class="sidebar-section" id="bo-nav-section">Back Office</div>
-      <div class="nav-item" onclick="showPage('bo-work')" id="nav-bo-work" title="ARN transfer, bank update, nominee, KYC jaise back-office kaam">
+      <div class="nav-item" onclick="showPage('bo-work')" id="nav-bo-work" title="Back office requests — ARN transfer, bank update, nominee, KYC and more">
         <span class="icon">🗂️</span> Back Office Work
         <span class="nav-badge" id="nb-bo" style="display:none">0</span>
       </div>
@@ -2241,7 +2241,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         </div>
         <div class="sq-stat-strip" id="bo-stats" style="padding:0 0 10px"></div>
         <div class="filters">
-          <input type="text" id="bo-search" placeholder="🔍 Client / code / PAN / folio / via..." oninput="BO.filter()" autocomplete="off">
+          <input type="text" id="bo-search" placeholder="🔍 Search client / code / PAN / folio..." oninput="BO.filter()" autocomplete="off">
           <select id="bo-status-filter" onchange="BO.filter()"><option value="">All Status</option></select>
           <select id="bo-type-filter" onchange="BO.filter()"><option value="">All Types</option></select>
           <select id="bo-rm-filter" onchange="BO.filter()"><option value="">All RMs</option></select>
@@ -3352,11 +3352,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-17-v2"></script>
+<script src="dninvest-app-1.js?v=2026-11-17-v6"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
-<script src="dninvest-backoffice.js?v=2026-11-17-v5"></script>
+<script src="dninvest-backoffice.js?v=2026-11-17-v6"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">

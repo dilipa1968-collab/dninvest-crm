@@ -24,14 +24,27 @@ window.BO = (function(){
   const KEY='bo_requests', TKEY='bo_types';
   // Segment-wise lists (17-Nov-2026) — entry ke time sirf client ke segment ke options dikhte hain.
   // Admin "⚙️ Lists" se badal sakta hai. Firestore crm_data/bo_types = {mf_types,eq_types,mf_modes,eq_modes}
+  const MF_TYPES=['ARN Transfer','Address Change','Bank Account Change','Bank Mandate (OTM) Registration',
+    'Folio Consolidation','KYC Modification','Minor to Major','Mobile / Email Update','Nominee Update','Transmission','Other'];
+  const MF_MODES=['BSE StAR MF','CAMS','Client Login','KFintech','Mail','MFCentral','NSE MF','Physical'];
   const DEFAULTS={
-    mf_types:['ARN Transfer','Bank Account Change','Bank Mandate (OTM) Registration','Nominee Update','KYC Modification',
-      'Mobile / Email Update','Address Change','Transmission','Minor to Major','Folio Consolidation','Other'],
-    eq_types:['Bank Account Change','Nominee Update','KYC Modification','Mobile / Email Update','Address Change',
-      'DDPI / POA','Segment Activation','Demat Transfer / Broker Change','Demat Closure','Transmission','Other'],
-    mf_modes:['NSE MF','BSE StAR','CAMS','KFintech','MF Central','Physical','Mail','Client Login'],
-    eq_modes:['CIS','Web Admin','Physical','Mail','Client Login']
+    mf_types:MF_TYPES,
+    // Equity = poori list (MF ke saare options bhi) — user request 17-Nov-2026
+    eq_types:[...new Set([...MF_TYPES,'DDPI / POA','Demat Closure','Demat Transfer / Broker Change','Segment Activation'])],
+    mf_modes:MF_MODES,
+    eq_modes:[...new Set([...MF_MODES,'CIS','Web Admin'])]
   };
+  // Alphabetical (case-insensitive), "Other" hamesha last
+  function sortList(list){
+    return [...new Set(list)].sort((a,b)=>{
+      const ao=/^other$/i.test(a), bo=/^other$/i.test(b);
+      if(ao!==bo) return ao?1:-1;
+      return a.localeCompare(b,'en',{sensitivity:'base'});
+    });
+  }
+  // purane spelling ko sahi naam pe map karo
+  const MODE_FIX={'MF Central':'MFCentral','BSE StAR':'BSE StAR MF','BSE Star':'BSE StAR MF','Kfintech':'KFintech'};
+  const normMode = m => MODE_FIX[m] || m || '';
   const STATUSES=['Docs Pending','Submitted','In Process','Completed','Rejected'];
   const ST_COLOR={
     'Docs Pending':{bg:'#fef3c7',fg:'#92400e'},
@@ -74,16 +87,16 @@ window.BO = (function(){
     Object.keys(DEFAULTS).forEach(k=>{
       let v = (t && !Array.isArray(t) && Array.isArray(t[k]) && t[k].length) ? t[k] : null;
       if(!v && Array.isArray(t) && t.length && /_types$/.test(k)) v=t;   // purana flat format
-      out[k]=(v||DEFAULTS[k]).slice();
+      out[k]=sortList((v||DEFAULTS[k]).map(x=>/_modes$/.test(k)?normMode(x):x));
     });
     return out;
   }
   const segKey = seg => seg==='equity' ? 'eq' : 'mf';
   function typesFor(seg){ return cfg()[segKey(seg)+'_types']; }
   function modesFor(seg){ return cfg()[segKey(seg)+'_modes']; }
-  function types(){ const c=cfg(); return [...new Set([...c.mf_types,...c.eq_types])]; }
+  function types(){ const c=cfg(); return sortList([...c.mf_types,...c.eq_types]); }
   function optList(list, cur, placeholder){
-    const l=[...list, ...((cur && !list.includes(cur))?[cur]:[])];
+    const l=sortList([...list, ...((cur && !list.includes(cur))?[cur]:[])]);
     return `<option value="">${placeholder}</option>`+l.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
   }
   // entry ke waqt default segment: edit me record ka, nayi entry me agar sirf ek segment ki permission ho to wahi
@@ -97,8 +110,8 @@ window.BO = (function(){
   function fillSegOptions(seg, curType, curMode){
     const t=$('bo_type'), m=$('bo_mode'); if(!t||!m) return;
     if(!seg){
-      t.innerHTML='<option value="">— pehle client chuniye —</option>'; t.disabled=true;
-      m.innerHTML='<option value="">— pehle client chuniye —</option>'; m.disabled=true;
+      t.innerHTML='<option value="">— Select a client first —</option>'; t.disabled=true;
+      m.innerHTML='<option value="">— Select a client first —</option>'; m.disabled=true;
       return;
     }
     t.disabled=false; m.disabled=false;
@@ -264,7 +277,7 @@ window.BO = (function(){
       <th>Date</th><th>Client</th><th>Seg</th><th>Code / Folio</th><th>Request Type</th><th>RTA / AMC</th>
       <th>Client RM</th><th>Entry By</th><th>Status</th><th>Submitted Via</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
     </tr></thead><tbody>`;
-    if(!slice.length) h+=`<tr><td colspan="15" style="text-align:center;color:var(--gray);padding:18px">No back-office requests found</td></tr>`;
+    if(!slice.length) h+=`<tr><td colspan="15" style="text-align:center;color:var(--gray);padding:18px">No back office requests found</td></tr>`;
     slice.forEach(r=>{
       const age=ageDays(r), od=isOpen(r)&&age>OVERDUE_DAYS, mg=canSeg(r.seg);
       h+=`<tr${od?' style="background:#fff1f2"':''}>
@@ -277,7 +290,7 @@ window.BO = (function(){
         <td><b style="color:var(--navy)">${esc(clientRm(r)||'—')}</b></td>
         <td title="${esc(r.created_at?('Entry: '+r.created_at.slice(0,16).replace('T',' ')):'')}">${esc(r.created_by||'—')}${r.updated_by&&r.updated_by!==r.created_by?`<br><small style="color:var(--gray)">Upd: ${esc(r.updated_by)}</small>`:''}</td>
         <td>${mg?`<select onchange="BO.quickStatus('${r.id}',this.value)" style="padding:2px 4px;font-size:.66rem;border-radius:6px;font-weight:700;background:${(ST_COLOR[r.status]||{}).bg||'#fff'};color:${(ST_COLOR[r.status]||{}).fg||'#333'}">${STATUSES.map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select>`:stBadge(r.status)}</td>
-        <td>${r.mode?`<span class="badge" style="background:#e0f2fe;color:#075985">${esc(r.mode)}</span>`:esc(r.ref_no||'—')}</td>
+        <td>${r.mode?`<span class="badge" style="background:#e0f2fe;color:#075985">${esc(normMode(r.mode))}</span>`:esc(r.ref_no||'—')}</td>
         <td>${fmtDate(r.submitted_date)||'—'}</td>
         <td>${fmtDate(r.completed_date)||'—'}</td>
         <td style="font-weight:700;color:${od?'#dc2626':isOpen(r)?'var(--navy)':'var(--gray)'}">${age}${od?' ⚠️':''}</td>
@@ -345,7 +358,7 @@ window.BO = (function(){
       </div>
       <div class="form-row three">
         <div class="form-field"><label>RTA / AMC / Broker</label><input type="text" id="bo_rta" list="bo_rta_list" value="${esc(r?r.rta:'')}" placeholder="CAMS / KFintech / AMC name">
-          <datalist id="bo_rta_list"><option>CAMS</option><option>KFintech</option><option>MF Central</option><option>CDSL</option><option>NSDL</option><option>Broker (Equity)</option></datalist></div>
+          <datalist id="bo_rta_list"><option>Broker (Equity)</option><option>CAMS</option><option>CDSL</option><option>KFintech</option><option>MFCentral</option><option>NSDL</option></datalist></div>
         <div class="form-field"><label>Folio No. (if any)</label><input type="text" id="bo_folio" value="${esc(r?r.folio:'')}" placeholder="Folio / multiple folios"></div>
         <div class="form-field"><label>Submitted Via</label><select id="bo_mode"></select></div>
       </div>
@@ -354,11 +367,11 @@ window.BO = (function(){
         <div class="form-field"><label>Completed Date</label><input type="date" id="bo_done" value="${esc(r?r.completed_date:'')}"></div>
         <div class="form-field"></div>
       </div>
-      <div class="form-row full"><div class="form-field"><label>Remarks</label><textarea id="bo_remarks" placeholder="Kya documents chahiye / kya pending hai...">${esc(r?r.remarks:'')}</textarea></div></div>
-      ${(!r && !(canSeg('equity')&&canSeg('mf')))?`<p style="font-size:.74rem;color:var(--gray)">ℹ️ Aapko sirf ${canSeg('equity')?'Equity':'MF'} requests ki permission hai — search me wahi clients aayenge.</p>`:''}`;
+      <div class="form-row full"><div class="form-field"><label>Remarks</label><textarea id="bo_remarks" placeholder="Documents required / pending items...">${esc(r?r.remarks:'')}</textarea></div></div>
+      ${(!r && !(canSeg('equity')&&canSeg('mf')))?`<p style="font-size:.74rem;color:var(--gray)">ℹ️ You have permission for ${canSeg('equity')?'Equity':'Mutual Fund'} requests only — the search will show only those clients.</p>`:''}`;
   }
   function openAdd(){
-    if(!canAddAny()){ toast('Back Office entry permission nahi hai — Admin se lijiye','error'); return; }
+    if(!canAddAny()){ toast('You do not have Back Office entry permission. Please contact Admin.','error'); return; }
     editingId=null; picked=null;
     $('boModalTitle').textContent='➕ New Back Office Request';
     $('boModalBody').innerHTML=modalHtml(null);
@@ -367,11 +380,11 @@ window.BO = (function(){
   }
   function openEdit(id){
     const r=all().find(x=>x.id===id); if(!r) return;
-    if(!canSeg(r.seg)){ toast('Is segment ki edit permission nahi hai','error'); return; }
+    if(!canSeg(r.seg)){ toast('You do not have edit permission for this segment.','error'); return; }
     editingId=id; picked=null;
     $('boModalTitle').textContent='✏️ Edit Request — '+r.type;
     $('boModalBody').innerHTML=modalHtml(r);
-    fillSegOptions(r.seg, r.type, r.mode);
+    fillSegOptions(r.seg, r.type, normMode(r.mode));
     $('boModal').classList.add('open');
   }
   function searchClient(){
@@ -399,12 +412,12 @@ window.BO = (function(){
   async function save(){
     const editRec = editingId ? all().find(x=>x.id===editingId) : null;
     const segOf = editRec ? editRec.seg : (picked ? picked.seg : null);
-    if(segOf && !canSeg(segOf)){ toast('Is segment ki entry permission nahi hai','error'); return; }
+    if(segOf && !canSeg(segOf)){ toast('You do not have entry permission for this segment.','error'); return; }
     const mg=true;
     const type=$('bo_type').value, date=$('bo_date').value;
     if(!editingId && !picked){ toast('Please select a client','error'); return; }
-    if(!type){ toast('Please select request type','error'); return; }
-    if(!date){ toast('Please enter request date','error'); return; }
+    if(!type){ toast('Please select a request type','error'); return; }
+    if(!date){ toast('Please enter the request date','error'); return; }
     let status = mg ? $('bo_status').value : 'Docs Pending';
     let sub = mg ? $('bo_sub').value : '';
     let done = mg ? $('bo_done').value : '';
@@ -427,8 +440,8 @@ window.BO = (function(){
         const prevStatus=r.status;
         Object.assign(r, fields, {updated_by:CU.name, updated_at:now});
         r.history=r.history||[];
-        if(prevStatus!==fields.status) r.history.push({at:now,by:CU.name,status:fields.status,note:'Status: '+prevStatus+' → '+fields.status});
-        else r.history.push({at:now,by:CU.name,status:fields.status,note:'Edited'});
+        if(prevStatus!==fields.status) r.history.push({at:now,by:CU.name,status:fields.status,note:'Status changed: '+prevStatus+' → '+fields.status});
+        else r.history.push({at:now,by:CU.name,status:fields.status,note:'Details edited'});
       });
     } else {
       const rec={id:uid(), seg:picked.seg, client_id:picked.id, client_name:picked.name, client_code:picked.code,
@@ -438,7 +451,7 @@ window.BO = (function(){
     }
     if(!res.ok && !res.aborted){ toast('⚠️ Save failed — '+(res.error||'please retry'),'error'); return; }
     closeModal('boModal');
-    toast(editingId?'Request updated ✓':'Request added ✓','success');
+    toast(editingId?'Request updated successfully ✓':'Request added successfully ✓','success');
     editingId=null; picked=null;
     afterChange();
   }
@@ -452,19 +465,19 @@ window.BO = (function(){
       if((status==='Completed'||status==='Rejected') && !r.completed_date) r.completed_date=today();
       if(status!=='Completed' && status!=='Rejected') r.completed_date='';
       r.updated_by=CU.name; r.updated_at=now;
-      (r.history=r.history||[]).push({at:now,by:CU.name,status,note:'Status: '+prev+' → '+status});
+      (r.history=r.history||[]).push({at:now,by:CU.name,status,note:'Status changed: '+prev+' → '+status});
     });
     if(!res.ok && !res.aborted) toast('⚠️ Update failed — '+(res.error||''),'error');
-    else if(res.ok) toast('Status → '+status,'success');
+    else if(res.ok) toast('Status updated to '+status,'success');
     afterChange();
   }
   async function del(id){
     if(!canDelete()) return;
     const r=all().find(x=>x.id===id); if(!r) return;
-    if(!confirm('Delete this request?\n\n'+r.client_name+' — '+r.type)) return;
+    if(!confirm('Are you sure you want to delete this request?\n\n'+r.client_name+' — '+r.type)) return;
     const res=await mutate(arr=>{ const i=arr.findIndex(x=>x.id===id); if(i<0) return false; arr.splice(i,1); });
     if(!res.ok && !res.aborted){ toast('⚠️ Delete failed — '+(res.error||''),'error'); return; }
-    toast('Deleted','success'); afterChange();
+    toast('Request deleted','success'); afterChange();
   }
   function afterChange(){ if(isPageActive()){ populateFilters(); ensureSpecialStatusOptions(); renderStats(); renderTable(); } updateBadge(); renderDashCard(); }
 
@@ -478,8 +491,8 @@ window.BO = (function(){
         ${di2('Client',r.client_name)}${di2('Segment',r.seg==='equity'?'Equity':'Mutual Fund')}${di2('Code',r.client_code)}
         ${di2('PAN',r.pan)}${di2('Client RM',clientRm(r))}${di2('Status',stBadge(r.status),true)}
         ${di2('Request Date',fmtDate(r.date))}${di2('Submitted',fmtDate(r.submitted_date))}${di2('Completed',fmtDate(r.completed_date))}
-        ${di2('RTA / AMC',r.rta)}${di2('Folio',r.folio)}${di2('Submitted Via',r.mode)}${r.ref_no?di2('Ref / Ack No. (old)',r.ref_no):''}
-        ${di2('Days',ageDays(r)+(isOpen(r)?' (open)':''))}${di2('Entry By',r.created_by)}${di2('Last Updated',r.updated_by?(r.updated_by+' · '+fmtDate((r.updated_at||'').slice(0,10))):'')}
+        ${di2('RTA / AMC',r.rta)}${di2('Folio',r.folio)}${di2('Submitted Via',normMode(r.mode))}${r.ref_no?di2('Ref / Ack No. (old)',r.ref_no):''}
+        ${di2('Days',ageDays(r)+(isOpen(r)?' (Open)':''))}${di2('Entry By',r.created_by)}${di2('Last Updated',r.updated_by?(r.updated_by+' · '+fmtDate((r.updated_at||'').slice(0,10))):'')}
       </div>
       ${r.remarks?`<div class="form-field"><label>Remarks</label><div style="font-size:.85rem;white-space:pre-wrap">${esc(r.remarks)}</div></div>`:''}
       <div class="form-section">🕐 History (${hist.length})</div>
@@ -495,26 +508,26 @@ window.BO = (function(){
     const list=all().filter(r=>r.client_id===clientId && r.seg===(seg==='equity'?'equity':'mf'))
       .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     let h=`<div class="form-section" style="margin-top:14px">🗂️ Back Office Requests (${list.length})</div>`;
-    if(!list.length) return h+'<p style="color:var(--gray);font-size:.82rem">No back-office requests.</p>';
+    if(!list.length) return h+'<p style="color:var(--gray);font-size:.82rem">No back office requests yet.</p>';
     return h+list.map(r=>`<div class="call-log-item" style="cursor:pointer;border-left-color:${(ST_COLOR[r.status]||{}).fg||'#999'}" onclick="closeModal('viewModal');BO.openView('${r.id}')">
       <div class="call-date">${fmtDate(r.date)} — ${esc(r.type)}${r.rta?' · '+esc(r.rta):''}</div>
-      <div class="call-status">${stBadge(r.status)} · By: ${esc(r.created_by||'—')} ${r.mode?'· Via: '+esc(r.mode):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
+      <div class="call-status">${stBadge(r.status)} · By: ${esc(r.created_by||'—')} ${r.mode?'· Via: '+esc(normMode(r.mode)):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
       ${r.remarks?`<div class="call-note">${esc(r.remarks)}</div>`:''}</div>`).join('');
   }
 
   // ── Request types (admin) ──
-  const LIST_LABELS={mf_types:'🏦 MF — Request Types',mf_modes:'🏦 MF — Submitted Via',eq_types:'📈 Equity — Request Types',eq_modes:'📈 Equity — Submitted Via'};
+  const LIST_LABELS={mf_types:'🏦 Mutual Fund — Request Types',mf_modes:'🏦 Mutual Fund — Submitted Via',eq_types:'📈 Equity — Request Types',eq_modes:'📈 Equity — Submitted Via'};
   function openTypes(){
     if(!(CU&&CU.role==='admin')) return;
     const c=cfg();
     $('boModalTitle').textContent='⚙️ Request Types / Submitted Via';
-    $('boModalBody').innerHTML=`<p style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Ek line me ek option. Entry ke time client ke segment wali list hi dikhegi. Purani requests par koi asar nahi hoga.</p>
+    $('boModalBody').innerHTML=`<p style="font-size:.8rem;color:var(--gray);margin-bottom:8px">One option per line. During entry, only the list for the client's segment is shown. Lists are sorted alphabetically ("Other" is always last). Existing requests are not affected.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       ${Object.keys(LIST_LABELS).map(k=>`<div class="form-field"><label>${LIST_LABELS[k]}</label>
         <textarea id="bo_list_${k}" style="width:100%;min-height:${/_types$/.test(k)?220:150}px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.82rem">${esc(c[k].join('\n'))}</textarea></div>`).join('')}
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:10px">
-        <button class="btn btn-outline" onclick="BO.defaultTypes()">↺ Default lists</button>
+        <button class="btn btn-outline" onclick="BO.defaultTypes()">↺ Reset to Default Lists</button>
         <button class="btn btn-primary" onclick="BO.saveTypesFromModal()">💾 Save</button></div>`;
     const sb=$('boSaveBtn'); if(sb) sb.style.display='none';
     $('boModal').classList.add('open');
@@ -523,12 +536,12 @@ window.BO = (function(){
     const obj={};
     for(const k of Object.keys(LIST_LABELS)){
       const list=[...new Set(($('bo_list_'+k).value||'').split('\n').map(x=>x.trim()).filter(Boolean))];
-      if(!list.length){ toast(LIST_LABELS[k]+' — kam se kam ek option chahiye','error'); return; }
+      if(!list.length){ toast(LIST_LABELS[k]+' — at least one option is required','error'); return; }
       obj[k]=list;
     }
     const r=await saveTypes(obj);
     if(!r.ok){ toast('⚠️ Save failed — '+(r.error||''),'error'); return; }
-    closeModal('boModal'); toast('Lists saved ✓','success'); if(isPageActive()) populateFilters();
+    closeModal('boModal'); toast('Lists saved successfully ✓','success'); if(isPageActive()) populateFilters();
   }
 
   // ── Excel export ──
@@ -539,7 +552,7 @@ window.BO = (function(){
       {header:'Status',width:13,color:v=>dnStatusColor(v)},{header:'Submitted Via',width:14},{header:'Submitted',width:12},{header:'Completed',width:12},
       {header:'Days',width:7,num:true},{header:'Remarks',width:40},{header:'Entry By',width:12}];
     const data=rows.map(r=>[fmtDate(r.date),r.client_name,r.seg==='equity'?'Equity':'MF',r.client_code,r.pan,r.type,r.rta,r.folio,clientRm(r),
-      r.status,r.mode||r.ref_no||'',fmtDate(r.submitted_date),fmtDate(r.completed_date),ageDays(r),r.remarks,r.created_by]);
+      r.status,normMode(r.mode)||r.ref_no||'',fmtDate(r.submitted_date),fmtDate(r.completed_date),ageDays(r),r.remarks,r.created_by]);
     dnXlsx('Back_Office_Requests_'+today()+'.xlsx','D N Investment — Back Office Requests ('+today()+')',cols,data);
   }
 

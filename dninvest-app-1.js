@@ -11878,14 +11878,14 @@ function userForm(u){
       </label>
     </div>
     <div class="form-field" id="uf_bowork_wrap" style="padding:8px 12px;background:var(--bg);border-radius:8px;${u?.role==='admin'?'display:none':''}">
-      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:4px">🗂️ Back Office Work — entry permission (Admin ke paas hamesha dono)</div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:4px">🗂️ Back Office Work — Entry Permission (Admin always has both)</div>
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem;font-weight:600;cursor:pointer">
         <input type="checkbox" id="uf_bo_eq_access" ${u?.bo_eq_access?'checked':''}>
-        Equity requests — add / edit / status update (sabhi Equity clients)
+        Equity requests — add, edit and update status (all Equity clients)
       </label>
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem;font-weight:600;cursor:pointer;margin-top:4px">
         <input type="checkbox" id="uf_bo_mf_access" ${u?.bo_mf_access?'checked':''}>
-        MF requests — add / edit / status update (sabhi MF investors)
+        Mutual Fund requests — add, edit and update status (all MF investors)
       </label>
     </div>
     <div class="form-field" id="uf_backup_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
