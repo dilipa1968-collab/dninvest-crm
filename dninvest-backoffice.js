@@ -22,11 +22,16 @@
    ═══════════════════════════════════════════════════════════════════════ */
 window.BO = (function(){
   const KEY='bo_requests', TKEY='bo_types';
-  const DEFAULT_TYPES=['ARN Transfer','Bank Mandate (OTM) Update','Bank Account Change','Nominee Update',
-    'KYC Modification','Mobile / Email Update','Address Change','Transmission','DDPI / POA',
-    'Demat Closure','Other'];
-  // "Submitted Via" — request kis platform/mode se submit hui (17-Nov-2026: Ref/Ack No. ki jagah)
-  const MODES=['NSE MF','BSE StAR','CAMS','KFintech','MF Central','Physical','CIS','Web Admin','Mail','Client Login'];
+  // Segment-wise lists (17-Nov-2026) — entry ke time sirf client ke segment ke options dikhte hain.
+  // Admin "⚙️ Lists" se badal sakta hai. Firestore crm_data/bo_types = {mf_types,eq_types,mf_modes,eq_modes}
+  const DEFAULTS={
+    mf_types:['ARN Transfer','Bank Account Change','Bank Mandate (OTM) Registration','Nominee Update','KYC Modification',
+      'Mobile / Email Update','Address Change','Transmission','Minor to Major','Folio Consolidation','Other'],
+    eq_types:['Bank Account Change','Nominee Update','KYC Modification','Mobile / Email Update','Address Change',
+      'DDPI / POA','Segment Activation','Demat Transfer / Broker Change','Demat Closure','Transmission','Other'],
+    mf_modes:['NSE MF','BSE StAR','CAMS','KFintech','MF Central','Physical','Mail','Client Login'],
+    eq_modes:['CIS','Web Admin','Physical','Mail','Client Login']
+  };
   const STATUSES=['Docs Pending','Submitted','In Process','Completed','Rejected'];
   const ST_COLOR={
     'Docs Pending':{bg:'#fef3c7',fg:'#92400e'},
@@ -64,7 +69,43 @@ window.BO = (function(){
 
   // ── data ──
   function all(){ const d=DB.get(KEY); return Array.isArray(d)?d:[]; }
-  function types(){ const t=DB.get(TKEY); return (Array.isArray(t)&&t.length)?t:DEFAULT_TYPES.slice(); }
+  function cfg(){
+    const t=DB.get(TKEY), out={};
+    Object.keys(DEFAULTS).forEach(k=>{
+      let v = (t && !Array.isArray(t) && Array.isArray(t[k]) && t[k].length) ? t[k] : null;
+      if(!v && Array.isArray(t) && t.length && /_types$/.test(k)) v=t;   // purana flat format
+      out[k]=(v||DEFAULTS[k]).slice();
+    });
+    return out;
+  }
+  const segKey = seg => seg==='equity' ? 'eq' : 'mf';
+  function typesFor(seg){ return cfg()[segKey(seg)+'_types']; }
+  function modesFor(seg){ return cfg()[segKey(seg)+'_modes']; }
+  function types(){ const c=cfg(); return [...new Set([...c.mf_types,...c.eq_types])]; }
+  function optList(list, cur, placeholder){
+    const l=[...list, ...((cur && !list.includes(cur))?[cur]:[])];
+    return `<option value="">${placeholder}</option>`+l.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
+  }
+  // entry ke waqt default segment: edit me record ka, nayi entry me agar sirf ek segment ki permission ho to wahi
+  function defaultSeg(r){
+    if(r) return r.seg;
+    if(picked) return picked.seg;
+    if(canSeg('mf') && !canSeg('equity')) return 'mf';
+    if(canSeg('equity') && !canSeg('mf')) return 'equity';
+    return null;
+  }
+  function fillSegOptions(seg, curType, curMode){
+    const t=$('bo_type'), m=$('bo_mode'); if(!t||!m) return;
+    if(!seg){
+      t.innerHTML='<option value="">— pehle client chuniye —</option>'; t.disabled=true;
+      m.innerHTML='<option value="">— pehle client chuniye —</option>'; m.disabled=true;
+      return;
+    }
+    t.disabled=false; m.disabled=false;
+    t.innerHTML=optList(typesFor(seg), curType||'', '— Select '+(seg==='equity'?'Equity':'MF')+' Request —');
+    m.innerHTML=optList(modesFor(seg), curMode||'', '— Select —');
+    const lb=$('bo_seg_label'); if(lb) lb.textContent = seg==='equity' ? '📈 Equity' : '🏦 Mutual Fund';
+  }
   function visible(){
     const list=all();
     if(isAdmin()) return list;
@@ -125,7 +166,7 @@ window.BO = (function(){
     try{
       const [a,b]=await Promise.all([fdb.collection('crm_data').doc(KEY).get(), fdb.collection('crm_data').doc(TKEY).get()]);
       if(a.exists && a.data() && Array.isArray(a.data().data)) DB.setLocal(KEY, a.data().data);
-      if(b.exists && b.data() && Array.isArray(b.data().data) && b.data().data.length) DB.setLocal(TKEY, b.data().data);
+      if(b.exists && b.data() && b.data().data) DB.setLocal(TKEY, b.data().data);
     }catch(e){ console.log('bo refresh err',e); }
   }
 
@@ -286,7 +327,6 @@ window.BO = (function(){
   // ── Add / Edit modal ──
   function modalHtml(r){
     const mg = r ? canSeg(r.seg) : canAddAny();
-    const tOpts=types().map(t=>`<option ${r&&r.type===t?'selected':''}>${esc(t)}</option>`).join('');
     const sOpts=STATUSES.map(s=>`<option ${(r?r.status:'Docs Pending')===s?'selected':''}>${s}</option>`).join('');
     return `
       <div class="form-row" ${r?'style="display:none"':''}>
@@ -299,7 +339,7 @@ window.BO = (function(){
       </div>
       ${r?`<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem"><b>${esc(r.client_name)}</b> · ${r.seg==='equity'?'Equity':'MF'} · ${esc(r.client_code||'')} · Client RM: ${esc(clientRm(r)||'—')} · Entry By: ${esc(r.created_by||'—')}</div>`:''}
       <div class="form-row three">
-        <div class="form-field"><label>Request Type *</label><select id="bo_type">${tOpts}</select></div>
+        <div class="form-field"><label>Request Type * <span id="bo_seg_label" style="color:var(--teal)"></span></label><select id="bo_type"></select></div>
         <div class="form-field"><label>Request Date *</label><input type="date" id="bo_date" value="${esc(r?r.date:today())}"></div>
         <div class="form-field"><label>Status</label><select id="bo_status" ${mg?'':'disabled'}>${sOpts}</select></div>
       </div>
@@ -307,8 +347,7 @@ window.BO = (function(){
         <div class="form-field"><label>RTA / AMC / Broker</label><input type="text" id="bo_rta" list="bo_rta_list" value="${esc(r?r.rta:'')}" placeholder="CAMS / KFintech / AMC name">
           <datalist id="bo_rta_list"><option>CAMS</option><option>KFintech</option><option>MF Central</option><option>CDSL</option><option>NSDL</option><option>Broker (Equity)</option></datalist></div>
         <div class="form-field"><label>Folio No. (if any)</label><input type="text" id="bo_folio" value="${esc(r?r.folio:'')}" placeholder="Folio / multiple folios"></div>
-        <div class="form-field"><label>Submitted Via</label><select id="bo_mode" ${mg?'':'disabled'}><option value="">— Select —</option>${
-          [...MODES, ...((r&&r.mode&&!MODES.includes(r.mode))?[r.mode]:[])].map(m=>`<option ${r&&r.mode===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
+        <div class="form-field"><label>Submitted Via</label><select id="bo_mode"></select></div>
       </div>
       <div class="form-row three" ${mg?'':'style="display:none"'}>
         <div class="form-field"><label>Submitted Date</label><input type="date" id="bo_sub" value="${esc(r?r.submitted_date:'')}"></div>
@@ -323,6 +362,7 @@ window.BO = (function(){
     editingId=null; picked=null;
     $('boModalTitle').textContent='➕ New Back Office Request';
     $('boModalBody').innerHTML=modalHtml(null);
+    fillSegOptions(defaultSeg(null));
     $('boModal').classList.add('open');
   }
   function openEdit(id){
@@ -331,6 +371,7 @@ window.BO = (function(){
     editingId=id; picked=null;
     $('boModalTitle').textContent='✏️ Edit Request — '+r.type;
     $('boModalBody').innerHTML=modalHtml(r);
+    fillSegOptions(r.seg, r.type, r.mode);
     $('boModal').classList.add('open');
   }
   function searchClient(){
@@ -346,7 +387,11 @@ window.BO = (function(){
   }
   function pick(seg,id){
     const c=pickerClients().find(x=>x.seg===seg && x.id===id); if(!c) return;
+    const prevSeg=picked?picked.seg:defaultSeg(null);
     picked=c;
+    // segment badla to us segment ki list; same segment to chuna hua option bana rahe
+    if(prevSeg!==seg) fillSegOptions(seg);
+    else fillSegOptions(seg, $('bo_type')?.value, $('bo_mode')?.value);
     $('bo_client_sel').value=c.name+' ('+(seg==='equity'?'EQ':'MF')+(c.code?' · '+c.code:'')+')';
     $('bo_client_search').value='';
     const out=$('bo_client_results'); out.style.display='none'; out.innerHTML='';
@@ -458,23 +503,32 @@ window.BO = (function(){
   }
 
   // ── Request types (admin) ──
+  const LIST_LABELS={mf_types:'🏦 MF — Request Types',mf_modes:'🏦 MF — Submitted Via',eq_types:'📈 Equity — Request Types',eq_modes:'📈 Equity — Submitted Via'};
   function openTypes(){
     if(!(CU&&CU.role==='admin')) return;
-    $('boModalTitle').textContent='⚙️ Request Types';
-    $('boModalBody').innerHTML=`<p style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Ek line me ek type. Purani requests par koi asar nahi hoga.</p>
-      <textarea id="bo_types_text" style="width:100%;min-height:260px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.85rem">${esc(types().join('\n'))}</textarea>
+    const c=cfg();
+    $('boModalTitle').textContent='⚙️ Request Types / Submitted Via';
+    $('boModalBody').innerHTML=`<p style="font-size:.8rem;color:var(--gray);margin-bottom:8px">Ek line me ek option. Entry ke time client ke segment wali list hi dikhegi. Purani requests par koi asar nahi hoga.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${Object.keys(LIST_LABELS).map(k=>`<div class="form-field"><label>${LIST_LABELS[k]}</label>
+        <textarea id="bo_list_${k}" style="width:100%;min-height:${/_types$/.test(k)?220:150}px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.82rem">${esc(c[k].join('\n'))}</textarea></div>`).join('')}
+      </div>
       <div style="display:flex;justify-content:space-between;margin-top:10px">
-        <button class="btn btn-outline" onclick="BO.defaultTypes()">↺ Default list</button>
-        <button class="btn btn-primary" onclick="BO.saveTypesFromModal()">💾 Save Types</button></div>`;
+        <button class="btn btn-outline" onclick="BO.defaultTypes()">↺ Default lists</button>
+        <button class="btn btn-primary" onclick="BO.saveTypesFromModal()">💾 Save</button></div>`;
     const sb=$('boSaveBtn'); if(sb) sb.style.display='none';
     $('boModal').classList.add('open');
   }
   async function saveTypesFromModal(){
-    const list=[...new Set(($('bo_types_text').value||'').split('\n').map(s=>s.trim()).filter(Boolean))];
-    if(!list.length){ toast('At least one type required','error'); return; }
-    const r=await saveTypes(list);
+    const obj={};
+    for(const k of Object.keys(LIST_LABELS)){
+      const list=[...new Set(($('bo_list_'+k).value||'').split('\n').map(x=>x.trim()).filter(Boolean))];
+      if(!list.length){ toast(LIST_LABELS[k]+' — kam se kam ek option chahiye','error'); return; }
+      obj[k]=list;
+    }
+    const r=await saveTypes(obj);
     if(!r.ok){ toast('⚠️ Save failed — '+(r.error||''),'error'); return; }
-    closeModal('boModal'); toast('Types saved ✓','success'); if(isPageActive()) populateFilters();
+    closeModal('boModal'); toast('Lists saved ✓','success'); if(isPageActive()) populateFilters();
   }
 
   // ── Excel export ──
@@ -531,7 +585,7 @@ window.BO = (function(){
     openEdit:id=>{ resetSaveBtn(); _openEdit(id); },
     openView, searchClient, pick, save, quickStatus, del,
     openTypes, saveTypesFromModal, exportXlsx,
-    defaultTypes:()=>{ const t=document.getElementById('bo_types_text'); if(t) t.value=DEFAULT_TYPES.join('\n'); },
+    defaultTypes:()=>{ Object.keys(DEFAULTS).forEach(k=>{ const t=document.getElementById('bo_list_'+k); if(t) t.value=DEFAULTS[k].join('\n'); }); },
     updateBadge, renderDashCard, clientHistoryHtml,
     STATUSES
   };

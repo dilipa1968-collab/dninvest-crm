@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-17-v4';
+  const APP_VERSION = '2026-11-17-v5';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -2235,7 +2235,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="page-title">🗂️ Back Office Work <span id="bo-count"></span></div>
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="BO.exportXlsx()">⬇️ Export</button>
-            <button class="btn btn-outline" id="bo-types-btn" style="display:none" onclick="BO.openTypes()">⚙️ Request Types</button>
+            <button class="btn btn-outline" id="bo-types-btn" style="display:none" onclick="BO.openTypes()">⚙️ Types / Submitted Via</button>
             <button class="btn btn-primary" id="bo-add-btn" style="display:none" onclick="BO.openAdd()">+ New Request</button>
           </div>
         </div>
@@ -3356,7 +3356,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
-<script src="dninvest-backoffice.js?v=2026-11-17-v4"></script>
+<script src="dninvest-backoffice.js?v=2026-11-17-v5"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
