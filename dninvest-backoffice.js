@@ -68,7 +68,12 @@ window.BO = (function(){
     if(isAdmin()) return list;
     const ds=myDealers();
     // permission wala segment poora + apne clients (RM) ki requests
-    return list.filter(r=>canSeg(r.seg) || ds.includes(String(r.rm||'').trim().toUpperCase()) || r.created_by===CU.name);
+    return list.filter(r=>canSeg(r.seg) || ds.includes(String(clientRm(r)).trim().toUpperCase()) || ds.includes(String(r.rm||'').trim().toUpperCase()) || r.created_by===CU.name);
+  }
+  function clientRm(r){
+    const list=DB.get(r.seg==='equity'?'eq_clients':'mf_clients')||[];
+    const c=list.find(x=>x.id===r.client_id);
+    return (c && c.rm) || r.rm || '';
   }
   function ageDays(r){
     const from = r.date || (r.created_at||'').slice(0,10);
@@ -147,7 +152,7 @@ window.BO = (function(){
   function populateFilters(){
     fillSelect('bo-type-filter', types(), 'All Types');
     fillSelect('bo-status-filter', STATUSES, 'All Status');
-    const rms=[...new Set(visible().map(r=>r.rm).filter(Boolean))].sort();
+    const rms=[...new Set(visible().map(r=>clientRm(r)).filter(Boolean))].sort();
     fillSelect('bo-rm-filter', rms, 'All RMs');
     const rmF=$('bo-rm-filter'); if(rmF) rmF.style.display=canAddAny()?'':'none';
     const months=[...new Set(visible().map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
@@ -175,7 +180,7 @@ window.BO = (function(){
       else if(st==='__OVERDUE__'){ if(!(isOpen(r) && ageDays(r)>OVERDUE_DAYS)) return false; }
       else if(st && r.status!==st) return false;
       if(ty && r.type!==ty) return false;
-      if(rm && r.rm!==rm) return false;
+      if(rm && clientRm(r)!==rm) return false;
       if(sg && r.seg!==sg) return false;
       if(mo && !(r.date||'').startsWith(mo)) return false;
       if(q){
@@ -214,9 +219,9 @@ window.BO = (function(){
     const cnt=$('bo-count'); if(cnt) cnt.textContent=rows.length+' request'+(rows.length===1?'':'s');
     let h=`<table><thead><tr>
       <th>Date</th><th>Client</th><th>Seg</th><th>Code / Folio</th><th>Request Type</th><th>RTA / AMC</th>
-      <th>RM</th><th>Status</th><th>Ref / Ack No.</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
+      <th>Client RM</th><th>Entry By</th><th>Status</th><th>Ref / Ack No.</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
     </tr></thead><tbody>`;
-    if(!slice.length) h+=`<tr><td colspan="14" style="text-align:center;color:var(--gray);padding:18px">No back-office requests found</td></tr>`;
+    if(!slice.length) h+=`<tr><td colspan="15" style="text-align:center;color:var(--gray);padding:18px">No back-office requests found</td></tr>`;
     slice.forEach(r=>{
       const age=ageDays(r), od=isOpen(r)&&age>OVERDUE_DAYS, mg=canSeg(r.seg);
       h+=`<tr${od?' style="background:#fff1f2"':''}>
@@ -226,7 +231,8 @@ window.BO = (function(){
         <td>${esc(r.client_code||'')}${r.folio?`<br><small style="color:var(--gray)">F: ${esc(r.folio)}</small>`:''}</td>
         <td><b>${esc(r.type)}</b></td>
         <td>${esc(r.rta||'—')}</td>
-        <td>${esc(r.rm||'—')}</td>
+        <td><b style="color:var(--navy)">${esc(clientRm(r)||'—')}</b></td>
+        <td title="${esc(r.created_at?('Entry: '+r.created_at.slice(0,16).replace('T',' ')):'')}">${esc(r.created_by||'—')}${r.updated_by&&r.updated_by!==r.created_by?`<br><small style="color:var(--gray)">Upd: ${esc(r.updated_by)}</small>`:''}</td>
         <td>${mg?`<select onchange="BO.quickStatus('${r.id}',this.value)" style="padding:2px 4px;font-size:.66rem;border-radius:6px;font-weight:700;background:${(ST_COLOR[r.status]||{}).bg||'#fff'};color:${(ST_COLOR[r.status]||{}).fg||'#333'}">${STATUSES.map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select>`:stBadge(r.status)}</td>
         <td>${esc(r.ref_no||'—')}</td>
         <td>${fmtDate(r.submitted_date)||'—'}</td>
@@ -289,7 +295,7 @@ window.BO = (function(){
         </div>
         <div class="form-field"><label>Selected Client</label><input type="text" id="bo_client_sel" readonly style="background:#f7f7f7" placeholder="No client selected"></div>
       </div>
-      ${r?`<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem"><b>${esc(r.client_name)}</b> · ${r.seg==='equity'?'Equity':'MF'} · ${esc(r.client_code||'')} · RM: ${esc(r.rm||'—')}</div>`:''}
+      ${r?`<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem"><b>${esc(r.client_name)}</b> · ${r.seg==='equity'?'Equity':'MF'} · ${esc(r.client_code||'')} · Client RM: ${esc(clientRm(r)||'—')} · Entry By: ${esc(r.created_by||'—')}</div>`:''}
       <div class="form-row three">
         <div class="form-field"><label>Request Type *</label><select id="bo_type">${tOpts}</select></div>
         <div class="form-field"><label>Request Date *</label><input type="date" id="bo_date" value="${esc(r?r.date:today())}"></div>
@@ -422,10 +428,10 @@ window.BO = (function(){
     $('boModalBody').innerHTML=`
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
         ${di2('Client',r.client_name)}${di2('Segment',r.seg==='equity'?'Equity':'Mutual Fund')}${di2('Code',r.client_code)}
-        ${di2('PAN',r.pan)}${di2('RM',r.rm)}${di2('Status',stBadge(r.status),true)}
+        ${di2('PAN',r.pan)}${di2('Client RM',clientRm(r))}${di2('Status',stBadge(r.status),true)}
         ${di2('Request Date',fmtDate(r.date))}${di2('Submitted',fmtDate(r.submitted_date))}${di2('Completed',fmtDate(r.completed_date))}
         ${di2('RTA / AMC',r.rta)}${di2('Folio',r.folio)}${di2('Ref / Ack No.',r.ref_no)}
-        ${di2('Days',ageDays(r)+(isOpen(r)?' (open)':''))}${di2('Created By',r.created_by)}${di2('Last Updated',r.updated_by?(r.updated_by+' · '+fmtDate((r.updated_at||'').slice(0,10))):'')}
+        ${di2('Days',ageDays(r)+(isOpen(r)?' (open)':''))}${di2('Entry By',r.created_by)}${di2('Last Updated',r.updated_by?(r.updated_by+' · '+fmtDate((r.updated_at||'').slice(0,10))):'')}
       </div>
       ${r.remarks?`<div class="form-field"><label>Remarks</label><div style="font-size:.85rem;white-space:pre-wrap">${esc(r.remarks)}</div></div>`:''}
       <div class="form-section">🕐 History (${hist.length})</div>
@@ -444,7 +450,7 @@ window.BO = (function(){
     if(!list.length) return h+'<p style="color:var(--gray);font-size:.82rem">No back-office requests.</p>';
     return h+list.map(r=>`<div class="call-log-item" style="cursor:pointer;border-left-color:${(ST_COLOR[r.status]||{}).fg||'#999'}" onclick="closeModal('viewModal');BO.openView('${r.id}')">
       <div class="call-date">${fmtDate(r.date)} — ${esc(r.type)}${r.rta?' · '+esc(r.rta):''}</div>
-      <div class="call-status">${stBadge(r.status)} ${r.ref_no?'· Ref: '+esc(r.ref_no):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
+      <div class="call-status">${stBadge(r.status)} · By: ${esc(r.created_by||'—')} ${r.ref_no?'· Ref: '+esc(r.ref_no):''} ${isOpen(r)?'· '+ageDays(r)+' days':''}</div>
       ${r.remarks?`<div class="call-note">${esc(r.remarks)}</div>`:''}</div>`).join('');
   }
 
@@ -472,10 +478,10 @@ window.BO = (function(){
   function exportXlsx(){
     const rows=filtered();
     const cols=[{header:'Date',width:12},{header:'Client',width:28},{header:'Segment',width:9},{header:'Code',width:12},{header:'PAN',width:12},
-      {header:'Request Type',width:24},{header:'RTA / AMC',width:14},{header:'Folio',width:14},{header:'RM',width:12},
+      {header:'Request Type',width:24},{header:'RTA / AMC',width:14},{header:'Folio',width:14},{header:'Client RM',width:12},
       {header:'Status',width:13,color:v=>dnStatusColor(v)},{header:'Ref / Ack No.',width:16},{header:'Submitted',width:12},{header:'Completed',width:12},
-      {header:'Days',width:7,num:true},{header:'Remarks',width:40},{header:'Created By',width:12}];
-    const data=rows.map(r=>[fmtDate(r.date),r.client_name,r.seg==='equity'?'Equity':'MF',r.client_code,r.pan,r.type,r.rta,r.folio,r.rm,
+      {header:'Days',width:7,num:true},{header:'Remarks',width:40},{header:'Entry By',width:12}];
+    const data=rows.map(r=>[fmtDate(r.date),r.client_name,r.seg==='equity'?'Equity':'MF',r.client_code,r.pan,r.type,r.rta,r.folio,clientRm(r),
       r.status,r.ref_no,fmtDate(r.submitted_date),fmtDate(r.completed_date),ageDays(r),r.remarks,r.created_by]);
     dnXlsx('Back_Office_Requests_'+today()+'.xlsx','D N Investment — Back Office Requests ('+today()+')',cols,data);
   }
@@ -503,7 +509,7 @@ window.BO = (function(){
         ${od.length?`<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:.65rem">${od.length} overdue</span>`:''}</h3>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`<span class="badge" style="background:var(--blue2);color:var(--navy)">${esc(t)}: ${n}</span>`).join('')}</div>
       ${top.map(r=>{ const a=ageDays(r), o=a>OVERDUE_DAYS; return `<div class="bar-row" style="cursor:pointer" onclick="BO.openView('${r.id}')">
-        <span class="bar-name" style="max-width:none;flex:1">${esc(r.client_name)} <small style="color:var(--gray)">— ${esc(r.type)}</small></span>
+        <span class="bar-name" style="max-width:none;flex:1">${esc(r.client_name)} <small style="color:var(--gray)">— ${esc(r.type)} · RM: ${esc(clientRm(r)||'—')} · By: ${esc(r.created_by||'—')}</small></span>
         ${stBadge(r.status)}<span style="font-size:.72rem;font-weight:700;margin-left:8px;color:${o?'var(--red)':'var(--gray)'}">${a}d</span></div>`; }).join('')}`;
   }
 
