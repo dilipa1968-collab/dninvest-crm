@@ -26,7 +26,7 @@ window.BO = (function(){
   // Admin "⚙️ Lists" se badal sakta hai. Firestore crm_data/bo_types = {mf_types,eq_types,mf_modes,eq_modes}
   const MF_TYPES=['ARN Transfer','Address Change','Bank Account Change','Bank Mandate (OTM) Registration',
     'Folio Consolidation','KYC Modification','Minor to Major','Mobile / Email Update','Nominee Update','Transmission','Other'];
-  const MF_MODES=['BSE StAR MF','CAMS','Client Login','KFintech','Mail','MFCentral','NSE MF','Physical'];
+  const MF_MODES=['BSE StAR MF','CAMS','Client Login','Courier Dispatch','KFintech','Mail','MFCentral','NSE MF','Physical'];
   const DEFAULTS={
     mf_types:MF_TYPES,
     // Equity = poori list (MF ke saare options bhi) — user request 17-Nov-2026
@@ -34,6 +34,7 @@ window.BO = (function(){
     mf_modes:MF_MODES,
     eq_modes:[...new Set([...MF_MODES,'CIS','Web Admin'])]
   };
+  const ALWAYS_MODES=['Courier Dispatch'];
   // Alphabetical (case-insensitive), "Other" hamesha last
   function sortList(list){
     return [...new Set(list)].sort((a,b)=>{
@@ -43,7 +44,7 @@ window.BO = (function(){
     });
   }
   // purane spelling ko sahi naam pe map karo
-  const MODE_FIX={'MF Central':'MFCentral','BSE StAR':'BSE StAR MF','BSE Star':'BSE StAR MF','Kfintech':'KFintech'};
+  const MODE_FIX={'MF Central':'MFCentral','BSE StAR':'BSE StAR MF','BSE Star':'BSE StAR MF','Kfintech':'KFintech','Courier':'Courier Dispatch','Courior Dispatch':'Courier Dispatch'};
   const normMode = m => MODE_FIX[m] || m || '';
   const STATUSES=['Docs Pending','Submitted','Mailed','In Process','Completed','Rejected'];
   const ST_COLOR={
@@ -88,7 +89,10 @@ window.BO = (function(){
     Object.keys(DEFAULTS).forEach(k=>{
       let v = (t && !Array.isArray(t) && Array.isArray(t[k]) && t[k].length) ? t[k] : null;
       if(!v && Array.isArray(t) && t.length && /_types$/.test(k)) v=t;   // purana flat format
-      out[k]=sortList((v||DEFAULTS[k]).map(x=>/_modes$/.test(k)?normMode(x):x));
+      let list=(v||DEFAULTS[k]).map(x=>/_modes$/.test(k)?normMode(x):x);
+      // Ye options hamesha rahenge (Admin ki saved list me na ho tab bhi) — 17-Nov-2026
+      if(/_modes$/.test(k)) list=list.concat(ALWAYS_MODES);
+      out[k]=sortList(list);
     });
     return out;
   }
