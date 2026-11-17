@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-17-v1';
+  const APP_VERSION = '2026-11-17-v2';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -2236,7 +2236,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="hdr-actions">
             <button class="btn btn-outline" onclick="BO.exportXlsx()">⬇️ Export</button>
             <button class="btn btn-outline" id="bo-types-btn" style="display:none" onclick="BO.openTypes()">⚙️ Request Types</button>
-            <button class="btn btn-primary" onclick="BO.openAdd()">+ New Request</button>
+            <button class="btn btn-primary" id="bo-add-btn" style="display:none" onclick="BO.openAdd()">+ New Request</button>
           </div>
         </div>
         <div class="sq-stat-strip" id="bo-stats" style="padding:0 0 10px"></div>
@@ -3352,11 +3352,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-17-v1"></script>
+<script src="dninvest-app-1.js?v=2026-11-17-v2"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
-<script src="dninvest-backoffice.js?v=2026-11-17-v1"></script>
+<script src="dninvest-backoffice.js?v=2026-11-17-v2"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">

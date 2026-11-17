@@ -12,11 +12,11 @@
    apna record badalte hain) — blind full-array overwrite nahi, taaki do log
    ek saath kaam karein to kisi ka data na ude (mf_business wipe jaisa).
 
-   Access:
-     Admin / Back Office role / RM with backoffice_access → sab requests,
-       add + edit + status change. Delete sirf Admin.
-     RM → sirf apne clients ki requests dekh sakta hai + nayi request daal
-       sakta hai (status "Docs Pending" se shuru). Edit nahi.
+   Access (Users & Settings → user edit → "Back Office Work" checkboxes):
+     Admin → sab kuch (Delete sirf Admin).
+     bo_eq_access → Equity ki sabhi requests dekh/add/edit/status.
+     bo_mf_access → MF ki sabhi requests dekh/add/edit/status.
+     Baaki RM → sirf apne clients ki requests DEKH sakta hai (read-only).
    Depends on app-1.js globals: DB, CU, fdb, uid, today, fmtDate, toast,
    closeModal, escapeHtml, getMyEqClients, getMyMfClients, getSegRMs.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -42,7 +42,17 @@ window.BO = (function(){
   const isOpen = r => r.status!=='Completed' && r.status!=='Rejected';
 
   // ── access ──
-  function canManage(){ return !!(CU && (CU.role==='admin' || CU.role==='backoffice' || CU.backoffice_access===true)); }
+  // Permission user record se (fresh DB copy — CU purana ho sakta hai)
+  function me(){ if(!CU) return null; return (DB.get('users')||[]).find(u=>u.id===CU.id) || CU; }
+  function isAdmin(){ return !!(CU && CU.role==='admin'); }
+  // seg: 'equity' | 'mf' — is segment ki entry/edit permission hai?
+  function canSeg(seg){
+    if(isAdmin()) return true;
+    const u=me(); if(!u) return false;
+    return seg==='equity' ? u.bo_eq_access===true : u.bo_mf_access===true;
+  }
+  function canAddAny(){ return canSeg('equity') || canSeg('mf'); }
+  function canManage(){ return canAddAny(); }
   function canDelete(){ return !!(CU && CU.role==='admin'); }
   function myDealers(){
     if(!CU) return [];
@@ -55,9 +65,10 @@ window.BO = (function(){
   function types(){ const t=DB.get(TKEY); return (Array.isArray(t)&&t.length)?t:DEFAULT_TYPES.slice(); }
   function visible(){
     const list=all();
-    if(canManage()) return list;
+    if(isAdmin()) return list;
     const ds=myDealers();
-    return list.filter(r=>ds.includes(String(r.rm||'').trim().toUpperCase()) || r.created_by===CU.name);
+    // permission wala segment poora + apne clients (RM) ki requests
+    return list.filter(r=>canSeg(r.seg) || ds.includes(String(r.rm||'').trim().toUpperCase()) || r.created_by===CU.name);
   }
   function ageDays(r){
     const from = r.date || (r.created_at||'').slice(0,10);
@@ -113,9 +124,9 @@ window.BO = (function(){
 
   // ── client picker source ──
   function pickerClients(){
-    let eq, mf;
-    if(canManage()){ eq=DB.get('eq_clients')||[]; mf=DB.get('mf_clients')||[]; }
-    else { eq=getMyEqClients(); mf=getMyMfClients(); }
+    // sirf permission wale segment ke (sabhi) clients
+    const eq = canSeg('equity') ? (DB.get('eq_clients')||[]) : [];
+    const mf = canSeg('mf') ? (DB.get('mf_clients')||[]) : [];
     const out=[];
     eq.forEach(c=>out.push({seg:'equity',id:c.id,name:c.name||'',code:c.code||'',pan:c.pan||'',mobile:c.mobile||'',rm:c.rm||''}));
     mf.forEach(c=>out.push({seg:'mf',id:c.id,name:c.name||'',code:c.client_id||'',pan:c.pan||'',mobile:c.mobile||'',rm:c.rm||''}));
@@ -138,7 +149,7 @@ window.BO = (function(){
     fillSelect('bo-status-filter', STATUSES, 'All Status');
     const rms=[...new Set(visible().map(r=>r.rm).filter(Boolean))].sort();
     fillSelect('bo-rm-filter', rms, 'All RMs');
-    const rmF=$('bo-rm-filter'); if(rmF) rmF.style.display=canManage()?'':'none';
+    const rmF=$('bo-rm-filter'); if(rmF) rmF.style.display=canAddAny()?'':'none';
     const months=[...new Set(visible().map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
     const mEl=$('bo-month-filter');
     if(mEl){
@@ -148,6 +159,7 @@ window.BO = (function(){
       }).join('');
       if([...mEl.options].some(o=>o.value===cur)) mEl.value=cur;
     }
+    const addBtn=$('bo-add-btn'); if(addBtn) addBtn.style.display=canAddAny()?'':'none';
     const typesBtn=$('bo-types-btn'); if(typesBtn) typesBtn.style.display=(CU&&CU.role==='admin')?'inline-flex':'none';
   }
 
@@ -200,14 +212,13 @@ window.BO = (function(){
     if(page>pages) page=pages;
     const slice=rows.slice((page-1)*PAGE, page*PAGE);
     const cnt=$('bo-count'); if(cnt) cnt.textContent=rows.length+' request'+(rows.length===1?'':'s');
-    const mg=canManage();
     let h=`<table><thead><tr>
       <th>Date</th><th>Client</th><th>Seg</th><th>Code / Folio</th><th>Request Type</th><th>RTA / AMC</th>
       <th>RM</th><th>Status</th><th>Ref / Ack No.</th><th>Submitted</th><th>Completed</th><th>Days</th><th>Remarks</th><th>Actions</th>
     </tr></thead><tbody>`;
     if(!slice.length) h+=`<tr><td colspan="14" style="text-align:center;color:var(--gray);padding:18px">No back-office requests found</td></tr>`;
     slice.forEach(r=>{
-      const age=ageDays(r), od=isOpen(r)&&age>OVERDUE_DAYS;
+      const age=ageDays(r), od=isOpen(r)&&age>OVERDUE_DAYS, mg=canSeg(r.seg);
       h+=`<tr${od?' style="background:#fff1f2"':''}>
         <td>${fmtDate(r.date)}</td>
         <td title="${esc(r.client_name)}"><b>${esc(r.client_name)}</b>${r.pan?`<br><small style="color:var(--gray)">${esc(r.pan)}</small>`:''}</td>
@@ -266,7 +277,7 @@ window.BO = (function(){
 
   // ── Add / Edit modal ──
   function modalHtml(r){
-    const mg=canManage();
+    const mg = r ? canSeg(r.seg) : canAddAny();
     const tOpts=types().map(t=>`<option ${r&&r.type===t?'selected':''}>${esc(t)}</option>`).join('');
     const sOpts=STATUSES.map(s=>`<option ${(r?r.status:'Docs Pending')===s?'selected':''}>${s}</option>`).join('');
     return `
@@ -296,17 +307,18 @@ window.BO = (function(){
         <div class="form-field"></div>
       </div>
       <div class="form-row full"><div class="form-field"><label>Remarks</label><textarea id="bo_remarks" placeholder="Kya documents chahiye / kya pending hai...">${esc(r?r.remarks:'')}</textarea></div></div>
-      ${mg?'':'<p style="font-size:.74rem;color:var(--gray)">ℹ️ Request "Docs Pending" status ke saath banegi — aage ka status Back Office update karega.</p>'}`;
+      ${(!r && !(canSeg('equity')&&canSeg('mf')))?`<p style="font-size:.74rem;color:var(--gray)">ℹ️ Aapko sirf ${canSeg('equity')?'Equity':'MF'} requests ki permission hai — search me wahi clients aayenge.</p>`:''}`;
   }
   function openAdd(){
+    if(!canAddAny()){ toast('Back Office entry permission nahi hai — Admin se lijiye','error'); return; }
     editingId=null; picked=null;
     $('boModalTitle').textContent='➕ New Back Office Request';
     $('boModalBody').innerHTML=modalHtml(null);
     $('boModal').classList.add('open');
   }
   function openEdit(id){
-    if(!canManage()){ toast('Only Back Office / Admin can edit','error'); return; }
     const r=all().find(x=>x.id===id); if(!r) return;
+    if(!canSeg(r.seg)){ toast('Is segment ki edit permission nahi hai','error'); return; }
     editingId=id; picked=null;
     $('boModalTitle').textContent='✏️ Edit Request — '+r.type;
     $('boModalBody').innerHTML=modalHtml(r);
@@ -331,7 +343,10 @@ window.BO = (function(){
     const out=$('bo_client_results'); out.style.display='none'; out.innerHTML='';
   }
   async function save(){
-    const mg=canManage();
+    const editRec = editingId ? all().find(x=>x.id===editingId) : null;
+    const segOf = editRec ? editRec.seg : (picked ? picked.seg : null);
+    if(segOf && !canSeg(segOf)){ toast('Is segment ki entry permission nahi hai','error'); return; }
+    const mg=true;
     const type=$('bo_type').value, date=$('bo_date').value;
     if(!editingId && !picked){ toast('Please select a client','error'); return; }
     if(!type){ toast('Please select request type','error'); return; }
@@ -374,7 +389,7 @@ window.BO = (function(){
     afterChange();
   }
   async function quickStatus(id,status){
-    if(!canManage()) return;
+    const rr=all().find(x=>x.id===id); if(!rr || !canSeg(rr.seg)) return;
     const now=new Date().toISOString();
     const res=await mutate(arr=>{
       const r=arr.find(x=>x.id===id); if(!r || r.status===status) return false;
@@ -415,7 +430,7 @@ window.BO = (function(){
       ${r.remarks?`<div class="form-field"><label>Remarks</label><div style="font-size:.85rem;white-space:pre-wrap">${esc(r.remarks)}</div></div>`:''}
       <div class="form-section">🕐 History (${hist.length})</div>
       ${hist.map(h=>`<div class="call-log-item"><div class="call-date">${fmtDate((h.at||'').slice(0,10))} ${(h.at||'').slice(11,16)} — ${esc(h.by||'')}</div><div class="call-note">${esc(h.note||'')}</div></div>`).join('')||'<p style="color:var(--gray);font-size:.82rem">No history</p>'}
-      ${canManage()?`<div style="text-align:right;margin-top:10px"><button class="btn btn-primary" onclick="BO.openEdit('${r.id}')">✏️ Edit</button></div>`:''}`;
+      ${canSeg(r.seg)?`<div style="text-align:right;margin-top:10px"><button class="btn btn-primary" onclick="BO.openEdit('${r.id}')">✏️ Edit</button></div>`:''}`;
     $('boModal').classList.add('open');
     const sb=$('boSaveBtn'); if(sb) sb.style.display='none';
   }

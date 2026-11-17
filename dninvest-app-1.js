@@ -11800,7 +11800,7 @@ function renderAdmin(){
       <div class="user-avatar">${u.name[0].toUpperCase()}</div>
       <div class="user-info">
         <div class="user-name">${u.name} ${u.left_company?'<span style="color:#fff;background:#7c2d12;font-size:.72rem;padding:1px 6px;border-radius:6px;margin-left:4px">🚶 LEFT COMPANY</span>':''}${!u.left_company&&!u.active?'<span style="color:var(--red);font-size:.75rem">(Inactive)</span>':''}${u.role!=='admin'&&!u.left_company&&u.manualOverride?'<span style="color:var(--orange);font-size:.72rem;margin-left:4px">⚙️ Manual</span>':''}${u.role!=='admin'&&!u.left_company&&!u.manualOverride?'<span style="color:var(--gray);font-size:.72rem;margin-left:4px">🕐 Auto</span>':''}</div>
-        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}${u.role==='rm'&&u.mf_prospects_access?' <span style="color:#2563eb;font-weight:600">+ MF Prospects</span>':''}</div>
+        <div class="user-role">@${u.username} · ${u.role==='admin'?'Admin':u.role==='mf_desk'?'MF Desk':u.role==='backoffice'?'Back Office':'RM'}${(u.bo_eq_access||u.bo_mf_access)&&u.role!=='admin'?' <span style="color:#0f766e;font-weight:600">+ BO Work ('+[u.bo_eq_access?'EQ':'',u.bo_mf_access?'MF':''].filter(Boolean).join('/')+')</span>':''}${u.role==='rm'&&u.mf_desk_access?' <span style="color:var(--teal);font-weight:600">+ MF Desk access</span>':''}${u.role==='rm'&&u.risk_upload?' <span style="color:#d97706;font-weight:600">+ Risk/Square-off</span>':''}${u.role==='rm'&&u.backoffice_access?' <span style="color:#7c3aed;font-weight:600">+ Back Office</span>':''}${u.role==='rm'&&u.mf_prospects_access?' <span style="color:#2563eb;font-weight:600">+ MF Prospects</span>':''}</div>
         <div class="user-role" style="margin-top:2px">${u.mobile?'📱 '+u.mobile:'<span style="color:var(--gray);font-style:italic">No mobile</span>'}</div>
         <div class="user-role" style="margin-top:2px">${u.email?'✉️ '+u.email:''}</div>
         ${u.role==='rm'?`<div class="user-role" style="margin-top:2px">${u.pin?'🔢 PIN set':'🔢 No PIN'}</div>`:''}
@@ -11877,6 +11877,17 @@ function userForm(u){
         Also give Back Office access (Equity/MF Import Excel maps to ALL clients office-wide, in addition to their own RM work)
       </label>
     </div>
+    <div class="form-field" id="uf_bowork_wrap" style="padding:8px 12px;background:var(--bg);border-radius:8px;${u?.role==='admin'?'display:none':''}">
+      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:4px">🗂️ Back Office Work — entry permission (Admin ke paas hamesha dono)</div>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="uf_bo_eq_access" ${u?.bo_eq_access?'checked':''}>
+        Equity requests — add / edit / status update (sabhi Equity clients)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.85rem;font-weight:600;cursor:pointer;margin-top:4px">
+        <input type="checkbox" id="uf_bo_mf_access" ${u?.bo_mf_access?'checked':''}>
+        MF requests — add / edit / status update (sabhi MF investors)
+      </label>
+    </div>
     <div class="form-field" id="uf_backup_wrap" style="${(!u||u.role==='rm')?'':'display:none'}">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:600">
         <input type="checkbox" id="uf_backup_access" ${u?.backup_access?'checked':''}>
@@ -11921,6 +11932,8 @@ async function saveUser(){
   const backofficeAccess = role==='rm' && !!document.getElementById('uf_backoffice_access')?.checked;
   const backupAccess = role==='rm' && !!document.getElementById('uf_backup_access')?.checked;
   const mfProspectsAccess = role==='rm' && !!document.getElementById('uf_mfprospects_access')?.checked;
+  const boEqAccess = role!=='admin' && !!document.getElementById('uf_bo_eq_access')?.checked;
+  const boMfAccess = role!=='admin' && !!document.getElementById('uf_bo_mf_access')?.checked;
   const mfProspectsEqRms = mfProspectsAccess ? Array.from(document.querySelectorAll('.uf-mfp-eqrm:checked')).map(x=>x.value) : [];
   if(role==='rm' && pinVal && !/^[0-9]{4}$/.test(pinVal)){
     toast('PIN must be 4 digits (0-9)','error'); return;
@@ -11939,7 +11952,7 @@ async function saveUser(){
       if(idx>=0){
         const mob=document.getElementById('uf_mobile').value.trim();
         const eml=document.getElementById('uf_email').value.trim();
-        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,backup_access:backupAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
+        users[idx]={...users[idx],name,role,segments:segs,mobile:mob,email:eml,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,backup_access:backupAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms,bo_eq_access:boEqAccess,bo_mf_access:boMfAccess};
         if(pwd) users[idx].password=pwd;
         if(role==='rm' && pinVal) users[idx].pin=pinVal;
       }
@@ -11947,7 +11960,7 @@ async function saveUser(){
       if(users.find(u=>u.username===uname)){ toast('Username already exists','error'); return false; }
       const mob2=document.getElementById('uf_mobile').value.trim();
       const eml2=document.getElementById('uf_email').value.trim();
-      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,backup_access:backupAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms};
+      const newUser={id:uid(),username:uname,password:pwd,name,role,segments:segs,mobile:mob2,email:eml2,active:true,mf_desk_access:mfDeskAccess,risk_upload:riskUpload,backoffice_access:backofficeAccess,backup_access:backupAccess,mf_prospects_access:mfProspectsAccess,mf_prospects_eq_rms:mfProspectsEqRms,bo_eq_access:boEqAccess,bo_mf_access:boMfAccess};
       if(role==='rm' && pinVal) newUser.pin=pinVal;
       users.push(newUser);
     }
@@ -13684,6 +13697,7 @@ async function saveChangeCred(){
 
 
 function onUserRoleChange(sel){
+  { const bw=document.getElementById('uf_bowork_wrap'); if(bw) bw.style.display = sel.value==='admin' ? 'none' : ''; }
   const pinWrap = document.getElementById('uf_pin_wrap');
   if(pinWrap) pinWrap.style.display = sel.value==='rm' ? '' : 'none';
   const mfDeskWrap = document.getElementById('uf_mfdesk_wrap');
