@@ -45,10 +45,11 @@ window.BO = (function(){
   // purane spelling ko sahi naam pe map karo
   const MODE_FIX={'MF Central':'MFCentral','BSE StAR':'BSE StAR MF','BSE Star':'BSE StAR MF','Kfintech':'KFintech'};
   const normMode = m => MODE_FIX[m] || m || '';
-  const STATUSES=['Docs Pending','Submitted','In Process','Completed','Rejected'];
+  const STATUSES=['Docs Pending','Submitted','Mailed','In Process','Completed','Rejected'];
   const ST_COLOR={
     'Docs Pending':{bg:'#fef3c7',fg:'#92400e'},
     'Submitted':{bg:'#dbeafe',fg:'#1e40af'},
+    'Mailed':{bg:'#ccfbf1',fg:'#0f766e'},
     'In Process':{bg:'#ede9fe',fg:'#6d28d9'},
     'Completed':{bg:'#d1fae5',fg:'#065f46'},
     'Rejected':{bg:'#fee2e2',fg:'#991b1b'}
