@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-18-v2';
+  const APP_VERSION = '2026-11-18-v3';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -1614,6 +1614,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <input type="date" onchange="filterEq()" id="eq-last-trade-from" title="From date" style="padding:4px;font-size:.73rem">
             <span style="font-size:.7rem">to</span>
             <input type="date" onchange="filterEq()" id="eq-last-trade-to" title="To date" style="padding:4px;font-size:.73rem"></label>
+          <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F5F9FF;border:1px solid #A9C4F5;border-radius:7px;padding:4px 7px;font-weight:500">A/c Opening:
+            <input type="date" onchange="filterEq()" id="eq-ac-open-from" title="Account Opening Date — from" style="padding:4px;font-size:.73rem">
+            <span style="font-size:.7rem">to</span>
+            <input type="date" onchange="filterEq()" id="eq-ac-open-to" title="Account Opening Date — to" style="padding:4px;font-size:.73rem"></label>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="eq-table"></div></div>
         <div class="pagination" id="eq-pg"></div>
@@ -3353,7 +3357,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-17-v6"></script>
+<script src="dninvest-app-1.js?v=2026-11-18-v3"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 

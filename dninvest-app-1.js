@@ -4656,7 +4656,7 @@ function sortTh(label, tableKey, field, type, renderFnName){
 }
 
 function resetFilters(t){
-  ['search','status','rm','comeback','followup-filter','badge','stale','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','last-biz-from','last-biz-to'].forEach(f=>{
+  ['search','status','rm','comeback','followup-filter','badge','stale','last-call-from','last-call-to','next-call-from','next-call-to','last-trade-from','last-trade-to','ac-open-from','ac-open-to','last-biz-from','last-biz-to'].forEach(f=>{
     const el=document.getElementById(t+'-'+f); if(el) el.value='';
   });
   if(t==='eq') filterEq();
@@ -4813,6 +4813,8 @@ function renderEqTable(){
   const ncTo=(document.getElementById('eq-next-call-to')||{value:''}).value;
   const ltFrom=(document.getElementById('eq-last-trade-from')||{value:''}).value;
   const ltTo=(document.getElementById('eq-last-trade-to')||{value:''}).value;
+  const aoFrom=(document.getElementById('eq-ac-open-from')||{value:''}).value;
+  const aoTo=(document.getElementById('eq-ac-open-to')||{value:''}).value;
   const staleFilter=parseInt((document.getElementById('eq-stale')||{value:''}).value)||0;
 
   if(q){ const qt=q.trim(); data=data.filter(c=>(c.name||'').toLowerCase().includes(qt)||(c.mobile||'').includes(qt)||(c.code||'').toLowerCase().includes(qt)||(c.rm||'').toLowerCase().includes(qt)); }
@@ -4854,6 +4856,12 @@ function renderEqTable(){
     const d=c.last_trade_date; if(!d) return false;
     if(ltFrom && d<ltFrom) return false;
     if(ltTo && d>ltTo) return false;
+    return true;
+  });
+  if(aoFrom||aoTo) data=data.filter(c=>{
+    const d=c.ac_open_date; if(!d) return false;
+    if(aoFrom && d<aoFrom) return false;
+    if(aoTo && d>aoTo) return false;
     return true;
   });
   if(staleFilter) data=data.filter(c=>(c.remarks_same_count||0)>=staleFilter);
@@ -7050,7 +7058,8 @@ function clientForm(seg, c){
       <div class="form-field"><label>Asset Value (₹)</label><input id="f_asset" type="number" value="${c?.asset_value||''}" placeholder="e.g. 500000"></div>
       <div class="form-field"><label>📞 Alternate Number <span style="color:var(--teal);font-weight:400;font-size:.72rem">(RM edit)</span></label><input id="f_alt_mobile" value="${c?.alt_mobile||''}" placeholder="Alternate / secondary mobile"></div>
     </div>
-    <div class="form-row three">
+    <div class="form-row four">
+      <div class="form-field"><label>Account Opening Date ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><input id="f_ac_open" type="date" value="${c?.ac_open_date||''}" ${(CU&&CU.role==='admin')?'':'disabled title="Updated from the broker client file (Import Excel) — only Admin can change it"'}></div>
       <div class="form-field"><label>Last Trade Date ${(CU&&CU.role==='admin')?'':'<span style="color:var(--red);font-weight:400;font-size:.7rem">🔒 Admin only</span>'}</label><input id="f_last_trade" type="date" value="${c?.last_trade_date||''}" ${(CU&&CU.role==='admin')?'':'disabled title="Only Admin can change the Last Trade Date"'}></div>
       <div class="form-field"><label>Last Trade Month</label><input id="f_last_month" value="${c?.last_trade_month||''}" placeholder="e.g. May-2025"></div>
       <div class="form-field"><label>Last Calling Date</label><input id="f_last_call" type="date" value="${c?.last_call_date||''}" data-orig="${c?.last_call_date||''}"${_lcAttr()}></div>
@@ -7344,6 +7353,7 @@ async function saveClient(){
       asset_value:parseFloat(gv2('f_asset'))||null,
       revenue: (currentEditId ? (clients.find(x=>x.id===currentEditId)?.revenue ?? null) : null),
       last_trade_date:gv2('f_last_trade'), last_trade_month:gv2('f_last_month'),
+      ac_open_date: (document.getElementById('f_ac_open') ? gv2('f_ac_open') : (currentEditId ? (clients.find(x=>x.id===currentEditId)?.ac_open_date || '') : '')),
       last_call_date:gv2('f_last_call'),
       next_call: (document.getElementById('f_do_not_call')?.checked ? '' : gv2('f_next_call')),
       do_not_call: document.getElementById('f_do_not_call')?.checked || false,
@@ -7377,7 +7387,7 @@ async function saveClient(){
       rec.created=old.created||today();
       // Audit log - track changed fields
       const auditFields = seg==='equity'
-        ? ['name','mobile','email','dob','rm','status','code','asset_value','revenue','last_trade_date','last_call_date','next_call','followup_status','remarks']
+        ? ['name','mobile','email','dob','rm','status','code','asset_value','revenue','ac_open_date','last_trade_date','last_call_date','next_call','followup_status','remarks']
         : ['name','mobile','email','dob','rm','status','pan','client_id','aum','sip_amount','sip_count','last_invest_date','last_call_date','next_call','followup_status','remarks'];
       const changes = [];
       auditFields.forEach(f=>{
@@ -7490,6 +7500,7 @@ function viewClient(id,seg){
       ${di('🎂 Date of Birth',c.dob?fmtDate(c.dob):null)}
       ${di('Asset Value',c.asset_value?'₹'+fmtNum(c.asset_value):null)}
       ${di('Revenue/Brokerage',c.revenue?'₹'+fmtNum(c.revenue):null)}
+      ${di('Account Opening Date',c.ac_open_date?fmtDate(c.ac_open_date):null)}
       ${di('Last Trade Date',fmtDate(c.last_trade_date)+(days!==null?` <small>(${days} days ago)</small>`:''))}
       ${di('Last Trade Month',c.last_trade_month)}
       ${di('Last Calling Date',fmtDate(c.last_call_date))}
@@ -11724,11 +11735,11 @@ function exportCSV(seg){
       {header:'Code',width:12},{header:'Name',width:22},{header:'Mobile',width:13},
       {header:'Email',width:24},{header:'RM',width:14},{header:'Status',width:12,align:'center',color:dnStatusColor},
       {header:'Asset Value',width:14,money:true},{header:'Revenue',width:13,money:true},
-      {header:'Last Trade Date',width:14},{header:'Last Trade Month',width:14},
+      {header:'Account Opening Date',width:14},{header:'Last Trade Date',width:14},{header:'Last Trade Month',width:14},
       {header:'Last Call Date',width:14},{header:'Next Call Date',width:14},
       {header:'Follow-up Status',width:16},{header:'Remarks',width:26}
     ];
-    rows=clients.map(c=>[c.code||'',c.name,c.mobile||'',c.email||'',c.rm,c.status,c.asset_value||0,c.revenue||0,c.last_trade_date||'',c.last_trade_month||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
+    rows=clients.map(c=>[c.code||'',c.name,c.mobile||'',c.email||'',c.rm,c.status,c.asset_value||0,c.revenue||0,c.ac_open_date||'',c.last_trade_date||'',c.last_trade_month||'',c.last_call_date||'',c.next_call||'',c.followup_status||'',c.remarks||'']);
     title='Equity Clients'; fname='equity_clients_';
   } else {
     cols=[
@@ -15555,6 +15566,7 @@ function handleEqFile(input){
       name: ['name','clientname','investorname'],
       asset_value: ['assetvalue','holdingvalue','portfoliovalue','marketvalue','currentvalue','aum','asset'],
       last_trade_date: ['lasttradedate','lasttrade','lasttradingdate','lastdealdate'],
+      ac_open_date: ['accountopendate','accountopeningdate','acopendate','acopeningdate','accountopendt','openingdate','dateofopening','dateofaccountopening','activationdate'],
       status: ['accountstatus','acstatus','clientstatus','status','tradingstatus']
     };
     if(CU.role==='admin') wanted.rm = ['rm','relationshipmanager','dealer','dealername','employeename'];
@@ -15589,6 +15601,7 @@ function handleEqFile(input){
         rm: colMap.rm!==undefined ? normRm(String(r[colMap.rm]||'').trim()) : '',
         asset_value: colMap.asset_value!==undefined ? (parseFloat(String(r[colMap.asset_value]).replace(/[₹,]/g,''))||null) : null,
         last_trade_date: lt,
+        ac_open_date: colMap.ac_open_date!==undefined ? parseExcelDate(r[colMap.ac_open_date]) : '',
         broker_status: bs,
         // Status file ke "Account Status" se nahi, LAST TRADE se banta hai
         status: deriveEqStatus(bs, lt)
@@ -15613,7 +15626,11 @@ function handleEqFile(input){
            ${nFlip?`<br>⚠️ Of these, the file says <b>${nFlip}</b> are "Active" but haven't traded in 1 year — they were kept Inactive.`:''}
            <br>New Closed accounts will not be added; existing clients will be marked Closed.</div>`
         : `<div style="background:#FEE2E2;color:#991B1B;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
-           ⚠️ Last Trade Date column not found — status will not be updated.</div>`);
+           ⚠️ Last Trade Date column not found — status will not be updated.</div>`) +
+      (colMap.ac_open_date!==undefined
+        ? `<div style="background:#eef6ff;color:#1d4ed8;padding:8px 10px;border-radius:8px;font-size:.8rem;font-weight:600;margin-top:6px">
+           🗓️ Account Opening Date found — will be updated for ${data.filter(r=>r.ac_open_date).length} client(s).</div>`
+        : '');
     document.getElementById('eqImportBtnGo').disabled = data.length===0;
   });
 }
@@ -15683,6 +15700,7 @@ async function doEqImport(){
       if(row.email) ex.email = row.email;      // always overwrite email from file
       if(row.mobile) ex.mobile = row.mobile;   // update mobile (country code stripped)
       if(row.dob) ex.dob = row.dob;            // fill DOB if present in file
+      if(row.ac_open_date) ex.ac_open_date = row.ac_open_date;   // Account Opening Date (broker file)
       ex.updated = today();
       touched.push(ex);
       updated++;
@@ -15699,7 +15717,7 @@ async function doEqImport(){
         id, code:row.code, name:row.name, mobile:row.mobile, email:row.email||'', dob:row.dob||'',
         rm, status: row.status || 'Active',
         asset_value: row.asset_value, revenue:null,
-        last_trade_date: row.last_trade_date, last_trade_month:'',
+        last_trade_date: row.last_trade_date, last_trade_month:'', ac_open_date: row.ac_open_date||'',
         last_call_date:'', next_call:'', followup_status:'', remarks:'',
         created: today(), updated: today()
       };
