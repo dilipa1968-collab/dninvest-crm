@@ -4726,6 +4726,49 @@ function enableColResize(tid){
     th.appendChild(handle);
   });
 }
+
+// ══════════════════════════════════════════
+// FROZEN LEFT COLUMNS (18-Nov-2026)
+// Left-right scroll karte waqt shuru ke column (Equity/MF me RM tak, Back
+// Office me Code/Folio tak) apni jagah fix rehte hain, baaki scroll hote hain.
+// Sirf desktop (>800px) — phone par itne column fix karne se jagah hi nahi bachti.
+// stickyLeftCols(table, headerRegex) → us header tak (usko milake) sab fix.
+// ══════════════════════════════════════════
+function stickyLeftCols(tbl, upToHeader){
+  if(!tbl) return;
+  // pehle ka sticky saaf karo (re-render / mobile)
+  tbl.querySelectorAll('.stk').forEach(c=>{ c.classList.remove('stk','stk-last'); c.style.left=''; });
+  if(window.innerWidth<=800) return;
+  const hr=tbl.querySelector('thead tr'); if(!hr) return;
+  const ths=[...hr.children];
+  const norm=t=>String(t||'').replace(/[▲▼⬍↕⇅·\s]+/g,' ').trim();
+  const n=ths.findIndex(th=>upToHeader.test(norm(th.textContent)))+1;
+  if(n<=0) return;
+  // widths: fixed-layout table ke <col> se (exact, zoom-safe), warna header ki width se
+  const cols=[...tbl.querySelectorAll('colgroup col')];
+  const lefts=[]; let left=0;
+  for(let i=0;i<n;i++){
+    lefts.push(left);
+    const cw = cols[i] && parseFloat(cols[i].style.width);
+    left += (cw>0 ? cw : ths[i].offsetWidth);
+  }
+  tbl.querySelectorAll('tr').forEach(tr=>{
+    let ci=0;
+    for(const cell of tr.children){
+      if(ci>=n) break;
+      if((cell.colSpan||1)>1) break;          // "No data" jaisi poori-row wali cell — skip
+      cell.classList.add('stk'); cell.style.left=lefts[ci]+'px';
+      if(ci===n-1) cell.classList.add('stk-last');
+      ci++;
+    }
+  });
+}
+function stickyForTable(tid){
+  const map={eq:['eq-table',/^RM\b/i], mf:['mf-table',/^RM\b/i]};
+  const m=map[tid]; if(!m) return;
+  stickyLeftCols(document.querySelector('#'+m[0]+' table'), m[1]);
+}
+window.addEventListener('resize', ()=>{ clearTimeout(window._stkT); window._stkT=setTimeout(()=>{ stickyForTable('eq'); stickyForTable('mf'); try{ if(window.BO) BO.restick(); }catch(_){} },200); });
 let _rz=null;
 function _rzStart(e,tid,col,key,W){
   e.preventDefault(); e.stopPropagation();
@@ -4748,9 +4791,11 @@ function _rzMove(e){
   _rz.col.style.width=nw+'px';
   const tbl=document.querySelector('#'+COL_CFG[_rz.tid].cont+' table');
   if(tbl){ const tw=(parseInt(tbl.style.width)||tbl.offsetWidth)+(nw-old); tbl.style.width=tw+'px'; }
+  // drag ke dauraan fixed column ki position bhi saath chale (frame me ek baar)
+  if(!_rz._raf){ const t=_rz.tid; _rz._raf=requestAnimationFrame(()=>{ if(_rz) _rz._raf=0; try{ stickyForTable(t); }catch(_){} }); }
 }
 function _rzEnd(){
-  if(_rz){ _rz.W[_rz.key]=parseInt(_rz.col.style.width)||COL_CFG[_rz.tid].def[_rz.key]; saveColW(_rz.tid,_rz.W); }
+  if(_rz){ _rz.W[_rz.key]=parseInt(_rz.col.style.width)||COL_CFG[_rz.tid].def[_rz.key]; saveColW(_rz.tid,_rz.W); try{ stickyForTable(_rz.tid); }catch(_){} }
   _rz=null;
   document.body.classList.remove('eq-resizing');
   document.querySelectorAll('.eqrz.active').forEach(el=>el.classList.remove('active'));
@@ -4972,6 +5017,7 @@ function renderEqTable(){
   h+='</tbody></table>';
   document.getElementById('eq-table').innerHTML=h;
   enableColResize('eq');
+  stickyForTable('eq');
   BULK.afterRender('eq');
   renderPg('eq',data.length,eqPage);
 }
@@ -5167,6 +5213,7 @@ function renderMfTable(){
   h+='</tbody></table>';
   document.getElementById('mf-table').innerHTML=h;
   enableColResize('mf');
+  stickyForTable('mf');
   BULK.afterRender('mf');
   renderPg('mf',data.length,mfPage);
 }

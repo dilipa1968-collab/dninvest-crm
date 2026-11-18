@@ -368,6 +368,7 @@ window.BO = (function(){
     });
     h+='</tbody></table>';
     const t=$('bo-table'); if(t) t.innerHTML=h;
+    restick();
     // pagination
     const pg=$('bo-pg');
     if(pg){
@@ -381,6 +382,8 @@ window.BO = (function(){
     }
   }
 
+  // Left-right scroll par Date → Code/Folio tak column fix
+  function restick(){ try{ if(typeof stickyLeftCols==='function') stickyLeftCols(document.querySelector('#bo-table table'), /^CODE\s*\/\s*FOLIO/i); }catch(_){} }
   function render(){
     populateFilters();
     ensureSpecialStatusOptions();
@@ -671,7 +674,7 @@ window.BO = (function(){
     openView, searchClient, pick, save, quickStatus, del,
     openTypes, saveTypesFromModal, exportXlsx,
     defaultTypes:()=>{ Object.keys(DEFAULTS).forEach(k=>{ const t=document.getElementById('bo_list_'+k); if(t) t.value=DEFAULTS[k].join('\n'); }); },
-    updateBadge, renderDashCard, clientHistoryHtml,
+    updateBadge, renderDashCard, clientHistoryHtml, restick,
     STATUSES
   };
 })();
