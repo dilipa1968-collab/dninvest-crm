@@ -391,6 +391,64 @@ const DB = {
       this._mfbWriting=Math.max(0,this._mfbWriting-1);
     }
   },
+  // Transaction-safe BULK append to mf_business (18-Nov-2026). Ye method pehle
+  // se MFUP.mfUpload (app-2) me call ho raha tha par kahin bana hi nahi tha.
+  // skipIf(latestArr, entry) → true ho to us entry ko mat jodo (duplicate check
+  // server ki latest copy par hota hai, taaki do jagah se ek saath chale to bhi double na ho).
+  async appendMfBizEntriesBulk(arrayKey, newEntries, skipIf){
+    if(!Array.isArray(newEntries) || !newEntries.length) return {ok:true, added:0};
+    if(typeof fdb==='undefined') return {ok:false, added:0, error:'Offline — could not connect to Firebase'};
+    this._mfbWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_business');
+      let finalData=null, added=0;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
+        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
+        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
+        const arr = arrayKey==='entries' ? lEntries : lEq;
+        const ids = new Set(arr.map(e=>e&&e.id));
+        added=0;
+        newEntries.forEach(e=>{
+          if(!e || ids.has(e.id)) return;
+          if(typeof skipIf==='function' && skipIf(arr, e)) return;
+          arr.push(e); ids.add(e.id); added++;
+        });
+        if(!added){ finalData=null; return; }
+        finalData = {entries:lEntries, eq_entries:lEq};
+        tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
+      });
+      if(finalData) this.setLocal('mf_business', finalData);
+      return {ok:true, added};
+    }catch(e){
+      console.log('mf_business bulk append error:',e);
+      return {ok:false, added:0, error:e.message};
+    }finally{ this._mfbWriting=Math.max(0,this._mfbWriting-1); }
+  },
+  // Transaction-safe delete of ONE mf_business entry by id
+  async deleteMfBizEntry(arrayKey, id){
+    if(typeof fdb==='undefined') return {ok:false, error:'Offline — could not connect to Firebase'};
+    this._mfbWriting++;
+    try{
+      const docRef = fdb.collection('crm_data').doc('mf_business');
+      let finalData=null;
+      await fdb.runTransaction(async (tx)=>{
+        const doc = await tx.get(docRef);
+        const latest = (doc.exists && doc.data()) ? doc.data().data : null;
+        let lEntries = Array.isArray(latest) ? latest.slice() : (latest?.entries||[]).slice();
+        let lEq = Array.isArray(latest) ? [] : (latest?.eq_entries||[]).slice();
+        if(arrayKey==='entries') lEntries=lEntries.filter(e=>!(e&&e.id===id)); else lEq=lEq.filter(e=>!(e&&e.id===id));
+        finalData = {entries:lEntries, eq_entries:lEq};
+        tx.set(docRef, {data:DB._clean(finalData), updated:new Date().toISOString()});
+      });
+      if(finalData) this.setLocal('mf_business', finalData);
+      return {ok:true};
+    }catch(e){
+      console.log('mf_business delete error:',e);
+      return {ok:false, error:e.message};
+    }finally{ this._mfbWriting=Math.max(0,this._mfbWriting-1); }
+  },
   // Append one or more entries to the shared append-only activity_logs array
   // WITHOUT clobbering other RMs' concurrent entries. Transaction merge-by-id,
   // keeps the newest 2000 by date.
@@ -3043,7 +3101,7 @@ function showPage(id){
   else if(id==='mf-sip') renderSip();
   else if(id==='mf-txns'){ renderMfTxnPage(); }
   else if(id==='mf-prospects'){ mfpPage=1; renderMfProspects(); }
-  else if(id==='eq-demat'){ renderEqDematPage(); }
+  else if(id==='eq-demat'){ renderEqDematPage(); if(CU&&CU.role==='admin') autoAddNewDematAccounts(); }
   else if(id==='reports') renderReports();
   else if(id==='activity-log'){ alPopulateMonths(); renderActivityLog(); }
   else if(id==='duplicates') DUP.scan();
@@ -4495,6 +4553,7 @@ function _safeAutoReload(){
 setInterval(_safeAutoReload, 30*60*1000);
 
 function updateBadges(){
+  try{ const nb=document.getElementById('nb-demat-unclaimed'); if(nb){ const u=getEqDematEntries().filter(isUnclaimedDemat).length; nb.textContent=u; nb.style.display=u?'':'none'; nb.title=u+' new account(s) waiting for an RM to claim'; } }catch(_){}
   try{ if(window.BO) BO.updateBadge(); }catch(_){}
   const eq=getMyEqClients(), mf=getMyMfClients();
   const activeEq=getActiveEqClients();
@@ -9804,6 +9863,71 @@ function exportMfTxns(){
 // ══════════════════════════════════════════
 let eqDematSelectedClient = null;
 
+// ══════════════════════════════════════════
+// DEMAT — AUTO-ADD NEW ACCOUNTS + RM CLAIM (18-Nov-2026)
+// Broker client file (Equity → Import Excel) me jo naye accounts (Account
+// Opening Date) aate hain aur Demat A/c Opening list me nahi hain, wo apne aap
+// "Unclaimed" entry ban jaate hain. Jis RM ne account khulwaya, wo 🙋 Claim
+// dabake Opening RM ban jata hai (pehla claim jeetta hai — transaction-safe).
+// Admin unclaimed entry approve nahi kar sakta (incentive galat RM ko na jaye).
+// ══════════════════════════════════════════
+const DEMAT_AUTO_FROM='2026-11-01';     // isse pehle khule purane accounts kabhi auto-add nahi honge
+const DEMAT_AUTO_DAYS=60;               // sirf pichhle 60 din me khule accounts
+function isUnclaimedDemat(e){ return !!(e && e.auto && !String(e.opening_rm||'').trim()); }
+async function dematAutoSkipList(){
+  try{ const d=await fdb.collection('crm_data').doc('demat_auto_skip').get(); return (d.exists && Array.isArray(d.data().ids)) ? d.data().ids : []; }
+  catch(_){ return []; }
+}
+async function dematAutoSkipAdd(e){
+  try{ await fdb.collection('crm_data').doc('demat_auto_skip').set({ids:firebase.firestore.FieldValue.arrayUnion(String(e.client_id||'')+'|'+String(e.client_code||'').toUpperCase())},{merge:true}); }catch(_){}
+}
+let _dematAutoRunning=false;
+async function autoAddNewDematAccounts(opts){
+  opts=opts||{};
+  if(!CU || CU.role!=='admin' || _dematAutoRunning) return 0;
+  if(typeof fdb==='undefined') return 0;
+  _dematAutoRunning=true;
+  try{
+    let from=addDays(today(),-DEMAT_AUTO_DAYS); if(from<DEMAT_AUTO_FROM) from=DEMAT_AUTO_FROM;
+    const clients=(DB.get('eq_clients')||[]).filter(c=>c && c.ac_open_date && c.ac_open_date>=from && c.ac_open_date<=today());
+    if(!clients.length){ if(opts.verbose) toast('No new accounts found in the client file (opened since '+fmtDate(from)+')','success'); return 0; }
+    const skip=new Set(await dematAutoSkipList());
+    const now=new Date().toISOString();
+    const cands=clients.filter(c=>!skip.has(String(c.id)+'|'+String(c.code||'').toUpperCase())).map(c=>({
+      id:'autodemat_'+c.id,
+      client_id:c.id, client_name:c.name||'', client_code:String(c.code||'').toUpperCase(),
+      rm:c.rm||'', opening_rm:'',
+      type:'Open Demat Account', date:c.ac_open_date,
+      remarks:'Auto-added — new account in broker client file',
+      mobile:c.mobile||'', created_by:'Auto (Client File)', created:today(), created_at:now,
+      status:'Pending', decline_reason:'', auto:true
+    }));
+    // Pehle se list me? (same client YA same client code — manual ho ya auto)
+    const already=(arr,e)=>arr.some(x=>x && ((x.client_id && x.client_id===e.client_id) || (e.client_code && String(x.client_code||'').toUpperCase()===e.client_code)));
+    const r=await DB.appendMfBizEntriesBulk('eq_entries', cands, already);
+    if(!r.ok){ toast('⚠️ Could not add new demat accounts — '+(r.error||''),'error'); return 0; }
+    if(r.added || opts.verbose) toast(r.added ? `🆕 ${r.added} new demat account(s) added to Demat A/c Opening — waiting for an RM to claim` : 'All new accounts are already in the Demat list ✓','success');
+    if(r.added){ try{ renderEqDematTable(); updateBadges(); }catch(_){} }
+    return r.added;
+  } finally { _dematAutoRunning=false; }
+}
+async function claimDematEntry(id){
+  const e=getEqDematEntries().find(x=>x.id===id);
+  if(!e) return;
+  if(!confirm(`Did you open the demat account of ${e.client_name}${e.client_code?' ('+e.client_code+')':''}?\n\nClick OK to claim it — you will be shown as the Opening RM. Admin will verify and approve.`)) return;
+  let takenBy='';
+  const r=await DB.updateMfBizEntry('eq_entries', id, f=>{
+    if(String(f.opening_rm||'').trim()){ takenBy=f.opening_rm; return false; }   // kisi ne pehle claim kar liya
+    f.opening_rm=CU.name; f.claimed_by=CU.name; f.claimed_at=new Date().toISOString();
+  });
+  // claim fail/abort hua to local copy (optimistic) galat ho sakti hai — server se taaza lo
+  const refetch=async()=>{ try{ const d=await fdb.collection('crm_data').doc('mf_business').get(); if(d.exists && d.data().data) DB.setLocal('mf_business', d.data().data); }catch(_){} };
+  if(!r.ok){ await refetch(); renderEqDematTable(); toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
+  if(r.aborted){ await refetch(); toast(takenBy?('Already claimed by '+takenBy):'This entry no longer exists','error'); }
+  else toast('✅ Claimed! You are now the Opening RM for '+e.client_name,'success');
+  renderEqDematTable(); try{ updateBadges(); }catch(_){}
+}
+
 function getEqDematEntries(){
   const biz = DB.get('mf_business');
   return Array.isArray(biz) ? [] : (biz?.eq_entries || []);
@@ -9863,7 +9987,7 @@ function populateEqDematMonths(){
   let entries=getEqDematEntries();
   const me=(CU.name||'').trim().toLowerCase();
   if(CU.role!=='admin'){
-    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===me||(e.opening_rm||'').trim().toLowerCase()===me);
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===me||(e.opening_rm||'').trim().toLowerCase()===me||isUnclaimedDemat(e));
   }
   const months=[...new Set(entries.map(e=>(e.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
   const cur=sel.value;
@@ -10003,7 +10127,7 @@ function getFilteredEqDemat(){
   const me=(CU.name||'').trim().toLowerCase();
   // RM scoping — non-admin sees entries where they are the trading RM OR the opening RM
   if(CU.role!=='admin'){
-    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===me||(e.opening_rm||'').trim().toLowerCase()===me);
+    entries=entries.filter(e=>(e.rm||'').trim().toLowerCase()===me||(e.opening_rm||'').trim().toLowerCase()===me||isUnclaimedDemat(e));
   }
   const q=(document.getElementById('eqdemat-search')?.value||'').trim().toLowerCase();
   const rmF=document.getElementById('eqdemat-rm-filter')?.value||'';
@@ -10014,7 +10138,8 @@ function getFilteredEqDemat(){
 
   if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.opening_rm||'').toLowerCase().includes(q)||(e.client_code||'').toLowerCase().includes(q));
   if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF||(e.opening_rm||'')===rmF);
-  if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
+  if(statusF==='__UNCLAIMED__') entries=entries.filter(isUnclaimedDemat);
+  else if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
   if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
   if(fromD) entries=entries.filter(e=>e.date>=fromD);
   if(toD) entries=entries.filter(e=>e.date<=toD);
@@ -10047,7 +10172,12 @@ function renderEqDematTable(){
           <td onclick="viewDematDetail('${e.id}')" style="cursor:pointer;color:var(--teal,#0d9488);text-decoration:underline;font-weight:600" title="Click to view full demat detail">${escapeHtml(e.client_name||'—')}</td>
           <td>${escapeHtml(e.client_code||'—')}</td>
           <td>${escapeHtml(e.rm||'—')}</td>
-          <td><span style="background:var(--teal,#0d9488);color:#fff;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:600">${escapeHtml(e.opening_rm||e.rm||'—')}</span></td>
+          <td>${isUnclaimedDemat(e)
+            ? (CU.role==='admin'
+                ? `<span title="No RM has claimed this account yet" style="background:#fef3c7;color:#92400e;border-radius:8px;padding:1px 8px;font-size:.72rem;font-weight:700">🙋 UNCLAIMED</span>`
+                : `<button class="btn" onclick="claimDematEntry('${e.id}')" title="Did you open this account? Click to claim it as yours" style="padding:2px 10px;font-size:.72rem;background:#f59e0b;color:#fff;border-radius:8px">🙋 Claim</button>`)
+            : `<span style="background:var(--teal,#0d9488);color:#fff;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:600" ${e.claimed_by?`title="Claimed by ${escapeHtml(e.claimed_by)} on ${escapeHtml((e.claimed_at||'').slice(0,10))}"`:''}>${escapeHtml(e.opening_rm||e.rm||'—')}</span>`}
+            ${e.auto?'<span title="Auto-added from the broker client file" style="font-size:.62rem;color:var(--gray);margin-left:3px">AUTO</span>':''}</td>
           ${INC.cell('demat',e)}
           <td style="font-size:.8rem;color:var(--gray)">${escapeHtml(e.remarks||'—')}</td>
           <td>${bizStatusBadge(status)}${status==='Declined'&&e.decline_reason?`<div style="font-size:.7rem;color:var(--red);margin-top:2px">${escapeHtml(e.decline_reason)}</div>`:''}</td>
@@ -10068,50 +10198,43 @@ function renderEqDematTable(){
   </table>`;
 }
 
-function approveEqDematEntry(id){
+async function approveEqDematEntry(id){
   if(CU.role!=='admin') return;
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Approved';
-  e.decline_reason = '';
-  setEqDematEntries(entries);
+  const e=getEqDematEntries().find(x=>x.id===id);
+  if(e && isUnclaimedDemat(e)){ toast('No RM has claimed this account yet — ask the RM to claim it, or set the Opening RM via ✏️ Edit first.','error'); return; }
+  const r=await DB.updateMfBizEntry('eq_entries', id, f=>{ f.status='Approved'; f.decline_reason=''; });
+  if(!r.ok){ toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
   toast('Demat entry approved!','success');
   renderEqDematTable();
 }
 
-function declineEqDematEntry(id){
+async function declineEqDematEntry(id){
   if(CU.role!=='admin') return;
-  const reason = prompt('Decline reason (optional):','') || '';
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Declined';
-  e.decline_reason = reason.trim();
-  setEqDematEntries(entries);
+  const reason = prompt('Decline reason (optional):','');
+  if(reason===null) return;
+  const r=await DB.updateMfBizEntry('eq_entries', id, f=>{ f.status='Declined'; f.decline_reason=reason.trim(); });
+  if(!r.ok){ toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
   toast('Demat entry declined','success');
   renderEqDematTable();
 }
 
-function markPendingEqDematEntry(id){
+async function markPendingEqDematEntry(id){
   if(CU.role!=='admin') return;
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  e.status = 'Pending';
-  e.decline_reason = '';
-  setEqDematEntries(entries);
+  const r=await DB.updateMfBizEntry('eq_entries', id, f=>{ f.status='Pending'; f.decline_reason=''; });
+  if(!r.ok){ toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
   toast('Status reset to Pending','success');
   renderEqDematTable();
 }
 
 async function deleteEqDematEntry(id){
   if(CU.role!=='admin') return;
-  if(!(await dangerConfirm('Delete this Demat account entry? This cannot be undone.'))) return;
-  const entries = getEqDematEntries().filter(e=>e.id!==id);
-  setEqDematEntries(entries);
+  const e=getEqDematEntries().find(x=>x.id===id);
+  if(!(await dangerConfirm('Delete this Demat account entry? This cannot be undone.'+(e&&e.auto?' (This was auto-added — it will NOT be auto-added again.)':'')))) return;
+  if(e && e.auto) await dematAutoSkipAdd(e);
+  const r=await DB.deleteMfBizEntry('eq_entries', id);
+  if(!r.ok){ toast('⚠️ Not deleted — '+(r.error||'please retry'),'error'); return; }
   toast('Entry deleted','success');
-  renderEqDematTable();
+  renderEqDematTable(); try{ updateBadges(); }catch(_){}
 }
 
 let editingDematId = null;
@@ -10131,9 +10254,10 @@ function editEqDematEntry(id){
   // Populate opening RM dropdown
   const sel = document.getElementById('demat_edit_opening_rm');
   const allRMs = getSegRMs('equity');
-  sel.innerHTML = allRMs.map(r=>`<option value="${escapeHtml(r)}" ${r===(e.opening_rm||e.rm)?'selected':''}>${escapeHtml(r)}</option>`).join('');
-  if(!allRMs.includes(e.opening_rm||e.rm)){
-    sel.innerHTML = `<option value="${escapeHtml(e.opening_rm||e.rm)}" selected>${escapeHtml(e.opening_rm||e.rm)}</option>` + sel.innerHTML;
+  const curOpen = isUnclaimedDemat(e) ? '' : (e.opening_rm||e.rm||'');
+  sel.innerHTML = (e.auto?`<option value="" ${curOpen===''?'selected':''}>— Unclaimed —</option>`:'') + allRMs.map(r=>`<option value="${escapeHtml(r)}" ${r===curOpen?'selected':''}>${escapeHtml(r)}</option>`).join('');
+  if(curOpen && !allRMs.includes(curOpen)){
+    sel.innerHTML = `<option value="${escapeHtml(curOpen)}" selected>${escapeHtml(curOpen)}</option>` + sel.innerHTML;
   }
   document.getElementById('dematEditModal').classList.add('open');
 }
@@ -10143,18 +10267,20 @@ function saveDematEdit(){
   if(!editingDematId) return;
   const date = document.getElementById('demat_edit_date').value;
   if(!date){ toast('Date is required','error'); return; }
-  const entries = getEqDematEntries();
-  const e = entries.find(x=>x.id===editingDematId);
-  if(!e){ toast('Entry not found','error'); return; }
-  e.client_code = document.getElementById('demat_edit_code').value.trim().toUpperCase();
-  e.date        = date;
-  e.remarks     = document.getElementById('demat_edit_remarks').value.trim();
-  e.opening_rm  = document.getElementById('demat_edit_opening_rm').value;
-  setEqDematEntries(entries);
-  toast('Demat entry updated!','success');
+  const code=document.getElementById('demat_edit_code').value.trim().toUpperCase();
+  const remarks=document.getElementById('demat_edit_remarks').value.trim();
+  const openRm=document.getElementById('demat_edit_opening_rm').value;
+  const id=editingDematId;
+  DB.updateMfBizEntry('eq_entries', id, f=>{
+    f.client_code=code; f.date=date; f.remarks=remarks;
+    if((f.opening_rm||'')!==openRm){ f.opening_rm=openRm; if(openRm){ f.claimed_by=f.claimed_by||('Admin: '+CU.name); f.claimed_at=f.claimed_at||new Date().toISOString(); } }
+  }).then(r=>{
+    if(!r.ok){ toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
+    toast('Demat entry updated!','success');
+    renderEqDematTable(); try{ updateBadges(); }catch(_){}
+  });
   closeModal('dematEditModal');
   editingDematId = null;
-  renderEqDematTable();
 }
 
 function exportEqDemat(){
@@ -15815,6 +15941,8 @@ async function doEqImport(){
   if(skipped) msg += `, ${skipped} skipped (no name)`;
   toast(msg, 'success');
   renderEqTable(); refreshDash(); updateBadges();
+  // naye accounts (Account Opening Date) → Demat A/c Opening me apne aap
+  try{ autoAddNewDematAccounts(); }catch(_){}
 
   // Import se jo bhi status auto-correct hua (jaise 1 saal purana last trade
   // -> Inactive) usko bhi activity_logs me daalo — warna wo sirf yahan ke
