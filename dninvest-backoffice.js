@@ -57,7 +57,7 @@ window.BO = (function(){
   };
   const OVERDUE_DAYS=7;
   const PAGE=50;
-  let page=1, editingId=null, picked=null;
+  let page=1, editingId=null, picked=null, _statusDefaulted=false;
 
   const esc = s => (typeof escapeHtml==='function') ? escapeHtml(String(s==null?'':s)) : String(s==null?'':s);
   const $ = id => document.getElementById(id);
@@ -379,6 +379,8 @@ window.BO = (function(){
   function render(){
     populateFilters();
     ensureSpecialStatusOptions();
+    // Page pehli baar khule to default "All Open" (user ke chune filter ko baad me nahi chhedte)
+    if(!_statusDefaulted){ _statusDefaulted=true; const sf=$('bo-status-filter'); if(sf) sf.value='__OPEN__'; page=1; }
     renderStats(); renderTable();
     // background me server se fresh copy, phir dobara render
     refreshFromServer().then(()=>{ if(isPageActive()){ populateFilters(); ensureSpecialStatusOptions(); renderStats(); renderTable(); } updateBadge(); });
@@ -395,7 +397,7 @@ window.BO = (function(){
   function filter(){ page=1; renderTable(); }
   function go(p){ page=p; renderTable(); }
   function quickFilter(v){ const s=$('bo-status-filter'); if(s){ ensureSpecialStatusOptions(); s.value=v; } filter(); }
-  function resetFilters(){ ['bo-search','bo-status-filter','bo-type-filter','bo-rm-filter','bo-seg-filter','bo-month-filter'].forEach(id=>{ const e=$(id); if(e) e.value=''; }); filter(); }
+  function resetFilters(){ ['bo-search','bo-status-filter','bo-type-filter','bo-rm-filter','bo-seg-filter','bo-month-filter'].forEach(id=>{ const e=$(id); if(e) e.value=''; }); ensureSpecialStatusOptions(); const sf=$('bo-status-filter'); if(sf) sf.value='__OPEN__'; filter(); }
 
   // ── Add / Edit modal ──
   function modalHtml(r){
