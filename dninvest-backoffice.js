@@ -267,7 +267,12 @@ window.BO = (function(){
   }
   function populateFilters(){
     fillSelect('bo-type-filter', types(), 'All Types');
-    fillSelect('bo-status-filter', STATUSES, 'All Status');
+    // Status list dobara banane se "All Open"/"Overdue" (special options) mit jaate the aur
+    // chuna hua filter "All Status" ho jata tha (live update ke baad) — 18-Nov-2026 fix
+    { const sf=$('bo-status-filter'); const keep=sf?sf.value:'';
+      fillSelect('bo-status-filter', STATUSES, 'All Status');
+      ensureSpecialStatusOptions();
+      if(sf && [...sf.options].some(o=>o.value===keep)) sf.value=keep; }
     const rms=[...new Set(visible().map(r=>clientRm(r)).filter(Boolean))].sort();
     fillSelect('bo-rm-filter', rms, 'All RMs');
     const rmF=$('bo-rm-filter'); if(rmF) rmF.style.display=canAddAny()?'':'none';
