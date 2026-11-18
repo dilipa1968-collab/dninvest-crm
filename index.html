@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-18-v3';
+  const APP_VERSION = '2026-11-18-v4';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -829,6 +829,25 @@ th .col-filter-active-dot{display:inline-block;width:6px;height:6px;border-radiu
   .dash-grid{gap:9px;}
 }
 
+
+/* ── Equity Clients filters: desktop par sirf 2 line (18-Nov-2026) ──
+   Line 1: search + saare dropdown + Reset + count. Line 2: 4 date-range
+   (Last Call / Next Call / Last Trade / A/c Opening). Mobile pe purana
+   wrap layout hi rahega. */
+@media(min-width:801px){
+  #eq-filters{flex-direction:column;align-items:stretch;gap:6px;}
+  #eq-filters .eqf-row{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;width:100%;min-width:0;}
+  #eq-filters .eqf-row > input[type=text]{flex:1.6 1 0;min-width:0!important;}
+  #eq-filters .eqf-row > select{flex:1 1 0;min-width:0;max-width:none!important;}
+  #eq-filters .eqf-row > .filter-sep{display:none;}
+  #eq-filters .eqf-row > .btn{flex:0 0 auto;}
+  #eq-filters .eqf-row > .res-count{flex:0 0 auto;margin-left:2px;}
+  /* bade screen par ek line; chhote laptop par date kategi nahi — 2+2 me aa jayegi */
+  #eq-filters .eqf-dates{flex-wrap:wrap;}
+  #eq-filters .eqf-dates > label{flex:1 1 330px;min-width:330px;white-space:nowrap;}
+  #eq-filters .eqf-dates input[type=date]{flex:1 1 0;min-width:112px;width:auto;}
+}
+@media(max-width:800px){ #eq-filters .eqf-row{display:contents;} }
 </style>
 <style id="premium-skin">
 /* ═══ PREMIUM SKIN — pure CSS polish layer, no functionality touched ═══ */
@@ -1573,6 +1592,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </div>
         </div>
         <div class="filters" id="eq-filters">
+          <div class="eqf-row">
           <input type="text" placeholder="🔍 Search name / mobile / code..." oninput="filterEqDebounced()" id="eq-search" autocomplete="off" name="eq-search-nofill" style="background:#F8FCFB;border:1px solid #B9E4D8;border-radius:8px;color:#1F2937;font-weight:500">
           <select onchange="filterEq()" id="eq-status" style="background:#F9FAFE;border:1px solid #C7D2F5;border-radius:8px;color:#1F2937;font-weight:500"><option value="">All Status</option>
             <option>Active</option><option>Inactive</option><option>Closed</option><option value="DNC">🚫 DNC</option></select>
@@ -1601,7 +1621,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           </select>
           <button class="btn btn-outline" onclick="resetFilters('eq')" style="padding:6px 11px;font-size:.75rem;white-space:nowrap;background:#FFF5F5;border:1px solid #F5B8B8;color:#1F2937">✕ Reset</button>
           <span class="res-count" id="eq-count"></span>
-          <div style="flex-basis:100%;height:0"></div>
+          </div>
+          <div class="eqf-row eqf-dates">
           <label style="font-size:.75rem;color:#1F2937;display:flex;align-items:center;gap:4px;background:#F8FBFE;border:1px solid #B9CDEE;border-radius:7px;padding:4px 7px;font-weight:500">Last Call:
             <input type="date" onchange="filterEq()" id="eq-last-call-from" title="From date" style="padding:4px;font-size:.73rem">
             <span style="font-size:.7rem">to</span>
@@ -1618,6 +1639,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
             <input type="date" onchange="filterEq()" id="eq-ac-open-from" title="Account Opening Date — from" style="padding:4px;font-size:.73rem">
             <span style="font-size:.7rem">to</span>
             <input type="date" onchange="filterEq()" id="eq-ac-open-to" title="Account Opening Date — to" style="padding:4px;font-size:.73rem"></label>
+        </div>
         </div>
         <div class="tbl-wrap"><div class="tbl-scroll" id="eq-table"></div></div>
         <div class="pagination" id="eq-pg"></div>
