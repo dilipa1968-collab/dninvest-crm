@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-18-v7';
+  const APP_VERSION = '2026-11-18-v8';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -2023,6 +2023,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <label>Client *</label>
               <input type="text" id="eqdemat-client-search" placeholder="🔍 Search by Name / Code / mobile..." autocomplete="off" oninput="searchEqDematClient()" onfocus="searchEqDematClient()">
               <div id="eqdemat-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border,#ddd);border-radius:8px;box-shadow:var(--shadow2,0 4px 14px rgba(0,0,0,.12));max-height:260px;overflow-y:auto;z-index:50;margin-top:4px"></div>
+              <a href="#" id="eqdemat-newclient-link" onclick="event.preventDefault();toggleEqDematNewClient(true)" style="display:inline-block;margin-top:4px;font-size:.74rem;font-weight:700;color:var(--teal)">➕ New account — client not in list yet</a>
             </div>
             <div class="form-field" style="min-width:160px">
               <label>Selected Client</label>
@@ -2038,9 +2039,17 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
               <select id="eqdemat-opening-rm" title="RM who opened the account — gets the demat opening incentive"></select>
             </div>
           </div>
+          <!-- 18-Nov-2026: naya account jo abhi client list me nahi hai — yahin se Equity client bhi ban jayega -->
+          <div class="form-row" id="eqdemat-newclient-wrap" style="display:none;flex-wrap:wrap;gap:10px;margin-top:8px;padding:8px 10px;background:#fff7ed;border:1.5px dashed #f59e0b;border-radius:10px">
+            <div style="flex-basis:100%;font-size:.76rem;font-weight:700;color:#b45309">➕ New account — this client will also be added to Equity Clients (with you as RM). When the broker client file is uploaded later, the same record gets updated by Client Code — no duplicate.
+              <a href="#" onclick="event.preventDefault();toggleEqDematNewClient(false)" style="margin-left:8px;color:var(--gray)">✕ Cancel</a></div>
+            <div class="form-field" style="min-width:220px"><label>Client Name *</label><input type="text" id="eqdemat-new-name" placeholder="Full name as per account"></div>
+            <div class="form-field" style="min-width:160px"><label>Mobile</label><input type="text" id="eqdemat-new-mobile" maxlength="10" inputmode="numeric" placeholder="10 digit mobile" oninput="this.value=this.value.replace(/\D/g,'')"></div>
+            <div class="form-field" style="min-width:160px"><label>PAN</label><input type="text" id="eqdemat-new-pan" maxlength="10" placeholder="ABCDE1234F"></div>
+          </div>
           <div class="form-row" style="flex-wrap:wrap;gap:10px;margin-top:8px">
             <div class="form-field" style="min-width:160px">
-              <label>Client Code / UCC</label>
+              <label>Client Code / UCC <span id="eqdemat-code-req" style="display:none;color:var(--red)">*</span></label>
               <input type="text" id="eqdemat-code" placeholder="e.g. ABC1234">
             </div>
             <div class="form-field" style="min-width:160px">
@@ -3392,7 +3401,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-18-v7"></script>
+<script src="dninvest-app-1.js?v=2026-11-18-v8"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 

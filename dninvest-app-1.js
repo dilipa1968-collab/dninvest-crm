@@ -10030,7 +10030,7 @@ function searchEqDematClient(){
   ).slice(0,30);
 
   if(matches.length===0){
-    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found</div>';
+    out.innerHTML='<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found — <a href="#" onclick="event.preventDefault();toggleEqDematNewClient(true)" style="color:var(--teal);font-weight:700">➕ add as a new account</a></div>';
     out.style.display='block';
     return;
   }
@@ -10042,7 +10042,32 @@ function searchEqDematClient(){
   out.style.display='block';
 }
 
+// "New account" mode: client abhi Equity list me nahi hai (broker file upload se pehle)
+let eqDematNewMode=false;
+function toggleEqDematNewClient(on){
+  eqDematNewMode=!!on;
+  const w=document.getElementById('eqdemat-newclient-wrap'); if(w) w.style.display=on?'flex':'none';
+  const lk=document.getElementById('eqdemat-newclient-link'); if(lk) lk.style.display=on?'none':'inline-block';
+  const req=document.getElementById('eqdemat-code-req'); if(req) req.style.display=on?'':'none';
+  const srch=document.getElementById('eqdemat-client-search');
+  const res=document.getElementById('eqdemat-client-results'); if(res){ res.style.display='none'; }
+  if(on){
+    eqDematSelectedClient=null;
+    const nm=document.getElementById('eqdemat-new-name');
+    if(nm && !nm.value && srch && srch.value) nm.value=srch.value.toUpperCase();   // search me jo likha tha wahi naam
+    if(srch){ srch.value=''; srch.disabled=true; srch.placeholder='New account — fill the details below'; }
+    const sel=document.getElementById('eqdemat-client-selected'); if(sel) sel.value='(New account)';
+    const rmEl=document.getElementById('eqdemat-client-rm'); if(rmEl) rmEl.value=CU.role==='admin'?'(Opening RM)':(CU.name||'');
+    if(nm) setTimeout(()=>nm.focus(),0);
+  } else {
+    if(srch){ srch.disabled=false; srch.placeholder='🔍 Search by Name / Code / mobile...'; }
+    ['eqdemat-new-name','eqdemat-new-mobile','eqdemat-new-pan'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+    const sel=document.getElementById('eqdemat-client-selected'); if(sel && sel.value==='(New account)') sel.value='';
+    const rmEl=document.getElementById('eqdemat-client-rm'); if(rmEl && rmEl.value==='(Opening RM)') rmEl.value='';
+  }
+}
 function selectEqDematClient(clientId){
+  if(eqDematNewMode) toggleEqDematNewClient(false);
   const clients=getMyEqClients();
   const c=clients.find(x=>x.id===clientId);
   if(!c) return;
@@ -10077,8 +10102,56 @@ document.addEventListener('click', e=>{
   }
 });
 
-function saveEqDematEntry(){
+let _eqDematSaving=false;
+async function saveEqDematEntry(){
+  if(_eqDematSaving) return;
+  _eqDematSaving=true;
+  try{ await _saveEqDematEntry(); } finally { _eqDematSaving=false; }
+}
+async function _saveEqDematEntry(){
+  // ── New account: pehle Equity client banao (agar Client Code se pehle se na mile) ──
+  if(eqDematNewMode){
+    const nm=(document.getElementById('eqdemat-new-name')?.value||'').trim().toUpperCase().replace(/\s+/g,' ');
+    const mob=(document.getElementById('eqdemat-new-mobile')?.value||'').trim();
+    const pan=(document.getElementById('eqdemat-new-pan')?.value||'').trim().toUpperCase();
+    const ncode=(document.getElementById('eqdemat-code')?.value||'').trim().toUpperCase();
+    const dt=document.getElementById('eqdemat-date')?.value||'';
+    if(!nm){ toast('Please enter the client name','error'); return; }
+    if(!ncode){ toast('Client Code / UCC is required for a new account','error'); document.getElementById('eqdemat-code')?.focus(); return; }
+    if(!/^[A-Z0-9]+$/.test(ncode)){ toast('Client Code can contain only letters and numbers','error'); return; }
+    if(mob && !/^[0-9]{10}$/.test(mob)){ toast('Mobile must be 10 digits','error'); return; }
+    if(pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('PAN format looks wrong (e.g. ABCDE1234F)','error'); return; }
+    if(!dt){ toast('Please enter the date','error'); return; }
+    const all=DB.get('eq_clients')||[];
+    let c=all.find(x=>String(x.code||'').trim().toUpperCase()===ncode);
+    if(c){
+      toast(`Client Code ${ncode} already exists — "${c.name}". Using that client.`,'success');
+    } else {
+      // RM khud RM banega; Admin ke case me Opening RM dropdown wala RM
+      const openSel=document.getElementById('eqdemat-opening-rm');
+      const rm = CU.role==='admin' ? ((openSel&&openSel.value)||CU.name) : CU.name;
+      let newId=uid(); while(all.some(x=>x.id===newId)) newId=uid();
+      c={ id:newId, code:ncode, name:nm, mobile:mob, email:'', pan, dob:'',
+          rm, status:'Active', asset_value:null, revenue:null,
+          last_trade_date:'', last_trade_month:'', ac_open_date:dt,
+          last_call_date:'', next_call:'', followup_status:'', remarks:'',
+          source:'demat_entry', created:today(), updated:today() };
+      const res=await DB.setClient('eq_clients', c);
+      if(res && res.ok===false){ toast('⚠️ Client NOT saved — '+(res.error||'please check your internet and retry'),'error'); return; }
+      try{ DB.addActivityLog({ id:uid(), type:'add', seg:'equity', client_id:c.id, client_name:c.name, rm:c.rm, by:CU.name, date:new Date().toISOString(), changes:[{field:'source',from:'',to:'New account via Demat A/c Opening'}] }); }catch(_){}
+      toast(`✅ ${c.name} added to Equity Clients (RM: ${c.rm})`,'success');
+      try{ renderEqTable(); updateBadges(); }catch(_){}
+    }
+    eqDematSelectedClient={id:c.id, name:c.name, rm:c.rm||''};
+    toggleEqDematNewClient(false);
+    const selEl=document.getElementById('eqdemat-client-selected'); if(selEl) selEl.value=c.name;
+    const rmEl=document.getElementById('eqdemat-client-rm'); if(rmEl) rmEl.value=c.rm||'—';
+    document.getElementById('eqdemat-code').value=c.code||ncode;
+  }
   if(!eqDematSelectedClient){ toast('Please select a client first','error'); return; }
+  // Is client ki demat entry pehle se hai? (auto ya manual) — galti se duplicate na bane
+  { const dup=getEqDematEntries().find(e=>e.client_id===eqDematSelectedClient.id);
+    if(dup && !confirm(`${eqDematSelectedClient.name} already has a Demat entry (${dup.date||''}, Opening RM: ${dup.opening_rm||'unclaimed'}).${isUnclaimedDemat(dup)?'\n\nTip: use the 🙋 Claim button on that entry instead.':''}\n\nAdd another entry anyway?`)) return; }
   const code=document.getElementById('eqdemat-code').value.trim().toUpperCase();
   const date=document.getElementById('eqdemat-date').value;
   const remarks=document.getElementById('eqdemat-remarks').value.trim();
