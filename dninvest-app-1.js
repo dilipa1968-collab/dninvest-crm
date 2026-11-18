@@ -3053,6 +3053,7 @@ function showPage(id){
   else if(id==='dashboard') refreshDash();
   else if(id==='other-products') renderOpPage();
   else if(id==='bo-work'){ if(window.BO) BO.render(); }
+  requestAnimationFrame(()=>{ try{ document.querySelectorAll('#page-'+id+' table').forEach(t=>stickyLeftCols(t, stickyRuleFor(t))); }catch(_){} });
 
   closeSidebar();
 }
@@ -4741,6 +4742,7 @@ function stickyLeftCols(tbl, upToHeader){
   if(window.innerWidth<=800) return;
   const hr=tbl.querySelector('thead tr'); if(!hr) return;
   const ths=[...hr.children];
+  if(!tbl.offsetParent && !tbl.closest('.page.active')) { tbl._stkPending=true; return; }   // chhupe page par widths 0 — page khulne par lagega
   const norm=t=>String(t||'').replace(/[▲▼⬍↕⇅·\s]+/g,' ').trim();
   const n=ths.findIndex(th=>upToHeader.test(norm(th.textContent)))+1;
   if(n<=0) return;
@@ -4763,12 +4765,42 @@ function stickyLeftCols(tbl, upToHeader){
     }
   });
 }
+// Kis table me kahan tak fix karna hai. Jo yahan nahi, unme default: pehla
+// Client / Name / Investor column (aur usse pehle ke Date/Code/checkbox).
+const STICKY_RULES={
+  'eq-table':/^RM\b/i,
+  'mf-table':/^(MF\s*)?RM\b/i,            // MF table me header "MF RM" hai
+  'bo-table':/^CODE\s*\/\s*FOLIO/i
+};
+const STICKY_DEFAULT=/^(CLIENT(\s*NAME)?|NAME|INVESTOR(\s*NAME)?|LEAD(\s*NAME)?|ATTENDEE)\b/i;
+function stickyRuleFor(tbl){
+  for(let el=tbl.parentElement; el; el=el.parentElement){ if(el.id && STICKY_RULES[el.id]) return STICKY_RULES[el.id]; }
+  return STICKY_DEFAULT;
+}
+// Har scroll wali table par apne aap lagao — table dobara bane (filter/page
+// badle) to bhi. MutationObserver sirf rows/table badalne par chalta hai.
+function initAutoSticky(){
+  const hosts=new Set([...document.querySelectorAll('.tbl-scroll, #op-table')]);
+  hosts.forEach(h=>{
+    if(h._stkObs) return;
+    let raf=0;
+    const run=()=>{ raf=0; h.querySelectorAll('table').forEach(t=>{ try{ stickyLeftCols(t, stickyRuleFor(t)); }catch(_){} }); };
+    h._stkObs=new MutationObserver(muts=>{
+      if(!muts.some(m=>m.type==='childList' && (m.addedNodes.length||m.removedNodes.length))) return;
+      if(!raf) raf=requestAnimationFrame(run);
+    });
+    h._stkObs.observe(h,{childList:true,subtree:true});
+    run();
+  });
+}
+window.restickAll=function(){ document.querySelectorAll('.tbl-scroll table, #op-table table, table#al-table').forEach(t=>{ try{ stickyLeftCols(t, stickyRuleFor(t)); }catch(_){} }); };
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initAutoSticky); else initAutoSticky();
 function stickyForTable(tid){
-  const map={eq:['eq-table',/^RM\b/i], mf:['mf-table',/^RM\b/i]};
+  const map={eq:['eq-table',STICKY_RULES['eq-table']], mf:['mf-table',STICKY_RULES['mf-table']]};
   const m=map[tid]; if(!m) return;
   stickyLeftCols(document.querySelector('#'+m[0]+' table'), m[1]);
 }
-window.addEventListener('resize', ()=>{ clearTimeout(window._stkT); window._stkT=setTimeout(()=>{ stickyForTable('eq'); stickyForTable('mf'); try{ if(window.BO) BO.restick(); }catch(_){} },200); });
+window.addEventListener('resize', ()=>{ clearTimeout(window._stkT); window._stkT=setTimeout(()=>{ try{ restickAll(); }catch(_){} },200); });
 let _rz=null;
 function _rzStart(e,tid,col,key,W){
   e.preventDefault(); e.stopPropagation();
