@@ -18,7 +18,7 @@ window.PROF = (function(){
   const esc = s => (typeof escapeHtml==='function') ? escapeHtml(String(s==null?'':s)) : String(s==null?'':s);
   const $ = id => document.getElementById(id);
   const money = v => (v==null||v===''||isNaN(+v)) ? '—' : '₹'+(typeof fmtNum==='function'?fmtNum(+v):Math.round(+v).toLocaleString('en-IN'));
-  let _profiles=[], _sends=[], _loaded=false;
+  let _profiles=[], _sends=[], _loaded=false, _deleted=new Set();
 
   // Fast lookup maps — DB list badle (naya array) tabhi dobara bante hain
   let _ix={eqA:null, mfA:null};
@@ -154,13 +154,18 @@ window.PROF = (function(){
       ps = await T(fdb.collection(COL).limit(1000).get(),'Profiles');
     }
     const sd = await sendsP;
+    const del = await T(fdb.collection('crm_data').doc('profile_deleted').get(),'Deleted-list').catch(()=>null);
+    if(del && del.exists && Array.isArray(del.data().ids)) _deleted=new Set(del.data().ids);
     const fresh=ps.docs.map(d=>norm({_id:d.id, ...d.data()}));
     let added=fresh.length;
     if(newest){
-      const ids=new Set(_profiles.map(p=>p._id));
-      const add=fresh.filter(p=>!ids.has(p._id)); added=add.length;
-      _profiles = add.concat(_profiles);
+      // Same document dobara aaya (client ne form dobara bhara → overwrite) → purana hata ke naya
+      const freshIds=new Set(fresh.map(p=>p._id));
+      const old=new Set(_profiles.map(p=>p._id));
+      added=fresh.filter(p=>!old.has(p._id)).length + fresh.filter(p=>old.has(p._id)).length;
+      _profiles = fresh.concat(_profiles.filter(p=>!freshIds.has(p._id)));
     } else _profiles = fresh;
+    _profiles = _profiles.filter(p=>!_deleted.has(p._id));
     _profiles.sort((a,b)=>(b._ms||0)-(a._ms||0));
     if(sd) _sends=(sd.exists && Array.isArray(sd.data().data)) ? sd.data().data : [];
     _loaded=true;
@@ -191,7 +196,10 @@ window.PROF = (function(){
   function rows(){
     const q=($('prof-search')?.value||'').trim().toLowerCase();
     const rf=$('prof-risk')?.value||'';
-    return _profiles.map(p=>{ const pr=pairForProfile(p); return {p, c:pr.mf, e:pr.eq, s:sendOf(p,pr)}; })
+    // Ek client ne do baar form bhara ho → sirf sabse naya (mobile se pehchaan; _profiles pehle se naya→purana sorted)
+    const seenMob=new Set();
+    const latest=_profiles.filter(p=>{ const k=cleanMobile(p.mobile)||('id:'+p._id); if(seenMob.has(k)) return false; seenMob.add(k); return true; });
+    return latest.map(p=>{ const pr=pairForProfile(p); return {p, c:pr.mf, e:pr.eq, s:sendOf(p,pr)}; })
       .filter(r=>{
         if(CU.role!=='admin'){ if(!canSeePair({eq:r.e, mf:r.c})) return false; }
         if(rf && r.p.riskProfile!==rf) return false;
@@ -222,7 +230,7 @@ window.PROF = (function(){
         <td><b>${r.c?money(r.c.aum):'—'}</b></td>
         <td><b>${r.e&&eqVal(r.e)?money(eqVal(r.e)):'—'}</b></td>
         <td>${r.s?`${money(r.s.sip)} / ${money(r.s.aum)} / ${r.s.eq?money(r.s.eq):'—'}<br><small style="color:var(--gray)">${fmtDate(String(r.s.at).slice(0,10))} by ${esc(r.s.by)}</small>`:'—'}</td>
-        <td><button class="btn-icon" title="View full profile">👁️</button></td></tr>`;
+        <td style="white-space:nowrap"><button class="btn-icon" title="View full profile">👁️</button>${CU.role==='admin'?`<button class="btn-icon" title="Delete this profile" style="color:var(--red)" onclick="event.stopPropagation();PROF.del(${i})">🗑️</button>`:''}</td></tr>`;
     });
     $('prof-table').innerHTML=h+'</tbody></table>';
     window._profRows=list;
@@ -268,7 +276,8 @@ window.PROF = (function(){
         ${box('At Send (SIP/MF/EQ)',r.s?money(r.s.sip)+' / '+money(r.s.aum)+' / '+(r.s.eq?money(r.s.eq):'—'):'—')}
       </div>
       <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc([r.e&&('EQ: '+(r.e.rm||'—')), r.c&&('MF: '+(r.c.rm||'—'))].filter(Boolean).join(' · ')||p.rm||'—')}</b> · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
-      <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>`;
+      <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>
+      ${CU.role==='admin'?`<div style="text-align:right;margin-top:12px"><button class="btn btn-danger" onclick="PROF.del(${i})">🗑️ Delete Profile</button></div>`:''}`;
     $('profDetailModal').classList.add('open');
   }
   function box(l,v){ return `<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:800;color:var(--navy);font-size:.9rem">${esc(v)}</div></div>`; }
@@ -295,10 +304,30 @@ window.PROF = (function(){
       + it('👁️','View Submitted Profiles',`PROF.openFor('${cid}','${seg}')`)
       + `<div style="height:6px;border-bottom:1px solid var(--border,#eee);margin-bottom:4px"></div>`;
   }
+  // Admin: profile delete — us client (mobile) ke saare purane records bhi
+  async function del(i){
+    if(!CU || CU.role!=='admin') return;
+    const r=(window._profRows||[])[i]; if(!r) return;
+    const mob=cleanMobile(r.p.mobile);
+    const docs=_profiles.filter(p=> p._id===r.p._id || (mob && cleanMobile(p.mobile)===mob));
+    if(!confirm(`Delete the profile of ${r.p.name} (${r.p.mobile})?${docs.length>1?`\n\n${docs.length} records of this client will be deleted (including older submissions).`:''}\n\nThis cannot be undone.`)) return;
+    const ids=docs.map(p=>p._id);
+    try{
+      await Promise.all(ids.map(id=>fdb.collection(COL).doc(id).delete()));
+      // doosre browsers ke cache se bhi hatane ke liye "deleted" list
+      try{ await fdb.collection('crm_data').doc('profile_deleted').set({ids:firebase.firestore.FieldValue.arrayUnion(...ids)},{merge:true}); }catch(_){}
+    }catch(e){ toast('⚠️ Not deleted — '+(e.message||e),'error'); return; }
+    ids.forEach(id=>_deleted.add(id));
+    _profiles=_profiles.filter(p=>!ids.includes(p._id));
+    writeCache();
+    try{ closeModal('profDetailModal'); }catch(_){}
+    render();
+    toast('Profile deleted','success');
+  }
   async function openFor(cid, seg){
     const c = seg==='equity' ? eqClient(cid) : mfClient(cid);
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
-  return { send, open, openFor, render, detail, exportXlsx, menuHtml };
+  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del };
 })();

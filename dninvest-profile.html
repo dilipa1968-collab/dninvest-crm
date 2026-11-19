@@ -304,7 +304,17 @@ f.addEventListener("submit", async e => {
   if (db) {
     try {
       const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 12000));
-      await Promise.race([db.collection(COLLECTION).add({...data, submittedAt: firebase.firestore.FieldValue.serverTimestamp()}), timeout]);
+      const rec = {...data, submittedAt: firebase.firestore.FieldValue.serverTimestamp()};
+      // Ek client = ek record (mobile number se). Dobara bhare to naya form purane ko overwrite karta hai.
+      const docId = "m_" + data.mobile;
+      try {
+        await Promise.race([db.collection(COLLECTION).doc(docId).set(rec), timeout]);
+      } catch (e1) {
+        if (String(e1 && e1.message) === "timeout") throw e1;
+        // overwrite ki permission na ho to naya record (CRM khud sirf latest dikhata hai)
+        console.warn("overwrite failed, adding new record", e1);
+        await Promise.race([db.collection(COLLECTION).add(rec), timeout]);
+      }
       saved = true;
     } catch (err) { console.error("Firestore save failed:", err); }
   }
