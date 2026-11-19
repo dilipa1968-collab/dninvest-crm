@@ -76,10 +76,26 @@ window.BO = (function(){
   function canAddAny(){ return canSeg('equity') || canSeg('mf'); }
   function canManage(){ return canAddAny(); }
   function canDelete(){ return !!(CU && CU.role==='admin'); }
-  function myDealers(){
+  // "Apne clients" segment-wise: Equity request → user ke eq_dealers, MF request → mf_dealers.
+  // (Pehle dono list mila di thi — kisi ki eq list me doosre RM ka naam ho to uske MF
+  //  clients ki requests bhi dikh jaati thi. 19-Nov-2026 fix.)
+  function myDealers(seg){
     if(!CU) return [];
-    return [...new Set([...(CU.eq_dealers||[CU.name]),...(CU.mf_dealers||[CU.name]),CU.name])]
-      .map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
+    const u=me()||CU;
+    const list = seg==='equity' ? (u.eq_dealers||CU.eq_dealers) : seg==='mf' ? (u.mf_dealers||CU.mf_dealers) : null;
+    const base = Array.isArray(list)&&list.length ? list : [CU.name];
+    return [...new Set([...base, CU.name])].map(d=>String(d||'').trim().toUpperCase()).filter(Boolean);
+  }
+  function isMine(r){
+    const ds=myDealers(r.seg);
+    return ds.includes(String(clientRm(r)).trim().toUpperCase());
+  }
+  // Har request kyun dikh rahi hai — permission se, apne client se, ya khud ki entry se
+  function accessText(){
+    if(!CU) return '';
+    if(isAdmin()) return 'Admin — all requests';
+    const e=canSeg('equity'), m=canSeg('mf');
+    return 'Your access: Equity — '+(e?'all clients (entry allowed)':'only your clients (view)')+' · MF — '+(m?'all investors (entry allowed)':'only your investors (view)');
   }
 
   // ── data ──
@@ -127,9 +143,9 @@ window.BO = (function(){
   function visible(){
     const list=all();
     if(isAdmin()) return list;
-    const ds=myDealers();
-    // permission wala segment poora + apne clients (RM) ki requests
-    return list.filter(r=>canSeg(r.seg) || ds.includes(String(clientRm(r)).trim().toUpperCase()) || ds.includes(String(r.rm||'').trim().toUpperCase()) || r.created_by===CU.name);
+    // Jis segment ki permission hai → us segment ki saari requests.
+    // Baaki segment → sirf apne clients ki (client ka current RM = user) ya khud ki daali hui.
+    return list.filter(r=>canSeg(r.seg) || isMine(r) || r.created_by===CU.name);
   }
   function clientRm(r){
     const list=DB.get(r.seg==='equity'?'eq_clients':'mf_clients')||[];
@@ -318,7 +334,11 @@ window.BO = (function(){
     });
   }
 
+  function renderAccess(){
+    const el=$('bo-access'); if(el) el.textContent=accessText();
+  }
   function renderStats(){
+    renderAccess();
     const v=visible(), open=v.filter(isOpen);
     const overdue=open.filter(r=>ageDays(r)>OVERDUE_DAYS).length;
     const docs=open.filter(r=>r.status==='Docs Pending').length;
