@@ -165,7 +165,11 @@ window.PROF = (function(){
       added=fresh.filter(p=>!old.has(p._id)).length + fresh.filter(p=>old.has(p._id)).length;
       _profiles = fresh.concat(_profiles.filter(p=>!freshIds.has(p._id)));
     } else _profiles = fresh;
-    _profiles = _profiles.filter(p=>!_deleted.has(p._id));
+    // "Deleted" list sirf is browser ke PURANE cache par lagti hai. Jo record abhi server
+    // se aaya hai wo Firebase me maujood hai — yani delete ke baad client ne dobara bhara
+    // (form mobile-number wali same ID par save karta hai). Use kabhi mat chhupao. (19-Nov-2026 fix)
+    const freshIds=new Set(fresh.map(p=>p._id));
+    _profiles = _profiles.filter(p=>freshIds.has(p._id) || !_deleted.has(p._id));
     _profiles.sort((a,b)=>(b._ms||0)-(a._ms||0));
     if(sd) _sends=(sd.exists && Array.isArray(sd.data().data)) ? sd.data().data : [];
     _loaded=true;
