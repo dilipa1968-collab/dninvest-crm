@@ -20,23 +20,35 @@ window.PROF = (function(){
   const money = v => (v==null||v===''||isNaN(+v)) ? '—' : '₹'+(typeof fmtNum==='function'?fmtNum(+v):Math.round(+v).toLocaleString('en-IN'));
   let _profiles=[], _sends=[], _loaded=false;
 
-  function mfClient(id){ return (DB.get('mf_clients')||[]).find(c=>c.id===id); }
-  function eqClient(id){ return (DB.get('eq_clients')||[]).find(c=>c.id===id); }
+  // Fast lookup maps — DB list badle (naya array) tabhi dobara bante hain
+  let _ix={eqA:null, mfA:null};
+  function ix(){
+    const eqA=DB.get('eq_clients')||[], mfA=DB.get('mf_clients')||[];
+    if(_ix.eqA===eqA && _ix.mfA===mfA) return _ix;
+    const byId=(a)=>{ const m=new Map(); a.forEach(c=>c&&m.set(c.id,c)); return m; };
+    const group=(a,key)=>{ const m=new Map(); a.forEach(c=>{ if(!c) return; const k=key(c); if(!k) return; (m.get(k)||m.set(k,[]).get(k)).push(c); }); return m; };
+    const panK=c=>{ const p=String(c.pan||'').trim().toUpperCase(); return (!c.is_minor && /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) ? p : ''; };
+    const mobK=c=>{ const d=String(c.mobile||'').replace(/\D/g,''); const m=d.length>10?d.slice(-10):d; return m.length===10?m:''; };
+    _ix={eqA, mfA, eqId:byId(eqA), mfId:byId(mfA), eqPan:group(eqA,panK), mfPan:group(mfA,panK), eqMob:group(eqA,mobK), mfMob:group(mfA,mobK)};
+    return _ix;
+  }
+  function mfClient(id){ return ix().mfId.get(id); }
+  function eqClient(id){ return ix().eqId.get(id); }
   const PAN = c => String((c&&c.pan)||'').trim().toUpperCase();
   const okPan = p => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p);
   // Equity ↔ MF same person: PAN se (minor ko chhod ke — wo guardian ka PAN carry karta hai);
   // PAN na ho to mobile se, sirf jab ek hi match ho
   function twinOf(c, seg){
     if(!c) return null;
-    const other = DB.get(seg==='equity' ? 'mf_clients' : 'eq_clients') || [];
+    const I=ix(); const panMap = seg==='equity' ? I.mfPan : I.eqPan, mobMap = seg==='equity' ? I.mfMob : I.eqMob;
     const p=PAN(c);
     if(okPan(p) && !c.is_minor){
-      const hits=other.filter(x=>PAN(x)===p && !x.is_minor);
+      const hits=panMap.get(p)||[];
       if(hits.length===1) return hits[0];
       if(hits.length>1) return null;
     }
     const m=cleanMobile(c.mobile);
-    if(m && m.length===10){ const hits=other.filter(x=>cleanMobile(x.mobile)===m); if(hits.length===1) return hits[0]; }
+    if(m && m.length===10){ const hits=mobMap.get(m)||[]; if(hits.length===1) return hits[0]; }
     return null;
   }
   // {eq, mf} pair for a client of either segment
@@ -114,17 +126,36 @@ window.PROF = (function(){
     _loaded=false;
   }
 
-  async function load(){
+  // ── Speed (19-Nov-2026): pehle har baar 2000 profiles server se aati thi.
+  // Ab profiles is browser me cache hoti hain (CRM ka baaki client data bhi
+  // aise hi cache hota hai) → popup TURANT khulta hai; peeche se sirf NAYI
+  // profiles (last wale ke baad ki) server se aati hain.
+  const CACHE='dninvest_profiles_cache';
+  const tsMs = v => v ? (v.toMillis ? v.toMillis() : (v.toDate ? v.toDate().getTime() : (typeof v==='number'?v:(Date.parse(v)||0)))) : 0;
+  function norm(d){ const o={...d}; o._ms=tsMs(d.submittedAt); delete o.submittedAt; return o; }
+  function readCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE)||'null'); return (c && Array.isArray(c.p)) ? c : null; }catch(_){ return null; } }
+  function writeCache(){ try{ localStorage.setItem(CACHE, JSON.stringify({p:_profiles, s:_sends, at:Date.now()})); }catch(_){ /* quota — memory me to hai */ } }
+  async function load(full){
     if(typeof fdb==='undefined'){ await window.waitForFdb?.(8000); }
-    const [ps, sd]=await Promise.all([
-      fdb.collection(COL).orderBy('submittedAt','desc').limit(2000).get(),
-      fdb.collection('crm_data').doc(SEND_KEY).get()
-    ]);
-    _profiles=ps.docs.map(d=>({_id:d.id, ...d.data()}));
+    const newest = (!full && _profiles.length) ? Math.max(..._profiles.map(p=>p._ms||0)) : 0;
+    let q=fdb.collection(COL).orderBy('submittedAt','desc');
+    if(newest && firebase?.firestore?.Timestamp?.fromMillis) q=q.where('submittedAt','>',firebase.firestore.Timestamp.fromMillis(newest));
+    q = q.limit(newest ? 500 : 1000);
+    const [ps, sd]=await Promise.all([ q.get(), fdb.collection('crm_data').doc(SEND_KEY).get() ]);
+    const fresh=ps.docs.map(d=>norm({_id:d.id, ...d.data()}));
+    let added=fresh.length;
+    if(newest){
+      const ids=new Set(_profiles.map(p=>p._id));
+      const add=fresh.filter(p=>!ids.has(p._id)); added=add.length;
+      _profiles = add.concat(_profiles);
+    } else _profiles = fresh;
+    _profiles.sort((a,b)=>(b._ms||0)-(a._ms||0));
     _sends=(sd.exists && Array.isArray(sd.data().data)) ? sd.data().data : [];
     _loaded=true;
+    writeCache();
+    return newest ? added : 0;
   }
-  const subDate = p => p.submittedAt?.toDate ? p.submittedAt.toDate() : null;
+  const subDate = p => p._ms ? new Date(p._ms) : (p.submittedAt?.toDate ? p.submittedAt.toDate() : null);
   // Profile → CRM client(s): link ka cid+seg, warna mobile se; phir doosre segment ka twin
   function pairForProfile(p){
     const seg = p.seg==='eq' ? 'equity' : 'mf';
@@ -133,8 +164,8 @@ window.PROF = (function(){
     if(!c){
       const m=cleanMobile(p.mobile);
       if(m){
-        const mfh=(DB.get('mf_clients')||[]).filter(x=>cleanMobile(x.mobile)===m);
-        const eqh=(DB.get('eq_clients')||[]).filter(x=>cleanMobile(x.mobile)===m);
+        const mfh=ix().mfMob.get(m)||[];
+        const eqh=ix().eqMob.get(m)||[];
         if(mfh.length===1){ c=mfh[0]; s2='mf'; } else if(eqh.length===1){ c=eqh[0]; s2='equity'; }
       }
     }
@@ -184,11 +215,21 @@ window.PROF = (function(){
     $('prof-table').innerHTML=h+'</tbody></table>';
     window._profRows=list;
   }
-  async function open(){
+  function setStatus(t){ const el=$('prof-sync'); if(el) el.textContent=t||''; }
+  async function open(full){
     $('profModal').classList.add('open');
-    $('prof-table').innerHTML='<div style="padding:20px;color:var(--gray)">Loading profiles…</div>';
-    try{ await load(); render(); }
-    catch(e){ $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ Could not load profiles — ${esc(e.message)}</div>`; }
+    if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; } }
+    if(_profiles.length){ render(); setStatus('🔄 Checking for new profiles…'); }
+    else $('prof-table').innerHTML='<div style="padding:20px;color:var(--gray)">Loading profiles…</div>';
+    try{
+      const n=await load(!!full);
+      render();
+      setStatus(n ? `✓ ${n} new` : '✓ Up to date');
+      setTimeout(()=>setStatus(''),4000);
+    }catch(e){
+      if(_profiles.length){ setStatus('⚠️ Offline — showing saved list'); }
+      else $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ Could not load profiles — ${esc(e.message)}</div>`;
+    }
   }
   const LABELS=[['incomeSource','Income Source'],['monthlyIncome','Monthly Income'],['monthlySavings','Monthly Savings'],['loan','Loan'],['loanAmount','Loan Outstanding'],
     ['emiAmount','Monthly EMI'],['emergencyFund','Emergency Fund'],['healthCover','Health Cover'],['lifeCover','Life Cover'],['goal','Goals'],['mode','Investment Mode'],

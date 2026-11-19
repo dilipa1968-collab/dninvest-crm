@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-19-v5';
+  const APP_VERSION = '2026-11-19-v6';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -47,6 +47,13 @@
   })();
   </script>
 <title>D N Investment — CRM</title>
+<!-- 19-Nov-2026 speed: servers se connection pehle hi khol do -->
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -84,7 +91,10 @@ window.waitForFdb = function(maxMs){
   });
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<!-- 19-Nov-2026 speed: Excel library (~1 MB) ab "async" — CRM iske download hone ka intezaar
+     nahi karta ("defer" kaam nahi karta: wo DOMContentLoaded/auto-login ko rok leta hai).
+     Sirf Import/Export ke waqt chahiye; dnXlsx call-time par check karta hai. -->
+<script async src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 /* ─────────────────────────────────────────────────────────────────────────────
    DN shared styled-Excel export engine (shared by CRM + HR Portal).
@@ -109,7 +119,14 @@ window.dnStatusColor = function(v){
 };
 
 window.dnXlsxBook = function(filename, sheets){
-  if(typeof XLSX==='undefined'){ alert('Excel library not loaded — please check your internet and try again.'); return; }
+  if(typeof XLSX==='undefined' || !XLSX.utils || !XLSX.writeFile){
+    // library "defer" se aati hai — bahut jaldi click hua ho to 5 sec tak ruk ke dobara try
+    const t0=Date.now(); const iv=setInterval(()=>{
+      if(typeof XLSX!=='undefined' && XLSX.writeFile){ clearInterval(iv); window.dnXlsxBook(filename, sheets); }
+      else if(Date.now()-t0>5000){ clearInterval(iv); alert('Excel library not loaded — please check your internet and try again.'); }
+    },250);
+    return;
+  }
   const wb = XLSX.utils.book_new();
   const thin   = {style:'thin', color:{rgb:'FF808A99'}};
   const border = {top:thin, bottom:thin, left:thin, right:thin};
@@ -193,7 +210,6 @@ window.dnXlsx = function(filename, title, columns, rows, totalRow){
 };
 </script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 :root{
   --navy:#0f1f3d;--navy2:#162b54;--navy3:#1e3a6e;
@@ -3412,7 +3428,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
         <input type="text" id="prof-search" placeholder="🔍 Name / mobile / RM..." oninput="PROF.render()" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:8px">
         <select id="prof-risk" onchange="PROF.render()" style="padding:7px 8px;border:1px solid var(--border);border-radius:8px"><option value="">All Risk Profiles</option><option>Aggressive</option><option>Conservative</option><option>Moderate</option></select>
-        <button class="btn btn-outline" onclick="PROF.open()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="PROF.open(true)" title="Reload all profiles from the server">🔄 Refresh</button>
+        <span id="prof-sync" style="font-size:.72rem;color:var(--teal);font-weight:700"></span>
         <button class="btn btn-outline" onclick="PROF.exportXlsx()">⬇️ Export</button>
         <span id="prof-pending" style="font-size:.75rem;color:#b45309;font-weight:700"></span>
         <span id="prof-count" class="res-count"></span>
@@ -3440,7 +3457,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <script src="dninvest-backoffice.js?v=2026-11-19-v1"></script>
 
-<script src="dninvest-profiles.js?v=2026-11-19-v3"></script>
+<script src="dninvest-profiles.js?v=2026-11-19-v4"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
