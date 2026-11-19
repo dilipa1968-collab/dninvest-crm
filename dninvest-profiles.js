@@ -201,7 +201,11 @@ window.PROF = (function(){
     const latest=_profiles.filter(p=>{ const k=cleanMobile(p.mobile)||('id:'+p._id); if(seenMob.has(k)) return false; seenMob.add(k); return true; });
     return latest.map(p=>{ const pr=pairForProfile(p); return {p, c:pr.mf, e:pr.eq, s:sendOf(p,pr)}; })
       .filter(r=>{
-        if(CU.role!=='admin'){ if(!canSeePair({eq:r.e, mf:r.c})) return false; }
+        // RM: apne clients ki profiles + jo form usne khud bheja (blank form / naya client — link me RM ka naam)
+        if(CU.role!=='admin'){
+          const mineByLink = String(r.p.rm||'').trim().toLowerCase()===String(CU.name||'').trim().toLowerCase() && !(r.c||r.e);
+          if(!mineByLink && !canSeePair({eq:r.e, mf:r.c})) return false;
+        }
         if(rf && r.p.riskProfile!==rf) return false;
         if(q && !([r.p.name,r.p.mobile,r.c&&r.c.rm,r.e&&r.e.rm,r.p.rm].join(' ').toLowerCase().includes(q))) return false;
         return true;
@@ -215,13 +219,13 @@ window.PROF = (function(){
     $('prof-count').textContent=list.length+' profile'+(list.length===1?'':'s');
     const riskC={Conservative:'#0369a1',Moderate:'#b45309',Aggressive:'#b91c1c'};
     let h=`<table><thead><tr><th>Date</th><th>Client</th><th>Mobile</th><th>RM</th><th>Risk Profile</th><th>Monthly Savings</th><th>Mode</th><th>Planned SIP</th>
-      <th title="Client's SIP in CRM right now">Current SIP</th><th title="MF amount invested (principal) — from CRM right now">MF Invested</th><th title="Client's MF value (AUM) in CRM right now">MF Value</th><th title="Equity holding value in CRM right now">Equity Value</th><th title="When the form was sent">At Send (SIP / MF / EQ)</th><th></th></tr></thead><tbody>`;
-    if(!list.length) h+=`<tr><td colspan="14" style="text-align:center;color:var(--gray);padding:16px">No profiles yet — right-click a client name in MF Investors → 📋 Send Profile Form</td></tr>`;
+      <th title="Client's SIP in CRM right now">Current SIP</th><th title="MF amount invested (principal) — from CRM right now">MF Invested</th><th title="Client's MF value (AUM) in CRM right now">MF Value</th><th title="Equity holding value in CRM right now">Equity Value</th><th title="When the form was sent">At Send (SIP / MF / EQ)</th><th title="Investments with other brokers / banks (client's own answer)">Elsewhere</th><th></th></tr></thead><tbody>`;
+    if(!list.length) h+=`<tr><td colspan="15" style="text-align:center;color:var(--gray);padding:16px">No profiles yet — right-click a client name in MF Investors → 📋 Send Profile Form</td></tr>`;
     list.forEach((r,i)=>{
       const d=subDate(r.p);
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
         <td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
-        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${(r.c||r.e)?'':' <small style="color:#b45309" title="Not matched to any client in CRM">⚠️ not in CRM</small>'}</td>
+        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Filled via the blank form — new client, not in CRM yet">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM">⚠️ not in CRM</small>')}</td>
         <td>${esc(r.p.mobile)}</td><td>${esc((r.c&&r.c.rm)||(r.e&&r.e.rm)||r.p.rm||'—')}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
@@ -230,6 +234,7 @@ window.PROF = (function(){
         <td><b>${r.c?money(r.c.aum):'—'}</b></td>
         <td><b>${r.e&&eqVal(r.e)?money(eqVal(r.e)):'—'}</b></td>
         <td>${r.s?`${money(r.s.sip)} / ${money(r.s.aum)} / ${r.s.eq?money(r.s.eq):'—'}<br><small style="color:var(--gray)">${fmtDate(String(r.s.at).slice(0,10))} by ${esc(r.s.by)}</small>`:'—'}</td>
+        <td title="${esc(elsewhereText(r.p))}" style="max-width:220px;font-size:.62rem">${esc(elsewhereText(r.p))||'—'}</td>
         <td style="white-space:nowrap"><button class="btn-icon" title="View full profile">👁️</button>${CU.role==='admin'?`<button class="btn-icon" title="Delete this profile" style="color:var(--red)" onclick="event.stopPropagation();PROF.del(${i})">🗑️</button>`:''}</td></tr>`;
     });
     $('prof-table').innerHTML=h+'</tbody></table>';
@@ -258,8 +263,18 @@ window.PROF = (function(){
       $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ ${_profiles.length} profile(s) loaded but the list could not be shown — ${esc(e.message||e)}<br><small style="color:var(--gray)">Please send a screenshot of this message.</small></div>`;
     }
   }
+  // "Elsewhere" ka chhota summary — sirf jo None nahi hai
+  function elsewhereText(p){
+    const parts=[];
+    const add=(k,l)=>{ const v=p[k]; if(v && v!=='None') parts.push(l+' '+v); };
+    add('oEquity','EQ'); add('oMf','MF'); add('oSip','SIP'); add('oFd','FD');
+    const o=(Array.isArray(p.oOther)?p.oOther:[]).filter(x=>x!=='None'); if(o.length) parts.push(o.join(', '));
+    return parts.join(' · ');
+  }
   const LABELS=[['incomeSource','Income Source'],['monthlyIncome','Monthly Income'],['monthlySavings','Monthly Savings'],['loan','Loan'],['loanAmount','Loan Outstanding'],
-    ['emiAmount','Monthly EMI'],['emergencyFund','Emergency Fund'],['healthCover','Health Cover'],['lifeCover','Life Cover'],['goal','Goals'],['mode','Investment Mode'],
+    ['emiAmount','Monthly EMI'],['emergencyFund','Emergency Fund'],['healthCover','Health Cover'],['lifeCover','Life Cover'],
+    ['oEquity','Elsewhere — Shares / Equity'],['oMf','Elsewhere — MF Holding'],['oSip','Elsewhere — Monthly SIP'],['oFd','Elsewhere — FD / Bonds'],['oOther','Elsewhere — Other Investments'],['otherDetails','Elsewhere — Broker / Details'],
+    ['goal','Goals'],['mode','Investment Mode'],
     ['sipAmount','Planned SIP'],['period','Investment Period'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
   function detail(i){
     const r=(window._profRows||[])[i]; if(!r) return;
@@ -324,10 +339,24 @@ window.PROF = (function(){
     render();
     toast('Profile deleted','success');
   }
+  // Blank form — naye client ke liye (CRM me abhi nahi). RM ka naam link me jaata hai.
+  function blankLink(){
+    const base=location.origin+location.pathname.replace(/[^/]*$/,'')+'dninvest-profile.html';
+    return base+'?'+new URLSearchParams({rm:CU&&CU.name||''}).toString();
+  }
+  async function blank(mode){
+    const link=blankLink();
+    if(mode==='copy'){
+      try{ await navigator.clipboard.writeText(link); toast('Blank form link copied ✓','success'); }catch(_){ prompt('Copy this link:', link); }
+      return;
+    }
+    const msg=`Greetings from D N Investment!\n\nPlease fill this short investment profile form (takes about 2 minutes) so we can suggest the right plan for you:\n${link}\n\nThank you,\n${CU&&CU.name||''}\nD N Investment`;
+    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');   // WhatsApp me contact khud chunein
+  }
   async function openFor(cid, seg){
     const c = seg==='equity' ? eqClient(cid) : mfClient(cid);
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
-  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del };
+  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank };
 })();

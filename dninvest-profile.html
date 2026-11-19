@@ -124,8 +124,9 @@
 
       <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small></h3></div></div>
       <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Emergency fund and insurance cover</small></h3></div></div>
-      <div class="card" id="planCard"><div class="sh"><div class="num">4</div><h3>Investment Plan</h3></div></div>
-      <div class="card" id="riskCard"><div class="sh"><div class="num">5</div><h3>Risk Profile<small>There are no right or wrong answers</small></h3></div></div>
+      <div class="card" id="otherCard"><div class="sh"><div class="num">4</div><h3>Investments Elsewhere<small>With other brokers, banks or platforms (approximate value)</small></h3></div></div>
+      <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Investment Plan</h3></div></div>
+      <div class="card" id="riskCard"><div class="sh"><div class="num">6</div><h3>Risk Profile<small>There are no right or wrong answers</small></h3></div></div>
 
       <div class="card">
         <label class="consent"><input type="checkbox" id="agree">
@@ -189,6 +190,13 @@ const SECTIONS = {
     {k:"healthCover", l:"Health Insurance Cover", hint:"(family total)", o:["None","Below ₹5 Lakh","₹5 – 10 Lakh","Above ₹10 Lakh"]},
     {k:"lifeCover", l:"Life / Term Insurance Cover", o:["None","Below ₹50 Lakh","₹50 Lakh – 1 Crore","Above ₹1 Crore"]}
   ],
+  otherCard: [
+    {k:"oEquity", l:"Shares / Equity (Demat with other broker)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oMf", l:"Mutual Fund Holding (other distributor / direct)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oSip", l:"Monthly SIP Running Elsewhere", o:["None","Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000"]},
+    {k:"oFd", l:"Fixed Deposits / Bonds", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oOther", l:"Other Investments", hint:"(tick all that apply)", multi:true, o:["PPF / EPF","LIC / Insurance Plans","Gold / SGB","NPS","Real Estate","Post Office Schemes","None"]}
+  ],
   planCard: [
     {k:"goal", l:"Investment Goal", hint:"(tick all that apply)", multi:true, o:["Wealth Creation","Child Education","Retirement","House / Car","Tax Saving"]},
     {k:"mode", l:"Investment Mode", o:["Monthly SIP","SIP + Top-up when surplus","Lumpsum when surplus","Lumpsum + SIP"]},
@@ -219,6 +227,17 @@ for (const [card, qs] of Object.entries(SECTIONS)) {
   });
 }
 
+// Optional free-text for "Investments Elsewhere"
+(function(){
+  const d=document.createElement("div"); d.className="q";
+  d.innerHTML='<div class="ql">Broker / platform names or any other details <em>(optional)</em></div><input type="text" name="otherDetails" placeholder="e.g. Zerodha, Groww, SBI FD">';
+  document.getElementById("otherCard").appendChild(d);
+})();
+// "None" tick ho to baaki options hat jaayen (aur ulta)
+document.addEventListener("change", e=>{
+  const el=e.target; if(el.name!=="oOther" || !el.checked) return;
+  document.querySelectorAll('input[name="oOther"]').forEach(x=>{ if(x!==el && ((el.value==="None") !== (x.value==="None"))) x.checked=false; });
+});
 const f = document.getElementById("f"), msg = document.getElementById("msg"), btn = document.getElementById("btn");
 // CRM se bheje gaye link me: cid (client id), rm, n (name), m (mobile), s (send id)
 const QS = new URLSearchParams(location.search);
@@ -294,6 +313,8 @@ f.addEventListener("submit", async e => {
   data.riskScore = score;
   data.riskProfile = profileFor(score);
   data.rm = rm;
+  data.otherDetails = (fd.get("otherDetails")||"").trim();
+  data.blankForm = !cid;   // naye client ka blank form (CRM link me client nahi tha)
   data.cid = cid;          // CRM MF investor id (link se) — CRM isi se current SIP / MF value jodta hai
   data.sendId = sendId;
   data.seg = SEG;
@@ -339,6 +360,8 @@ function sendWhatsApp(d){
     "", "*Loans & Protection*",
     "Loan: "+d.loan + (d.loan==="Yes" ? " | Outstanding: "+d.loanAmount+" | EMI: "+d.emiAmount : ""),
     "Emergency Fund: "+d.emergencyFund, "Health Cover: "+d.healthCover, "Life Cover: "+d.lifeCover,
+    "", "*Investments Elsewhere*",
+    "Equity: "+d.oEquity, "MF: "+d.oMf, "SIP: "+d.oSip, "FD / Bonds: "+d.oFd, "Others: "+(d.oOther||[]).join(", ") + (d.otherDetails ? " ("+d.otherDetails+")" : ""),
     "", "*Investment Plan*",
     "Goal: "+d.goal.join(", "), "Mode: "+d.mode, "SIP: "+d.sipAmount, "Period: "+d.period,
     "", "Risk Score: "+d.riskScore+"/15 – *"+d.riskProfile+"*",

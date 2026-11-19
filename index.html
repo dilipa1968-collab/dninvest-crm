@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-19-v8';
+  const APP_VERSION = '2026-11-19-v9';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -3431,6 +3431,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <button class="btn btn-outline" onclick="PROF.open(true)" title="Reload all profiles from the server">🔄 Refresh</button>
         <span id="prof-sync" style="font-size:.72rem;color:var(--teal);font-weight:700"></span>
         <button class="btn btn-outline" onclick="PROF.exportXlsx()">⬇️ Export</button>
+        <button class="btn btn-outline" style="border-color:#0f766e;color:#0f766e" onclick="PROF.blank('wa')" title="Blank form for a NEW client (not in CRM yet) — opens WhatsApp, you pick the contact">🆕 Blank Form (WhatsApp)</button>
+        <button class="btn btn-outline" style="border-color:#0f766e;color:#0f766e" onclick="PROF.blank('copy')" title="Copy the blank form link">🔗 Copy Blank Link</button>
         <span id="prof-pending" style="font-size:.75rem;color:#b45309;font-weight:700"></span>
         <span id="prof-count" class="res-count"></span>
       </div>
@@ -3457,7 +3459,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <script src="dninvest-backoffice.js?v=2026-11-19-v1"></script>
 
-<script src="dninvest-profiles.js?v=2026-11-19-v6"></script>
+<script src="dninvest-profiles.js?v=2026-11-19-v7"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">
