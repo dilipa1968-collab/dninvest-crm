@@ -5082,7 +5082,7 @@ function renderEqTable(){
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="${rowCls}"${rowStyle}${comebackTag?` title="Comeback trade — ${comebackTag==='blue'?'~1':comebackTag==='green'?'~3':'~6'}+ month gap"`:''}>${BULK.td('eq',c.id)}
       <td><span style="display:inline-block;min-width:60px">${c.code||'—'}</span>${(_mfPanSet.has(String(c.pan||'').trim().toUpperCase())||_mfMobileSet.has(_mob10(c.mobile)))?`<span class="badge-tip" data-tip="MF RM: ${escapeHtml(_mfRmFor(c))}" style="font-size:.62rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">M</span>`:''}</td>
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','equity')" title="Right-click → Send Profile Form / Add to Seminar">${c.name}${(c.asset_value>=500000)?'<span class="badge-tip" data-tip="HNI — Asset Value ≥ ₹5L" style="margin-left:4px;font-size:.65rem;background:#7c3aed;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.rm||'—'}</td>
       <td style="white-space:nowrap">${(()=>{const rk=_riskOf(c.code);return rk?`<a href="#" onclick="openEqRisk('${(c.code||'').replace(/'/g,"\\'")}','${(c.name||'').replace(/'/g,"\\'")}');return false" style="text-decoration:none">${fmtRiskMoney(rk.risk_val)}</a>`:'<span style="color:#ccc">—</span>';})()}</td>
@@ -6970,7 +6970,7 @@ function showClientSeminarMenu(ev, sourceId, type){
   const m=document.createElement('div');
   m.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:60vh;overflow:auto;font-size:.82rem;padding:6px';
   // MF investor: upar "Client Profile Form" bhejne ke options (19-Nov-2026)
-  let inner=(type==='mf' && window.PROF) ? PROF.menuHtml(sourceId) : '';
+  let inner=window.PROF ? PROF.menuHtml(sourceId, type) : '';
   inner+=`<div style="padding:7px 10px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border,#eee);margin-bottom:4px">➕ Add ${src?('“'+src.name+'”'):'client'} to Seminar</div>`;
   if(!list.length){
     inner+='<div style="padding:12px 10px;color:#999">No upcoming seminars — create one first.</div>';
