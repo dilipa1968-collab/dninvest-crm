@@ -73,6 +73,11 @@
   .meter div{flex:1;padding:8px 4px;border-radius:8px;background:#222;color:var(--mute);font-size:11.5px}
   .meter div.on{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#111;font-weight:800}
   .hide{display:none!important}
+  .hold{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .hold div{background:#0e0e0e;border:1px solid var(--line);border-radius:12px;padding:12px}
+  .hold small{display:block;font-size:11.5px;color:var(--mute);margin-bottom:3px}
+  .hold b{font-size:18px;color:var(--gold2)}
+  .hold .gain{color:var(--ok)} .hold .loss{color:var(--err)}
 
   /* admin */
   table{width:100%;border-collapse:collapse;font-size:12px}
@@ -107,6 +112,11 @@
           <div><label class="f">Full Name *</label><input type="text" name="name" autocomplete="name"></div>
           <div><label class="f">Mobile Number *</label><input type="tel" name="mobile" maxlength="10" inputmode="numeric" autocomplete="tel"></div>
         </div>
+      </div>
+
+      <div class="card hide" id="holdCard">
+        <div class="sh"><div class="num">₹</div><h3>Your Current Investments with Us<small>As per our records</small></h3></div>
+        <div class="hold" id="holdGrid"></div>
       </div>
 
       <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small></h3></div></div>
@@ -212,6 +222,20 @@ const QS = new URLSearchParams(location.search);
 const rm = QS.get("rm") || "";
 const cid = QS.get("cid") || "";
 const sendId = QS.get("s") || "";
+// Client ki maujooda investment (CRM link se) — sirf dikhane ke liye + submission me save
+const HOLD = { inv:+QS.get("inv")||0, val:+QS.get("val")||0, sip:+QS.get("sip")||0, sc:+QS.get("sc")||0 };
+(function showHoldings(){
+  if (!HOLD.inv && !HOLD.val && !HOLD.sip) return;
+  const r = n => "₹" + Math.round(n).toLocaleString("en-IN");
+  const g = HOLD.val - HOLD.inv, gp = HOLD.inv ? (g / HOLD.inv * 100) : 0;
+  const cells = [];
+  if (HOLD.inv) cells.push(`<div><small>Amount Invested</small><b>${r(HOLD.inv)}</b></div>`);
+  if (HOLD.val) cells.push(`<div><small>Current Value</small><b>${r(HOLD.val)}</b></div>`);
+  if (HOLD.inv && HOLD.val) cells.push(`<div><small>Gain / Loss</small><b class="${g>=0?'gain':'loss'}">${g>=0?'+':'−'}${r(Math.abs(g))} (${gp>=0?'+':''}${gp.toFixed(1)}%)</b></div>`);
+  cells.push(`<div><small>Monthly SIP</small><b>${HOLD.sip ? r(HOLD.sip) + (HOLD.sc ? ` <span style="font-size:12px;color:var(--mute)">(${HOLD.sc} SIP${HOLD.sc>1?'s':''})</span>` : '') : 'No active SIP'}</b></div>`);
+  document.getElementById("holdGrid").innerHTML = cells.join("");
+  document.getElementById("holdCard").classList.remove("hide");
+})();
 (function prefill(){
   const n = (QS.get("n")||"").trim(), m = (QS.get("m")||"").replace(/\D/g,"").slice(-10);
   if (n) f.elements.name.value = n;
@@ -261,6 +285,7 @@ f.addEventListener("submit", async e => {
   data.cid = cid;          // CRM MF investor id (link se) — CRM isi se current SIP / MF value jodta hai
   data.sendId = sendId;
   data.seg = "mf";
+  data.curInvested = HOLD.inv; data.curValue = HOLD.val; data.curSip = HOLD.sip; data.curSipCount = HOLD.sc;
 
   btn.disabled = true; btn.textContent = "Submitting...";
   let saved = false;

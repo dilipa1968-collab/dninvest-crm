@@ -19,6 +19,8 @@ window.PROF = (function(){
   let _profiles=[], _sends=[], _loaded=false;
 
   function mfClient(id){ return (DB.get('mf_clients')||[]).find(c=>c.id===id); }
+  // Invested amount (principal) — AUM import ke aum_detail.inv se
+  function investedOf(c){ const v=c && c.aum_detail && +c.aum_detail.inv; return v>0 ? v : 0; }
   function cleanMobile(m){ const d=String(m||'').replace(/\D/g,''); return d.length>10 ? d.slice(-10) : d; }
   function canSeeClient(c){
     if(!CU) return false;
@@ -28,6 +30,12 @@ window.PROF = (function(){
   function linkFor(c, sendId){
     const base=location.origin+location.pathname.replace(/[^/]*$/,'')+'dninvest-profile.html';
     const p=new URLSearchParams({cid:c.id, rm:c.rm||CU.name||'', n:c.name||'', m:cleanMobile(c.mobile)});
+    // Client ki maujooda investment — form me "Your current investments" box me dikhti hai
+    const inv=investedOf(c);
+    if(inv) p.set('inv', Math.round(inv));
+    if(+c.aum) p.set('val', Math.round(+c.aum));
+    if(+c.sip_amount) p.set('sip', Math.round(+c.sip_amount));
+    if(+c.sip_count) p.set('sc', +c.sip_count);
     if(sendId) p.set('s',sendId);
     return base+'?'+p.toString();
   }
@@ -56,7 +64,7 @@ window.PROF = (function(){
     const link=linkFor(c, sendId);
     // Bhejte waqt ka SIP / MF value snapshot
     const rec={ id:sendId, cid:c.id, name:c.name||'', mobile:mob, rm:c.rm||'', by:CU.name, at:new Date().toISOString(),
-      sip:+c.sip_amount||0, sip_count:+c.sip_count||0, aum:+c.aum||0, via:mode==='copy'?'copy':'whatsapp' };
+      sip:+c.sip_amount||0, sip_count:+c.sip_count||0, aum:+c.aum||0, inv:investedOf(c), via:mode==='copy'?'copy':'whatsapp' };
     if(mode==='copy'){
       try{ await navigator.clipboard.writeText(link); toast('Profile form link copied ✓','success'); }
       catch(_){ prompt('Copy this link:', link); }
@@ -114,8 +122,8 @@ window.PROF = (function(){
     $('prof-count').textContent=list.length+' profile'+(list.length===1?'':'s');
     const riskC={Conservative:'#0369a1',Moderate:'#b45309',Aggressive:'#b91c1c'};
     let h=`<table><thead><tr><th>Date</th><th>Client</th><th>Mobile</th><th>RM</th><th>Risk Profile</th><th>Monthly Savings</th><th>Mode</th><th>Planned SIP</th>
-      <th title="Client's SIP in CRM right now">Current SIP</th><th title="Client's MF value (AUM) in CRM right now">Current MF Value</th><th title="When the form was sent">SIP / MF Value at Send</th><th></th></tr></thead><tbody>`;
-    if(!list.length) h+=`<tr><td colspan="12" style="text-align:center;color:var(--gray);padding:16px">No profiles yet — right-click a client name in MF Investors → 📋 Send Profile Form</td></tr>`;
+      <th title="Client's SIP in CRM right now">Current SIP</th><th title="Total amount invested (principal) — from CRM right now">Invested</th><th title="Client's MF value (AUM) in CRM right now">Current MF Value</th><th title="When the form was sent">SIP / MF Value at Send</th><th></th></tr></thead><tbody>`;
+    if(!list.length) h+=`<tr><td colspan="13" style="text-align:center;color:var(--gray);padding:16px">No profiles yet — right-click a client name in MF Investors → 📋 Send Profile Form</td></tr>`;
     list.forEach((r,i)=>{
       const d=subDate(r.p);
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
@@ -125,6 +133,7 @@ window.PROF = (function(){
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
         <td><b>${r.c?money(r.c.sip_amount):'—'}</b>${r.c&&r.c.sip_count?` <small>(${r.c.sip_count})</small>`:''}</td>
+        <td><b>${r.c&&investedOf(r.c)?money(investedOf(r.c)):'—'}</b></td>
         <td><b>${r.c?money(r.c.aum):'—'}</b></td>
         <td>${r.s?`${money(r.s.sip)} / ${money(r.s.aum)}<br><small style="color:var(--gray)">${fmtDate(String(r.s.at).slice(0,10))} by ${esc(r.s.by)}</small>`:'—'}</td>
         <td><button class="btn-icon" title="View full profile">👁️</button></td></tr>`;
@@ -147,9 +156,10 @@ window.PROF = (function(){
     const v=k=>Array.isArray(p[k])?p[k].join(', '):(p[k]||'');
     $('profDetailTitle').textContent='📋 '+(p.name||'Client Profile');
     $('profDetailBody').innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">
         ${box('Risk Profile',(p.riskProfile||'—')+' ('+(p.riskScore??'')+'/15)')}
         ${box('Current SIP',r.c?money(r.c.sip_amount)+(r.c.sip_count?' ('+r.c.sip_count+' SIPs)':''):'—')}
+        ${box('Invested',r.c&&investedOf(r.c)?money(investedOf(r.c)):'—')}
         ${box('Current MF Value',r.c?money(r.c.aum):'—')}
         ${box('At Send',r.s?money(r.s.sip)+' / '+money(r.s.aum):'—')}
       </div>
@@ -161,12 +171,12 @@ window.PROF = (function(){
   function exportXlsx(){
     const list=rows();
     const cols=[{header:'Submitted',width:18},{header:'Client',width:26},{header:'Mobile',width:12},{header:'RM',width:12},
-      {header:'Current SIP (₹)',width:14,money:true},{header:'SIP Count',width:9,num:true},{header:'Current MF Value (₹)',width:16,money:true},
+      {header:'Current SIP (₹)',width:14,money:true},{header:'SIP Count',width:9,num:true},{header:'Invested (₹)',width:14,money:true},{header:'Current MF Value (₹)',width:16,money:true},
       {header:'SIP at Send (₹)',width:14,money:true},{header:'MF Value at Send (₹)',width:16,money:true},{header:'Sent On',width:12},
       {header:'Risk Score',width:9,num:true},{header:'Risk Profile',width:13}, ...LABELS.map(([,l])=>({header:l,width:18}))];
     const data=list.map(r=>{ const p=r.p, d=subDate(p);
       return [d?d.toLocaleString('en-IN'):'', p.name, p.mobile, (r.c&&r.c.rm)||p.rm||'',
-        r.c?(+r.c.sip_amount||0):'', r.c?(+r.c.sip_count||0):'', r.c?(+r.c.aum||0):'',
+        r.c?(+r.c.sip_amount||0):'', r.c?(+r.c.sip_count||0):'', r.c?investedOf(r.c):'', r.c?(+r.c.aum||0):'',
         r.s?r.s.sip:'', r.s?r.s.aum:'', r.s?fmtDate(String(r.s.at).slice(0,10)):'',
         p.riskScore??'', p.riskProfile||'', ...LABELS.map(([k])=>Array.isArray(p[k])?p[k].join(', '):(p[k]||''))]; });
     dnXlsx('Client_Profiles_'+today()+'.xlsx','D N Investment — Client Profiles ('+today()+')',cols,data);
