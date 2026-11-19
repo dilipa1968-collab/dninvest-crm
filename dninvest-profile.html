@@ -73,6 +73,34 @@
   .meter div{flex:1;padding:8px 4px;border-radius:8px;background:#222;color:var(--mute);font-size:11.5px}
   .meter div.on{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#111;font-weight:800}
   .hide{display:none!important}
+
+  /* ── Hindi lines + compact size (19-Nov-2026) ── */
+  .hi{display:block;font-size:11.5px;color:#b9a77a;font-weight:400;line-height:1.35;margin-top:1px;font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif}
+  .ql .qh{margin-top:2px}
+  .opts label .oh{font-size:10.5px;color:#a89a74;margin-top:1px}
+  .opts input:checked+label .oh{color:#e9cf86}
+  .hero .hi{font-size:12px}
+  .sh h3 small.hi{color:#b9a77a}
+  label.f .hi{display:inline;margin-left:4px}
+  /* compact */
+  header{padding:16px 0 10px} header img{height:52px;margin-bottom:4px} header h1{font-size:20px;letter-spacing:3px}
+  header .tag{font-size:11px} header .sub{font-size:10.5px;margin-top:3px}
+  .hero{padding:11px 14px;margin-bottom:10px;border-radius:13px} .hero h2{font-size:15.5px} .hero p{font-size:12px;margin-top:2px}
+  .card{padding:13px 12px;margin-bottom:10px;border-radius:13px}
+  .sh{margin-bottom:10px;padding-bottom:8px;gap:9px} .sh .num{width:26px;height:26px;font-size:12.5px;flex:0 0 26px} .sh h3{font-size:14px} .sh small{font-size:11px}
+  .grid{gap:9px}
+  label.f{font-size:11.5px;margin-bottom:4px}
+  input[type=text],input[type=tel],input[type=email],input[type=password]{padding:9px 11px;font-size:14.5px;border-radius:9px}
+  .q{margin-bottom:12px} .q.sub{padding:9px 10px}
+  .ql{font-size:12.8px;margin-bottom:6px}
+  .opts{gap:6px}
+  .opts label{min-height:38px;padding:7px 10px;font-size:12.6px;gap:8px;border-radius:9px;line-height:1.25}
+  .opts label::before{flex:0 0 16px;height:16px}
+  .hold{gap:8px} .hold div{padding:9px 10px;border-radius:10px} .hold b{font-size:16px} .hold small{font-size:10.5px}
+  .consent{font-size:12px}
+  button{padding:12px;font-size:15px;border-radius:11px}
+  .disc{font-size:10.5px;margin:10px 0 26px}
+  .prog{padding:7px 0 6px}
   .hold{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   .hold div{background:#0e0e0e;border:1px solid var(--line);border-radius:12px;padding:12px}
   .hold small{display:block;font-size:11.5px;color:var(--mute);margin-bottom:3px}
@@ -103,45 +131,48 @@
   <!-- ================= CLIENT FORM ================= -->
   <div id="formView">
     <div class="hero">
-      <h2>Client Investment Profile</h2>
+      <h2>Client Investment Profile</h2><div class="hi" style="color:var(--gold2)">ग्राहक निवेश प्रोफ़ाइल</div>
       <p>Takes about 2 minutes. Just tap the option that fits you.</p>
+      <p class="hi">लगभग 2 मिनट लगेंगे। जो विकल्प आप पर लागू हो, उस पर टैप करें।</p>
     </div>
     <div class="prog"><div class="bar"><div class="fill" id="fill"></div></div><div class="lbl" id="plbl">0% complete</div></div>
 
     <form id="f" novalidate>
       <div class="card">
-        <div class="sh"><div class="num">1</div><h3>Your Details</h3></div>
+        <div class="sh"><div class="num">1</div><h3>Your Details<small class="hi">आपकी जानकारी</small></h3></div>
         <div class="grid">
-          <div><label class="f">Full Name *</label><input type="text" name="name" autocomplete="name"></div>
-          <div><label class="f">Mobile Number *</label><input type="tel" name="mobile" maxlength="10" inputmode="numeric" autocomplete="tel"></div>
+          <div><label class="f">Full Name * <span class="hi">पूरा नाम</span></label><input type="text" name="name" autocomplete="name"></div>
+          <div><label class="f">Mobile Number * <span class="hi">मोबाइल नंबर</span></label><input type="tel" name="mobile" maxlength="10" inputmode="numeric" autocomplete="tel"></div>
         </div>
       </div>
 
       <div class="card hide" id="holdCard">
-        <div class="sh"><div class="num">₹</div><h3>Your Current Investments with Us<small>As per our records</small></h3></div>
+        <div class="sh"><div class="num">₹</div><h3>Your Current Investments with Us<small>As per our records</small><small class="hi">हमारे साथ आपका मौजूदा निवेश (हमारे रिकॉर्ड अनुसार)</small></h3></div>
         <div class="hold" id="holdGrid"></div>
       </div>
 
-      <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small></h3></div></div>
-      <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Emergency fund and insurance cover</small></h3></div></div>
-      <div class="card" id="otherCard"><div class="sh"><div class="num">4</div><h3>Investments Elsewhere<small>With other brokers, banks or platforms (approximate value)</small></h3></div></div>
-      <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Investment Plan</h3></div></div>
-      <div class="card" id="riskCard"><div class="sh"><div class="num">6</div><h3>Risk Profile<small>There are no right or wrong answers</small></h3></div></div>
+      <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small><small class="hi">आय और बचत (मासिक आँकड़े)</small></h3></div></div>
+      <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Emergency fund and insurance cover</small><small class="hi">लोन और सुरक्षा — इमरजेंसी फंड और बीमा</small></h3></div></div>
+      <div class="card" id="otherCard"><div class="sh"><div class="num">4</div><h3>Investments Elsewhere<small>With other brokers, banks or platforms (approximate value)</small><small class="hi">अन्य जगह निवेश — दूसरे ब्रोकर, बैंक या प्लेटफ़ॉर्म पर (अनुमानित राशि)</small></h3></div></div>
+      <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Investment Plan<small class="hi">निवेश योजना</small></h3></div></div>
+      <div class="card" id="riskCard"><div class="sh"><div class="num">6</div><h3>Risk Profile<small>There are no right or wrong answers</small><small class="hi">जोखिम प्रोफ़ाइल — कोई उत्तर सही या गलत नहीं है</small></h3></div></div>
 
       <div class="card">
         <label class="consent"><input type="checkbox" id="agree">
-          <span>I confirm the above information is correct. I understand that Mutual Fund investments are subject to market risks and I will read all scheme related documents carefully.</span></label>
+          <span>I confirm the above information is correct. I understand that Mutual Fund investments are subject to market risks and I will read all scheme related documents carefully.
+          <span class="hi" style="display:block;margin-top:4px">मैं पुष्टि करता/करती हूँ कि ऊपर दी गई जानकारी सही है। म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, मैं योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ूँगा/पढ़ूँगी।</span></span></label>
       </div>
       <div class="msg" id="msg"></div>
-      <button type="submit" id="btn">Submit Profile</button>
+      <button type="submit" id="btn">Submit Profile <span style="font-weight:600;opacity:.8">· प्रोफ़ाइल जमा करें</span></button>
     </form>
-    <div class="disc">Mutual Fund investments are subject to market risks, read all scheme related documents carefully.</div>
+    <div class="disc">Mutual Fund investments are subject to market risks, read all scheme related documents carefully.<br>म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ें।</div>
   </div>
 
   <div id="doneView" class="card done hide">
     <div class="tick">✓</div>
     <h3>Thank you, <span id="dName"></span>!</h3>
-    <div style="color:var(--mute);font-size:14px">Your profile has been received.<br>Our Relationship Manager will contact you shortly.</div>
+    <div style="color:var(--mute);font-size:13px">Your profile has been received.<br>Our Relationship Manager will contact you shortly.</div>
+    <div class="hi" style="margin-top:6px">धन्यवाद! आपकी प्रोफ़ाइल मिल गई है। हमारे रिलेशनशिप मैनेजर जल्द ही आपसे संपर्क करेंगे।</div>
     <div class="meter" id="meter"><div>Conservative</div><div>Moderate</div><div>Aggressive</div></div>
     <div style="font-size:12px;color:var(--mute)">Your Risk Profile</div>
   </div>
@@ -178,40 +209,52 @@ try {
 // ---- Questions. risk:true => scored 1..3 by option order. when => shown only if another answer matches
 const SECTIONS = {
   incomeCard: [
-    {k:"incomeSource", l:"Income Source", o:["Salary","Business","Professional","Retired / Pension"]},
-    {k:"monthlyIncome", l:"Monthly Income", o:["Below ₹25,000","₹25,000 – 50,000","₹50,000 – 1 Lakh","₹1 – 2 Lakh","Above ₹2 Lakh"]},
-    {k:"monthlySavings", l:"Monthly Savings", hint:"(amount left after all expenses)", o:["Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","₹25,000 – 50,000","Above ₹50,000"]}
+    {k:"incomeSource", h:"आय का स्रोत", l:"Income Source", o:["Salary","Business","Professional","Retired / Pension"]},
+    {k:"monthlyIncome", h:"मासिक आय", l:"Monthly Income", o:["Below ₹25,000","₹25,000 – 50,000","₹50,000 – 1 Lakh","₹1 – 2 Lakh","Above ₹2 Lakh"]},
+    {k:"monthlySavings", h:"मासिक बचत (सभी खर्चों के बाद बची राशि)", l:"Monthly Savings", hint:"(amount left after all expenses)", o:["Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","₹25,000 – 50,000","Above ₹50,000"]}
   ],
   safetyCard: [
-    {k:"loan", l:"Do you have any loan?", o:["No","Yes"]},
-    {k:"loanAmount", l:"Total Loan Outstanding", when:["loan","Yes"], o:["Below ₹5 Lakh","₹5 – 20 Lakh","₹20 – 50 Lakh","Above ₹50 Lakh"]},
-    {k:"emiAmount", l:"Total Monthly EMI", when:["loan","Yes"], o:["Below ₹5,000","₹5,000 – 15,000","₹15,000 – 30,000","Above ₹30,000"]},
-    {k:"emergencyFund", l:"Emergency Fund", hint:"(money kept aside in bank / FD for emergencies)", o:["None","Below ₹1 Lakh","₹1 – 3 Lakh","₹3 – 5 Lakh","Above ₹5 Lakh"]},
-    {k:"healthCover", l:"Health Insurance Cover", hint:"(family total)", o:["None","Below ₹5 Lakh","₹5 – 10 Lakh","Above ₹10 Lakh"]},
-    {k:"lifeCover", l:"Life / Term Insurance Cover", o:["None","Below ₹50 Lakh","₹50 Lakh – 1 Crore","Above ₹1 Crore"]}
+    {k:"loan", h:"क्या आपका कोई लोन है?", l:"Do you have any loan?", o:["No","Yes"]},
+    {k:"loanAmount", h:"कुल बकाया लोन", l:"Total Loan Outstanding", when:["loan","Yes"], o:["Below ₹5 Lakh","₹5 – 20 Lakh","₹20 – 50 Lakh","Above ₹50 Lakh"]},
+    {k:"emiAmount", h:"कुल मासिक EMI", l:"Total Monthly EMI", when:["loan","Yes"], o:["Below ₹5,000","₹5,000 – 15,000","₹15,000 – 30,000","Above ₹30,000"]},
+    {k:"emergencyFund", h:"इमरजेंसी फंड (आपात स्थिति के लिए बैंक / FD में रखी राशि)", l:"Emergency Fund", hint:"(money kept aside in bank / FD for emergencies)", o:["None","Below ₹1 Lakh","₹1 – 3 Lakh","₹3 – 5 Lakh","Above ₹5 Lakh"]},
+    {k:"healthCover", h:"स्वास्थ्य बीमा कवर (पूरे परिवार का)", l:"Health Insurance Cover", hint:"(family total)", o:["None","Below ₹5 Lakh","₹5 – 10 Lakh","Above ₹10 Lakh"]},
+    {k:"lifeCover", h:"जीवन / टर्म बीमा कवर", l:"Life / Term Insurance Cover", o:["None","Below ₹50 Lakh","₹50 Lakh – 1 Crore","Above ₹1 Crore"]}
   ],
   otherCard: [
-    {k:"oEquity", l:"Shares / Equity (Demat with other broker)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
-    {k:"oMf", l:"Mutual Fund Holding (other distributor / direct)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
-    {k:"oSip", l:"Monthly SIP Running Elsewhere", o:["None","Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000"]},
-    {k:"oFd", l:"Fixed Deposits / Bonds", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
-    {k:"oOther", l:"Other Investments", hint:"(tick all that apply)", multi:true, o:["PPF / EPF","LIC / Insurance Plans","Gold / SGB","NPS","Real Estate","Post Office Schemes","None"]}
+    {k:"oEquity", h:"शेयर / इक्विटी (दूसरे ब्रोकर के डीमैट में)", l:"Shares / Equity (Demat with other broker)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oMf", h:"म्यूचुअल फंड होल्डिंग (दूसरे डिस्ट्रीब्यूटर / डायरेक्ट)", l:"Mutual Fund Holding (other distributor / direct)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oSip", h:"दूसरी जगह चल रही मासिक SIP", l:"Monthly SIP Running Elsewhere", o:["None","Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000"]},
+    {k:"oFd", h:"फिक्स्ड डिपॉज़िट / बॉन्ड", l:"Fixed Deposits / Bonds", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oOther", h:"अन्य निवेश (जो लागू हों, सभी पर टिक करें)", l:"Other Investments", hint:"(tick all that apply)", multi:true, o:["PPF / EPF","LIC / Insurance Plans","Gold / SGB","NPS","Real Estate","Post Office Schemes","None"]}
   ],
   planCard: [
-    {k:"goal", l:"Investment Goal", hint:"(tick all that apply)", multi:true, o:["Wealth Creation","Child Education","Retirement","House / Car","Tax Saving"]},
-    {k:"mode", l:"Investment Mode", o:["Monthly SIP","SIP + Top-up when surplus","Lumpsum when surplus","Lumpsum + SIP"]},
-    {k:"sipAmount", l:"Monthly SIP Amount", o:["₹1,000 – 5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000","No SIP"]},
-    {k:"period", l:"Investment Period", o:["3 – 5 years","5 – 10 years","10+ years"]}
+    {k:"goal", h:"निवेश का लक्ष्य (जो लागू हों, सभी पर टिक करें)", l:"Investment Goal", hint:"(tick all that apply)", multi:true, o:["Wealth Creation","Child Education","Retirement","House / Car","Tax Saving"]},
+    {k:"mode", h:"निवेश का तरीका", l:"Investment Mode", o:["Monthly SIP","SIP + Top-up when surplus","Lumpsum when surplus","Lumpsum + SIP"]},
+    {k:"sipAmount", h:"मासिक SIP राशि", l:"Monthly SIP Amount", o:["₹1,000 – 5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000","No SIP"]},
+    {k:"period", h:"निवेश की अवधि", l:"Investment Period", o:["3 – 5 years","5 – 10 years","10+ years"]}
   ],
   riskCard: [
-    {k:"r1", risk:true, l:"1. How regular is your income?", o:["Irregular","Fairly regular","Very regular"]},
-    {k:"r2", risk:true, l:"2. If the market falls 20%, you will:", o:["Sell","Hold","Invest more"]},
-    {k:"r3", risk:true, l:"3. Experience in equity / mutual funds?", o:["None","Up to 2 years","More than 2 years"]},
-    {k:"r4", risk:true, l:"4. What do you expect most?", o:["Capital safety","Balanced growth","High growth"]},
-    {k:"r5", risk:true, l:"5. Your age?", o:["Above 55","35 – 55","Below 35"]}
+    {k:"r1", h:"1. आपकी आय कितनी नियमित है?", risk:true, l:"1. How regular is your income?", o:["Irregular","Fairly regular","Very regular"]},
+    {k:"r2", h:"2. अगर बाज़ार 20% गिर जाए, तो आप:", risk:true, l:"2. If the market falls 20%, you will:", o:["Sell","Hold","Invest more"]},
+    {k:"r3", h:"3. इक्विटी / म्यूचुअल फंड में आपका अनुभव?", risk:true, l:"3. Experience in equity / mutual funds?", o:["None","Up to 2 years","More than 2 years"]},
+    {k:"r4", h:"4. आप सबसे ज़्यादा क्या चाहते हैं?", risk:true, l:"4. What do you expect most?", o:["Capital safety","Balanced growth","High growth"]},
+    {k:"r5", h:"5. आपकी उम्र?", risk:true, l:"5. Your age?", o:["Above 55","35 – 55","Below 35"]}
   ]
 };
 const ALL = Object.values(SECTIONS).flat();
+// Option ka Hindi (sirf shabd wale options; ₹ range waale waise hi samajh aate hain)
+const OH = {"Salary":"वेतन","Business":"व्यवसाय","Professional":"प्रोफेशनल (डॉक्टर, CA आदि)","Retired / Pension":"सेवानिवृत्त / पेंशन",
+  "No":"नहीं","Yes":"हाँ","None":"कोई नहीं",
+  "PPF / EPF":"PPF / EPF","LIC / Insurance Plans":"LIC / बीमा पॉलिसी","Gold / SGB":"सोना / SGB","NPS":"NPS","Real Estate":"प्रॉपर्टी","Post Office Schemes":"पोस्ट ऑफिस योजनाएँ",
+  "Wealth Creation":"धन निर्माण","Child Education":"बच्चों की पढ़ाई","Retirement":"रिटायरमेंट","House / Car":"घर / गाड़ी","Tax Saving":"टैक्स बचत",
+  "Monthly SIP":"मासिक SIP","SIP + Top-up when surplus":"SIP + पैसा बचने पर टॉप-अप","Lumpsum when surplus":"पैसा बचने पर एकमुश्त","Lumpsum + SIP":"एकमुश्त + SIP",
+  "No SIP":"SIP नहीं","3 – 5 years":"3 – 5 साल","5 – 10 years":"5 – 10 साल","10+ years":"10+ साल",
+  "Irregular":"अनियमित","Fairly regular":"काफ़ी हद तक नियमित","Very regular":"बहुत नियमित",
+  "Sell":"बेच दूँगा","Hold":"रुका रहूँगा","Invest more":"और निवेश करूँगा",
+  "Up to 2 years":"2 साल तक","More than 2 years":"2 साल से ज़्यादा",
+  "Capital safety":"पूंजी की सुरक्षा","Balanced growth":"संतुलित बढ़त","High growth":"ऊँची बढ़त",
+  "Above 55":"55 से ऊपर","Below 35":"35 से कम"};
 
 // render
 for (const [card, qs] of Object.entries(SECTIONS)) {
@@ -219,9 +262,9 @@ for (const [card, qs] of Object.entries(SECTIONS)) {
   qs.forEach(q => {
     const d = document.createElement("div");
     d.className = "q" + (q.when ? " sub hide" : ""); d.id = "q_"+q.k;
-    d.innerHTML = `<div class="ql">${q.l} *${q.hint?` <em>${q.hint}</em>`:""}</div><div class="opts${q.o.length===3?' c3':''}">` + q.o.map((o,i)=>{
+    d.innerHTML = `<div class="ql">${q.l} *${q.hint?` <em>${q.hint}</em>`:""}${q.h?`<span class="hi qh">${q.h}</span>`:""}</div><div class="opts${q.o.length===3?' c3':''}">` + q.o.map((o,i)=>{
       const id = q.k+"_"+i;
-      return `<input type="${q.multi?'checkbox':'radio'}" name="${q.k}" id="${id}" value="${o}"><label for="${id}">${o}</label>`;
+      return `<input type="${q.multi?'checkbox':'radio'}" name="${q.k}" id="${id}" value="${o}"><label for="${id}"><span>${o}${OH[o]&&OH[o]!==o?`<span class="hi oh">${OH[o]}</span>`:""}</span></label>`;
     }).join("") + `</div>`;
     el.appendChild(d);
   });
@@ -230,7 +273,7 @@ for (const [card, qs] of Object.entries(SECTIONS)) {
 // Optional free-text for "Investments Elsewhere"
 (function(){
   const d=document.createElement("div"); d.className="q";
-  d.innerHTML='<div class="ql">Broker / platform names or any other details <em>(optional)</em></div><input type="text" name="otherDetails" placeholder="e.g. Zerodha, Groww, SBI FD">';
+  d.innerHTML='<div class="ql">Broker / platform names or any other details <em>(optional)</em><span class="hi qh">ब्रोकर / प्लेटफ़ॉर्म का नाम या अन्य जानकारी (वैकल्पिक)</span></div><input type="text" name="otherDetails" placeholder="e.g. Zerodha, Groww, SBI FD">';
   document.getElementById("otherCard").appendChild(d);
 })();
 // "None" tick ho to baaki options hat jaayen (aur ulta)
@@ -254,16 +297,16 @@ const SEG = QS.get("seg")==="eq" ? "eq" : "mf";
   const g = HOLD.val - HOLD.inv, gp = HOLD.inv ? (g / HOLD.inv * 100) : 0;
   const cells = [];
   const head = t => `<div class="hh">${t}</div>`;
-  if (hasMf && HOLD.eq) cells.push(head("Mutual Funds"));
-  if (HOLD.inv) cells.push(`<div><small>Amount Invested</small><b>${r(HOLD.inv)}</b></div>`);
-  if (HOLD.val) cells.push(`<div><small>Current Value</small><b>${r(HOLD.val)}</b></div>`);
-  if (HOLD.inv && HOLD.val) cells.push(`<div><small>Gain / Loss</small><b class="${g>=0?'gain':'loss'}">${g>=0?'+':'−'}${r(Math.abs(g))} (${gp>=0?'+':''}${gp.toFixed(1)}%)</b></div>`);
-  if (hasMf) cells.push(`<div><small>Monthly SIP</small><b>${HOLD.sip ? r(HOLD.sip) + (HOLD.sc ? ` <span style="font-size:12px;color:var(--mute)">(${HOLD.sc} SIP${HOLD.sc>1?'s':''})</span>` : '') : 'No active SIP'}</b></div>`);
+  if (hasMf && HOLD.eq) cells.push(head("Mutual Funds · म्यूचुअल फंड"));
+  if (HOLD.inv) cells.push(`<div><small>Amount Invested · निवेश राशि</small><b>${r(HOLD.inv)}</b></div>`);
+  if (HOLD.val) cells.push(`<div><small>Current Value · मौजूदा मूल्य</small><b>${r(HOLD.val)}</b></div>`);
+  if (HOLD.inv && HOLD.val) cells.push(`<div><small>Gain / Loss · लाभ / हानि</small><b class="${g>=0?'gain':'loss'}">${g>=0?'+':'−'}${r(Math.abs(g))} (${gp>=0?'+':''}${gp.toFixed(1)}%)</b></div>`);
+  if (hasMf) cells.push(`<div><small>Monthly SIP · मासिक SIP</small><b>${HOLD.sip ? r(HOLD.sip) + (HOLD.sc ? ` <span style="font-size:12px;color:var(--mute)">(${HOLD.sc} SIP${HOLD.sc>1?'s':''})</span>` : '') : 'No active SIP'}</b></div>`);
   if (HOLD.eq){
-    if (hasMf) cells.push(head("Equity (Shares)"));
-    cells.push(`<div class="full"><small>Equity Holding Value</small><b>${r(HOLD.eq)}</b></div>`);
+    if (hasMf) cells.push(head("Equity (Shares) · शेयर"));
+    cells.push(`<div class="full"><small>Equity Holding Value · शेयर होल्डिंग मूल्य</small><b>${r(HOLD.eq)}</b></div>`);
   }
-  if (hasMf && HOLD.eq) cells.push(`<div class="full tot"><small>Total Portfolio with Us (MF + Equity)</small><b>${r(HOLD.val + HOLD.eq)}</b></div>`);
+  if (hasMf && HOLD.eq) cells.push(`<div class="full tot"><small>Total Portfolio with Us (MF + Equity) · कुल पोर्टफोलियो</small><b>${r(HOLD.val + HOLD.eq)}</b></div>`);
   document.getElementById("holdGrid").innerHTML = cells.join("");
   document.getElementById("holdCard").classList.remove("hide");
 })();
@@ -296,8 +339,8 @@ f.addEventListener("submit", async e => {
   const fd = new FormData(f), data = {};
   data.name = (fd.get("name")||"").trim();
   data.mobile = (fd.get("mobile")||"").trim();
-  if (!data.name) return msg.textContent = "Please enter your name.";
-  if (!/^[6-9]\d{9}$/.test(data.mobile)) return msg.textContent = "Please enter a valid 10-digit mobile number.";
+  if (!data.name) return msg.textContent = "Please enter your name. / कृपया अपना नाम लिखें।";
+  if (!/^[6-9]\d{9}$/.test(data.mobile)) return msg.textContent = "Please enter a valid 10-digit mobile number. / कृपया सही 10 अंकों का मोबाइल नंबर लिखें।";
 
   let missing = null, score = 0;
   ALL.forEach(q => {
@@ -307,8 +350,8 @@ f.addEventListener("submit", async e => {
     data[q.k] = q.multi ? v : (v||"");
     if (q.risk && v) score += q.o.indexOf(v) + 1;
   });
-  if (missing) { document.getElementById("q_"+missing.k).scrollIntoView({behavior:"smooth",block:"center"}); return msg.textContent = "Please answer the questions marked in red."; }
-  if (!document.getElementById("agree").checked) return msg.textContent = "Please tick the declaration to submit.";
+  if (missing) { document.getElementById("q_"+missing.k).scrollIntoView({behavior:"smooth",block:"center"}); return msg.textContent = "Please answer the questions marked in red. / लाल रंग वाले प्रश्नों के उत्तर दें।"; }
+  if (!document.getElementById("agree").checked) return msg.textContent = "Please tick the declaration to submit. / जमा करने के लिए घोषणा पर टिक करें।";
 
   data.riskScore = score;
   data.riskProfile = profileFor(score);
