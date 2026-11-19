@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-19-v2';
+  const APP_VERSION = '2026-11-19-v3';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -1739,6 +1739,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
           <div class="page-title">MF Investors <span id="mf-total-label"></span></div>
           <div class="hdr-actions">
             <button class="btn btn-outline" style="border-color:#0d9488;color:#0d9488" onclick="showMfAumList()">📈 Invested Amt Changes</button>
+            <button class="btn btn-outline" style="border-color:#b45309;color:#b45309" onclick="PROF.open()" title="Client Profile Form submissions — right-click a client name to send the form">📋 Client Profiles</button>
             <button class="btn btn-outline" onclick="exportCSV('mf')">⬇️ Export</button>
             <button class="btn btn-outline" onclick="openImportModal()" id="mfImportBtn">📥 Import Excel</button>
             <button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="openMfDupMerge()">🔀 Merge Duplicates</button>
@@ -3403,16 +3404,43 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   </div>
 </div>
 
+<!-- Client Profiles (19-Nov-2026) -->
+<div class="modal-overlay" id="profModal" onclick="if(event.target===this)closeModal('profModal')">
+  <div class="modal wide" style="width:min(1300px,96vw);max-width:96vw">
+    <div class="modal-hdr"><h3>📋 Client Profiles</h3><button class="modal-close" onclick="closeModal('profModal')">×</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <input type="text" id="prof-search" placeholder="🔍 Name / mobile / RM..." oninput="PROF.render()" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:8px">
+        <select id="prof-risk" onchange="PROF.render()" style="padding:7px 8px;border:1px solid var(--border);border-radius:8px"><option value="">All Risk Profiles</option><option>Aggressive</option><option>Conservative</option><option>Moderate</option></select>
+        <button class="btn btn-outline" onclick="PROF.open()">🔄 Refresh</button>
+        <button class="btn btn-outline" onclick="PROF.exportXlsx()">⬇️ Export</button>
+        <span id="prof-pending" style="font-size:.75rem;color:#b45309;font-weight:700"></span>
+        <span id="prof-count" class="res-count"></span>
+      </div>
+      <p style="font-size:.74rem;color:var(--gray);margin:-4px 0 8px">To send the form: MF Investors → right-click the client's name → 💬 Send Profile Form. Current SIP / MF Value come live from the CRM; "At Send" is what it was on the day the form was sent.</p>
+      <div class="tbl-wrap"><div class="tbl-scroll" id="prof-table"></div></div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="profDetailModal" onclick="if(event.target===this)closeModal('profDetailModal')">
+  <div class="modal" style="width:620px;max-width:96vw">
+    <div class="modal-hdr"><h3 id="profDetailTitle">Client Profile</h3><button class="modal-close" onclick="closeModal('profDetailModal')">×</button></div>
+    <div class="modal-body" id="profDetailBody"></div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-19-v2"></script>
+<script src="dninvest-app-1.js?v=2026-11-19-v3"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
 <script src="dninvest-backoffice.js?v=2026-11-19-v1"></script>
+
+<script src="dninvest-profiles.js?v=2026-11-19-v1"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">

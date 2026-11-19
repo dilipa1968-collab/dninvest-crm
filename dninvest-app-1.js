@@ -5278,7 +5278,7 @@ function renderMfTable(){
   rows.forEach(c=>{
     const fuBadge=c.next_call?(c.next_call<today()?'b-pending':c.next_call===today()?'b-active':'b-na'):'b-na';
     h+=`<tr class="row-mf">${BULK.td('mf',c.id)}
-      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Add to Seminar"><span style="display:inline-block;width:20px;text-align:left">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(_mob10e(c.mobile)))?`<span class="badge-tip" data-tip="Equity RM: ${escapeHtml(_eqRmFor(c))}" style="font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">E</span>`:''}</span>${c.name}${(c.aum>=300000)?'<span class="badge-tip" data-tip="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
+      <td style="font-weight:600;cursor:context-menu" oncontextmenu="showClientSeminarMenu(event,'${c.id}','mf')" title="Right-click → Send Profile Form / Add to Seminar"><span style="display:inline-block;width:20px;text-align:left">${(_eqPanSet.has(String(c.pan||'').trim().toUpperCase())||_eqMobileSet.has(_mob10e(c.mobile)))?`<span class="badge-tip" data-tip="Equity RM: ${escapeHtml(_eqRmFor(c))}" style="font-size:.65rem;background:#2563eb;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">E</span>`:''}</span>${c.name}${(c.aum>=300000)?'<span class="badge-tip" data-tip="HNI — AUM ≥ ₹3L" style="margin-left:4px;font-size:.65rem;background:#0d9488;color:#fff;border-radius:4px;padding:0 4px;font-weight:700;vertical-align:middle;cursor:help">H</span>':''}</td>
       <td><a href="tel:${c.mobile}" style="color:var(--navy);text-decoration:none">${c.mobile||'—'}</a></td>
       <td>${c.pan||'—'}</td>
       <td>${c.rm||'—'}</td>
@@ -6969,7 +6969,9 @@ function showClientSeminarMenu(ev, sourceId, type){
     .sort((a,b)=>(a.date||'').localeCompare(b.date||''));  // nearest first
   const m=document.createElement('div');
   m.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:60vh;overflow:auto;font-size:.82rem;padding:6px';
-  let inner=`<div style="padding:7px 10px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border,#eee);margin-bottom:4px">➕ Add ${src?('“'+src.name+'”'):'client'} to Seminar</div>`;
+  // MF investor: upar "Client Profile Form" bhejne ke options (19-Nov-2026)
+  let inner=(type==='mf' && window.PROF) ? PROF.menuHtml(sourceId) : '';
+  inner+=`<div style="padding:7px 10px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border,#eee);margin-bottom:4px">➕ Add ${src?('“'+src.name+'”'):'client'} to Seminar</div>`;
   if(!list.length){
     inner+='<div style="padding:12px 10px;color:#999">No upcoming seminars — create one first.</div>';
   } else {

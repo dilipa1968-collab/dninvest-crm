@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Profile – D N Investment</title>
+<style>
+  :root{--bg:#0a0a0a;--card:#151515;--card2:#1b1b1b;--line:#2a2a2a;--gold:#d4a937;--gold2:#f3d27a;--txt:#f4f4f4;--mute:#9b9b9b;--err:#ff6b6b;--ok:#3ecf8e}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(1200px 500px at 50% -200px,#2a2108 0%,var(--bg) 60%) fixed;color:var(--txt);line-height:1.45}
+  .wrap{max-width:660px;margin:0 auto;padding:0 14px}
+
+  /* header */
+  header{text-align:center;padding:26px 0 18px}
+  header img{height:70px;margin-bottom:8px}
+  header h1{font-size:24px;letter-spacing:4px;background:linear-gradient(90deg,var(--gold),var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  header .tag{font-size:12px;color:var(--gold2);letter-spacing:2px;margin-top:2px}
+  header .sub{font-size:11.5px;color:var(--mute);margin-top:6px}
+  .hero{background:linear-gradient(135deg,#1e1806,#141414);border:1px solid #3a2e0c;border-radius:16px;padding:16px 18px;margin-bottom:14px;text-align:center}
+  .hero h2{font-size:17px;color:var(--gold2)}
+  .hero p{font-size:13px;color:var(--mute);margin-top:4px}
+
+  /* progress */
+  .prog{position:sticky;top:0;z-index:5;background:rgba(10,10,10,.92);backdrop-filter:blur(6px);padding:10px 0 8px;margin-bottom:6px}
+  .prog .bar{height:6px;background:#222;border-radius:6px;overflow:hidden}
+  .prog .fill{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .3s}
+  .prog .lbl{font-size:11px;color:var(--mute);text-align:right;margin-top:4px}
+
+  /* cards */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 16px;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  .sh{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px dashed var(--line)}
+  .sh .num{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#111;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .sh h3{font-size:15px;letter-spacing:.5px}
+  .sh small{display:block;font-size:11.5px;color:var(--mute);font-weight:400}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.grid{grid-template-columns:1fr}}
+  label.f{display:block;font-size:12px;color:var(--mute);margin-bottom:5px}
+  input[type=text],input[type=tel],input[type=email],input[type=password]{width:100%;padding:12px 13px;border-radius:10px;border:1px solid var(--line);background:#0e0e0e;color:var(--txt);font-size:15px}
+  input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,169,55,.15)}
+
+  /* questions */
+  .q{margin-bottom:16px}
+  .q:last-child{margin-bottom:0}
+  .q.sub{margin-left:6px;padding:12px;border-left:3px solid var(--gold);background:var(--card2);border-radius:0 10px 10px 0}
+  .ql{font-size:13.5px;font-weight:600;margin-bottom:8px}
+  .ql em{font-style:normal;font-weight:400;color:var(--mute);font-size:12px}
+  .opts{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .opts.c3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:420px){.opts.c3{grid-template-columns:1fr}}
+  .opts input{display:none}
+  .opts label{display:flex;align-items:center;gap:9px;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;cursor:pointer;user-select:none;background:#0e0e0e;transition:.15s}
+  .opts label:hover{border-color:#4a4a4a}
+  .opts label::before{content:"";flex:0 0 18px;height:18px;border:2px solid var(--mute);border-radius:50%;box-sizing:border-box}
+  .opts input[type=checkbox]+label::before{border-radius:4px}
+  .opts input:checked+label{background:rgba(212,169,55,.14);border-color:var(--gold);color:var(--gold2);font-weight:600}
+  .opts input:checked+label::before{border-color:var(--gold);background:var(--gold);box-shadow:inset 0 0 0 3px #0e0e0e}
+  .opts input[type=checkbox]:checked+label::before{box-shadow:none;content:"✓";color:#111;font-size:13px;line-height:14px;text-align:center}
+  .q.bad .ql{color:var(--err)}
+  .q.bad .opts label{border-color:rgba(255,107,107,.45)}
+
+  .consent{display:flex;gap:10px;font-size:13px;color:var(--mute);align-items:flex-start;cursor:pointer}
+  .consent input{margin-top:2px;accent-color:var(--gold);width:19px;height:19px;flex:0 0 19px}
+  button{width:100%;padding:15px;border:none;border-radius:12px;background:linear-gradient(90deg,var(--gold),var(--gold2));color:#111;font-size:16px;font-weight:800;letter-spacing:.5px;cursor:pointer;box-shadow:0 8px 22px rgba(212,169,55,.25)}
+  button:disabled{opacity:.6}
+  .msg{font-size:13px;color:var(--err);text-align:center;margin:10px 0;min-height:18px}
+  .disc{font-size:11px;color:var(--mute);text-align:center;margin:14px 0 34px}
+
+  /* done */
+  .done{text-align:center;padding:34px 18px;margin-top:10px}
+  .done .tick{width:74px;height:74px;border-radius:50%;margin:0 auto;background:rgba(62,207,142,.12);border:2px solid var(--ok);color:var(--ok);font-size:40px;display:flex;align-items:center;justify-content:center}
+  .done h3{margin:14px 0 6px;font-size:21px}
+  .meter{display:flex;gap:6px;margin:18px auto 6px;max-width:320px}
+  .meter div{flex:1;padding:8px 4px;border-radius:8px;background:#222;color:var(--mute);font-size:11.5px}
+  .meter div.on{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#111;font-weight:800}
+  .hide{display:none!important}
+
+  /* admin */
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{border-bottom:1px solid var(--line);padding:7px 5px;text-align:left;vertical-align:top}
+  th{color:var(--gold);font-weight:600}
+  .row{display:flex;gap:8px;margin-bottom:10px}
+  .row button{width:auto;padding:9px 14px;font-size:13px;box-shadow:none}
+  .tbl{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="dn-logo.png" alt="D N Investment" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='logo_new.png'}else{this.style.display='none'}">
+    <h1>D N INVESTMENT</h1>
+    <div class="tag">TRUSTED WEALTH PARTNER</div>
+    <div class="sub">AMFI Registered Mutual Fund Distributor · ARN-67217 · Bistupur, Jamshedpur</div>
+  </header>
+
+  <!-- ================= CLIENT FORM ================= -->
+  <div id="formView">
+    <div class="hero">
+      <h2>Client Profile – Equity Mutual Fund</h2>
+      <p>Takes about 2 minutes. Just tap the option that fits you.</p>
+    </div>
+    <div class="prog"><div class="bar"><div class="fill" id="fill"></div></div><div class="lbl" id="plbl">0% complete</div></div>
+
+    <form id="f" novalidate>
+      <div class="card">
+        <div class="sh"><div class="num">1</div><h3>Your Details</h3></div>
+        <div class="grid">
+          <div><label class="f">Full Name *</label><input type="text" name="name" autocomplete="name"></div>
+          <div><label class="f">Mobile Number *</label><input type="tel" name="mobile" maxlength="10" inputmode="numeric" autocomplete="tel"></div>
+        </div>
+      </div>
+
+      <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small></h3></div></div>
+      <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Emergency fund and insurance cover</small></h3></div></div>
+      <div class="card" id="planCard"><div class="sh"><div class="num">4</div><h3>Investment Plan</h3></div></div>
+      <div class="card" id="riskCard"><div class="sh"><div class="num">5</div><h3>Risk Profile<small>There are no right or wrong answers</small></h3></div></div>
+
+      <div class="card">
+        <label class="consent"><input type="checkbox" id="agree">
+          <span>I confirm the above information is correct. I understand that Mutual Fund investments are subject to market risks and I will read all scheme related documents carefully.</span></label>
+      </div>
+      <div class="msg" id="msg"></div>
+      <button type="submit" id="btn">Submit Profile</button>
+    </form>
+    <div class="disc">Mutual Fund investments are subject to market risks, read all scheme related documents carefully.</div>
+  </div>
+
+  <div id="doneView" class="card done hide">
+    <div class="tick">✓</div>
+    <h3>Thank you, <span id="dName"></span>!</h3>
+    <div style="color:var(--mute);font-size:14px">Your profile has been received.<br>Our Relationship Manager will contact you shortly.</div>
+    <div class="meter" id="meter"><div>Conservative</div><div>Moderate</div><div>Aggressive</div></div>
+    <div style="font-size:12px;color:var(--mute)">Your Risk Profile</div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ====== Firebase — same project as the D N Investment CRM (dninvest-crm) ======
+   Submissions land in the "clientProfiles" collection; the CRM (MF Investors →
+   📋 Client Profiles) reads them and joins the client's current SIP / MF value. */
+const firebaseConfig = {
+  apiKey: "AIzaSyALWQ8VJVppX49GPCfcjK0cRlqKoAeRsH0",
+  authDomain: "dninvest-crm.firebaseapp.com",
+  projectId: "dninvest-crm",
+  storageBucket: "dninvest-crm.firebasestorage.app",
+  messagingSenderId: "331999342266",
+  appId: "1:331999342266:web:67b888b2d9210f65b0dc83"
+};
+const COLLECTION = "clientProfiles";
+const WHATSAPP_NO = "919031928090";   // form copy goes here if Firebase is not set up / fails
+/* ===================================================================================== */
+
+const CONFIG_READY = !String(firebaseConfig.apiKey).startsWith("PASTE");
+let db = null, auth = null;
+try {
+  if (CONFIG_READY && window.firebase) {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+  }
+} catch (e) { console.error("Firebase init failed", e); db = null; }
+
+// ---- Questions. risk:true => scored 1..3 by option order. when => shown only if another answer matches
+const SECTIONS = {
+  incomeCard: [
+    {k:"incomeSource", l:"Income Source", o:["Salary","Business","Professional","Retired / Pension"]},
+    {k:"monthlyIncome", l:"Monthly Income", o:["Below ₹25,000","₹25,000 – 50,000","₹50,000 – 1 Lakh","₹1 – 2 Lakh","Above ₹2 Lakh"]},
+    {k:"monthlySavings", l:"Monthly Savings", hint:"(amount left after all expenses)", o:["Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","₹25,000 – 50,000","Above ₹50,000"]}
+  ],
+  safetyCard: [
+    {k:"loan", l:"Do you have any loan?", o:["No","Yes"]},
+    {k:"loanAmount", l:"Total Loan Outstanding", when:["loan","Yes"], o:["Below ₹5 Lakh","₹5 – 20 Lakh","₹20 – 50 Lakh","Above ₹50 Lakh"]},
+    {k:"emiAmount", l:"Total Monthly EMI", when:["loan","Yes"], o:["Below ₹5,000","₹5,000 – 15,000","₹15,000 – 30,000","Above ₹30,000"]},
+    {k:"emergencyFund", l:"Emergency Fund", hint:"(money kept aside in bank / FD for emergencies)", o:["None","Below ₹1 Lakh","₹1 – 3 Lakh","₹3 – 5 Lakh","Above ₹5 Lakh"]},
+    {k:"healthCover", l:"Health Insurance Cover", hint:"(family total)", o:["None","Below ₹5 Lakh","₹5 – 10 Lakh","Above ₹10 Lakh"]},
+    {k:"lifeCover", l:"Life / Term Insurance Cover", o:["None","Below ₹50 Lakh","₹50 Lakh – 1 Crore","Above ₹1 Crore"]}
+  ],
+  planCard: [
+    {k:"goal", l:"Investment Goal", hint:"(tick all that apply)", multi:true, o:["Wealth Creation","Child Education","Retirement","House / Car","Tax Saving"]},
+    {k:"mode", l:"Investment Mode", o:["Monthly SIP","SIP + Top-up when surplus","Lumpsum when surplus","Lumpsum + SIP"]},
+    {k:"sipAmount", l:"Monthly SIP Amount", o:["₹1,000 – 5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000","No SIP"]},
+    {k:"period", l:"Investment Period", o:["3 – 5 years","5 – 10 years","10+ years"]}
+  ],
+  riskCard: [
+    {k:"r1", risk:true, l:"1. How regular is your income?", o:["Irregular","Fairly regular","Very regular"]},
+    {k:"r2", risk:true, l:"2. If the market falls 20%, you will:", o:["Sell","Hold","Invest more"]},
+    {k:"r3", risk:true, l:"3. Experience in equity / mutual funds?", o:["None","Up to 2 years","More than 2 years"]},
+    {k:"r4", risk:true, l:"4. What do you expect most?", o:["Capital safety","Balanced growth","High growth"]},
+    {k:"r5", risk:true, l:"5. Your age?", o:["Above 55","35 – 55","Below 35"]}
+  ]
+};
+const ALL = Object.values(SECTIONS).flat();
+
+// render
+for (const [card, qs] of Object.entries(SECTIONS)) {
+  const el = document.getElementById(card);
+  qs.forEach(q => {
+    const d = document.createElement("div");
+    d.className = "q" + (q.when ? " sub hide" : ""); d.id = "q_"+q.k;
+    d.innerHTML = `<div class="ql">${q.l} *${q.hint?` <em>${q.hint}</em>`:""}</div><div class="opts${q.o.length===3?' c3':''}">` + q.o.map((o,i)=>{
+      const id = q.k+"_"+i;
+      return `<input type="${q.multi?'checkbox':'radio'}" name="${q.k}" id="${id}" value="${o}"><label for="${id}">${o}</label>`;
+    }).join("") + `</div>`;
+    el.appendChild(d);
+  });
+}
+
+const f = document.getElementById("f"), msg = document.getElementById("msg"), btn = document.getElementById("btn");
+// CRM se bheje gaye link me: cid (client id), rm, n (name), m (mobile), s (send id)
+const QS = new URLSearchParams(location.search);
+const rm = QS.get("rm") || "";
+const cid = QS.get("cid") || "";
+const sendId = QS.get("s") || "";
+(function prefill(){
+  const n = (QS.get("n")||"").trim(), m = (QS.get("m")||"").replace(/\D/g,"").slice(-10);
+  if (n) f.elements.name.value = n;
+  if (m) f.elements.mobile.value = m;
+})();
+const visible = q => !q.when || (new FormData(f).get(q.when[0]) === q.when[1]);
+
+function refresh(){
+  const fd = new FormData(f);
+  ALL.forEach(q => { if (q.when) document.getElementById("q_"+q.k).classList.toggle("hide", !visible(q)); });
+  const qs = ALL.filter(visible);
+  let done = qs.filter(q => q.multi ? fd.getAll(q.k).length : fd.get(q.k)).length;
+  if ((fd.get("name")||"").trim()) done++;
+  if (/^[6-9]\d{9}$/.test((fd.get("mobile")||"").trim())) done++;
+  const pct = Math.round(done / (qs.length + 2) * 100);
+  document.getElementById("fill").style.width = pct + "%";
+  document.getElementById("plbl").textContent = pct + "% complete";
+}
+f.addEventListener("change", e => { e.target.closest(".q")?.classList.remove("bad"); refresh(); });
+f.addEventListener("input", refresh);
+
+const profileFor = s => s<=8 ? "Conservative" : s<=12 ? "Moderate" : "Aggressive";
+
+f.addEventListener("submit", async e => {
+  e.preventDefault(); msg.textContent = "";
+  document.querySelectorAll(".q.bad").forEach(x=>x.classList.remove("bad"));
+  const fd = new FormData(f), data = {};
+  data.name = (fd.get("name")||"").trim();
+  data.mobile = (fd.get("mobile")||"").trim();
+  if (!data.name) return msg.textContent = "Please enter your name.";
+  if (!/^[6-9]\d{9}$/.test(data.mobile)) return msg.textContent = "Please enter a valid 10-digit mobile number.";
+
+  let missing = null, score = 0;
+  ALL.forEach(q => {
+    if (!visible(q)) { data[q.k] = ""; return; }
+    const v = q.multi ? fd.getAll(q.k) : fd.get(q.k);
+    if (!v || (q.multi && !v.length)) { document.getElementById("q_"+q.k).classList.add("bad"); missing = missing || q; }
+    data[q.k] = q.multi ? v : (v||"");
+    if (q.risk && v) score += q.o.indexOf(v) + 1;
+  });
+  if (missing) { document.getElementById("q_"+missing.k).scrollIntoView({behavior:"smooth",block:"center"}); return msg.textContent = "Please answer the questions marked in red."; }
+  if (!document.getElementById("agree").checked) return msg.textContent = "Please tick the declaration to submit.";
+
+  data.riskScore = score;
+  data.riskProfile = profileFor(score);
+  data.rm = rm;
+  data.cid = cid;          // CRM MF investor id (link se) — CRM isi se current SIP / MF value jodta hai
+  data.sendId = sendId;
+  data.seg = "mf";
+
+  btn.disabled = true; btn.textContent = "Submitting...";
+  let saved = false;
+  if (db) {
+    try {
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 12000));
+      await Promise.race([db.collection(COLLECTION).add({...data, submittedAt: firebase.firestore.FieldValue.serverTimestamp()}), timeout]);
+      saved = true;
+    } catch (err) { console.error("Firestore save failed:", err); }
+  }
+  showDone(data);
+  if (!saved) setTimeout(() => sendWhatsApp(data), 600);   // fallback so the form never gets stuck
+});
+
+function showDone(d){
+  document.getElementById("formView").classList.add("hide");
+  document.getElementById("dName").textContent = d.name.split(" ")[0];
+  [...document.getElementById("meter").children].forEach(x => x.classList.toggle("on", x.textContent === d.riskProfile));
+  document.getElementById("doneView").classList.remove("hide");
+  scrollTo(0,0);
+}
+
+function sendWhatsApp(d){
+  const t = [
+    "*CLIENT PROFILE – D N INVESTMENT*",
+    "Name: "+d.name, "Mobile: "+d.mobile,
+    "", "*Income & Savings*",
+    "Source: "+d.incomeSource, "Monthly Income: "+d.monthlyIncome, "Monthly Savings: "+d.monthlySavings,
+    "", "*Loans & Protection*",
+    "Loan: "+d.loan + (d.loan==="Yes" ? " | Outstanding: "+d.loanAmount+" | EMI: "+d.emiAmount : ""),
+    "Emergency Fund: "+d.emergencyFund, "Health Cover: "+d.healthCover, "Life Cover: "+d.lifeCover,
+    "", "*Investment Plan*",
+    "Goal: "+d.goal.join(", "), "Mode: "+d.mode, "SIP: "+d.sipAmount, "Period: "+d.period,
+    "", "Risk Score: "+d.riskScore+"/15 – *"+d.riskProfile+"*",
+    d.rm ? "RM: "+d.rm : ""
+  ].join("\n").trim();
+  location.href = "https://wa.me/"+WHATSAPP_NO+"?text="+encodeURIComponent(t);
+}
+
+refresh();
+</script>
+</body>
+</html>
