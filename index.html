@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-19-v1';
+  const APP_VERSION = '2026-11-19-v2';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -2969,7 +2969,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     <div class="modal-body">
       <div class="form-row">
         <div class="form-field"><label>Selected Client</label><input type="text" id="demat_edit_client" readonly style="background:#f7f7f7"></div>
-        <div class="form-field"><label>Trading RM</label><input type="text" id="demat_edit_rm" readonly style="background:#f7f7f7"></div>
+        <div class="form-field"><label>Trading RM (brokerage)</label><select id="demat_edit_rm" onchange="onDematEditRmChange()"></select></div>
+      </div>
+      <div class="form-row full" id="demat_edit_rm_sync_wrap" style="display:none;margin-top:-2px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;cursor:pointer;text-transform:none">
+          <input type="checkbox" id="demat_edit_rm_sync" style="width:16px;height:16px">
+          <span id="demat_edit_rm_sync_txt">Also set this RM as the client's RM in Equity Clients</span>
+        </label>
       </div>
       <div class="form-row">
         <div class="form-field"><label>Opening RM</label><select id="demat_edit_opening_rm"></select></div>
@@ -3402,7 +3408,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-18-v8"></script>
+<script src="dninvest-app-1.js?v=2026-11-19-v2"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 

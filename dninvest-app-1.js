@@ -9888,6 +9888,11 @@ async function autoAddNewDematAccounts(opts){
   if(typeof fdb==='undefined') return 0;
   _dematAutoRunning=true;
   try{
+    // Pehle se bani auto-entries jinka Trading RM khaali tha — client ka RM ab set ho gaya ho to bhar do
+    { const byId=new Map((DB.get('eq_clients')||[]).map(c=>[c.id,c]));
+      const fill=getEqDematEntries().filter(e=>e.auto && !String(e.rm||'').trim() && byId.get(e.client_id) && byId.get(e.client_id).rm);
+      for(const e of fill){ const rm=byId.get(e.client_id).rm; await DB.updateMfBizEntry('eq_entries', e.id, f=>{ if(String(f.rm||'').trim()) return false; f.rm=rm; }); }
+      if(fill.length){ try{ renderEqDematTable(); }catch(_){} } }
     let from=addDays(today(),-DEMAT_AUTO_DAYS); if(from<DEMAT_AUTO_FROM) from=DEMAT_AUTO_FROM;
     const clients=(DB.get('eq_clients')||[]).filter(c=>c && c.ac_open_date && c.ac_open_date>=from && c.ac_open_date<=today());
     if(!clients.length){ if(opts.verbose) toast('No new accounts found in the client file (opened since '+fmtDate(from)+')','success'); return 0; }
@@ -10320,7 +10325,17 @@ function editEqDematEntry(id){
   editingDematId = id;
   document.getElementById('dematEditModalTitle').textContent = 'Edit Demat Entry — '+escapeHtml(e.client_name||'');
   document.getElementById('demat_edit_client').value = e.client_name||'';
-  document.getElementById('demat_edit_rm').value = e.rm||'—';
+  // Trading RM ab dropdown hai (19-Nov-2026) — auto-added entry me client ka RM khaali ho to yahin se baithao
+  { const tsel=document.getElementById('demat_edit_rm');
+    const rms=getSegRMs('equity'); const cur=e.rm||'';
+    tsel.innerHTML=`<option value="" ${cur===''?'selected':''}>— Not set —</option>`+rms.map(r=>`<option value="${escapeHtml(r)}" ${r===cur?'selected':''}>${escapeHtml(r)}</option>`).join('');
+    if(cur && !rms.includes(cur)) tsel.innerHTML=`<option value="${escapeHtml(cur)}" selected>${escapeHtml(cur)}</option>`+tsel.innerHTML;
+    tsel.dataset.orig=cur;
+    const c=(DB.get('eq_clients')||[]).find(x=>x.id===e.client_id);
+    tsel.dataset.clientRm=c?(c.rm||''):'';
+    tsel.dataset.hasClient=c?'1':'';
+    document.getElementById('demat_edit_rm_sync').checked=false;
+    onDematEditRmChange(); }
   document.getElementById('demat_edit_code').value = e.client_code||'';
   document.getElementById('demat_edit_date').value = e.date||today();
   document.getElementById('demat_edit_remarks').value = e.remarks||'';
@@ -10335,6 +10350,18 @@ function editEqDematEntry(id){
   document.getElementById('dematEditModal').classList.add('open');
 }
 
+// Trading RM badla aur linked Equity client ka RM alag/khaali hai → "client ka RM bhi badlo" option
+function onDematEditRmChange(){
+  const tsel=document.getElementById('demat_edit_rm'); if(!tsel) return;
+  const wrap=document.getElementById('demat_edit_rm_sync_wrap'), cb=document.getElementById('demat_edit_rm_sync'), txt=document.getElementById('demat_edit_rm_sync_txt');
+  const nv=tsel.value, crm=tsel.dataset.clientRm||'';
+  const show = !!tsel.dataset.hasClient && !!nv && nv!==crm;
+  wrap.style.display = show ? '' : 'none';
+  if(show){
+    txt.textContent = crm ? `Also change the client's RM in Equity Clients (currently: ${crm} → ${nv})` : `Also set ${nv} as the client's RM in Equity Clients (currently blank)`;
+    if(!crm) cb.checked=true;   // client ka RM khaali hai to default tick
+  } else cb.checked=false;
+}
 function saveDematEdit(){
   if(CU.role!=='admin') return;
   if(!editingDematId) return;
@@ -10343,9 +10370,24 @@ function saveDematEdit(){
   const code=document.getElementById('demat_edit_code').value.trim().toUpperCase();
   const remarks=document.getElementById('demat_edit_remarks').value.trim();
   const openRm=document.getElementById('demat_edit_opening_rm').value;
+  const tradeRm=document.getElementById('demat_edit_rm').value;
+  const syncClient=document.getElementById('demat_edit_rm_sync').checked && document.getElementById('demat_edit_rm_sync_wrap').style.display!=='none';
   const id=editingDematId;
+  const entry=getEqDematEntries().find(x=>x.id===id);
+  // Equity client ka RM bhi (sirf jab user ne tick kiya)
+  if(syncClient && entry && entry.client_id && tradeRm){
+    const c=(DB.get('eq_clients')||[]).find(x=>x.id===entry.client_id);
+    if(c && c.rm!==tradeRm){
+      const oldRm=c.rm||'';
+      DB.setClient('eq_clients', {...c, rm:tradeRm, updated:today()}).then(r=>{
+        if(r && r.ok===false){ toast('⚠️ Client RM not saved — '+(r.error||'please retry'),'error'); return; }
+        try{ DB.addActivityLog({ id:uid(), type:'edit', seg:'equity', client_id:c.id, client_name:c.name, rm:tradeRm, by:CU.name, date:new Date().toISOString(), changes:[{field:'rm',from:oldRm,to:tradeRm}] }); }catch(_){}
+        try{ renderEqTable(); }catch(_){}
+      });
+    }
+  }
   DB.updateMfBizEntry('eq_entries', id, f=>{
-    f.client_code=code; f.date=date; f.remarks=remarks;
+    f.client_code=code; f.date=date; f.remarks=remarks; f.rm=tradeRm;
     if((f.opening_rm||'')!==openRm){ f.opening_rm=openRm; if(openRm){ f.claimed_by=f.claimed_by||('Admin: '+CU.name); f.claimed_at=f.claimed_at||new Date().toISOString(); } }
   }).then(r=>{
     if(!r.ok){ toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
