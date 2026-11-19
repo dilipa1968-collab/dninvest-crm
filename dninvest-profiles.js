@@ -138,10 +138,22 @@ window.PROF = (function(){
   async function load(full){
     if(typeof fdb==='undefined'){ await window.waitForFdb?.(8000); }
     const newest = (!full && _profiles.length) ? Math.max(..._profiles.map(p=>p._ms||0)) : 0;
+    // Har server request par 15 sec ki seema — warna "Loading…" hamesha atka reh sakta tha
+    const T=(pr,what)=>Promise.race([pr, new Promise((_,rej)=>setTimeout(()=>rej(new Error(what+' — no reply from server in 15 sec (internet slow / blocked)')),15000))]);
     let q=fdb.collection(COL).orderBy('submittedAt','desc');
     if(newest && firebase?.firestore?.Timestamp?.fromMillis) q=q.where('submittedAt','>',firebase.firestore.Timestamp.fromMillis(newest));
     q = q.limit(newest ? 500 : 1000);
-    const [ps, sd]=await Promise.all([ q.get(), fdb.collection('crm_data').doc(SEND_KEY).get() ]);
+    // "Sent" log alag se — wo fail ho to bhi profiles dikhein
+    const sendsP = T(fdb.collection('crm_data').doc(SEND_KEY).get(),'Sent-log').catch(e=>{ console.warn('profile_sends load failed',e); return null; });
+    let ps;
+    try{ ps = await T(q.get(),'Profiles'); }
+    catch(e){
+      if(/no reply from server/.test(e.message||'')) throw e;   // server hi nahi mil raha — dobara 15 sec mat ruko
+      console.warn('profiles ordered query failed, trying plain read',e);
+      // Fallback: bina orderBy (index/field ki dikkat ho to bhi chale) — sort browser me
+      ps = await T(fdb.collection(COL).limit(1000).get(),'Profiles');
+    }
+    const sd = await sendsP;
     const fresh=ps.docs.map(d=>norm({_id:d.id, ...d.data()}));
     let added=fresh.length;
     if(newest){
@@ -150,7 +162,7 @@ window.PROF = (function(){
       _profiles = add.concat(_profiles);
     } else _profiles = fresh;
     _profiles.sort((a,b)=>(b._ms||0)-(a._ms||0));
-    _sends=(sd.exists && Array.isArray(sd.data().data)) ? sd.data().data : [];
+    if(sd) _sends=(sd.exists && Array.isArray(sd.data().data)) ? sd.data().data : [];
     _loaded=true;
     writeCache();
     return newest ? added : 0;
@@ -221,14 +233,21 @@ window.PROF = (function(){
     if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; } }
     if(_profiles.length){ render(); setStatus('🔄 Checking for new profiles…'); }
     else $('prof-table').innerHTML='<div style="padding:20px;color:var(--gray)">Loading profiles…</div>';
+    let n=0;
+    try{ n=await load(!!full); }
+    catch(e){
+      console.error('Client Profiles load error:', e);
+      if(_profiles.length){ setStatus('⚠️ Could not reach server — showing saved list ('+(e.message||e)+')'); }
+      else $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ Could not load profiles — ${esc(e.message||e)}<br><small style="color:var(--gray)">Check internet and click 🔄 Refresh. If it keeps happening, send a screenshot of this message.</small></div>`;
+      return;
+    }
     try{
-      const n=await load(!!full);
       render();
       setStatus(n ? `✓ ${n} new` : '✓ Up to date');
       setTimeout(()=>setStatus(''),4000);
     }catch(e){
-      if(_profiles.length){ setStatus('⚠️ Offline — showing saved list'); }
-      else $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ Could not load profiles — ${esc(e.message)}</div>`;
+      console.error('Client Profiles render error:', e);
+      $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ ${_profiles.length} profile(s) loaded but the list could not be shown — ${esc(e.message||e)}<br><small style="color:var(--gray)">Please send a screenshot of this message.</small></div>`;
     }
   }
   const LABELS=[['incomeSource','Income Source'],['monthlyIncome','Monthly Income'],['monthlySavings','Monthly Savings'],['loan','Loan'],['loanAmount','Loan Outstanding'],
