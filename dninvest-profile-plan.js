@@ -6,7 +6,10 @@
    - Suggested monthly amount (savings ke hisab se) + Emergency Fund ka hissa
      + category-wise SIP split (risk profile, period, goals, direct shares).
    - RM ke liye "Talking Points" (sirf CRM me — client ko nahi jaate).
-   - 📤 WhatsApp (Hindi + English) aur 🖨️ Print / PDF (DN Investment logo).
+   - 🖼️ Colorful image (PNG) WhatsApp par — mobile par share sheet, computer par
+     copy + Ctrl+V. 💬 Text bhi, 🖨️ PDF bhi (Hindi + English, DN Investment logo).
+   - ✏️ Edit Plan: RM health-check advice, funds, scheme naam, amount, note badal sakta
+     hai (is browser me save). Image / text / PDF edited plan se hi bante hain.
    - RM amount badal sakta hai → split dobara ban jaata hai.
    Sab fixed rules (if-else) hain — koi AI / internet nahi. Final faisla RM ka.
    Depends on: dninvest-profiles.js (window._profRows), escapeHtml, toast, CU.
@@ -39,16 +42,16 @@ window.PLAN = (function(){
   const ST = { g:{c:'#0f7a45',bg:'#e3f7ee',e:'🟢'}, a:{c:'#b45309',bg:'#fff4e5',e:'🟡'}, r:{c:'#c0392b',bg:'#fdf0ee',e:'🔴'}, n:{c:'#5d6e8a',bg:'#f4f6fa',e:'⚪'} };
 
   const CAT = {
-    flexi:{en:'Flexi Cap',hi:'फ्लेक्सी कैप',c:'#1a56db',why:'Core holding — fund manager har size me invest kar sakta hai',whyHi:'मुख्य निवेश — हर साइज़ की कंपनी में'},
-    large:{en:'Large Cap / Nifty 50 Index',hi:'लार्ज कैप / इंडेक्स',c:'#0f1f3d',why:'Badi, stable companies',whyHi:'बड़ी, स्थिर कंपनियाँ'},
+    flexi:{en:'Flexi Cap',hi:'फ्लेक्सी कैप',c:'#1a56db',why:'Core holding — invests across large, mid & small companies',whyHi:'मुख्य निवेश — हर साइज़ की कंपनी में'},
+    large:{en:'Large Cap / Nifty 50 Index',hi:'लार्ज कैप / इंडेक्स',c:'#0f1f3d',why:'Large, stable companies',whyHi:'बड़ी, स्थिर कंपनियाँ'},
     lm:{en:'Large & Mid Cap',hi:'लार्ज एंड मिड कैप',c:'#0891b2',why:'Stability + growth',whyHi:'स्थिरता + बढ़त'},
-    mid:{en:'Mid Cap',hi:'मिड कैप',c:'#6d28d9',why:'Lambe samay me zyada growth',whyHi:'लंबे समय में ज़्यादा बढ़त'},
-    small:{en:'Small Cap',hi:'स्मॉल कैप',c:'#c2185b',why:'High growth, high risk — chhota hissa',whyHi:'ऊँची बढ़त, ऊँचा जोखिम — छोटा हिस्सा'},
-    multi:{en:'Multi Asset Allocation',hi:'मल्टी एसेट',c:'#c9942a',why:'Equity + Debt + Gold — girawat me sahara',whyHi:'इक्विटी + डेट + सोना — गिरावट में सहारा'},
-    bal:{en:'Balanced Advantage',hi:'बैलेंस्ड एडवांटेज',c:'#0f7a45',why:'Market ke hisab se equity kam-zyada',whyHi:'बाज़ार के हिसाब से इक्विटी कम-ज़्यादा'},
-    debt:{en:'Short Duration / Corporate Bond',hi:'डेट फंड',c:'#64748b',why:'Kam utaar-chadhav, stable return',whyHi:'कम उतार-चढ़ाव'},
-    elss:{en:'ELSS (Tax Saver)',hi:'ELSS (टैक्स सेवर)',c:'#b91c1c',why:'80C tax bachat, 3 saal lock-in',whyHi:'80C टैक्स बचत, 3 साल लॉक-इन'},
-    liquid:{en:'Liquid / Arbitrage Fund (Emergency)',hi:'लिक्विड फंड (इमरजेंसी)',c:'#94a3b8',why:'Emergency fund banane ke liye — kabhi bhi nikaal sakte hain',whyHi:'इमरजेंसी फंड के लिए — कभी भी निकाल सकते हैं'}
+    mid:{en:'Mid Cap',hi:'मिड कैप',c:'#6d28d9',why:'Higher growth over the long term',whyHi:'लंबे समय में ज़्यादा बढ़त'},
+    small:{en:'Small Cap',hi:'स्मॉल कैप',c:'#c2185b',why:'High growth, high risk — small portion',whyHi:'ऊँची बढ़त, ऊँचा जोखिम — छोटा हिस्सा'},
+    multi:{en:'Multi Asset Allocation',hi:'मल्टी एसेट',c:'#c9942a',why:'Equity + Debt + Gold — cushions market falls',whyHi:'इक्विटी + डेट + सोना — गिरावट में सहारा'},
+    bal:{en:'Balanced Advantage',hi:'बैलेंस्ड एडवांटेज',c:'#0f7a45',why:'Adjusts equity based on market levels',whyHi:'बाज़ार के हिसाब से इक्विटी कम-ज़्यादा'},
+    debt:{en:'Short Duration / Corporate Bond',hi:'डेट फंड',c:'#64748b',why:'Low volatility, steady returns',whyHi:'कम उतार-चढ़ाव'},
+    elss:{en:'ELSS (Tax Saver)',hi:'ELSS (टैक्स सेवर)',c:'#b91c1c',why:'80C tax saving, 3-year lock-in',whyHi:'80C टैक्स बचत, 3 साल लॉक-इन'},
+    liquid:{en:'Liquid / Arbitrage Fund (Emergency)',hi:'लिक्विड फंड (इमरजेंसी)',c:'#94a3b8',why:'For building emergency fund — withdraw anytime',whyHi:'इमरजेंसी फंड के लिए — कभी भी निकाल सकते हैं'}
   };
   // Order = priority (chhoti SIP me peeche wale pehle hat-te hain)
   const ALLOC = {
@@ -180,48 +183,80 @@ window.PLAN = (function(){
     return {checks, total, sip, efPart, efTarget, alloc, lvlName:LVL[lvl], talk, notes, stepUp, noSip, tax, auto, curSip};
   }
 
+  // ══════════════ RM EDITS ══════════════
+  // _edit[profileId] = {checks:{key:{s,adv,advHi}}, alloc:[{k,scheme,amt}], note, by, at}
+  // Is browser me save (localStorage) — RM baad me khole to edit wahi milta hai.
+  const EKEY='dninvest_plan_edits';
+  let _edit = {};
+  try{ _edit = JSON.parse(localStorage.getItem(EKEY)||'{}')||{}; }catch(_){ _edit={}; }
+  const saveEdits = ()=>{ try{ localStorage.setItem(EKEY, JSON.stringify(_edit)); }catch(_){} };
+  const _editing = {};   // pid → true jab editor khula ho
+  const _draft = {};     // editor ka beech ka data
+
+  // Auto plan + RM edits = final plan (card, WhatsApp, image, print — sab yahi use karte hain)
+  function final(r){
+    const A=analyse(r), E=_edit[r.p._id];
+    const F={...A, note:'', edited:false, checks:A.checks.map(c=>({...c})), alloc:A.alloc.map(a=>({...a, scheme:''}))};
+    if(!E) return F;
+    F.edited=true; F.by=E.by; F.at=E.at; F.note=E.note||'';
+    F.checks.forEach(c=>{ const x=E.checks&&E.checks[c.key]; if(x){ c.s=x.s||c.s; c.adv=x.adv!=null?x.adv:c.adv; c.advHi=x.advHi!=null?x.advHi:c.advHi; } });
+    if(Array.isArray(E.alloc) && E.alloc.length){
+      F.alloc=E.alloc.filter(a=>CAT[a.k] && +a.amt>0).map(a=>({k:a.k, amt:+a.amt, scheme:a.scheme||'', ...CAT[a.k]}));
+      F.total=F.alloc.reduce((s,a)=>s+a.amt,0);
+      F.efPart=F.alloc.filter(a=>a.k==='liquid').reduce((s,a)=>s+a.amt,0);
+      F.sip=F.total-F.efPart;
+      F.tax=F.alloc.some(a=>a.k==='elss');
+    }
+    return F;
+  }
+
   // ══════════════ CRM CARD ══════════════
+  const btnS='padding:5px 10px;font-size:.72rem';
   function html(i){
     const r=(window._profRows||[])[i]; if(!r||!r.p) return '';
-    let A; try{ A=analyse(r); }catch(e){ console.error('PLAN error',e); return `<div style="color:var(--red);font-size:.75rem;margin:8px 0">⚠️ Suggested plan nahi ban paya — ${esc(e.message)}</div>`; }
-    const red=A.checks.filter(c=>c.s==='r').length, amb=A.checks.filter(c=>c.s==='a').length;
-    const chk = A.checks.map(c=>{ const s=ST[c.s]; return `<div style="background:${s.bg};border-left:4px solid ${s.c};border-radius:8px;padding:7px 9px">
+    let F; try{ F=final(r); }catch(e){ console.error('PLAN error',e); return `<div style="color:var(--red);font-size:.75rem;margin:8px 0">⚠️ Suggested plan nahi ban paya — ${esc(e.message)}</div>`; }
+    if(_editing[r.p._id]) return editorHtml(i, r, F);
+    const red=F.checks.filter(c=>c.s==='r').length, amb=F.checks.filter(c=>c.s==='a').length;
+    const chk = F.checks.map(c=>{ const s=ST[c.s]||ST.n; return `<div style="background:${s.bg};border-left:4px solid ${s.c};border-radius:8px;padding:7px 9px">
         <div style="font-size:.66rem;font-weight:800;color:${s.c};text-transform:uppercase">${s.e} ${esc(c.en)}</div>
         <div style="font-size:.7rem;color:var(--gray)">${esc(c.have)}</div>
         <div style="font-size:.74rem;font-weight:700;color:var(--navy);margin-top:2px">${esc(c.adv)}</div></div>`; }).join('');
-    const bar = A.alloc.map(a=>`<div title="${esc(a.en)} ${inr(a.amt)}" style="width:${a.amt/A.total*100}%;background:${a.c}"></div>`).join('');
-    const rows = A.alloc.map(a=>`<tr><td style="width:14px"><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${a.c}"></span></td>
-        <td><b>${esc(a.en)}</b><br><small style="color:var(--gray)">${esc(a.why)}</small></td>
+    const tot=F.total||1;
+    const bar = F.alloc.map(a=>`<div title="${esc(a.en)} ${inr(a.amt)}" style="width:${a.amt/tot*100}%;background:${a.c}"></div>`).join('');
+    const rows = F.alloc.map(a=>`<tr><td style="width:14px"><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${a.c}"></span></td>
+        <td><b>${esc(a.en)}</b>${a.scheme?`<br><span style="color:#1a56db;font-weight:700">${esc(a.scheme)}</span>`:''}<br><small style="color:var(--gray)">${esc(a.why)}</small></td>
         <td style="text-align:right;font-weight:800;color:var(--navy);white-space:nowrap">${inr(a.amt)}</td>
-        <td style="text-align:right;color:var(--gray);font-size:.7rem">${Math.round(a.amt/A.total*100)}%</td></tr>`).join('');
+        <td style="text-align:right;color:var(--gray);font-size:.7rem">${Math.round(a.amt/tot*100)}%</td></tr>`).join('');
     return `<div id="planCard" style="border:2px solid var(--gold);border-radius:14px;padding:12px;margin:4px 0 14px;background:linear-gradient(180deg,#fdf6e3,#fff 120px)">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-        <div style="font-weight:900;color:var(--navy);font-size:1rem">💡 Suggested Plan <small style="font-weight:600;color:var(--gray);font-size:.68rem">auto · ${esc(A.lvlName)}</small></div>
-        <div style="font-size:.7rem;font-weight:700">${red?`<span style="color:#c0392b">🔴 ${red} gap${red>1?'s':''}</span> `:''}${amb?`<span style="color:#b45309">🟡 ${amb}</span> `:''}${!red&&!amb?'<span style="color:#0f7a45">🟢 All good</span>':''}</div>
+        <div style="font-weight:900;color:var(--navy);font-size:1rem">💡 Suggested Plan <small style="font-weight:600;color:var(--gray);font-size:.68rem">${F.edited?`✏️ edited by ${esc(F.by||'RM')}`:'auto'} · ${esc(F.lvlName)}</small></div>
+        <div style="display:flex;gap:6px;align-items:center;font-size:.7rem;font-weight:700">${red?`<span style="color:#c0392b">🔴 ${red}</span>`:''}${amb?`<span style="color:#b45309">🟡 ${amb}</span>`:''}${!red&&!amb?'<span style="color:#0f7a45">🟢 All good</span>':''}
+          <button class="btn btn-outline" style="${btnS}" onclick="PLAN.edit(${i})">✏️ Edit Plan</button></div>
       </div>
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Financial Health Check</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-bottom:12px">${chk}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">
-        <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase">Suggested Monthly ${A.noSip?'Investment':'SIP'}
-          <span style="font-size:1.15rem;color:var(--navy);text-transform:none;margin-left:4px">${inr(A.total)}</span>
-          ${A.efPart?`<small style="text-transform:none;font-weight:600">(${inr(A.sip)} equity + ${inr(A.efPart)} emergency)</small>`:''}</div>
-        <div style="display:flex;gap:4px;align-items:center">
-          <input id="plan-amt" type="number" step="500" min="500" value="${A.total}" style="width:95px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;font-size:.78rem">
-          <button class="btn btn-outline" style="padding:5px 9px;font-size:.72rem" onclick="PLAN.setAmt(${i})">↻ Recalc</button>
-          ${_over[r.p._id]?`<button class="btn btn-outline" style="padding:5px 9px;font-size:.72rem" title="Auto amount (${inr(A.auto)}) wapas" onclick="PLAN.setAmt(${i},true)">Auto</button>`:''}
-        </div>
+        <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase">Suggested Monthly ${F.noSip?'Investment':'SIP'}
+          <span style="font-size:1.15rem;color:var(--navy);text-transform:none;margin-left:4px">${inr(F.total)}</span>
+          ${F.efPart?`<small style="text-transform:none;font-weight:600">(${inr(F.sip)} equity + ${inr(F.efPart)} emergency)</small>`:''}</div>
+        ${F.edited?'':`<div style="display:flex;gap:4px;align-items:center">
+          <input id="plan-amt" type="number" step="500" min="500" value="${F.total}" style="width:95px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;font-size:.78rem">
+          <button class="btn btn-outline" style="${btnS}" onclick="PLAN.setAmt(${i})">↻ Recalc</button>
+          ${_over[r.p._id]?`<button class="btn btn-outline" style="${btnS}" title="Auto amount (${inr(F.auto)}) wapas" onclick="PLAN.setAmt(${i},true)">Auto</button>`:''}</div>`}
       </div>
       <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin-bottom:6px">${bar}</div>
       <table style="width:100%;font-size:.76rem;margin-bottom:6px"><tbody>${rows}</tbody></table>
-      ${A.stepUp?'<div style="font-size:.72rem;color:#0f7a45;font-weight:700;margin-bottom:6px">📈 Har saal 10% step-up lagwayein</div>':''}
-      ${A.notes.length?`<div style="font-size:.68rem;color:var(--gray);margin-bottom:6px">ℹ️ ${A.notes.map(esc).join(' · ')}</div>`:''}
-      ${A.talk.length?`<div style="background:#eef3fc;border-radius:8px;padding:8px 10px;margin-bottom:8px">
+      ${F.stepUp?'<div style="font-size:.72rem;color:#0f7a45;font-weight:700;margin-bottom:6px">📈 Har saal 10% step-up lagwayein</div>':''}
+      ${F.note?`<div style="background:#fdf6e3;border:1px solid #f5d98a;border-radius:8px;padding:6px 9px;font-size:.74rem;margin-bottom:6px;white-space:pre-wrap"><b>📝 Note for client:</b> ${esc(F.note)}</div>`:''}
+      ${F.notes.length&&!F.edited?`<div style="font-size:.68rem;color:var(--gray);margin-bottom:6px">ℹ️ ${F.notes.map(esc).join(' · ')}</div>`:''}
+      ${F.talk.length?`<div style="background:#eef3fc;border-radius:8px;padding:8px 10px;margin-bottom:8px">
         <div style="font-size:.68rem;font-weight:800;color:#1a56db;text-transform:uppercase;margin-bottom:3px">🗣️ RM Talking Points <small style="font-weight:600;text-transform:none;color:var(--gray)">(sirf aapke liye — client ko nahi jaata)</small></div>
-        <ul style="margin:0;padding-left:16px;font-size:.73rem;line-height:1.45">${A.talk.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
+        <ul style="margin:0;padding-left:16px;font-size:.73rem;line-height:1.45">${F.talk.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn" style="background:#25D366;color:#fff;border:none" onclick="PLAN.wa(${i})">📤 Send Plan on WhatsApp</button>
-        <button class="btn btn-outline" onclick="PLAN.copy(${i})">📋 Copy Text</button>
-        <button class="btn btn-outline" onclick="PLAN.print(${i})">🖨️ Print / PDF</button>
+        <button class="btn" style="background:#25D366;color:#fff;border:none" onclick="PLAN.sendImage(${i})" title="Rangeen image banakar WhatsApp par">🖼️ Send Colorful Plan (WhatsApp)</button>
+        <button class="btn btn-outline" onclick="PLAN.wa(${i})" title="Sirf text message">💬 Send as Text</button>
+        <button class="btn btn-outline" onclick="PLAN.downloadImage(${i})">⬇️ Image</button>
+        <button class="btn btn-outline" onclick="PLAN.print(${i})">🖨️ PDF</button>
       </div>
       <div style="font-size:.62rem;color:var(--gray);margin-top:6px">Suggestion fixed rules par hai — scheme aur final amount client se baat karke RM tay karein.</div>
     </div>`;
@@ -231,89 +266,253 @@ window.PLAN = (function(){
     const r=(window._profRows||[])[i]; if(!r) return;
     if(reset) delete _over[r.p._id];
     else { const v=r500(+(document.getElementById('plan-amt')||{}).value||0); if(v<500){ toast&&toast('Amount kam se kam ₹500','error'); return; } _over[r.p._id]=v; }
-    const el=document.getElementById('planCard'); if(el) el.outerHTML=html(i);
+    redraw(i);
+  }
+  function redraw(i){ const el=document.getElementById('planCard'); if(el) el.outerHTML=html(i); }
+
+  // ══════════════ EDITOR ══════════════
+  const inS='padding:5px 7px;border:1px solid var(--border);border-radius:7px;font-size:.76rem';
+  function editorHtml(i, r, F){
+    const pid=r.p._id;
+    const D=_draft[pid] || (_draft[pid]={
+      checks:F.checks.map(c=>({key:c.key,en:c.en,s:c.s,adv:c.adv,advHi:c.advHi})),
+      alloc:F.alloc.map(a=>({k:a.k,scheme:a.scheme||'',amt:a.amt})), note:F.note||''});
+    const catOpts=k=>Object.entries(CAT).map(([kk,c])=>`<option value="${kk}"${kk===k?' selected':''}>${esc(c.en)}</option>`).join('');
+    const stOpts=s=>[['g','🟢 Good'],['a','🟡 Attention'],['r','🔴 Gap'],['n','⚪ N/A']].map(([v,l])=>`<option value="${v}"${v===s?' selected':''}>${l}</option>`).join('');
+    const ck=D.checks.map((c,n)=>`<div style="display:grid;grid-template-columns:120px 105px 1fr;gap:5px;align-items:center;margin-bottom:5px">
+        <b style="font-size:.72rem">${esc(c.en)}</b>
+        <select id="pe-cs-${n}" style="${inS}">${stOpts(c.s)}</select>
+        <div style="display:grid;gap:3px"><input id="pe-ca-${n}" value="${esc(c.adv)}" placeholder="Advice (English)" style="${inS}">
+        <input id="pe-ch-${n}" value="${esc(c.advHi)}" placeholder="सलाह (हिंदी) — खाली छोड़ सकते हैं" style="${inS}"></div></div>`).join('');
+    const al=D.alloc.map((a,n)=>`<div style="display:grid;grid-template-columns:1.1fr 1.3fr 90px 28px;gap:5px;align-items:center;margin-bottom:5px">
+        <select id="pe-k-${n}" style="${inS}">${catOpts(a.k)}</select>
+        <input id="pe-sc-${n}" value="${esc(a.scheme)}" placeholder="Scheme name (optional)" style="${inS}">
+        <input id="pe-a-${n}" type="number" step="500" min="0" value="${a.amt}" oninput="PLAN.edSum(${i})" style="${inS}">
+        <button class="btn-icon" title="Remove" style="color:var(--red)" onclick="PLAN.edDel(${i},${n})">✖</button></div>`).join('');
+    const sum=D.alloc.reduce((s,a)=>s+(+a.amt||0),0);
+    return `<div id="planCard" style="border:2px dashed var(--blue);border-radius:14px;padding:12px;margin:4px 0 14px;background:#f8fbff">
+      <div style="font-weight:900;color:var(--navy);margin-bottom:8px">✏️ Edit Plan <small style="font-weight:600;color:var(--gray);font-size:.68rem">— jo client ko jayega wahi yahan badlein</small></div>
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Health Check</div>${ck}
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:10px 0 5px">Funds / SIP Split</div>${al}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 10px">
+        <button class="btn btn-outline" style="${btnS}" onclick="PLAN.edAdd(${i})">➕ Add Fund</button>
+        <b style="font-size:.85rem;color:var(--navy)">Total: <span id="pe-sum">${inr(sum)}</span></b></div>
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:4px">📝 Note for client <small style="text-transform:none;font-weight:600">(optional — Hindi / English, image aur message me jayega)</small></div>
+      <textarea id="pe-note" rows="2" style="${inS};width:100%;resize:vertical">${esc(D.note)}</textarea>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-primary" onclick="PLAN.edSave(${i})">✅ Save Plan</button>
+        <button class="btn btn-outline" onclick="PLAN.edCancel(${i})">Cancel</button>
+        ${_edit[pid]?`<button class="btn btn-outline" style="color:var(--red)" onclick="PLAN.edReset(${i})">↺ Reset to Auto Plan</button>`:''}
+      </div></div>`;
+  }
+  const rowOf = i => (window._profRows||[])[i];
+  function edRead(i){   // DOM → draft
+    const r=rowOf(i); if(!r) return null; const D=_draft[r.p._id]; if(!D) return null;
+    const v=id=>{ const el=document.getElementById(id); return el?el.value:null; };
+    D.checks.forEach((c,n)=>{ if(v('pe-cs-'+n)!=null){ c.s=v('pe-cs-'+n); c.adv=v('pe-ca-'+n); c.advHi=v('pe-ch-'+n); } });
+    D.alloc.forEach((a,n)=>{ if(v('pe-k-'+n)!=null){ a.k=v('pe-k-'+n); a.scheme=v('pe-sc-'+n).trim(); a.amt=Math.max(0,Math.round(+v('pe-a-'+n)||0)); } });
+    if(v('pe-note')!=null) D.note=v('pe-note');
+    return D;
+  }
+  function edit(i){ const r=rowOf(i); if(!r) return; _editing[r.p._id]=true; delete _draft[r.p._id]; redraw(i); }
+  function edSum(i){ const D=edRead(i); const el=document.getElementById('pe-sum'); if(D&&el) el.textContent=inr(D.alloc.reduce((s,a)=>s+(+a.amt||0),0)); }
+  function edAdd(i){ const D=edRead(i); if(!D) return; D.alloc.push({k:'flexi',scheme:'',amt:1000}); redraw(i); }
+  function edDel(i,n){ const D=edRead(i); if(!D) return; D.alloc.splice(n,1); redraw(i); }
+  function edCancel(i){ const r=rowOf(i); if(!r) return; delete _editing[r.p._id]; delete _draft[r.p._id]; redraw(i); }
+  function edSave(i){
+    const r=rowOf(i); const D=edRead(i); if(!r||!D) return;
+    const alloc=D.alloc.filter(a=>+a.amt>0);
+    if(!alloc.length){ toast&&toast('Kam se kam ek fund me amount daalein','error'); return; }
+    const checks={}; D.checks.forEach(c=>checks[c.key]={s:c.s,adv:c.adv,advHi:c.advHi});
+    _edit[r.p._id]={checks, alloc, note:(D.note||'').trim(), by:(typeof CU!=='undefined'&&CU&&CU.name)||'', at:new Date().toISOString()};
+    saveEdits();
+    delete _editing[r.p._id]; delete _draft[r.p._id];
+    redraw(i); toast&&toast('Plan saved ✓','success');
+  }
+  function edReset(i){
+    const r=rowOf(i); if(!r) return;
+    if(!confirm('Edits hata kar auto plan wapas laayein?')) return;
+    delete _edit[r.p._id]; saveEdits(); delete _editing[r.p._id]; delete _draft[r.p._id]; redraw(i);
   }
 
   // ══════════════ CLIENT MESSAGE (Hindi + English) ══════════════
+  const firstName = p => { const f=String(p.name||'').trim().split(/\s+/)[0]||''; return f.charAt(0).toUpperCase()+f.slice(1).toLowerCase(); };
+  const rmName = () => (typeof CU!=='undefined'&&CU&&CU.name)||'';
   function text(i){
-    const r=(window._profRows||[])[i]; if(!r) return '';
-    const A=analyse(r), p=r.p;
-    const first=String(p.name||'').trim().split(/\s+/)[0]||''; const nm=first.charAt(0).toUpperCase()+first.slice(1).toLowerCase();
-    const L=[];
+    const r=rowOf(i); if(!r) return '';
+    const F=final(r), p=r.p, L=[];
     L.push('*D N INVESTMENT — Your Investment Plan*','*आपका निवेश प्लान*','');
-    L.push(`Dear ${nm},`,'Thank you for filling the profile form. Based on your answers, here is our suggested plan.','प्रोफ़ाइल फ़ॉर्म भरने के लिए धन्यवाद। आपके उत्तरों के आधार पर हमारा सुझाया गया प्लान:','');
-    L.push(`*Risk Profile / जोखिम प्रोफ़ाइल:* ${A.lvlName} — ${LVL_HI[A.lvlName]||''}`,'');
+    L.push(`Dear ${firstName(p)},`,'Thank you for filling the profile form. Based on your answers, here is our suggested plan.','प्रोफ़ाइल फ़ॉर्म भरने के लिए धन्यवाद। आपके उत्तरों के आधार पर हमारा सुझाया गया प्लान:','');
+    L.push(`*Risk Profile / जोखिम प्रोफ़ाइल:* ${F.lvlName} — ${LVL_HI[F.lvlName]||''}`,'');
     L.push('*Financial Health Check / वित्तीय स्वास्थ्य जाँच*');
-    A.checks.forEach(c=>{ L.push(`${ST[c.s].e} ${c.en}: ${c.adv}`, `    ${c.hi}: ${c.advHi}`); });
-    L.push('',`*Suggested Monthly ${A.noSip?'Investment':'SIP'} / सुझाया गया मासिक निवेश: ${inr(A.total)}*`);
-    A.alloc.forEach(a=>L.push(`• ${a.en} / ${a.hi} — ${inr(a.amt)}`));
-    if(A.efPart) L.push('',`💰 ${inr(A.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(A.efTarget)}) is built; then it moves to equity.`,`💰 ${inr(A.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(A.efTarget)}) न बन जाए; फिर ये इक्विटी में।`);
-    if(A.tax) L.push('','🧾 ELSS gives tax benefit only under the Old Tax Regime.','🧾 ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था (Old Regime) में मिलता है।');
-    if(A.stepUp) L.push('','📈 Increase your SIP by 10% every year.','📈 हर साल अपनी SIP 10% बढ़ाएँ।');
+    F.checks.forEach(c=>{ L.push(`${(ST[c.s]||ST.n).e} ${c.en}: ${c.adv}`); if(c.advHi) L.push(`    ${c.hi}: ${c.advHi}`); });
+    L.push('',`*Suggested Monthly ${F.noSip?'Investment':'SIP'} / सुझाया गया मासिक निवेश: ${inr(F.total)}*`);
+    F.alloc.forEach(a=>L.push(`• ${a.en} / ${a.hi} — ${inr(a.amt)}${a.scheme?`\n    _${a.scheme}_`:''}`));
+    if(F.efPart) L.push('',`💰 ${inr(F.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(F.efTarget)}) is built; then it moves to equity.`,`💰 ${inr(F.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(F.efTarget)}) न बन जाए; फिर ये इक्विटी में।`);
+    if(F.tax) L.push('','🧾 ELSS gives tax benefit only under the Old Tax Regime.','🧾 ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था (Old Regime) में मिलता है।');
+    if(F.stepUp) L.push('','📈 Increase your SIP by 10% every year.','📈 हर साल अपनी SIP 10% बढ़ाएँ।');
+    if(F.note) L.push('','📝 '+F.note);
     L.push('','This is a suggestion based on your profile. Your Relationship Manager will discuss the final schemes with you.','यह आपकी प्रोफ़ाइल पर आधारित सुझाव है। आपके रिलेशनशिप मैनेजर अंतिम स्कीम पर आपसे बात करेंगे।');
     L.push('','_Mutual Fund investments are subject to market risks, read all scheme related documents carefully._','_म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ें।_');
-    L.push('',(typeof CU!=='undefined'&&CU&&CU.name)||'', 'D N Investment · ARN-67217');
+    L.push('',rmName(), 'D N Investment · ARN-67217');
     return L.join('\n').trim();
   }
-  function wa(i){
-    const r=(window._profRows||[])[i]; if(!r) return;
-    const m=String(r.p.mobile||'').replace(/\D/g,'').slice(-10);
-    const url=/^[6-9]\d{9}$/.test(m) ? 'https://wa.me/91'+m : 'https://wa.me/';
-    window.open(url+'?text='+encodeURIComponent(text(i)),'_blank');
+  function caption(i){
+    const p=rowOf(i).p;
+    return [`Dear ${firstName(p)},`,'Your investment plan from D N Investment is attached. Please have a look — we will call you to discuss.',
+      'आपका निवेश प्लान संलग्न है। कृपया देखें — हम आपसे बात करने के लिए कॉल करेंगे।','',
+      '_Mutual Fund investments are subject to market risks, read all scheme related documents carefully._','',rmName(),'D N Investment'].join('\n');
   }
-  async function copy(i){
-    const t=text(i);
-    try{ await navigator.clipboard.writeText(t); toast&&toast('Plan text copied ✓','success'); }catch(_){ prompt('Copy:',t); }
+  const waUrl = (p,t) => { const m=String(p.mobile||'').replace(/\D/g,'').slice(-10); return (/^[6-9]\d{9}$/.test(m)?'https://wa.me/91'+m:'https://wa.me/')+'?text='+encodeURIComponent(t); };
+  function wa(i){ const r=rowOf(i); if(!r) return; window.open(waUrl(r.p, text(i)),'_blank'); }
+  async function copy(i){ const t=text(i); try{ await navigator.clipboard.writeText(t); toast&&toast('Plan text copied ✓','success'); }catch(_){ prompt('Copy:',t); } }
+
+  // ══════════════ COLORFUL IMAGE (canvas → PNG) ══════════════
+  const FONT = '"Segoe UI","Nirmala UI","Noto Sans Devanagari","Mangal",Roboto,system-ui,sans-serif';
+  const fnt = (sz,w) => `${w||400} ${sz}px ${FONT}`;
+  let _logo=null;
+  function logo(){
+    if(_logo) return _logo;
+    const base=location.origin+location.pathname.replace(/[^/]*$/,'');
+    _logo=new Promise(res=>{ const tryLoad=(srcs)=>{ if(!srcs.length) return res(null); const im=new Image(); im.onload=()=>res(im); im.onerror=()=>tryLoad(srcs.slice(1)); im.src=srcs[0]; }; tryLoad([base+'dn-logo.png', base+'logo_new.png']); setTimeout(()=>res(null),4000); });
+    return _logo;
+  }
+  function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function lines(ctx, t, font, maxW){
+    ctx.font=font; const out=[];
+    String(t||'').split('\n').forEach(par=>{ let cur=''; par.split(/\s+/).forEach(w=>{ const nx=cur?cur+' '+w:w; if(ctx.measureText(nx).width>maxW && cur){ out.push(cur); cur=w; } else cur=nx; }); out.push(cur); });
+    return out;
+  }
+  function txt(ctx, t, x, y, maxW, font, color, lh){ const ls=lines(ctx,t,font,maxW); ctx.fillStyle=color; ctx.textBaseline='top'; ls.forEach((l,n)=>ctx.fillText(l,x,y+n*lh)); return y+ls.length*lh; }
+
+  async function makeCanvas(i){
+    const r=rowOf(i); const F=final(r), p=r.p;
+    const W=1080, P=48, IW=W-2*P;
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=4200;
+    const c=cv.getContext('2d');
+    c.fillStyle='#ffffff'; c.fillRect(0,0,W,cv.height);
+    // Header
+    const g=c.createLinearGradient(0,0,W,0); g.addColorStop(0,'#0f1f3d'); g.addColorStop(1,'#1e3a6e');
+    c.fillStyle=g; c.fillRect(0,0,W,180);
+    c.fillStyle='#c9942a'; c.fillRect(0,180,W,6);
+    const im=await logo(); let hx=P;
+    if(im){ const h=120, w=im.width*h/im.height; c.fillStyle='#fff'; rr(c,P-8,22,w+16,h+16,14); c.fill(); c.drawImage(im,P,30,w,h); hx=P+w+30; }
+    txt(c,'D N INVESTMENT',hx,40,W-hx-P,fnt(50,900),'#f5d98a',58);
+    txt(c,'TRUSTED WEALTH PARTNER',hx,100,W-hx-P,fnt(20,700),'#c9942a',26);
+    txt(c,'Mutual Fund Distributor · ARN-67217 · Bistupur, Jamshedpur',hx,130,W-hx-P,fnt(19),'#c8d3e6',24);
+    let y=216;
+    // Title
+    y=txt(c,'Your Investment Plan',P,y,IW,fnt(44,900),'#0f1f3d',52);
+    y=txt(c,'आपका निवेश प्लान',P,y,IW,fnt(30,700),'#9a7a2a',40);
+    const d=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    y=txt(c,`Prepared for ${p.name||''} · ${d}`,P,y+6,IW,fnt(24,600),'#5d6e8a',32)+14;
+    // Risk pill
+    const pill=`Risk Profile: ${F.lvlName}  ·  ${LVL_HI[F.lvlName]||''}`; c.font=fnt(24,800); const pw=c.measureText(pill).width+44;
+    c.fillStyle='#0f1f3d'; rr(c,P,y,pw,50,25); c.fill(); txt(c,pill,P+22,y+11,pw,fnt(24,800),'#f5d98a',30); y+=74;
+    // Health check
+    const sec=(en,hi)=>{ c.fillStyle='#c9942a'; c.fillRect(P,y+6,8,30); txt(c,en,P+20,y,IW,fnt(26,900),'#0f1f3d',34); c.font=fnt(26,900); const w=c.measureText(en).width; txt(c,'· '+hi,P+30+w,y+3,IW,fnt(22,600),'#9a7a2a',30); y+=50; };
+    sec('FINANCIAL HEALTH CHECK','वित्तीय स्वास्थ्य जाँच');
+    const cw=(IW-20)/2, ci=cw-46;
+    const cardH=ch=>{ let h=18; h+=lines(c,ch.en,fnt(23,800),ci).length*30; h+=lines(c,ch.have,fnt(19),ci).length*25; h+=4+lines(c,ch.adv,fnt(23,700),ci).length*30; if(ch.advHi) h+=lines(c,ch.advHi,fnt(21),ci).length*29; return h+18; };
+    for(let n=0;n<F.checks.length;n+=2){
+      const pair=F.checks.slice(n,n+2), h=Math.max(...pair.map(cardH));
+      pair.forEach((ch,k)=>{ const s=ST[ch.s]||ST.n, x=P+k*(cw+20);
+        c.fillStyle=s.bg; rr(c,x,y,cw,h,16); c.fill(); c.fillStyle=s.c; rr(c,x,y,10,h,5); c.fill();
+        c.beginPath(); c.arc(x+36,y+33,11,0,Math.PI*2); c.fill();
+        let yy=txt(c,ch.en.toUpperCase(),x+56,y+18,ci-30,fnt(23,800),s.c,30);
+        yy=txt(c,ch.hi+' · '+ch.have,x+26,yy+2,ci,fnt(19),'#5d6e8a',25);
+        yy=txt(c,ch.adv,x+26,yy+4,ci,fnt(23,700),'#0f1f3d',30);
+        if(ch.advHi) txt(c,ch.advHi,x+26,yy,ci,fnt(21),'#7a6a3a',29);
+      });
+      y+=h+16;
+    }
+    y+=14;
+    // SIP
+    sec(`SUGGESTED MONTHLY ${F.noSip?'INVESTMENT':'SIP'}`,'सुझाया गया मासिक निवेश');
+    const bg=c.createLinearGradient(P,0,W-P,0); bg.addColorStop(0,'#fdf6e3'); bg.addColorStop(1,'#fff');
+    c.fillStyle=bg; rr(c,P,y,IW,110,18); c.fill(); c.strokeStyle='#f5d98a'; c.lineWidth=2; c.stroke();
+    txt(c,inr(F.total),P+28,y+18,IW,fnt(64,900),'#0f1f3d',72);
+    txt(c,'per month · प्रति माह',P+30+ (c.font=fnt(64,900), c.measureText(inr(F.total)).width)+16,y+30,IW,fnt(22,700),'#5d6e8a',28);
+    if(F.efPart) txt(c,`${inr(F.sip)} equity + ${inr(F.efPart)} emergency fund`,P+30+(c.font=fnt(64,900),c.measureText(inr(F.total)).width)+16,y+62,IW,fnt(20,600),'#9a7a2a',26);
+    y+=130;
+    // bar
+    const tot=F.total||1; let bx=P; c.save(); rr(c,P,y,IW,36,18); c.clip();
+    F.alloc.forEach(a=>{ const w=IW*a.amt/tot; c.fillStyle=a.c; c.fillRect(bx,y,w+1,36); bx+=w; }); c.restore(); y+=56;
+    // rows
+    F.alloc.forEach(a=>{
+      const tx=P+50, tw=IW-50-230; let yy=y+10;
+      c.fillStyle=a.c; rr(c,P,y+12,30,30,7); c.fill();
+      yy=txt(c,a.en,tx,yy,tw,fnt(26,800),'#0f1f3d',33);
+      yy=txt(c,a.hi,tx,yy,tw,fnt(22,600),'#9a7a2a',29);
+      if(a.scheme) yy=txt(c,a.scheme,tx,yy+2,tw,fnt(23,700),'#1a56db',30);
+      yy=txt(c,a.why,tx,yy+2,tw,fnt(19),'#5d6e8a',25);
+      c.textAlign='right'; txt(c,inr(a.amt),W-P,y+12,230,fnt(32,900),'#0f1f3d',38); txt(c,Math.round(a.amt/tot*100)+'%',W-P,y+54,230,fnt(21,700),a.c,26); c.textAlign='left';
+      y=Math.max(yy,y+90)+12; c.fillStyle='#e3e8f0'; c.fillRect(P,y,IW,2); y+=10;
+    });
+    y+=12;
+    // boxes
+    const box=(icon,en,hi,col,bgc)=>{ const w=IW-80; const h=20+lines(c,en,fnt(22,700),w).length*30+(hi?lines(c,hi,fnt(21),w).length*29:0)+18;
+      c.fillStyle=bgc; rr(c,P,y,IW,h,14); c.fill(); c.fillStyle=col; rr(c,P,y,8,h,4); c.fill();
+      txt(c,icon,P+22,y+18,40,fnt(28),col,32); let yy=txt(c,en,P+66,y+20,w,fnt(22,700),'#0f1f3d',30); if(hi) txt(c,hi,P+66,yy,w,fnt(21),'#7a6a3a',29); y+=h+12; };
+    if(F.efPart) box('💰',`${inr(F.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(F.efTarget)}) is built; then it moves to equity.`,`${inr(F.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(F.efTarget)}) न बन जाए; फिर ये इक्विटी में।`,'#64748b','#f1f5f9');
+    if(F.tax) box('🧾','ELSS gives tax benefit only under the Old Tax Regime.','ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था में मिलता है।','#b91c1c','#fdf0ee');
+    if(F.stepUp) box('📈','Increase your SIP by 10% every year — small step-ups make a big difference over time.','हर साल SIP 10% बढ़ाएँ — छोटी बढ़त लंबे समय में बड़ा फ़र्क लाती है।','#0f7a45','#e3f7ee');
+    if(F.note) box('📝','Note from your RM: '+F.note,'','#c9942a','#fdf6e3');
+    y+=8;
+    y=txt(c,'This is a suggestion based on the information you provided. Your Relationship Manager will discuss specific schemes and the final plan with you.',P,y,IW,fnt(19),'#5d6e8a',25);
+    y=txt(c,'यह आपके द्वारा दी गई जानकारी पर आधारित सुझाव है। आपके रिलेशनशिप मैनेजर स्कीम और अंतिम प्लान पर आपसे बात करेंगे।',P,y+2,IW,fnt(19),'#7a6a3a',26);
+    y=txt(c,'Mutual Fund investments are subject to market risks, read all scheme related documents carefully.',P,y+10,IW,fnt(19,700),'#0f1f3d',25);
+    y=txt(c,'म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ें।',P,y+2,IW,fnt(19,600),'#7a6a3a',26)+22;
+    // footer
+    c.fillStyle=g; c.fillRect(0,y,W,96); c.fillStyle='#c9942a'; c.fillRect(0,y,W,5);
+    txt(c,rmName()?`Your RM: ${rmName()}`:'D N Investment',P,y+22,IW/2,fnt(26,800),'#f5d98a',32);
+    txt(c,'D N Investment · Bistupur, Jamshedpur',P,y+56,IW,fnt(19),'#c8d3e6',24);
+    y+=96;
+    const out=document.createElement('canvas'); out.width=W; out.height=Math.min(y,cv.height);
+    out.getContext('2d').drawImage(cv,0,0);
+    return out;
+  }
+  const fileName = p => 'Investment_Plan_'+String(p.name||'Client').trim().replace(/[^a-z0-9]+/gi,'_')+'.png';
+  const toBlob = cv => new Promise(res=>cv.toBlob(res,'image/png'));
+  function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
+
+  async function downloadImage(i){
+    const r=rowOf(i); if(!r) return;
+    try{ const b=await toBlob(await makeCanvas(i)); dl(b,fileName(r.p)); toast&&toast('Image downloaded ✓','success'); }
+    catch(e){ console.error(e); toast&&toast('⚠️ Image nahi bani — '+(e.message||e),'error'); }
+  }
+  async function sendImage(i){
+    const r=rowOf(i); if(!r) return;
+    let blob; try{ blob=await toBlob(await makeCanvas(i)); }catch(e){ console.error(e); toast&&toast('⚠️ Image nahi bani — '+(e.message||e),'error'); return; }
+    const name=fileName(r.p), cap=caption(i);
+    // 1) Mobile (Android / iPhone): seedha share sheet → WhatsApp → contact chunein
+    try{
+      const file=new File([blob],name,{type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]}) && /Android|iPhone|iPad/i.test(navigator.userAgent)){
+        await navigator.share({files:[file], text:cap}); return;
+      }
+    }catch(e){ if(e && e.name==='AbortError') return; console.warn('share failed',e); }
+    // 2) Computer: image clipboard me copy + download, aur client ka WhatsApp chat khule → Ctrl+V
+    let copied=false;
+    try{ if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){ console.warn('clipboard image failed',e); }
+    dl(blob,name);
+    window.open(waUrl(r.p, cap),'_blank');
+    toast&&toast(copied ? '🖼️ Image copied — WhatsApp chat me message bhejne se pehle Ctrl+V dabayein' : '🖼️ Image downloaded — WhatsApp me 📎 se attach karein', 'success');
   }
 
   // ══════════════ PRINT / PDF ══════════════
-  function print(i){
-    const r=(window._profRows||[])[i]; if(!r) return;
-    const A=analyse(r), p=r.p;
-    const base=location.origin+location.pathname.replace(/[^/]*$/,'');
-    const d=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    const chk=A.checks.map(c=>{ const s=ST[c.s]; return `<div class="ck" style="background:${s.bg};border-left:5px solid ${s.c}">
-      <div class="ckh" style="color:${s.c}">${s.e} ${esc(c.en)} <span class="hi">· ${esc(c.hi)}</span></div>
-      <div class="ckv">${esc(c.have)}</div><div class="cka">${esc(c.adv)}</div><div class="hi">${esc(c.advHi)}</div></div>`; }).join('');
-    const bar=A.alloc.map(a=>`<div style="width:${a.amt/A.total*100}%;background:${a.c}"></div>`).join('');
-    const rows=A.alloc.map(a=>`<tr><td><span class="sw" style="background:${a.c}"></span></td><td><b>${esc(a.en)}</b> <span class="hi">· ${esc(a.hi)}</span><br><small>${esc(a.why)} · <span class="hi">${esc(a.whyHi)}</span></small></td><td class="amt">${inr(a.amt)}</td><td class="pc">${Math.round(a.amt/A.total*100)}%</td></tr>`).join('');
+  async function print(i){
+    const r=rowOf(i); if(!r) return;
     const w=window.open('','_blank'); if(!w){ toast&&toast('Popup blocked — allow popups','error'); return; }
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Investment Plan – ${esc(p.name)}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0} body{font-family:system-ui,"Segoe UI",Roboto,sans-serif;color:#0f1f3d;padding:22px;max-width:800px;margin:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.hi{font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",sans-serif;color:#7a6a3a;font-size:.86em}
-header{display:flex;align-items:center;gap:14px;border-bottom:3px solid #c9942a;padding-bottom:10px;margin-bottom:14px}
-header img{height:58px} header h1{font-size:22px;letter-spacing:3px} header .t{font-size:11px;color:#c9942a;letter-spacing:2px;font-weight:700} header .s{font-size:10.5px;color:#5d6e8a}
-.ttl{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px} .ttl h2{font-size:18px} .ttl div{font-size:11.5px;color:#5d6e8a;text-align:right}
-.pill{display:inline-block;background:#0f1f3d;color:#f5d98a;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;margin-bottom:12px}
-h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#5d6e8a;margin:14px 0 7px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
-.ck{border-radius:8px;padding:8px 10px} .ckh{font-weight:800;font-size:12px;text-transform:uppercase} .ckv{font-size:11px;color:#5d6e8a} .cka{font-weight:700;font-size:13px;margin-top:2px}
-.big{font-size:26px;font-weight:900} .bar{display:flex;height:20px;border-radius:10px;overflow:hidden;margin:8px 0}
-table{width:100%;border-collapse:collapse;font-size:12.5px} td{padding:6px 4px;border-bottom:1px solid #e3e8f0;vertical-align:top} small{color:#5d6e8a}
-.sw{display:inline-block;width:13px;height:13px;border-radius:3px;margin-top:2px} .amt{text-align:right;font-weight:800;white-space:nowrap} .pc{text-align:right;color:#5d6e8a}
-.box{background:#fdf6e3;border:1px solid #f5d98a;border-radius:8px;padding:9px 11px;margin-top:10px;font-size:12px;line-height:1.5}
-.disc{margin-top:16px;font-size:10.5px;color:#5d6e8a;border-top:1px solid #e3e8f0;padding-top:8px;line-height:1.5}
-@media print{body{padding:10px} button{display:none}}
-</style></head><body>
-<header><img src="${base}dn-logo.png" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${base}logo_new.png'}else{this.style.display='none'}">
-<div><h1>D N INVESTMENT</h1><div class="t">TRUSTED WEALTH PARTNER</div><div class="s">AMFI Registered Mutual Fund Distributor · ARN-67217 · Bistupur, Jamshedpur</div></div></header>
-<div class="ttl"><h2>Suggested Investment Plan <span class="hi">· सुझाया गया निवेश प्लान</span></h2><div>${esc(p.name)}<br>${esc(p.mobile)} · ${d}</div></div>
-<div class="pill">Risk Profile: ${esc(A.lvlName)} · <span style="font-family:'Nirmala UI','Mangal',sans-serif">${esc(LVL_HI[A.lvlName]||'')}</span></div>
-<h3>Financial Health Check <span class="hi">· वित्तीय स्वास्थ्य जाँच</span></h3><div class="grid">${chk}</div>
-<h3>Suggested Monthly ${A.noSip?'Investment':'SIP'} <span class="hi">· सुझाया गया मासिक निवेश</span></h3>
-<div class="big">${inr(A.total)}${A.efPart?` <small style="font-size:12px;font-weight:600">(${inr(A.sip)} equity + ${inr(A.efPart)} emergency)</small>`:''}</div>
-<div class="bar">${bar}</div><table><tbody>${rows}</tbody></table>
-${A.efPart?`<div class="box">💰 ${inr(A.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(A.efTarget)}) is built; then it moves to equity.<br><span class="hi">${inr(A.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(A.efTarget)}) न बन जाए; फिर ये इक्विटी में।</span></div>`:''}
-${A.tax?`<div class="box">🧾 ELSS gives tax benefit only under the Old Tax Regime.<br><span class="hi">ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था में मिलता है।</span></div>`:''}
-${A.stepUp?`<div class="box">📈 Increase your SIP by 10% every year — small step-ups make a big difference over time.<br><span class="hi">हर साल SIP 10% बढ़ाएँ — छोटी बढ़त लंबे समय में बड़ा फ़र्क लाती है।</span></div>`:''}
-<div class="disc">This is a suggestion based on the information you provided. Your Relationship Manager will discuss specific schemes and the final plan with you.<br>
-<span class="hi">यह आपके द्वारा दी गई जानकारी पर आधारित सुझाव है। आपके रिलेशनशिप मैनेजर स्कीम और अंतिम प्लान पर आपसे बात करेंगे।</span><br><br>
-<b>Mutual Fund investments are subject to market risks, read all scheme related documents carefully.</b><br><span class="hi">म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ें।</span></div>
-<div style="text-align:center;margin-top:14px"><button onclick="print()" style="padding:9px 22px;border:none;border-radius:8px;background:#c9942a;color:#fff;font-weight:700;cursor:pointer">🖨️ Print / Save as PDF</button></div>
-</body></html>`);
+    w.document.write('<p style="font-family:sans-serif;padding:20px">Preparing plan…</p>');
+    let url; try{ url=(await makeCanvas(i)).toDataURL('image/png'); }catch(e){ w.document.body.innerHTML='⚠️ '+esc(e.message||e); return; }
+    w.document.open();
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Investment Plan – ${esc(r.p.name)}</title>
+<style>body{margin:0;background:#eee;text-align:center} img{width:100%;max-width:800px;display:block;margin:0 auto;background:#fff} button{margin:14px;padding:10px 22px;border:none;border-radius:8px;background:#c9942a;color:#fff;font-weight:700;cursor:pointer}
+@page{size:A4;margin:8mm} @media print{body{background:#fff} button{display:none} img{max-width:100%}}</style></head>
+<body><button onclick="print()">🖨️ Print / Save as PDF</button><img src="${url}"></body></html>`);
     w.document.close();
   }
 
-  return { analyse, html, setAmt, text, wa, copy, print };
+  return { analyse, final, html, setAmt, text, wa, copy, print, sendImage, downloadImage, edit, edSum, edAdd, edDel, edCancel, edSave, edReset };
 })();
