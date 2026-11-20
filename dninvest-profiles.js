@@ -212,6 +212,19 @@ window.PROF = (function(){
     const ids=[p.cid, pr.eq&&pr.eq.id, pr.mf&&pr.mf.id].filter(Boolean); if(!ids.length) return null;
     return _sends.filter(x=>ids.includes(x.cid)).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0]||null;
   }
+  // Form kisne bheja: CRM se bheja → send log ka "by"; blank form → link me RM ka naam
+  function senderOf(r){ return (r.s && r.s.by) || (r.p && r.p.blankForm ? (r.p.rm||'') : ''); }
+  // Profile ka RM: MF RM → (MF na ho to) form bhejne wala → Equity RM. (20-Nov-2026)
+  // Wajah: bahut se client equity me ek RM ke paas, MF kisi ke paas map nahi — MF ka kaam
+  // jis RM ne form bheja wahi karega.
+  function rmOf(r){
+    const mf=r.c&&r.c.rm, eq=r.e&&r.e.rm, by=senderOf(r);
+    const main = mf || by || eq || r.p.rm || '';
+    const sub=[];
+    if(eq && eq.toLowerCase()!==main.toLowerCase()) sub.push('EQ: '+eq);
+    if(by && by.toLowerCase()!==main.toLowerCase()) sub.push('📤 '+by);
+    return {main, sub, mf, eq, by};
+  }
   function rows(){
     const q=($('prof-search')?.value||'').trim().toLowerCase();
     const rf=$('prof-risk')?.value||'';
@@ -236,7 +249,7 @@ window.PROF = (function(){
       .filter(r=>{
         if(!r) return false;
         if(rf && r.p.riskProfile!==rf) return false;
-        if(q && !([r.p.name,r.p.mobile,r.c&&r.c.rm,r.e&&r.e.rm,r.p.rm,r.other].join(' ').toLowerCase().includes(q))) return false;
+        if(q && !([r.p.name,r.p.mobile,r.c&&r.c.rm,r.e&&r.e.rm,r.p.rm,r.other,r.s&&r.s.by].join(' ').toLowerCase().includes(q))) return false;
         return true;
       });
   }
@@ -255,7 +268,7 @@ window.PROF = (function(){
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
         <td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
         <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client CRM me ${esc(r.other)} ke paas mapped hai — investment details unhe / Admin ko dikhti hain">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
-        <td>${esc(r.p.mobile)}</td><td>${esc((r.c&&r.c.rm)||(r.e&&r.e.rm)||r.p.rm||'—')}</td>
+        <td>${esc(r.p.mobile)}</td><td>${(()=>{ const R=rmOf(r); return `<b>${esc(R.main||'—')}</b>${R.sub.length?`<br><small style="color:var(--gray);white-space:nowrap" title="EQ = equity RM · 📤 = form sent by">${esc(R.sub.join(' · '))}</small>`:''}`; })()}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
         <td><b>${r.c?money(r.c.sip_amount):'—'}</b>${r.c&&r.c.sip_count?` <small>(${r.c.sip_count})</small>`:''}</td>
@@ -319,7 +332,7 @@ window.PROF = (function(){
         ${box('Equity Value',r.e&&eqVal(r.e)?money(eqVal(r.e)):'—')}
         ${box('At Send (SIP/MF/EQ)',r.s?money(r.s.sip)+' / '+money(r.s.aum)+' / '+(r.s.eq?money(r.s.eq):'—'):'—')}
       </div>
-      <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc([r.e&&('EQ: '+(r.e.rm||'—')), r.c&&('MF: '+(r.c.rm||'—'))].filter(Boolean).join(' · ')||p.rm||'—')}</b> · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
+      <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc((()=>{ const R=rmOf(r); return [R.mf&&('MF: '+R.mf), R.eq&&('EQ: '+R.eq)].filter(Boolean).join(' · ') || R.main || '—'; })())}</b>${senderOf(r)?` · Form sent by: <b>${esc(senderOf(r))}</b>`:''} · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
       ${linkBox(i, r)}
       ${window.PLAN ? PLAN.html(i) : ''}
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 4px">Client's Answers</div>
@@ -394,12 +407,12 @@ window.PROF = (function(){
   function box(l,v){ return `<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:800;color:var(--navy);font-size:.9rem">${esc(v)}</div></div>`; }
   function exportXlsx(){
     const list=rows();
-    const cols=[{header:'Submitted',width:18},{header:'Client',width:26},{header:'Mobile',width:12},{header:'RM',width:12},
+    const cols=[{header:'Submitted',width:18},{header:'Client',width:26},{header:'Mobile',width:12},{header:'RM',width:12},{header:'EQ RM',width:12},{header:'Form Sent By',width:13},
       {header:'Current SIP (₹)',width:14,money:true},{header:'SIP Count',width:9,num:true},{header:'MF Invested (₹)',width:14,money:true},{header:'MF Value (₹)',width:14,money:true},{header:'Equity Value (₹)',width:14,money:true},
       {header:'SIP at Send (₹)',width:14,money:true},{header:'MF Value at Send (₹)',width:16,money:true},{header:'Sent On',width:12},
       {header:'Risk Score',width:9,num:true},{header:'Risk Profile',width:13}, ...LABELS.map(([,l])=>({header:l,width:18}))];
     const data=list.map(r=>{ const p=r.p, d=subDate(p);
-      return [d?d.toLocaleString('en-IN'):'', p.name, p.mobile, (r.c&&r.c.rm)||(r.e&&r.e.rm)||p.rm||'',
+      return [d?d.toLocaleString('en-IN'):'', p.name, p.mobile, rmOf(r).main, rmOf(r).eq||'', senderOf(r),
         r.c?(+r.c.sip_amount||0):'', r.c?(+r.c.sip_count||0):'', r.c?investedOf(r.c):'', r.c?(+r.c.aum||0):'', r.e?eqVal(r.e):'',
         r.s?r.s.sip:'', r.s?r.s.aum:'', r.s?fmtDate(String(r.s.at).slice(0,10)):'',
         p.riskScore??'', p.riskProfile||'', ...LABELS.map(([k])=>Array.isArray(p[k])?p[k].join(', '):(p[k]||''))]; });
