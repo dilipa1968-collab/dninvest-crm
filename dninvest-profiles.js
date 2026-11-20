@@ -140,11 +140,19 @@ window.PROF = (function(){
   // Ab profiles is browser me cache hoti hain (CRM ka baaki client data bhi
   // aise hi cache hota hai) → popup TURANT khulta hai; peeche se sirf NAYI
   // profiles (last wale ke baad ki) server se aati hain.
-  const CACHE='dninvest_profiles_cache';
+  // Cache key "dninvest_" se shuru NAHI hota → CRM ka 🧹 Clear Cache ise nahi mitata, popup turant
+  // khulta hai. Clear Cache ka pata "dninvest_prof_ok" marker se chalta hai (wo mit jaata hai) →
+  // tab purani list dikhate hue peeche se POORI list dobara aati hai (fresh data bhi, wait bhi nahi).
+  const CACHE='dnprof_cache_v2', OLD_CACHE='dninvest_profiles_cache', OK_MARK='dninvest_prof_ok';
   const tsMs = v => v ? (v.toMillis ? v.toMillis() : (v.toDate ? v.toDate().getTime() : (typeof v==='number'?v:(Date.parse(v)||0)))) : 0;
   function norm(d){ const o={...d}; o._ms=tsMs(d.submittedAt); delete o.submittedAt; return o; }
-  function readCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE)||'null'); return (c && Array.isArray(c.p)) ? c : null; }catch(_){ return null; } }
-  function writeCache(){ try{ localStorage.setItem(CACHE, JSON.stringify({p:_profiles, s:_sends, l:_links, at:Date.now()})); }catch(_){ /* quota — memory me to hai */ } }
+  function readCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE)||localStorage.getItem(OLD_CACHE)||'null'); return (c && Array.isArray(c.p)) ? c : null; }catch(_){ return null; } }
+  function writeCache(){
+    const v=JSON.stringify({p:_profiles, s:_sends, l:_links, at:Date.now()});
+    try{ localStorage.setItem(CACHE, v); }
+    catch(_){ try{ localStorage.setItem(CACHE, JSON.stringify({p:_profiles, s:[], l:_links, at:Date.now()})); }catch(__){ /* quota — memory me to hai */ } }
+    try{ localStorage.removeItem(OLD_CACHE); }catch(_){}
+  }
   async function load(full){
     if(typeof fdb==='undefined'){ await window.waitForFdb?.(8000); }
     const newest = (!full && _profiles.length) ? Math.max(..._profiles.map(p=>p._ms||0)) : 0;
@@ -153,8 +161,10 @@ window.PROF = (function(){
     let q=fdb.collection(COL).orderBy('submittedAt','desc');
     if(newest && firebase?.firestore?.Timestamp?.fromMillis) q=q.where('submittedAt','>',firebase.firestore.Timestamp.fromMillis(newest));
     q = q.limit(newest ? 500 : 1000);
-    // "Sent" log alag se — wo fail ho to bhi profiles dikhein
+    // Saari requests EK SAATH (pehle ek ke baad ek jaati thin → Clear Cache ke baad bahut der lagti thi)
     const sendsP = T(fdb.collection('crm_data').doc(SEND_KEY).get(),'Sent-log').catch(e=>{ console.warn('profile_sends load failed',e); return null; });
+    const delP = T(fdb.collection('crm_data').doc('profile_deleted').get(),'Deleted-list').catch(()=>null);
+    const lkP = T(fdb.collection('crm_data').doc(LINK_KEY).get(),'Links').catch(()=>null);
     let ps;
     try{ ps = await T(q.get(),'Profiles'); }
     catch(e){
@@ -163,10 +173,8 @@ window.PROF = (function(){
       // Fallback: bina orderBy (index/field ki dikkat ho to bhi chale) — sort browser me
       ps = await T(fdb.collection(COL).limit(1000).get(),'Profiles');
     }
-    const sd = await sendsP;
-    const del = await T(fdb.collection('crm_data').doc('profile_deleted').get(),'Deleted-list').catch(()=>null);
+    const [sd, del, lk] = await Promise.all([sendsP, delP, lkP]);
     if(del && del.exists && Array.isArray(del.data().ids)) _deleted=new Set(del.data().ids);
-    const lk = await T(fdb.collection('crm_data').doc(LINK_KEY).get(),'Links').catch(()=>null);
     if(lk) _links = (lk.exists && lk.data().links) || {};
     const fresh=ps.docs.map(d=>norm({_id:d.id, ...d.data()}));
     let added=fresh.length;
@@ -186,6 +194,7 @@ window.PROF = (function(){
     if(sd) _sends=(sd.exists && Array.isArray(sd.data().data)) ? sd.data().data : [];
     _loaded=true;
     writeCache();
+    try{ localStorage.setItem(OK_MARK,'1'); }catch(_){}
     return newest ? added : 0;
   }
   const subDate = p => p._ms ? new Date(p._ms) : (p.submittedAt?.toDate ? p.submittedAt.toDate() : null);
@@ -287,8 +296,11 @@ window.PROF = (function(){
   async function open(full){
     $('profModal').classList.add('open');
     if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; _links=c.l||{}; } }
-    if(_profiles.length){ render(); setStatus('🔄 Checking for new profiles…'); }
-    else $('prof-table').innerHTML='<div style="padding:20px;color:var(--gray)">Loading profiles…</div>';
+    let afterClear=false; try{ afterClear=!localStorage.getItem(OK_MARK); }catch(_){}
+    if(afterClear) full=true;   // 🧹 Clear Cache ke baad: list turant dikhao, peeche se poori fresh list
+    if(_profiles.length){ render(); setStatus(full ? '🔄 Refreshing full list…' : '🔄 Checking for new profiles…'); }
+    else $('prof-table').innerHTML='<div style="padding:20px;color:var(--gray)">Loading profiles… <small>(first load after Clear Cache can take a few seconds)</small></div>';
+    watchCrmData();
     let n=0;
     try{ n=await load(!!full); }
     catch(e){
@@ -305,6 +317,19 @@ window.PROF = (function(){
       console.error('Client Profiles render error:', e);
       $('prof-table').innerHTML=`<div style="padding:20px;color:var(--red)">⚠️ ${_profiles.length} profile(s) loaded but the list could not be shown — ${esc(e.message||e)}<br><small style="color:var(--gray)">Please send a screenshot of this message.</small></div>`;
     }
+  }
+  // Clear Cache ke baad CRM ka client data (MF / Equity) der se aata hai → tab tak profiles
+  // "not in CRM" dikhti hain. Data aate hi list dobara banao (popup khula ho tab tak, max 60 sec).
+  let _watchT=null;
+  function watchCrmData(){
+    clearInterval(_watchT);
+    const sig=()=>{ const a=DB.get('mf_clients')||[], b=DB.get('eq_clients')||[]; return a.length+'|'+b.length; };
+    let last=sig(), n=0;
+    _watchT=setInterval(()=>{
+      n++; const open=$('profModal')&&$('profModal').classList.contains('open');
+      if(!open || n>40){ clearInterval(_watchT); return; }
+      const now=sig(); if(now!==last){ last=now; try{ render(); }catch(_){} }
+    },1500);
   }
   // "Elsewhere" ka chhota summary — sirf jo None nahi hai
   function elsewhereText(p){

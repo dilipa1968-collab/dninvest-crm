@@ -295,13 +295,12 @@ window.PLAN = (function(){
   // ══════════════ RM EDITS ══════════════
   // _edit[profileId] = {checks:{key:{s,adv,advHi}}, alloc:[{k,scheme,amt}], note, by, at}
   // Is browser me save (localStorage) — RM baad me khole to edit wahi milta hai.
-  const EKEY='dninvest_plan_edits';
-  let _edit = {};
-  try{ _edit = JSON.parse(localStorage.getItem(EKEY)||'{}')||{}; }catch(_){ _edit={}; }
+  // Keys "dninvest_" se shuru NAHI — CRM ka 🧹 Clear Cache RM ke edits / combo nahi mitayega
+  const EKEY='dnplan_edits', CKEY='dnplan_combo';
+  const loadKey=(k,old)=>{ try{ const v=localStorage.getItem(k)||localStorage.getItem(old); if(v && !localStorage.getItem(k)){ localStorage.setItem(k,v); localStorage.removeItem(old); } return JSON.parse(v||'{}')||{}; }catch(_){ return {}; } };
+  let _edit = loadKey(EKEY,'dninvest_plan_edits');
   const saveEdits = ()=>{ try{ localStorage.setItem(EKEY, JSON.stringify(_edit)); }catch(_){} };
-  const CKEY='dninvest_plan_combo';
-  let _combo = {};
-  try{ _combo = JSON.parse(localStorage.getItem(CKEY)||'{}')||{}; }catch(_){ _combo={}; }
+  let _combo = loadKey(CKEY,'dninvest_plan_combo');
   const _editing = {};   // pid → true jab editor khula ho
   const _draft = {};     // editor ka beech ka data
 
