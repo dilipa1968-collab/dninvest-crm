@@ -8,7 +8,9 @@
    - RM ke liye "Talking Points" (sirf CRM me — client ko nahi jaate).
    - 🖼️ Colorful image (PNG) WhatsApp par — mobile par share sheet, computer par
      copy + Ctrl+V. 💬 Text bhi, 🖨️ PDF bhi (Hindi + English, DN Investment logo).
-   - 28 categories (Equity / Hybrid / Debt / Others) + scheme naam suggestion
+   - 4 Fund Combinations (Recommended / Simple / Low Cost Index / Multi Cap) —
+     risk × horizon ke hisab se, bina overlap, ELSS core ki jagah, gold diversifier.
+   - 26 categories (Equity / Hybrid / Debt / Others) + scheme naam suggestion
      (FUND_NAME_LIST + clients ki schemes, category ke hisab se).
    - ✏️ Edit Plan: RM health-check advice, funds, scheme naam, amount, note badal sakta
      hai (is browser me save). Image / text / PDF edited plan se hi bante hain.
@@ -92,20 +94,61 @@ window.PLAN = (function(){
   }
   const dlOpts = k => namesFor(k).map(n=>`<option value="${esc(n)}"></option>`).join('');
 
-  // Order = priority (chhoti SIP me peeche wale pehle hat-te hain)
-  const ALLOC = {
-    0:[['bal',35],['large',25],['multi',20],['debt',20]],
-    1:[['flexi',35],['lm',20],['bal',25],['large',20]],
-    2:[['flexi',30],['lm',25],['mid',20],['multi',15],['small',10]],
-    3:[['flexi',30],['mid',25],['lm',20],['small',15],['multi',10]]
+  // ══ FUND COMBINATIONS (20-Nov-2026 v2) ══
+  // TPL[combo][risk 0-2][horizon 0-2] — order = priority (chhoti SIP me peeche wale hat-te hain)
+  // risk: 0 Conservative, 1 Moderate, 2 Aggressive · horizon: 0 = 3–5 saal, 1 = 5–10, 2 = 10+
+  // Rules: ek hi style ke 2 fund nahi (Flexi + Multi Cap + L&M ek saath nahi = overlap);
+  // har combo me "core" (Flexi / Index) + "growth" (Mid / Small) + "style" (Value) + "cushion" (BAF / Multi Asset).
+  const TPL = {
+    rec: [
+      [ [['eqsav',30],['bal',30],['debt',25],['multi',15]],
+        [['bal',35],['large',25],['multi',25],['debt',15]],
+        [['bal',30],['large',25],['multi',25],['flexi',20]] ],
+      [ [['bal',35],['large',25],['multi',25],['eqsav',15]],
+        [['flexi',30],['bal',25],['large',20],['value',15],['multi',10]],
+        [['flexi',30],['large',20],['mid',20],['value',15],['bal',15]] ],
+      [ [['flexi',30],['bal',30],['large',20],['multi',20]],
+        [['flexi',30],['mid',25],['large',15],['value',15],['multi',15]],
+        [['flexi',25],['mid',25],['small',15],['value',15],['large',10],['multi',10]] ]
+    ],
+    simple: [
+      [ [['eqsav',50],['bal',50]], [['bal',60],['large',40]], [['bal',50],['large',50]] ],
+      [ [['bal',60],['large',40]], [['flexi',55],['bal',45]], [['flexi',45],['mid',25],['bal',30]] ],
+      [ [['flexi',50],['bal',50]], [['flexi',60],['mid',40]], [['flexi',45],['mid',30],['small',25]] ]
+    ],
+    index: [
+      [ [['eqsav',40],['large',30],['debt',30]], [['large',40],['bal',40],['debt',20]], [['large',45],['bal',35],['gold',20]] ],
+      [ [['large',45],['bal',35],['gold',20]], [['large',50],['index',25],['multi',25]], [['large',45],['index',35],['multi',20]] ],
+      [ [['large',50],['bal',30],['gold',20]], [['large',45],['index',40],['gold',15]], [['large',40],['index',45],['gold',15]] ]
+    ],
+    multicap: [
+      [ [['bal',45],['multi',35],['large',20]], [['bal',40],['multicap',30],['multi',30]], [['multicap',40],['bal',35],['multi',25]] ],
+      [ [['bal',40],['multicap',35],['multi',25]], [['multicap',45],['bal',30],['value',25]], [['multicap',45],['value',25],['bal',30]] ],
+      [ [['multicap',45],['bal',30],['multi',25]], [['multicap',50],['mid',25],['value',25]], [['multicap',45],['mid',25],['small',15],['value',15]] ]
+    ]
   };
-  const LVL = ['Conservative','Moderate','Aggressive','Aggressive'];
+  const COMBO = {
+    rec:{en:'Recommended — Core + Satellite',hi:'सुझाया गया — कोर + सैटेलाइट',short:'⭐ Recommended',
+      why:'A strong core fund plus growth and value funds, with a hybrid cushion — spread across styles without overlap.',
+      whyHi:'मज़बूत कोर फंड + ग्रोथ और वैल्यू फंड, साथ में हाइब्रिड सहारा — अलग-अलग स्टाइल, बिना दोहराव।'},
+    simple:{en:'Simple — 2 to 3 Funds',hi:'सरल — 2 से 3 फंड',short:'🎯 Simple',
+      why:'Just 2–3 well-diversified funds — easy to track, nothing overlapping.',
+      whyHi:'सिर्फ़ 2–3 अच्छे फंड — आसान निगरानी, कोई दोहराव नहीं।'},
+    index:{en:'Low Cost — Index Based',hi:'कम खर्च — इंडेक्स आधारित',short:'💰 Low Cost Index',
+      why:'Index funds with very low expense ratio, plus a hybrid / gold cushion.',
+      whyHi:'बहुत कम खर्च वाले इंडेक्स फंड, साथ में हाइब्रिड / गोल्ड सहारा।'},
+    multicap:{en:'Multi Cap Based',hi:'मल्टी कैप आधारित',short:'🧩 Multi Cap',
+      why:'Multi Cap as the core (min. 25% each in large, mid & small) with value / hybrid support.',
+      whyHi:'मल्टी कैप मुख्य फंड (लार्ज, मिड, स्मॉल में कम से कम 25%), साथ में वैल्यू / हाइब्रिड।'}
+  };
+  const COMBOS=['rec','simple','index','multicap'];
+  const LVL = ['Conservative','Moderate','Aggressive'];
   const LVL_HI = {Conservative:'सुरक्षित (Conservative)',Moderate:'संतुलित (Moderate)',Aggressive:'आक्रामक (Aggressive)'};
 
   const _over = {};   // RM ne amount badla → profile id ke hisab se
 
   // ══════════════ RULES ENGINE ══════════════
-  function analyse(r){
+  function analyse(r, combo){
     const p=r.p||{};
     const inc=band(p,'monthlyIncome'), sav=band(p,'monthlySavings');
     const incBase = inc ? (inc[0]>=200000 ? 200000 : mid(inc)) : 0;
@@ -166,14 +209,16 @@ window.PLAN = (function(){
         advHi: s==='g'?'अच्छी ✓':'आय के हिसाब से कम — मासिक बजट देखें'});
     }
 
-    // ── Risk level ──
+    // ── Risk level + horizon ──
     const li = LVL.indexOf(p.riskProfile);
-    let lvl = li<0 ? 1 : li;   // purani profile me risk na ho to Moderate
+    let lvl = li<0 ? 1 : Math.min(2,li);   // purani profile me risk na ho to Moderate
     const period = K(p.period);
-    if(period===K('3 – 5 years')){ if(lvl>0) notes.push('Period sirf 3–5 saal → allocation ek level safe kiya'); lvl=Math.max(0,lvl-1); }
+    const H = period===K('3 – 5 years') ? 0 : period===K('10+ years') ? 2 : 1;
     if(old && lvl>1){ lvl=1; notes.push('Age 55+ → Aggressive se Moderate kiya'); }
-    if(lvl===2 && period===K('10+ years')) lvl=3;
-    if(retired && has(p,'goal','Retirement') && lvl>1) lvl=1;
+    if(K(p.r2)===K('Sell') && lvl>1){ lvl=1; notes.push('20% girawat par bechne wala → Moderate combo'); }
+    if(retired && has(p,'goal','Retirement') && lvl>0){ lvl=Math.min(lvl,1); }
+    const shortGoal = (has(p,'goal','House / Car')||has(p,'goal','Child Education')) && H===0;
+    if(shortGoal && lvl>0){ lvl--; notes.push('3–5 saal me ghar / gaadi / padhai ka goal → ek level safe'); }
 
     // ── Amount ──
     const planned = band(p,'sipAmount');
@@ -181,24 +226,45 @@ window.PLAN = (function(){
     let auto = sav ? Math.max(500, r500(Math.min(savMid*0.85, sav[1]))) : (planned?r500(mid(planned)):5000);
     const total = _over[r.p._id] || auto;
     let efPart = efS==='r' ? Math.max(500, r500(total*0.33)) : efS==='a' ? Math.max(500, r500(total*0.2)) : 0;
-    if(efPart && total-efPart<500) efPart = Math.max(0,total-500);
+    if(efPart && total-efPart<1000) efPart = Math.max(0,total-1000);
     const sip = total-efPart;
 
-    // ── Allocation ──
-    let slots = ALLOC[lvl].map(([k,w])=>({k,w}));
+    // ── Allocation (chuna hua combination) ──
+    combo = COMBO[combo] ? combo : 'rec';
+    let slots = TPL[combo][lvl][H].map(([k,w])=>({k,w}));
+    const add=(k,w)=>{ const x=slots.find(s=>s.k===k); if(x) x.w+=w; else slots.push({k,w}); };
     const bigEq = BIG_EQ.includes(K(p.oEquity)) || (r.e && +r.e.asset_value>=5e5);
     if(bigEq && slots.some(s=>s.k==='small')){
-      const sm=slots.find(s=>s.k==='small'); slots.find(s=>s.k==='flexi').w+=sm.w; slots=slots.filter(s=>s.k!=='small');
-      notes.push('Direct shares pehle se ₹5 L+ → Small Cap hataya (MF ka kaam diversification)');
+      const sm=slots.find(s=>s.k==='small'); slots=slots.filter(s=>s!==sm);
+      add(slots.some(s=>s.k==='multi')?'multi':slots[0].k, sm.w);
+      notes.push('Direct shares pehle se ₹5 L+ → Small Cap hata kar diversification badhaya');
     }
+    // Gold: client ke paas Gold / SGB nahi aur combo me koi gold / multi-asset nahi → 10% gold (₹15k+ SIP par)
+    const hasGold = has(p,'oOther','Gold / SGB') || slots.some(s=>s.k==='gold'||s.k==='multi');
+    if(!hasGold && sip>=15000 && lvl>0 && (combo==='rec'||combo==='multicap')){ slots.forEach(s=>s.w*=0.9); slots.push({k:'gold',w:10}); notes.push('Gold / SGB nahi hai → 10% Gold Fund diversification ke liye'); }
+    // Tax Saving: ELSS core fund ki JAGAH (ELSS bhi flexi-cap jaisa hi hai → dono rakhne se overlap)
     const tax = has(p,'goal','Tax Saving');
-    if(tax){ slots.forEach(s=>s.w*=0.8); slots.splice(1,0,{k:'elss',w:20}); }   // ELSS 20% — core fund ke baad
-    // chhoti SIP me kam funds (priority order se)
-    const maxN = sip<3000 ? 2 : sip<6000 ? 3 : sip<10000 ? 4 : 6;
-    slots=slots.slice(0,maxN);
+    let elssCapNote='';
+    if(tax){
+      const core = slots.find(s=>s.k==='flexi' || (s.k==='multicap' && combo!=='multicap'));   // Multi Cap combo me Multi Cap rehta hai
+      if(core){ core.k='elss'; }
+      else { slots.forEach(s=>s.w*=0.8); slots.splice(1,0,{k:'elss',w:20}); }
+    }
+    // Fund count — SIP ke size se (bahut funds = overlap + tracking mushkil)
+    const maxN = sip<2000 ? 1 : sip<5000 ? 2 : sip<10000 ? 3 : sip<20000 ? 4 : sip<40000 ? 5 : 6;
+    if(slots.length>maxN){
+      const keep=slots.slice(0,maxN);
+      if(tax && !keep.some(s=>s.k==='elss')) keep[keep.length-1]=slots.find(s=>s.k==='elss');
+      slots=keep;
+    }
     const W=slots.reduce((a,s)=>a+s.w,0);
-    slots.forEach(s=>{ s.amt=Math.max(500, r500(sip*s.w/W)); });
+    slots.forEach(s=>{ s.amt=r500(sip*s.w/W); });
+    // ₹1,000 se kam wala fund hata kar sabse bade me jodo
+    let tiny; while(slots.length>1 && (tiny=slots.find(s=>s.amt<1000))){ slots=slots.filter(s=>s!==tiny); slots.reduce((a,s)=>s.amt>a.amt?s:a,slots[0]).amt+=tiny.amt; }
     const diff = sip - slots.reduce((a,s)=>a+s.amt,0); slots.reduce((a,s)=>s.amt>a.amt?s:a,slots[0]).amt += diff;
+    // ELSS: 80C limit ₹1.5 L/saal = ₹12,500/month — upar ka flexi me
+    const el=slots.find(s=>s.k==='elss');
+    if(el && el.amt>12500){ const extra=el.amt-12500; el.amt=12500; slots.push({k:'flexi',amt:extra}); elssCapNote='ELSS ₹12,500/month tak (80C limit), baaki Flexi Cap me'; notes.push(elssCapNote); }
     slots = slots.filter(s=>s.amt>0);
     const alloc = slots.map(s=>({k:s.k, amt:s.amt, ...CAT[s.k]}));
     if(efPart) alloc.push({k:'liquid', amt:efPart, ...CAT.liquid});
@@ -218,8 +284,12 @@ window.PLAN = (function(){
     if((has(p,'goal','Child Education')||has(p,'goal','House / Car')) && period===K('3 – 5 years')) talk.push('Short-term goal (padhai / ghar / gaadi) ke liye us hisse ko equity ki jagah hybrid / debt me rakhein.');
     if(K(p.r2)===K('Sell')) talk.push('Client 20% girawat par bechna chahta hai — volatility samjhayein, SIP band na kare.');
     const stepUp = !old && !retired && K(p.r1)!==K('Irregular');
+    if(irregular && !noSip) talk.push('Income irregular / business hai — base SIP chhoti rakhein aur achhe mahine me top-up karwayein.');
+    if(/lumpsum/i.test(p.mode||'')) talk.push('Lumpsum aaye to ek saath equity me nahi — Liquid / Arbitrage me rakh kar 6–12 mahine STP se isi split me daalein.');
+    if(old) talk.push('Age 55+ — retirement ke baad ke liye SWP plan ki baat karein.');
+    if(p.oMf && BIG_EQ.includes(K(p.oMf))) talk.push('Bahar ka MF bada hai — uska portfolio mangwa kar overlap check karein, warna same type ke fund dobara ho jayenge.');
 
-    return {checks, total, sip, efPart, efTarget, alloc, lvlName:LVL[lvl], talk, notes, stepUp, noSip, tax, auto, curSip};
+    return {checks, total, sip, efPart, efTarget, alloc, lvlName:LVL[lvl], talk, notes, stepUp, noSip, tax, auto, curSip, combo, comboEn:COMBO[combo].en, comboHi:COMBO[combo].hi, comboWhy:COMBO[combo].why, comboWhyHi:COMBO[combo].whyHi};
   }
 
   // ══════════════ RM EDITS ══════════════
@@ -229,12 +299,15 @@ window.PLAN = (function(){
   let _edit = {};
   try{ _edit = JSON.parse(localStorage.getItem(EKEY)||'{}')||{}; }catch(_){ _edit={}; }
   const saveEdits = ()=>{ try{ localStorage.setItem(EKEY, JSON.stringify(_edit)); }catch(_){} };
+  const CKEY='dninvest_plan_combo';
+  let _combo = {};
+  try{ _combo = JSON.parse(localStorage.getItem(CKEY)||'{}')||{}; }catch(_){ _combo={}; }
   const _editing = {};   // pid → true jab editor khula ho
   const _draft = {};     // editor ka beech ka data
 
   // Auto plan + RM edits = final plan (card, WhatsApp, image, print — sab yahi use karte hain)
   function final(r){
-    const A=analyse(r), E=_edit[r.p._id];
+    const A=analyse(r, _combo[r.p._id]||'rec'), E=_edit[r.p._id];
     const F={...A, note:'', edited:false, checks:A.checks.map(c=>({...c})), alloc:A.alloc.map(a=>({...a, scheme:''}))};
     if(!E) return F;
     F.edited=true; F.by=E.by; F.at=E.at; F.note=E.note||'';
@@ -274,6 +347,9 @@ window.PLAN = (function(){
       </div>
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Financial Health Check</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-bottom:12px">${chk}</div>
+      ${F.edited?'':`<div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Fund Combination <small style="text-transform:none;font-weight:600">— client ke hisab se chunein</small></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">${COMBOS.map(k=>`<button class="btn ${k===F.combo?'':'btn-outline'}" style="${btnS};${k===F.combo?'background:var(--navy);color:#f5d98a;border:1px solid var(--navy)':''}" onclick="PLAN.setCombo(${i},'${k}')">${COMBO[k].short}</button>`).join('')}</div>
+      <div style="font-size:.7rem;color:var(--gray);margin-bottom:10px">${esc(F.comboWhy)}</div>`}
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">
         <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase">Suggested Monthly ${F.noSip?'Investment':'SIP'}
           <span style="font-size:1.15rem;color:var(--navy);text-transform:none;margin-left:4px">${inr(F.total)}</span>
@@ -305,6 +381,12 @@ window.PLAN = (function(){
     const r=(window._profRows||[])[i]; if(!r) return;
     if(reset) delete _over[r.p._id];
     else { const v=r500(+(document.getElementById('plan-amt')||{}).value||0); if(v<500){ toast&&toast('Amount kam se kam ₹500','error'); return; } _over[r.p._id]=v; }
+    redraw(i);
+  }
+  function setCombo(i,k){
+    const r=(window._profRows||[])[i]; if(!r||!COMBO[k]) return;
+    if(k==='rec') delete _combo[r.p._id]; else _combo[r.p._id]=k;
+    try{ localStorage.setItem(CKEY, JSON.stringify(_combo)); }catch(_){}
     redraw(i);
   }
   function redraw(i){ const el=document.getElementById('planCard'); if(el) el.outerHTML=html(i); }
@@ -392,6 +474,7 @@ window.PLAN = (function(){
     L.push('*Financial Health Check / वित्तीय स्वास्थ्य जाँच*');
     F.checks.forEach(c=>{ L.push(`${(ST[c.s]||ST.n).e} ${c.en}: ${c.adv}`); if(c.advHi) L.push(`    ${c.hi}: ${c.advHi}`); });
     L.push('',`*Suggested Monthly ${F.noSip?'Investment':'SIP'} / सुझाया गया मासिक निवेश: ${inr(F.total)}*`);
+    if(!F.edited) L.push(`_${F.comboEn} — ${F.comboWhy}_`,`_${F.comboHi} — ${F.comboWhyHi}_`);
     F.alloc.forEach(a=>L.push(`• ${a.en} / ${a.hi} — ${inr(a.amt)}${a.scheme?`\n    _${a.scheme}_`:''}`));
     if(F.efPart) L.push('',`💰 ${inr(F.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(F.efTarget)}) is built; then it moves to equity.`,`💰 ${inr(F.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(F.efTarget)}) न बन जाए; फिर ये इक्विटी में।`);
     if(F.tax) L.push('','🧾 ELSS gives tax benefit only under the Old Tax Regime.','🧾 ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था (Old Regime) में मिलता है।');
@@ -480,6 +563,12 @@ window.PLAN = (function(){
     txt(c,'per month · प्रति माह',P+30+ (c.font=fnt(64,900), c.measureText(inr(F.total)).width)+16,y+30,IW,fnt(22,700),'#5d6e8a',28);
     if(F.efPart) txt(c,`${inr(F.sip)} equity + ${inr(F.efPart)} emergency fund`,P+30+(c.font=fnt(64,900),c.measureText(inr(F.total)).width)+16,y+62,IW,fnt(20,600),'#9a7a2a',26);
     y+=130;
+    if(!F.edited){
+      c.fillStyle='#0f1f3d'; c.font=fnt(22,800); const cl=F.comboEn; const cw2=c.measureText(cl).width+36;
+      rr(c,P,y,cw2,40,20); c.fill(); txt(c,cl,P+18,y+8,cw2,fnt(22,800),'#f5d98a',26);
+      txt(c,F.comboHi,P+cw2+14,y+10,IW-cw2-14,fnt(21,700),'#9a7a2a',26); y+=50;
+      y=txt(c,F.comboWhy,P,y,IW,fnt(20),'#5d6e8a',26); y=txt(c,F.comboWhyHi,P,y,IW,fnt(20),'#7a6a3a',27)+12;
+    }
     // bar
     const tot=F.total||1; let bx=P; c.save(); rr(c,P,y,IW,36,18); c.clip();
     F.alloc.forEach(a=>{ const w=IW*a.amt/tot; c.fillStyle=a.c; c.fillRect(bx,y,w+1,36); bx+=w; }); c.restore(); y+=56;
@@ -559,5 +648,5 @@ window.PLAN = (function(){
     w.document.close();
   }
 
-  return { analyse, final, html, setAmt, text, wa, copy, print, sendImage, downloadImage, edit, edCat, edSum, edAdd, edDel, edCancel, edSave, edReset };
+  return { analyse, final, html, setAmt, setCombo, text, wa, copy, print, sendImage, downloadImage, edit, edCat, edSum, edAdd, edDel, edCancel, edSave, edReset };
 })();
