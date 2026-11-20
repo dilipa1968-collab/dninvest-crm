@@ -10,6 +10,7 @@
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
    Access: Admin sab; RM sirf apne clients ke profiles.
+   📊 RM-wise Sent / Filled / Pending (toolbar button + ⏳ par click), blank form bhi log hota hai.
    👤 RM ko wo profiles bhi dikhti hain jo form usne khud bheja (client CRM me na ho /
       MF hamare yahan na ho). Kisi aur RM ka client nikle to uski investment chhupi rehti hai.
    🔗 Mobile alag ho to detail popup → "Link to CRM Client" (20-Nov-2026).
@@ -256,8 +257,8 @@ window.PROF = (function(){
   function render(){
     const list=rows();
     const pend=(CU.role==='admin' ? _sends : _sends.filter(s=>{ if(String(s.by||'').trim().toLowerCase()===String(CU.name||'').trim().toLowerCase()) return true; const sg=s.seg==='equity'?'equity':'mf'; const c=sg==='equity'?eqClient(s.cid):mfClient(s.cid); return c && canSeeClient(c, sg); }))
-      .filter(s=>!_profiles.some(p=>p.sendId===s.id || (p.cid && p.cid===s.cid && subDate(p) && subDate(p).toISOString()>=s.at)));
-    const pc=$('prof-pending'); if(pc) pc.textContent = pend.length ? `⏳ ${pend.length} sent, not filled yet` : '';
+      .filter(s=>!s.blank && !filledFor(s));
+    const pc=$('prof-pending'); if(pc){ pc.textContent = pend.length ? `⏳ ${pend.length} sent, not filled yet` : ''; pc.style.cursor='pointer'; pc.title='Click — RM-wise sent / filled / pending'; pc.onclick=()=>PROF.summary(); }
     $('prof-count').textContent=list.length+' profile'+(list.length===1?'':'s');
     const riskC={Conservative:'#0369a1',Moderate:'#b45309',Aggressive:'#b91c1c'};
     let h=`<table><thead><tr><th>Date</th><th>Client</th><th>Mobile</th><th>RM</th><th>Risk Profile</th><th>Monthly Savings</th><th>Mode</th><th>Planned SIP</th>
@@ -404,6 +405,89 @@ window.PROF = (function(){
     toast('Link removed','success');
     reopen(r.p._id);
   }
+  // ══════ 📊 RM-wise: kitne link bheje / bhare / baaki (20-Nov-2026) ══════
+  function filledFor(s){ return _profiles.some(p=>p.sendId===s.id || (s.cid && p.cid && p.cid===s.cid && subDate(p) && subDate(p).toISOString()>=s.at)); }
+  const nk = v => String(v||'').trim().toLowerCase();
+  // Profile kisne bhejwayi: send log (sendId) → blank form ka RM → us client ko aakhri bhejne wala → link ka RM
+  function senderOfProfile(p){
+    if(p.sendId){ const s=_sends.find(x=>x.id===p.sendId); if(s) return s.by||p.rm||''; }
+    if(p.blankForm) return p.rm||'';
+    if(p.cid){ const s=_sends.filter(x=>x.cid===p.cid).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0]; if(s) return s.by||''; }
+    return p.rm||'';
+  }
+  let _sumRange='all', _sumOpen='';
+  function inRange(iso){
+    if(_sumRange==='all') return true;
+    const t=Date.parse(iso)||0, now=new Date();
+    if(_sumRange==='7') return t>=Date.now()-7*864e5;
+    if(_sumRange==='30') return t>=Date.now()-30*864e5;
+    if(_sumRange==='month') return t>=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+    return true;
+  }
+  function sumData(){
+    const isAdmin=CU.role==='admin', me=nk(CU.name);
+    const R={}; const row=n=>{ const k=nk(n)||'(unknown)'; return R[k]||(R[k]={name:n||'(unknown)',sent:0,clients:new Set(),pend:new Map(),blank:0,blankFilled:0,filled:0,last:''}); };
+    // Bheje gaye links
+    _sends.filter(s=>inRange(s.at)).forEach(s=>{
+      const x=row(s.by); if(String(s.at)>x.last) x.last=String(s.at);
+      if(s.blank){ x.blank++; return; }
+      x.sent++; x.clients.add(s.cid);
+    });
+    // Pending: client ka aakhri send abhi tak nahi bhara
+    const latest=new Map(); _sends.filter(s=>!s.blank && s.cid && inRange(s.at)).forEach(s=>{ const k=nk(s.by)+'|'+s.cid; const o=latest.get(k); if(!o || String(s.at)>String(o.at)) latest.set(k,{...s, times:(o?o.times:0)+1}); else o.times++; });
+    latest.forEach(s=>{ if(!filledFor(s)) row(s.by).pend.set(s.cid, s); });
+    // Bhare gaye profiles (ek mobile = ek, sabse naya)
+    const seen=new Set();
+    _profiles.forEach(p=>{ const m=cleanMobile(p.mobile)||p._id; if(seen.has(m)) return; seen.add(m);
+      if(!inRange(p._ms?new Date(p._ms).toISOString():'')) return;
+      const by=senderOfProfile(p); const x=row(by); x.filled++; if(p.blankForm) x.blankFilled++; });
+    let list=Object.values(R);
+    if(!isAdmin) list=list.filter(x=>nk(x.name)===me);
+    return list.sort((a,b)=>(b.sent+b.blank)-(a.sent+a.blank) || a.name.localeCompare(b.name));
+  }
+  async function summary(){
+    $('profSumModal').classList.add('open');
+    if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; _links=c.l||{}; } }
+    renderSummary();
+    if(!_loaded){ try{ await load(false); renderSummary(); }catch(e){ console.warn('summary load',e); } }
+  }
+  function sumRange(v){ _sumRange=v; renderSummary(); }
+  function sumToggle(n){ _sumOpen = _sumOpen===n ? '' : n; renderSummary(); }
+  function renderSummary(){
+    const body=$('profSumBody'); if(!body) return;
+    const L=sumData();
+    const T=L.reduce((t,x)=>{ t.sent+=x.sent; t.cl+=x.clients.size; t.pend+=x.pend.size; t.blank+=x.blank; t.bf+=x.blankFilled; t.f+=x.filled; return t; },{sent:0,cl:0,pend:0,blank:0,bf:0,f:0});
+    const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+    const pc=v=>{ const n=parseInt(v); return isNaN(n)?'var(--gray)':n>=60?'#0f7a45':n>=30?'#b45309':'#c0392b'; };
+    const rng=[['all','All time'],['month','This month'],['30','Last 30 days'],['7','Last 7 days']].map(([v,l])=>`<option value="${v}"${v===_sumRange?' selected':''}>${l}</option>`).join('');
+    let h=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <select onchange="PROF.sumRange(this.value)" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px">${rng}</select>
+      <span style="font-size:.74rem;color:var(--gray)">Row par click karein → us RM ke baaki (not filled) clients + 💬 Resend</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
+        ${[['📤 Clients Sent',T.cl,'#1a56db'],['✅ Filled (from sent)',T.cl-T.pend,'#0f7a45'],['⏳ Pending',T.pend,'#b45309'],['📊 Fill %',pct(T.cl-T.pend,T.cl),pc(pct(T.cl-T.pend,T.cl))],['🆕 Blank Links',T.blank,'#0f766e'],['📋 Total Profiles',T.f,'#0f1f3d']]
+          .map(([l,v,c])=>`<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:900;color:${c};font-size:1.25rem">${v}</div></div>`).join('')}
+      </div>
+      <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr><th>RM</th><th title="Unique clients ko CRM se link bheja">Clients Sent</th><th title="Kul baar bheja (resend sahit)">Links (incl. resend)</th><th>Filled</th><th>Pending</th><th>Fill %</th><th>Blank Links</th><th>Blank Filled</th><th title="Is RM ke naam ki saari profiles (blank + CRM)">Total Profiles</th><th>Last Sent</th></tr></thead><tbody>`;
+    if(!L.length) h+=`<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:14px">No forms sent in this period</td></tr>`;
+    L.forEach((x,n)=>{
+      const cl=x.clients.size, f=cl-x.pend.size, pr=pct(f,cl), open=_sumOpen===x.name;
+      h+=`<tr style="cursor:pointer;${open?'background:#F0F5FB':''}" onclick="PROF.sumToggle('${esc(x.name).replace(/'/g,"\\'")}')">
+        <td><b>${open?'▾':'▸'} ${esc(x.name)}</b></td><td><b>${cl}</b></td><td>${x.sent}</td>
+        <td style="color:#0f7a45;font-weight:700">${f}</td><td style="color:#b45309;font-weight:700">${x.pend.size}</td>
+        <td><b style="color:${pc(pr)}">${pr}</b></td><td>${x.blank}</td><td>${x.blankFilled}</td><td><b>${x.filled}</b></td>
+        <td>${x.last?fmtDate(x.last.slice(0,10)):'—'}</td></tr>`;
+      if(open){
+        const P=[...x.pend.values()].sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+        h+=`<tr><td colspan="10" style="background:#fafcff;padding:6px 10px">${P.length?`<div style="font-size:.72rem;font-weight:800;color:#b45309;margin-bottom:4px">⏳ Not filled yet (${P.length}) — purane pehle</div>
+          <table style="font-size:.74rem"><tbody>${P.map(s=>{ const days=Math.floor((Date.now()-Date.parse(s.at))/864e5);
+            return `<tr><td><b>${esc(s.name)}</b> <span class="badge ${s.seg==='equity'?'b-eq':'b-mf'}" style="font-size:.55rem">${s.seg==='equity'?'EQ':'MF'}</span></td><td>${esc(s.mobile||'—')}</td>
+            <td>${fmtDate(String(s.at).slice(0,10))} <small style="color:${days>=7?'#c0392b':'var(--gray)'}">(${days}d ago${s.times>1?` · sent ${s.times}×`:''})</small></td>
+            <td style="text-align:right"><button class="btn btn-outline" style="padding:3px 9px;font-size:.7rem" onclick="event.stopPropagation();PROF.send('${esc(s.cid)}','wa','${s.seg==='equity'?'equity':'mf'}')">💬 Resend</button></td></tr>`; }).join('')}</tbody></table>`
+          :'<div style="font-size:.74rem;color:#0f7a45">✅ Sabne bhar diya</div>'}</td></tr>`;
+      }
+    });
+    body.innerHTML=h+'</tbody></table></div></div><p style="font-size:.68rem;color:var(--gray);margin-top:8px">Blank links ki ginti aaj (20-Nov-2026) ke update ke baad se shuru hai — usse pehle ke blank forms "Blank Filled" me gine jaate hain par "Blank Links" me nahi.</p>';
+  }
   function box(l,v){ return `<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:800;color:var(--navy);font-size:.9rem">${esc(v)}</div></div>`; }
   function exportXlsx(){
     const list=rows();
@@ -449,12 +533,17 @@ window.PROF = (function(){
     toast('Profile deleted','success');
   }
   // Blank form — naye client ke liye (CRM me abhi nahi). RM ka naam link me jaata hai.
-  function blankLink(){
+  function blankLink(sendId){
     const base=location.origin+location.pathname.replace(/[^/]*$/,'')+'dninvest-profile.html';
-    return base+'?'+new URLSearchParams({rm:CU&&CU.name||''}).toString();
+    const q={rm:CU&&CU.name||''}; if(sendId) q.s=sendId;
+    return base+'?'+new URLSearchParams(q).toString();
   }
   async function blank(mode){
-    const link=blankLink();
+    // Blank form bhi "sent" log me (RM-wise ginti ke liye) — 20-Nov-2026
+    const sendId=uid();
+    const link=blankLink(sendId);
+    recordSend({id:sendId, blank:true, cid:'', seg:'', name:'(Blank form)', mobile:'', rm:CU.name||'', by:CU.name||'', at:new Date().toISOString(), via:mode==='copy'?'copy':'whatsapp'})
+      .then(r=>{ if(!r.ok) console.log('blank send not logged:', r.error); });
     if(mode==='copy'){
       try{ await navigator.clipboard.writeText(link); toast('Blank form link copied ✓','success'); }catch(_){ prompt('Copy this link:', link); }
       return;
@@ -467,5 +556,5 @@ window.PROF = (function(){
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
-  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink };
+  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink, summary, sumRange, sumToggle };
 })();
