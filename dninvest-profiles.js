@@ -426,7 +426,7 @@ window.PROF = (function(){
   }
   function sumData(){
     const isAdmin=CU.role==='admin', me=nk(CU.name);
-    const R={}; const row=n=>{ const k=nk(n)||'(unknown)'; return R[k]||(R[k]={name:n||'(unknown)',sent:0,clients:new Set(),pend:new Map(),blank:0,blankFilled:0,filled:0,last:''}); };
+    const R={}; const row=n=>{ const k=nk(n)||'(unknown)'; return R[k]||(R[k]={name:n||'(unknown)',sent:0,clients:new Set(),pend:new Map(),blank:0,blankFilled:0,filled:0,last:'',blankList:[],sentList:[]}); };
     // Bheje gaye links
     _sends.filter(s=>inRange(s.at)).forEach(s=>{
       const x=row(s.by); if(String(s.at)>x.last) x.last=String(s.at);
@@ -440,7 +440,7 @@ window.PROF = (function(){
     const seen=new Set();
     _profiles.forEach(p=>{ const m=cleanMobile(p.mobile)||p._id; if(seen.has(m)) return; seen.add(m);
       if(!inRange(p._ms?new Date(p._ms).toISOString():'')) return;
-      const by=senderOfProfile(p); const x=row(by); x.filled++; if(p.blankForm) x.blankFilled++; });
+      const by=senderOfProfile(p); const x=row(by); x.filled++; if(p.blankForm){ x.blankFilled++; x.blankList.push(p); } else x.sentList.push(p); });
     let list=Object.values(R);
     if(!isAdmin) list=list.filter(x=>nk(x.name)===me);
     return list.sort((a,b)=>(b.sent+b.blank)-(a.sent+a.blank) || a.name.localeCompare(b.name));
@@ -450,6 +450,14 @@ window.PROF = (function(){
     if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; _links=c.l||{}; } }
     renderSummary();
     if(!_loaded){ try{ await load(false); renderSummary(); }catch(e){ console.warn('summary load',e); } }
+  }
+  // Summary se seedha profile / plan kholna (main list ka search / filter hata kar)
+  function openById(pid, what){
+    let list=window._profRows||[]; let j=list.findIndex(r=>r.p._id===pid);
+    if(j<0){ const sr=$('prof-search'), rk=$('prof-risk'); if(sr) sr.value=''; if(rk) rk.value=''; render(); list=window._profRows||[]; j=list.findIndex(r=>r.p._id===pid); }
+    if(j<0){ toast('Profile list me nahi mili (naya record aaya ho to 🔄 Refresh karein)','error'); return; }
+    try{ closeModal('profSumModal'); }catch(_){}
+    if(what==='plan') plan(j); else detail(j);
   }
   function sumRange(v){ _sumRange=v; renderSummary(); }
   function sumToggle(n){ _sumOpen = _sumOpen===n ? '' : n; renderSummary(); }
@@ -478,12 +486,23 @@ window.PROF = (function(){
         <td>${x.last?fmtDate(x.last.slice(0,10)):'—'}</td></tr>`;
       if(open){
         const P=[...x.pend.values()].sort((a,b)=>String(a.at).localeCompare(String(b.at)));
-        h+=`<tr><td colspan="10" style="background:#fafcff;padding:6px 10px">${P.length?`<div style="font-size:.72rem;font-weight:800;color:#b45309;margin-bottom:4px">⏳ Not filled yet (${P.length}) — purane pehle</div>
-          <table style="font-size:.74rem"><tbody>${P.map(s=>{ const days=Math.floor((Date.now()-Date.parse(s.at))/864e5);
+        const pendH = P.length?`<div style="font-size:.72rem;font-weight:800;color:#b45309;margin-bottom:4px">⏳ Not filled yet (${P.length}) — purane pehle</div>
+          <table style="font-size:.74rem;margin-bottom:10px"><tbody>${P.map(s=>{ const days=Math.floor((Date.now()-Date.parse(s.at))/864e5);
             return `<tr><td><b>${esc(s.name)}</b> <span class="badge ${s.seg==='equity'?'b-eq':'b-mf'}" style="font-size:.55rem">${s.seg==='equity'?'EQ':'MF'}</span></td><td>${esc(s.mobile||'—')}</td>
             <td>${fmtDate(String(s.at).slice(0,10))} <small style="color:${days>=7?'#c0392b':'var(--gray)'}">(${days}d ago${s.times>1?` · sent ${s.times}×`:''})</small></td>
             <td style="text-align:right"><button class="btn btn-outline" style="padding:3px 9px;font-size:.7rem" onclick="event.stopPropagation();PROF.send('${esc(s.cid)}','wa','${s.seg==='equity'?'equity':'mf'}')">💬 Resend</button></td></tr>`; }).join('')}</tbody></table>`
-          :'<div style="font-size:.74rem;color:#0f7a45">✅ Sabne bhar diya</div>'}</td></tr>`;
+          : (x.clients.size?'<div style="font-size:.74rem;color:#0f7a45;margin-bottom:8px">✅ Bheje gaye sab links bhar diye gaye</div>':'');
+        // Bhari gayi profiles ki list (blank / sent)
+        const filledTbl=(list,title,col)=> list.length ? `<div style="font-size:.72rem;font-weight:800;color:${col};margin-bottom:4px">${title} (${list.length})</div>
+          <table style="font-size:.74rem;margin-bottom:10px"><tbody>${list.slice().sort((a,b)=>(b._ms||0)-(a._ms||0)).map(p=>{
+            const pr=pairForProfile(p), c=pr.mf||pr.eq, d=subDate(p);
+            const tag = c ? `<span style="color:#0f7a45;font-weight:700">✓ CRM: ${esc(c.name)}${c.rm?` <small style="color:var(--gray)">(${pr.mf?'MF':'EQ'} RM ${esc(c.rm)})</small>`:''}</span>` : (p.blankForm?'<span style="color:#0f766e;font-weight:700">🆕 New — not in CRM</span>':'<span style="color:#b45309">⚠️ not in CRM</span>');
+            const pid=esc(p._id).replace(/'/g,"\\'");
+            return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.mobile||'—')}</td><td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
+              <td><b style="color:${{Conservative:'#0369a1',Moderate:'#b45309',Aggressive:'#b91c1c'}[p.riskProfile]||'var(--navy)'}">${esc(p.riskProfile||'—')}</b></td><td>${tag}</td>
+              <td style="text-align:right;white-space:nowrap"><button class="btn-icon" title="View profile" onclick="event.stopPropagation();PROF.openById('${pid}','detail')">👁️</button>${window.PLAN?`<button class="btn-icon" title="Suggested Plan" onclick="event.stopPropagation();PROF.openById('${pid}','plan')">💡</button>`:''}</td></tr>`; }).join('')}</tbody></table>` : '';
+        const inner = pendH + filledTbl(x.blankList,'🆕 Blank form bhara','#0f766e') + filledTbl(x.sentList,'✅ Bheje gaye link se bhara','#0f7a45');
+        h+=`<tr><td colspan="10" style="background:#fafcff;padding:6px 10px">${inner||'<div style="font-size:.74rem;color:var(--gray)">Kuch nahi</div>'}</td></tr>`;
       }
     });
     body.innerHTML=h+'</tbody></table></div></div><p style="font-size:.68rem;color:var(--gray);margin-top:8px">Blank links ki ginti aaj (20-Nov-2026) ke update ke baad se shuru hai — usse pehle ke blank forms "Blank Filled" me gine jaate hain par "Blank Links" me nahi.</p>';
@@ -566,5 +585,5 @@ window.PROF = (function(){
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
-  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink, summary, sumRange, sumToggle, plan };
+  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink, summary, sumRange, sumToggle, plan, openById };
 })();
