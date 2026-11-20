@@ -10,6 +10,7 @@
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
    Access: Admin sab; RM sirf apne clients ke profiles.
+   🆕 IPO section (ipo* fields) — detail, Excel, list me IPO badge.
    📈 Form me Equity / Trading section (eq* fields) — detail, Excel aur list me 📈 badge.
    ⚡ Profiles login ke baad peeche se pehle hi load (prefetch) — Clear Cache ke baad bhi popup jaldi.
    📊 RM-wise Sent / Filled / Pending (toolbar button + ⏳ par click), blank form bhi log hota hai.
@@ -287,7 +288,7 @@ window.PROF = (function(){
       const d=subDate(r.p);
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
         <td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
-        <td><b>${esc(r.p.name)}</b> ${r.p.eqInterest && r.p.eqInterest!=='No'?`<span title="Share market: ${esc(r.p.eqInterest)}${r.p.eqStyle&&r.p.eqStyle.length?' · '+esc([].concat(r.p.eqStyle).join(', ')):''}" style="font-size:.7rem">📈</span> `:''}${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client is mapped to ${esc(r.other)} in the CRM — investment details are visible to them and Admin">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
+        <td><b>${esc(r.p.name)}</b> ${r.p.ipoApply && r.p.ipoApply!=='No'?`<span title="IPO: ${esc(r.p.ipoApply)}${r.p.ipoAmount?' · '+esc(r.p.ipoAmount):''}${r.p.ipoAccounts?' · '+esc(r.p.ipoAccounts)+' accounts':''}" style="font-size:.55rem;font-weight:800;color:#7c3aed;background:#f3e8ff;border-radius:6px;padding:1px 5px">IPO</span> `:''}${r.p.eqInterest && r.p.eqInterest!=='No'?`<span title="Share market: ${esc(r.p.eqInterest)}${r.p.eqStyle&&r.p.eqStyle.length?' · '+esc([].concat(r.p.eqStyle).join(', ')):''}" style="font-size:.7rem">📈</span> `:''}${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client is mapped to ${esc(r.other)} in the CRM — investment details are visible to them and Admin">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
         <td>${esc(r.p.mobile)}</td><td>${(()=>{ const R=rmOf(r); return `<b>${esc(R.main||'—')}</b>${R.sub.length?`<br><small style="color:var(--gray);white-space:nowrap" title="EQ = equity RM · 📤 = form sent by">${esc(R.sub.join(' · '))}</small>`:''}`; })()}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc([].concat(r.p.mode||[]).join(', ')||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
@@ -355,7 +356,8 @@ window.PROF = (function(){
     ['goal','Goals'],['mode','Investment Mode'],
     ['sipAmount','Planned SIP'],['period','Investment Period'],
     ['eqInterest','Equity — Interested'],['eqStyle','Equity — Trading Type'],['eqExp','Equity — Experience'],['eqCapital','Equity — Capital'],
-    ['eqMonthly','Equity — Monthly Amount'],['eqFreq','Equity — Trading Frequency'],['eqHolding','Equity — Holding Period'],['eqLoss','Equity — Max Loss Bearable'],['eqSupport','Equity — Help Wanted'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
+    ['eqMonthly','Equity — Monthly Amount'],['eqFreq','Equity — Trading Frequency'],['eqHolding','Equity — Holding Period'],['eqLoss','Equity — Max Loss Bearable'],['eqSupport','Equity — Help Wanted'],
+    ['ipoApply','IPO — Applies'],['ipoAmount','IPO — Amount per IPO'],['ipoAccounts','IPO — Family Demat Accounts'],['ipoGoal','IPO — Purpose'],['ipoUpi','IPO — UPI Linked'],['ipoHelp','IPO — Help Wanted'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
   function detail(i){
     const r=(window._profRows||[])[i]; if(!r) return;
     const p=r.p, d=subDate(p);

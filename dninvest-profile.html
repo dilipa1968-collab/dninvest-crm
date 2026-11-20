@@ -156,7 +156,8 @@
       <div class="card" id="otherCard"><div class="sh"><div class="num">4</div><h3>Investments Elsewhere<small>With other brokers, banks or platforms (approximate value)</small><small class="hi">अन्य जगह निवेश — दूसरे ब्रोकर, बैंक या प्लेटफ़ॉर्म पर (अनुमानित राशि)</small></h3></div></div>
       <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Mutual Fund Investment Plan<small class="hi">म्यूचुअल फंड निवेश योजना</small></h3></div></div>
       <div class="card" id="eqCard"><div class="sh"><div class="num">6</div><h3>Share Market / Equity Trading Plan<small>Direct shares, trading, IPO</small><small class="hi">शेयर बाज़ार / इक्विटी ट्रेडिंग योजना — शेयर, ट्रेडिंग, IPO</small></h3></div></div>
-      <div class="card" id="riskCard"><div class="sh"><div class="num">7</div><h3>Risk Profile<small>There are no right or wrong answers</small><small class="hi">जोखिम प्रोफ़ाइल — कोई उत्तर सही या गलत नहीं है</small></h3></div></div>
+      <div class="card" id="ipoCard"><div class="sh"><div class="num">7</div><h3>IPO Investment<small>New share issues (Initial Public Offers)</small><small class="hi">IPO निवेश — नए शेयर इश्यू</small></h3></div></div>
+      <div class="card" id="riskCard"><div class="sh"><div class="num">8</div><h3>Risk Profile<small>There are no right or wrong answers</small><small class="hi">जोखिम प्रोफ़ाइल — कोई उत्तर सही या गलत नहीं है</small></h3></div></div>
 
       <div class="card">
         <label class="consent"><input type="checkbox" id="agree">
@@ -238,14 +239,23 @@ const SECTIONS = {
   // 20-Nov-2026: Equity / Trading section — "No" chunne par baaki sawaal chhup jaate hain (whenNot)
   eqCard: [
     {k:"eqInterest", h:"क्या आप शेयर बाज़ार में निवेश / ट्रेडिंग करना चाहते हैं?", l:"Do you want to invest / trade in the share market?", o:["No","Yes — Long-term Investing","Yes — Trading","Both"]},
-    {k:"eqStyle", h:"किस तरह की ट्रेडिंग / निवेश (जो लागू हों, सभी पर टिक करें)", l:"Type of trading / investing", hint:"(tick all that apply)", multi:true, whenNot:["eqInterest","No"], o:["Delivery (Long term)","Swing (days – weeks)","Intraday","F&O (Futures & Options)","IPO","Commodity / Currency"]},
+    {k:"eqStyle", h:"किस तरह की ट्रेडिंग / निवेश (जो लागू हों, सभी पर टिक करें)", l:"Type of trading / investing", hint:"(tick all that apply)", multi:true, whenNot:["eqInterest","No"], o:["Delivery (Long term)","Swing (days – weeks)","Intraday","F&O (Futures & Options)","Commodity / Currency"]},
     {k:"eqExp", h:"शेयर ट्रेडिंग का अनुभव", l:"Share trading experience", whenNot:["eqInterest","No"], o:["New / Beginner","Below 1 year","1 – 3 years","More than 3 years"]},
     {k:"eqCapital", h:"शेयर बाज़ार के लिए कुल पूंजी", l:"Total capital for share market", whenNot:["eqInterest","No"], o:["Below ₹50,000","₹50,000 – 2 Lakh","₹2 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
     {k:"eqMonthly", h:"हर महीने शेयर में लगाने की राशि", l:"Monthly amount for buying shares", whenNot:["eqInterest","No"], o:["None","Below ₹10,000","₹10,000 – 25,000","₹25,000 – 1 Lakh","Above ₹1 Lakh"]},
     {k:"eqFreq", h:"आप कितनी बार ट्रेड करेंगे?", l:"How often will you trade?", whenNot:["eqInterest","No"], o:["Rarely","Few times a month","Weekly","Daily"]},
     {k:"eqHolding", h:"आम तौर पर शेयर कितने समय रखते हैं?", l:"Usual holding period", whenNot:["eqInterest","No"], o:["Same day","Few days – weeks","Few months","1 year or more"]},
     {k:"eqLoss", h:"ट्रेडिंग पूंजी पर कितना नुकसान सह सकते हैं?", l:"Maximum loss you can bear on trading capital", whenNot:["eqInterest","No"], o:["Up to 5%","5 – 10%","10 – 25%","More than 25%"]},
-    {k:"eqSupport", h:"हमसे किस तरह की मदद चाहिए? (जो लागू हों, सभी पर टिक करें)", l:"What help do you want from us?", hint:"(tick all that apply)", multi:true, whenNot:["eqInterest","No"], o:["Research / Stock ideas","Portfolio review","Calls / Alerts","IPO alerts","Margin / MTF","Only execution (I decide myself)"]}
+    {k:"eqSupport", h:"हमसे किस तरह की मदद चाहिए? (जो लागू हों, सभी पर टिक करें)", l:"What help do you want from us?", hint:"(tick all that apply)", multi:true, whenNot:["eqInterest","No"], o:["Research / Stock ideas","Portfolio review","Calls / Alerts","Margin / MTF","Only execution (I decide myself)"]}
+  ],
+  // 20-Nov-2026: IPO — alag section (sirf IPO wale client bhi bhar sakein, Equity "No" ho tab bhi)
+  ipoCard: [
+    {k:"ipoApply", h:"क्या आप IPO में आवेदन करते हैं / करना चाहते हैं?", l:"Do you apply / want to apply in IPOs?", o:["No","Sometimes","Regularly (most IPOs)"]},
+    {k:"ipoAmount", h:"एक IPO में कितनी राशि लगाते हैं?", l:"Amount per IPO", whenNot:["ipoApply","No"], o:["1 lot (about ₹15,000)","Up to ₹2 Lakh (Retail)","₹2 – 10 Lakh (Small HNI)","Above ₹10 Lakh (Big HNI)"]},
+    {k:"ipoAccounts", h:"परिवार के कितने डीमैट खातों से आवेदन करते हैं?", l:"Family Demat accounts used to apply", hint:"(more accounts = better allotment chance)", whenNot:["ipoApply","No"], o:["Only mine","2 – 3","4 – 6","More than 6"]},
+    {k:"ipoGoal", h:"IPO में निवेश का उद्देश्य", l:"Purpose of IPO investment", whenNot:["ipoApply","No"], o:["Listing-day gain","Long-term holding","Both"]},
+    {k:"ipoUpi", h:"क्या IPO के लिए बैंक से जुड़ा UPI ID है?", l:"Do you have a UPI ID linked to your bank for IPO?", whenNot:["ipoApply","No"], o:["Yes","No","Need help"]},
+    {k:"ipoHelp", h:"IPO में हमसे क्या मदद चाहिए? (जो लागू हों, सभी पर टिक करें)", l:"What IPO help do you want from us?", hint:"(tick all that apply)", multi:true, whenNot:["ipoApply","No"], o:["IPO alerts on WhatsApp","Review: apply or skip","Help in applying","Demat for family members","Allotment / listing updates"]}
   ],
   riskCard: [
     {k:"r1", h:"1. आपकी आय कितनी नियमित है?", risk:true, l:"1. How regular is your income?", o:["Irregular","Fairly regular","Very regular"]},
@@ -274,6 +284,10 @@ const OH = {"Salary":"वेतन","Business":"व्यवसाय","Professi
   "Rarely":"कभी-कभी","Few times a month":"महीने में कुछ बार","Weekly":"हर हफ़्ते","Daily":"रोज़",
   "Same day":"उसी दिन","Few days – weeks":"कुछ दिन – हफ़्ते","Few months":"कुछ महीने","1 year or more":"1 साल या ज़्यादा",
   "Up to 5%":"5% तक","5 – 10%":"5 – 10%","10 – 25%":"10 – 25%","More than 25%":"25% से ज़्यादा",
+  "Sometimes":"कभी-कभी","Regularly (most IPOs)":"नियमित (ज़्यादातर IPO में)",
+  "1 lot (about ₹15,000)":"1 लॉट (लगभग ₹15,000)","Up to ₹2 Lakh (Retail)":"₹2 लाख तक (रिटेल)","₹2 – 10 Lakh (Small HNI)":"₹2 – 10 लाख (स्मॉल HNI)","Above ₹10 Lakh (Big HNI)":"₹10 लाख से ऊपर (बिग HNI)",
+  "Only mine":"सिर्फ़ मेरा","Listing-day gain":"लिस्टिंग के दिन का मुनाफ़ा","Long-term holding":"लंबे समय तक रखना","Need help":"मदद चाहिए",
+  "IPO alerts on WhatsApp":"WhatsApp पर IPO अलर्ट","Review: apply or skip":"सलाह: आवेदन करें या नहीं","Help in applying":"आवेदन में मदद","Demat for family members":"परिवार के लिए डीमैट","Allotment / listing updates":"अलॉटमेंट / लिस्टिंग अपडेट",
   "Research / Stock ideas":"रिसर्च / शेयर सुझाव","Portfolio review":"पोर्टफोलियो समीक्षा","Calls / Alerts":"कॉल / अलर्ट","IPO alerts":"IPO अलर्ट","Margin / MTF":"मार्जिन / MTF","Only execution (I decide myself)":"सिर्फ़ ऑर्डर (फ़ैसला मैं खुद लूँगा)"};
 
 // render
@@ -356,8 +370,10 @@ function refresh(){
 f.addEventListener("change", e => {
   e.target.closest(".q")?.classList.remove("bad");
   // MF section me "Equity (Direct Shares)" / "IPO" tick kiya aur Equity section khaali hai → "Yes" pehle se chun do
-  if (e.target.name==="mode" && e.target.checked && /Equity|IPO/.test(e.target.value) && !new FormData(f).get("eqInterest")){
-    const y=document.getElementById("eqInterest_1"); if(y){ y.checked=true; }
+  if (e.target.name==="mode" && e.target.checked){
+    const fd0=new FormData(f);
+    if (/Equity/.test(e.target.value) && !fd0.get("eqInterest")){ const y=document.getElementById("eqInterest_1"); if(y) y.checked=true; }
+    if (e.target.value==="IPO" && !fd0.get("ipoApply")){ const y=document.getElementById("ipoApply_1"); if(y) y.checked=true; }
   }
   refresh();
 });
@@ -441,6 +457,8 @@ function sendWhatsApp(d){
     "Goal: "+d.goal.join(", "), "Mode: "+[].concat(d.mode||[]).join(", "), "SIP: "+d.sipAmount, "Period: "+d.period,
     "", "*Share Market / Equity*",
     "Interest: "+(d.eqInterest||"—") + (d.eqInterest && d.eqInterest!=="No" ? "\nType: "+[].concat(d.eqStyle||[]).join(", ")+"\nExperience: "+d.eqExp+"\nCapital: "+d.eqCapital+" | Monthly: "+d.eqMonthly+"\nFrequency: "+d.eqFreq+" | Holding: "+d.eqHolding+"\nMax loss: "+d.eqLoss+"\nHelp: "+[].concat(d.eqSupport||[]).join(", ") : ""),
+    "", "*IPO*",
+    "Apply: "+(d.ipoApply||"—") + (d.ipoApply && d.ipoApply!=="No" ? "\nAmount: "+d.ipoAmount+" | Accounts: "+d.ipoAccounts+"\nPurpose: "+d.ipoGoal+" | UPI: "+d.ipoUpi+"\nHelp: "+[].concat(d.ipoHelp||[]).join(", ") : ""),
     "", "Risk Score: "+d.riskScore+"/15 – *"+d.riskProfile+"*",
     d.rm ? "RM: "+d.rm : ""
   ].join("\n").trim();
