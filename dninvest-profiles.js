@@ -10,6 +10,7 @@
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
    Access: Admin sab; RM sirf apne clients ke profiles.
+   🔗 Mobile alag ho to detail popup → "Link to CRM Client" (20-Nov-2026).
    💡 Detail popup me "Suggested Plan" (dninvest-profile-plan.js) apne aap banta hai (20-Nov-2026).
    Depends on app-1.js: DB, CU, fdb, uid, today, fmtDate, fmtNum, toast,
    escapeHtml, closeModal, getMyMfClients.
@@ -20,6 +21,11 @@ window.PROF = (function(){
   const $ = id => document.getElementById(id);
   const money = v => (v==null||v===''||isNaN(+v)) ? '—' : '₹'+(typeof fmtNum==='function'?fmtNum(+v):Math.round(+v).toLocaleString('en-IN'));
   let _profiles=[], _sends=[], _loaded=false, _deleted=new Set();
+  // Manual link (20-Nov-2026): profile ka mobile CRM se alag ho → RM haath se jodta hai.
+  // crm_data/profile_links → {links:{<profile mobile>:{cid,seg,by,at}}}. Mobile par key
+  // hai, isliye client form dobara bhare (record overwrite ho) tab bhi link bana rehta hai.
+  let _links={};
+  const LINK_KEY='profile_links';
 
   // Fast lookup maps — DB list badle (naya array) tabhi dobara bante hain
   let _ix={eqA:null, mfA:null};
@@ -135,7 +141,7 @@ window.PROF = (function(){
   const tsMs = v => v ? (v.toMillis ? v.toMillis() : (v.toDate ? v.toDate().getTime() : (typeof v==='number'?v:(Date.parse(v)||0)))) : 0;
   function norm(d){ const o={...d}; o._ms=tsMs(d.submittedAt); delete o.submittedAt; return o; }
   function readCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE)||'null'); return (c && Array.isArray(c.p)) ? c : null; }catch(_){ return null; } }
-  function writeCache(){ try{ localStorage.setItem(CACHE, JSON.stringify({p:_profiles, s:_sends, at:Date.now()})); }catch(_){ /* quota — memory me to hai */ } }
+  function writeCache(){ try{ localStorage.setItem(CACHE, JSON.stringify({p:_profiles, s:_sends, l:_links, at:Date.now()})); }catch(_){ /* quota — memory me to hai */ } }
   async function load(full){
     if(typeof fdb==='undefined'){ await window.waitForFdb?.(8000); }
     const newest = (!full && _profiles.length) ? Math.max(..._profiles.map(p=>p._ms||0)) : 0;
@@ -157,6 +163,8 @@ window.PROF = (function(){
     const sd = await sendsP;
     const del = await T(fdb.collection('crm_data').doc('profile_deleted').get(),'Deleted-list').catch(()=>null);
     if(del && del.exists && Array.isArray(del.data().ids)) _deleted=new Set(del.data().ids);
+    const lk = await T(fdb.collection('crm_data').doc(LINK_KEY).get(),'Links').catch(()=>null);
+    if(lk) _links = (lk.exists && lk.data().links) || {};
     const fresh=ps.docs.map(d=>norm({_id:d.id, ...d.data()}));
     let added=fresh.length;
     if(newest){
@@ -183,6 +191,10 @@ window.PROF = (function(){
     const seg = p.seg==='eq' ? 'equity' : 'mf';
     let c = p.cid ? (seg==='equity'?eqClient(p.cid):mfClient(p.cid)) : null;
     let s2 = seg;
+    if(!c){
+      const L=_links[cleanMobile(p.mobile)];
+      if(L){ c = L.seg==='equity' ? eqClient(L.cid) : mfClient(L.cid); if(c) s2 = L.seg==='equity'?'equity':'mf'; }
+    }
     if(!c){
       const m=cleanMobile(p.mobile);
       if(m){
@@ -230,7 +242,7 @@ window.PROF = (function(){
       const d=subDate(r.p);
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
         <td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
-        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Filled via the blank form — new client, not in CRM yet">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM">⚠️ not in CRM</small>')}</td>
+        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
         <td>${esc(r.p.mobile)}</td><td>${esc((r.c&&r.c.rm)||(r.e&&r.e.rm)||r.p.rm||'—')}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
@@ -248,7 +260,7 @@ window.PROF = (function(){
   function setStatus(t){ const el=$('prof-sync'); if(el) el.textContent=t||''; }
   async function open(full){
     $('profModal').classList.add('open');
-    if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; } }
+    if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; _links=c.l||{}; } }
     if(_profiles.length){ render(); setStatus('🔄 Checking for new profiles…'); }
     else $('prof-table').innerHTML='<div style="padding:20px;color:var(--gray)">Loading profiles…</div>';
     let n=0;
@@ -296,11 +308,75 @@ window.PROF = (function(){
         ${box('At Send (SIP/MF/EQ)',r.s?money(r.s.sip)+' / '+money(r.s.aum)+' / '+(r.s.eq?money(r.s.eq):'—'):'—')}
       </div>
       <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc([r.e&&('EQ: '+(r.e.rm||'—')), r.c&&('MF: '+(r.c.rm||'—'))].filter(Boolean).join(' · ')||p.rm||'—')}</b> · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
+      ${linkBox(i, r)}
       ${window.PLAN ? PLAN.html(i) : ''}
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 4px">Client's Answers</div>
       <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>
       ${CU.role==='admin'?`<div style="text-align:right;margin-top:12px"><button class="btn btn-danger" onclick="PROF.del(${i})">🗑️ Delete Profile</button></div>`:''}`;
     $('profDetailModal').classList.add('open');
+  }
+  // ── 🔗 Manual link: profile ↔ CRM client ──
+  function linkBox(i, r){
+    const mob=cleanMobile(r.p.mobile), L=_links[mob];
+    if(r.c||r.e){
+      if(!L) return '';
+      const nm=(r.c||r.e).name||'';
+      return `<div style="background:#eef3fc;border-radius:8px;padding:6px 10px;margin-bottom:10px;font-size:.74rem;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+        <span>🔗 Linked manually to <b>${esc(nm)}</b> <small style="color:var(--gray)">(by ${esc(L.by||'—')}, ${esc(String(L.at||'').slice(0,10))})</small></span>
+        <button class="btn btn-outline" style="padding:3px 9px;font-size:.7rem" onclick="PROF.unlink(${i})">✖ Unlink</button></div>`;
+    }
+    return `<div style="background:#fff4e5;border:1px solid #f5c98a;border-radius:10px;padding:9px 10px;margin-bottom:10px">
+      <div style="font-size:.76rem;font-weight:800;color:#b45309;margin-bottom:5px">⚠️ This profile is not linked to any CRM client (mobile ${esc(r.p.mobile)} not found). Existing client? Link it:</div>
+      <input id="plink-q" type="text" placeholder="🔍 Search name / PAN / mobile (min 3 letters)" oninput="PROF.linkSearch(${i})" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:.8rem">
+      <div id="plink-res" style="max-height:220px;overflow:auto;margin-top:5px"></div></div>`;
+  }
+  function linkCandidates(){
+    let mf=[], eq=[];
+    if(CU && CU.role==='admin'){ mf=DB.get('mf_clients')||[]; eq=DB.get('eq_clients')||[]; }
+    else { try{ mf=getMyMfClients()||[]; }catch(_){} try{ eq=getMyEqClients()||[]; }catch(_){} }
+    return mf.map(c=>({c,seg:'mf'})).concat(eq.map(c=>({c,seg:'equity'})));
+  }
+  function linkSearch(i){
+    const q=($('plink-q')?.value||'').trim().toLowerCase(), box=$('plink-res'); if(!box) return;
+    if(q.length<3){ box.innerHTML=''; return; }
+    const qd=q.replace(/\D/g,'');
+    const hits=linkCandidates().filter(({c})=> c && (String(c.name||'').toLowerCase().includes(q) || String(c.pan||'').toLowerCase().includes(q) || (qd.length>=4 && cleanMobile(c.mobile).includes(qd)))).slice(0,30);
+    if(!hits.length){ box.innerHTML='<div style="font-size:.74rem;color:var(--gray);padding:6px">No client found</div>'; return; }
+    box.innerHTML=hits.map(({c,seg})=>{
+      const val = seg==='mf' ? 'MF '+money(c.aum)+(+c.sip_amount?' · SIP '+money(c.sip_amount):'') : 'EQ '+money(eqVal(c));
+      return `<div onclick="PROF.link(${i},'${seg}','${esc(c.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;font-size:.76rem" onmouseover="this.style.background='#F0F5FB'" onmouseout="this.style.background='transparent'">
+        <span><span class="badge ${seg==='mf'?'b-mf':'b-eq'}" style="font-size:.55rem">${seg==='mf'?'MF':'EQ'}</span> <b>${esc(c.name)}</b> <small style="color:var(--gray)">${esc(c.mobile||'—')} · ${esc(c.pan||'no PAN')} · RM ${esc(c.rm||'—')}</small></span>
+        <span style="white-space:nowrap;font-weight:700;color:var(--navy)">${val}</span></div>`;
+    }).join('');
+  }
+  function reopen(pid){
+    render();
+    const j=(window._profRows||[]).findIndex(x=>x.p._id===pid);
+    if(j>=0) detail(j); else { try{ closeModal('profDetailModal'); }catch(_){} }
+  }
+  async function link(i, seg, cid){
+    const r=(window._profRows||[])[i]; if(!r) return;
+    const c = seg==='equity' ? eqClient(cid) : mfClient(cid);
+    if(!c){ toast('Client not found','error'); return; }
+    if(!canSeeClient(c, seg)){ toast('This client is mapped to '+(c.rm||'another RM'),'error'); return; }
+    const mob=cleanMobile(r.p.mobile); if(!mob){ toast('Profile has no mobile','error'); return; }
+    if(!confirm(`Link this profile (${r.p.name}, ${r.p.mobile}) to CRM client:\n\n${c.name} (${seg==='mf'?'MF':'Equity'}, ${c.mobile||'no mobile'})?`)) return;
+    const rec={cid:c.id, seg, by:CU.name||'', at:new Date().toISOString()};
+    try{ await fdb.collection('crm_data').doc(LINK_KEY).set({links:{[mob]:rec}},{merge:true}); }
+    catch(e){ toast('⚠️ Not linked — '+(e.message||e),'error'); return; }
+    _links[mob]=rec; writeCache();
+    toast('Linked ✓ — investment ab dikhega','success');
+    reopen(r.p._id);
+  }
+  async function unlink(i){
+    const r=(window._profRows||[])[i]; if(!r) return;
+    const mob=cleanMobile(r.p.mobile); if(!_links[mob]) return;
+    if(!confirm('Remove the manual link for '+r.p.name+'?')) return;
+    try{ await fdb.collection('crm_data').doc(LINK_KEY).update({['links.'+mob]:firebase.firestore.FieldValue.delete()}); }
+    catch(e){ toast('⚠️ Not removed — '+(e.message||e),'error'); return; }
+    delete _links[mob]; writeCache();
+    toast('Link removed','success');
+    reopen(r.p._id);
   }
   function box(l,v){ return `<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:800;color:var(--navy);font-size:.9rem">${esc(v)}</div></div>`; }
   function exportXlsx(){
@@ -365,5 +441,5 @@ window.PROF = (function(){
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
-  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank };
+  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink };
 })();
