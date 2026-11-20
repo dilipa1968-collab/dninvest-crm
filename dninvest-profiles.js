@@ -10,6 +10,7 @@
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
    Access: Admin sab; RM sirf apne clients ke profiles.
+   💡 Detail popup me "Suggested Plan" (dninvest-profile-plan.js) apne aap banta hai (20-Nov-2026).
    Depends on app-1.js: DB, CU, fdb, uid, today, fmtDate, fmtNum, toast,
    escapeHtml, closeModal, getMyMfClients.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -295,6 +296,8 @@ window.PROF = (function(){
         ${box('At Send (SIP/MF/EQ)',r.s?money(r.s.sip)+' / '+money(r.s.aum)+' / '+(r.s.eq?money(r.s.eq):'—'):'—')}
       </div>
       <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc([r.e&&('EQ: '+(r.e.rm||'—')), r.c&&('MF: '+(r.c.rm||'—'))].filter(Boolean).join(' · ')||p.rm||'—')}</b> · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
+      ${window.PLAN ? PLAN.html(i) : ''}
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 4px">Client's Answers</div>
       <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>
       ${CU.role==='admin'?`<div style="text-align:right;margin-top:12px"><button class="btn btn-danger" onclick="PROF.del(${i})">🗑️ Delete Profile</button></div>`:''}`;
     $('profDetailModal').classList.add('open');
