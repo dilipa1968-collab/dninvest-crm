@@ -8,6 +8,8 @@
    - RM ke liye "Talking Points" (sirf CRM me — client ko nahi jaate).
    - 🖼️ Colorful image (PNG) WhatsApp par — mobile par share sheet, computer par
      copy + Ctrl+V. 💬 Text bhi, 🖨️ PDF bhi (Hindi + English, DN Investment logo).
+   - 28 categories (Equity / Hybrid / Debt / Others) + scheme naam suggestion
+     (FUND_NAME_LIST + clients ki schemes, category ke hisab se).
    - ✏️ Edit Plan: RM health-check advice, funds, scheme naam, amount, note badal sakta
      hai (is browser me save). Image / text / PDF edited plan se hi bante hain.
    - RM amount badal sakta hai → split dobara ban jaata hai.
@@ -41,18 +43,55 @@ window.PLAN = (function(){
 
   const ST = { g:{c:'#0f7a45',bg:'#e3f7ee',e:'🟢'}, a:{c:'#b45309',bg:'#fff4e5',e:'🟡'}, r:{c:'#c0392b',bg:'#fdf0ee',e:'🔴'}, n:{c:'#5d6e8a',bg:'#f4f6fa',e:'⚪'} };
 
+  // g = dropdown group, kw = scheme naam pehchanne ka pattern (suggestion list ke liye), nk = jo nahi hona chahiye
   const CAT = {
-    flexi:{en:'Flexi Cap',hi:'फ्लेक्सी कैप',c:'#1a56db',why:'Core holding — invests across large, mid & small companies',whyHi:'मुख्य निवेश — हर साइज़ की कंपनी में'},
-    large:{en:'Large Cap / Nifty 50 Index',hi:'लार्ज कैप / इंडेक्स',c:'#0f1f3d',why:'Large, stable companies',whyHi:'बड़ी, स्थिर कंपनियाँ'},
-    lm:{en:'Large & Mid Cap',hi:'लार्ज एंड मिड कैप',c:'#0891b2',why:'Stability + growth',whyHi:'स्थिरता + बढ़त'},
-    mid:{en:'Mid Cap',hi:'मिड कैप',c:'#6d28d9',why:'Higher growth over the long term',whyHi:'लंबे समय में ज़्यादा बढ़त'},
-    small:{en:'Small Cap',hi:'स्मॉल कैप',c:'#c2185b',why:'High growth, high risk — small portion',whyHi:'ऊँची बढ़त, ऊँचा जोखिम — छोटा हिस्सा'},
-    multi:{en:'Multi Asset Allocation',hi:'मल्टी एसेट',c:'#c9942a',why:'Equity + Debt + Gold — cushions market falls',whyHi:'इक्विटी + डेट + सोना — गिरावट में सहारा'},
-    bal:{en:'Balanced Advantage',hi:'बैलेंस्ड एडवांटेज',c:'#0f7a45',why:'Adjusts equity based on market levels',whyHi:'बाज़ार के हिसाब से इक्विटी कम-ज़्यादा'},
-    debt:{en:'Short Duration / Corporate Bond',hi:'डेट फंड',c:'#64748b',why:'Low volatility, steady returns',whyHi:'कम उतार-चढ़ाव'},
-    elss:{en:'ELSS (Tax Saver)',hi:'ELSS (टैक्स सेवर)',c:'#b91c1c',why:'80C tax saving, 3-year lock-in',whyHi:'80C टैक्स बचत, 3 साल लॉक-इन'},
-    liquid:{en:'Liquid / Arbitrage Fund (Emergency)',hi:'लिक्विड फंड (इमरजेंसी)',c:'#94a3b8',why:'For building emergency fund — withdraw anytime',whyHi:'इमरजेंसी फंड के लिए — कभी भी निकाल सकते हैं'}
+    flexi:{g:'Equity',en:'Flexi Cap',hi:'फ्लेक्सी कैप',c:'#1a56db',why:'Core holding — invests across large, mid & small companies',whyHi:'मुख्य निवेश — हर साइज़ की कंपनी में',kw:/flexi ?cap/i},
+    multicap:{g:'Equity',en:'Multi Cap',hi:'मल्टी कैप',c:'#2563eb',why:'Min. 25% each in large, mid & small caps',whyHi:'लार्ज, मिड, स्मॉल — हर एक में कम से कम 25%',kw:/multi ?cap/i},
+    large:{g:'Equity',en:'Large Cap / Nifty 50 Index',hi:'लार्ज कैप / इंडेक्स',c:'#0f1f3d',why:'Large, stable companies',whyHi:'बड़ी, स्थिर कंपनियाँ',kw:/large ?cap|bluechip|blue chip|top 100|nifty 50|sensex|front ?line/i,nk:/mid|next 50/i},
+    lm:{g:'Equity',en:'Large & Mid Cap',hi:'लार्ज एंड मिड कैप',c:'#0891b2',why:'Stability + growth',whyHi:'स्थिरता + बढ़त',kw:/large ?(&|and) ?mid|emerging equit|equity opportunit/i},
+    mid:{g:'Equity',en:'Mid Cap',hi:'मिड कैप',c:'#6d28d9',why:'Higher growth over the long term',whyHi:'लंबे समय में ज़्यादा बढ़त',kw:/mid ?cap|midcap/i,nk:/large|small/i},
+    small:{g:'Equity',en:'Small Cap',hi:'स्मॉल कैप',c:'#c2185b',why:'High growth, high risk — small portion',whyHi:'ऊँची बढ़त, ऊँचा जोखिम — छोटा हिस्सा',kw:/small ?cap/i},
+    focused:{g:'Equity',en:'Focused Fund',hi:'फोकस्ड फंड',c:'#4338ca',why:'Concentrated portfolio of max. 30 stocks',whyHi:'अधिकतम 30 चुनिंदा शेयर',kw:/focus/i},
+    value:{g:'Equity',en:'Value / Contra',hi:'वैल्यू / कॉन्ट्रा',c:'#7c3aed',why:'Buys good companies at lower valuations',whyHi:'अच्छी कंपनियाँ सस्ते भाव पर',kw:/value|contra/i},
+    divy:{g:'Equity',en:'Dividend Yield',hi:'डिविडेंड यील्ड',c:'#9333ea',why:'High-dividend companies — steadier equity',whyHi:'ज़्यादा डिविडेंड देने वाली कंपनियाँ',kw:/dividend yield/i},
+    index:{g:'Equity',en:'Index Fund / ETF (Next 50, Midcap 150 etc.)',hi:'इंडेक्स फंड / ETF',c:'#334155',why:'Low cost, follows the index',whyHi:'कम खर्च, इंडेक्स के साथ चलता है',kw:/index|etf|next 50|nifty|sensex/i,nk:/gold|silver/i},
+    elss:{g:'Equity',en:'ELSS (Tax Saver)',hi:'ELSS (टैक्स सेवर)',c:'#b91c1c',why:'80C tax saving, 3-year lock-in',whyHi:'80C टैक्स बचत, 3 साल लॉक-इन',kw:/elss|tax ?saver|long term equity|tax ?plan|taxsaver|tax advantage/i},
+    thematic:{g:'Equity',en:'Sectoral / Thematic',hi:'सेक्टोरल / थीमैटिक',c:'#ea580c',why:'One sector / theme — high risk, small portion only',whyHi:'एक सेक्टर / थीम — ज़्यादा जोखिम, छोटा हिस्सा',kw:/bank|financial serv|infra|pharma|health|technolog|digital|consum|manufactur|psu|business cycle|energy|mnc|thematic|innovation|defen|transport|auto|esg|quant|momentum|special opp/i,nk:/banking ?(&|and) ?psu|debt|bond/i},
+    intl:{g:'Equity',en:'International / Global FoF',hi:'इंटरनेशनल फंड',c:'#0e7490',why:'Global diversification (US / world markets)',whyHi:'विदेशी बाज़ार में निवेश',kw:/international|global|nasdaq|us equity|overseas|world|s&p 500|china|japan/i},
+    bal:{g:'Hybrid',en:'Balanced Advantage',hi:'बैलेंस्ड एडवांटेज',c:'#0f7a45',why:'Adjusts equity based on market levels',whyHi:'बाज़ार के हिसाब से इक्विटी कम-ज़्यादा',kw:/balanced advantage|dynamic asset|asset allocator/i},
+    aggh:{g:'Hybrid',en:'Aggressive Hybrid (Equity & Debt)',hi:'एग्रेसिव हाइब्रिड',c:'#15803d',why:'65–80% equity + debt — smoother ride',whyHi:'65–80% इक्विटी + डेट',kw:/aggressive hybrid|equity hybrid|hybrid equity|equity ?& ?debt|equity and debt|balanced fund/i},
+    multi:{g:'Hybrid',en:'Multi Asset Allocation',hi:'मल्टी एसेट',c:'#c9942a',why:'Equity + Debt + Gold — cushions market falls',whyHi:'इक्विटी + डेट + सोना — गिरावट में सहारा',kw:/multi ?asset/i},
+    eqsav:{g:'Hybrid',en:'Equity Savings',hi:'इक्विटी सेविंग्स',c:'#65a30d',why:'Low equity + arbitrage + debt — low volatility',whyHi:'कम जोखिम वाला हाइब्रिड',kw:/equity savings/i},
+    conh:{g:'Hybrid',en:'Conservative Hybrid',hi:'कंज़र्वेटिव हाइब्रिड',c:'#4d7c0f',why:'Mostly debt + small equity — regular income style',whyHi:'ज़्यादातर डेट + थोड़ी इक्विटी',kw:/conservative hybrid|regular savings|hybrid debt|monthly income/i},
+    arb:{g:'Hybrid',en:'Arbitrage Fund',hi:'आर्बिट्राज फंड',c:'#64748b',why:'Very low risk, equity taxation — for 3+ months parking',whyHi:'बहुत कम जोखिम — 3+ महीने के लिए',kw:/arbitrage/i},
+    liquid:{g:'Debt',en:'Liquid / Arbitrage Fund (Emergency)',hi:'लिक्विड फंड (इमरजेंसी)',c:'#94a3b8',why:'For building emergency fund — withdraw anytime',whyHi:'इमरजेंसी फंड के लिए — कभी भी निकाल सकते हैं',kw:/liquid|overnight|money market|ultra short|arbitrage/i},
+    debt:{g:'Debt',en:'Short Duration / Corporate Bond',hi:'डेट फंड',c:'#475569',why:'Low volatility, steady returns',whyHi:'कम उतार-चढ़ाव',kw:/short (term|duration)|corporate bond|banking ?(&|and) ?psu|low duration|medium duration|credit risk|floater|floating/i,nk:/ultra short/i},
+    gilt:{g:'Debt',en:'Dynamic Bond / Gilt',hi:'डायनामिक बॉन्ड / गिल्ट',c:'#1e293b',why:'Government bonds — gains when interest rates fall',whyHi:'सरकारी बॉन्ड — ब्याज दर घटने पर फ़ायदा',kw:/gilt|dynamic bond|constant maturity|government sec|g-sec|long duration/i},
+    gold:{g:'Others',en:'Gold Fund / ETF',hi:'गोल्ड फंड',c:'#ca8a04',why:'Hedge against inflation & market falls',whyHi:'महँगाई और गिरावट से बचाव',kw:/gold/i},
+    silver:{g:'Others',en:'Silver Fund / ETF',hi:'सिल्वर फंड',c:'#a1a1aa',why:'Precious metal diversification',whyHi:'चाँदी में निवेश',kw:/silver/i},
+    child:{g:'Others',en:"Children's Fund (Solution)",hi:'चिल्ड्रन फंड',c:'#db2777',why:"For child's education — 5-year lock-in",whyHi:'बच्चों की पढ़ाई के लिए — 5 साल लॉक-इन',kw:/child/i},
+    retire:{g:'Others',en:'Retirement Fund (Solution)',hi:'रिटायरमेंट फंड',c:'#9f1239',why:'For retirement — 5-year lock-in',whyHi:'रिटायरमेंट के लिए — 5 साल लॉक-इन',kw:/retire|pension/i}
   };
+  const GROUPS=['Equity','Hybrid','Debt','Others'];
+
+  // ── Scheme naam suggestions: CRM ki built-in fund list + clients ki asli schemes ──
+  let _names=null;
+  function allNames(){
+    if(_names) return _names;
+    let L=[];
+    try{ if(typeof getCrmSchemeNames==='function') L=L.concat(getCrmSchemeNames()||[]); }catch(_){}
+    try{ if(typeof FUND_NAME_LIST!=='undefined') L=L.concat(FUND_NAME_LIST); }catch(_){}
+    const seen=new Set(); _names=[];
+    L.forEach(n=>{ n=String(n||'').trim(); const k=n.toLowerCase(); if(n && !seen.has(k)){ seen.add(k); _names.push(n); } });
+    return _names;
+  }
+  function namesFor(k){
+    const C=CAT[k]; if(!C||!C.kw) return [];
+    return allNames().filter(n=>C.kw.test(n) && !(C.nk&&C.nk.test(n)) && !/idcw|dividend payout|dividend reinvest/i.test(n) || (k==='divy' && C.kw.test(n)))
+      .sort((a,b)=>(/growth/i.test(b)-/growth/i.test(a)) || a.localeCompare(b)).slice(0,300);
+  }
+  const dlOpts = k => namesFor(k).map(n=>`<option value="${esc(n)}"></option>`).join('');
+
   // Order = priority (chhoti SIP me peeche wale pehle hat-te hain)
   const ALLOC = {
     0:[['bal',35],['large',25],['multi',20],['debt',20]],
@@ -277,7 +316,7 @@ window.PLAN = (function(){
     const D=_draft[pid] || (_draft[pid]={
       checks:F.checks.map(c=>({key:c.key,en:c.en,s:c.s,adv:c.adv,advHi:c.advHi})),
       alloc:F.alloc.map(a=>({k:a.k,scheme:a.scheme||'',amt:a.amt})), note:F.note||''});
-    const catOpts=k=>Object.entries(CAT).map(([kk,c])=>`<option value="${kk}"${kk===k?' selected':''}>${esc(c.en)}</option>`).join('');
+    const catOpts=k=>GROUPS.map(g=>`<optgroup label="${g}">`+Object.entries(CAT).filter(([,c])=>c.g===g).map(([kk,c])=>`<option value="${kk}"${kk===k?' selected':''}>${esc(c.en)}</option>`).join('')+'</optgroup>').join('');
     const stOpts=s=>[['g','🟢 Good'],['a','🟡 Attention'],['r','🔴 Gap'],['n','⚪ N/A']].map(([v,l])=>`<option value="${v}"${v===s?' selected':''}>${l}</option>`).join('');
     const ck=D.checks.map((c,n)=>`<div style="display:grid;grid-template-columns:120px 105px 1fr;gap:5px;align-items:center;margin-bottom:5px">
         <b style="font-size:.72rem">${esc(c.en)}</b>
@@ -285,8 +324,9 @@ window.PLAN = (function(){
         <div style="display:grid;gap:3px"><input id="pe-ca-${n}" value="${esc(c.adv)}" placeholder="Advice (English)" style="${inS}">
         <input id="pe-ch-${n}" value="${esc(c.advHi)}" placeholder="सलाह (हिंदी) — खाली छोड़ सकते हैं" style="${inS}"></div></div>`).join('');
     const al=D.alloc.map((a,n)=>`<div style="display:grid;grid-template-columns:1.1fr 1.3fr 90px 28px;gap:5px;align-items:center;margin-bottom:5px">
-        <select id="pe-k-${n}" style="${inS}">${catOpts(a.k)}</select>
-        <input id="pe-sc-${n}" value="${esc(a.scheme)}" placeholder="Scheme name (optional)" style="${inS}">
+        <select id="pe-k-${n}" style="${inS}" onchange="PLAN.edCat(${n})">${catOpts(a.k)}</select>
+        <div><input id="pe-sc-${n}" list="pe-dl-${n}" value="${esc(a.scheme)}" placeholder="Scheme name — type / pick (optional)" autocomplete="off" style="${inS};width:100%">
+        <datalist id="pe-dl-${n}">${dlOpts(a.k)}</datalist></div>
         <input id="pe-a-${n}" type="number" step="500" min="0" value="${a.amt}" oninput="PLAN.edSum(${i})" style="${inS}">
         <button class="btn-icon" title="Remove" style="color:var(--red)" onclick="PLAN.edDel(${i},${n})">✖</button></div>`).join('');
     const sum=D.alloc.reduce((s,a)=>s+(+a.amt||0),0);
@@ -313,6 +353,11 @@ window.PLAN = (function(){
     D.alloc.forEach((a,n)=>{ if(v('pe-k-'+n)!=null){ a.k=v('pe-k-'+n); a.scheme=v('pe-sc-'+n).trim(); a.amt=Math.max(0,Math.round(+v('pe-a-'+n)||0)); } });
     if(v('pe-note')!=null) D.note=v('pe-note');
     return D;
+  }
+  function edCat(n){   // category badli → us category ke scheme suggestions
+    const k=(document.getElementById('pe-k-'+n)||{}).value, dl=document.getElementById('pe-dl-'+n);
+    if(dl) dl.innerHTML=dlOpts(k);
+    const sc=document.getElementById('pe-sc-'+n); if(sc && sc.value && CAT[k] && !CAT[k].kw.test(sc.value)) sc.value='';
   }
   function edit(i){ const r=rowOf(i); if(!r) return; _editing[r.p._id]=true; delete _draft[r.p._id]; redraw(i); }
   function edSum(i){ const D=edRead(i); const el=document.getElementById('pe-sum'); if(D&&el) el.textContent=inr(D.alloc.reduce((s,a)=>s+(+a.amt||0),0)); }
@@ -514,5 +559,5 @@ window.PLAN = (function(){
     w.document.close();
   }
 
-  return { analyse, final, html, setAmt, text, wa, copy, print, sendImage, downloadImage, edit, edSum, edAdd, edDel, edCancel, edSave, edReset };
+  return { analyse, final, html, setAmt, text, wa, copy, print, sendImage, downloadImage, edit, edCat, edSum, edAdd, edDel, edCancel, edSave, edReset };
 })();
