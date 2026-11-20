@@ -154,8 +154,9 @@
       <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small><small class="hi">आय और बचत (मासिक आँकड़े)</small></h3></div></div>
       <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Emergency fund and insurance cover</small><small class="hi">लोन और सुरक्षा — इमरजेंसी फंड और बीमा</small></h3></div></div>
       <div class="card" id="otherCard"><div class="sh"><div class="num">4</div><h3>Investments Elsewhere<small>With other brokers, banks or platforms (approximate value)</small><small class="hi">अन्य जगह निवेश — दूसरे ब्रोकर, बैंक या प्लेटफ़ॉर्म पर (अनुमानित राशि)</small></h3></div></div>
-      <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Investment Plan<small class="hi">निवेश योजना</small></h3></div></div>
-      <div class="card" id="riskCard"><div class="sh"><div class="num">6</div><h3>Risk Profile<small>There are no right or wrong answers</small><small class="hi">जोखिम प्रोफ़ाइल — कोई उत्तर सही या गलत नहीं है</small></h3></div></div>
+      <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Mutual Fund Investment Plan<small class="hi">म्यूचुअल फंड निवेश योजना</small></h3></div></div>
+      <div class="card" id="eqCard"><div class="sh"><div class="num">6</div><h3>Share Market / Equity Trading Plan<small>Direct shares, trading, IPO</small><small class="hi">शेयर बाज़ार / इक्विटी ट्रेडिंग योजना — शेयर, ट्रेडिंग, IPO</small></h3></div></div>
+      <div class="card" id="riskCard"><div class="sh"><div class="num">7</div><h3>Risk Profile<small>There are no right or wrong answers</small><small class="hi">जोखिम प्रोफ़ाइल — कोई उत्तर सही या गलत नहीं है</small></h3></div></div>
 
       <div class="card">
         <label class="consent"><input type="checkbox" id="agree">
@@ -230,9 +231,21 @@ const SECTIONS = {
   ],
   planCard: [
     {k:"goal", h:"निवेश का लक्ष्य (जो लागू हों, सभी पर टिक करें)", l:"Investment Goal", hint:"(tick all that apply)", multi:true, o:["Wealth Creation","Child Education","Retirement","House / Car","Tax Saving"]},
-    {k:"mode", h:"निवेश का तरीका", l:"Investment Mode", o:["Monthly SIP","SIP + Top-up when surplus","Lumpsum when surplus","Lumpsum + SIP"]},
+    {k:"mode", h:"निवेश का तरीका (जो लागू हों, सभी पर टिक करें)", l:"Investment Mode", hint:"(tick all that apply)", multi:true, o:["Monthly SIP","SIP + Top-up when surplus","Lumpsum when surplus","Lumpsum + SIP","Equity (Direct Shares)","IPO"]},
     {k:"sipAmount", h:"मासिक SIP राशि", l:"Monthly SIP Amount", o:["₹1,000 – 5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000","No SIP"]},
     {k:"period", h:"निवेश की अवधि", l:"Investment Period", o:["3 – 5 years","5 – 10 years","10+ years"]}
+  ],
+  // 20-Nov-2026: Equity / Trading section — "No" chunne par baaki sawaal chhup jaate hain (whenNot)
+  eqCard: [
+    {k:"eqInterest", h:"क्या आप शेयर बाज़ार में निवेश / ट्रेडिंग करना चाहते हैं?", l:"Do you want to invest / trade in the share market?", o:["No","Yes — Long-term Investing","Yes — Trading","Both"]},
+    {k:"eqStyle", h:"किस तरह की ट्रेडिंग / निवेश (जो लागू हों, सभी पर टिक करें)", l:"Type of trading / investing", hint:"(tick all that apply)", multi:true, whenNot:["eqInterest","No"], o:["Delivery (Long term)","Swing (days – weeks)","Intraday","F&O (Futures & Options)","IPO","Commodity / Currency"]},
+    {k:"eqExp", h:"शेयर ट्रेडिंग का अनुभव", l:"Share trading experience", whenNot:["eqInterest","No"], o:["New / Beginner","Below 1 year","1 – 3 years","More than 3 years"]},
+    {k:"eqCapital", h:"शेयर बाज़ार के लिए कुल पूंजी", l:"Total capital for share market", whenNot:["eqInterest","No"], o:["Below ₹50,000","₹50,000 – 2 Lakh","₹2 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"eqMonthly", h:"हर महीने शेयर में लगाने की राशि", l:"Monthly amount for buying shares", whenNot:["eqInterest","No"], o:["None","Below ₹10,000","₹10,000 – 25,000","₹25,000 – 1 Lakh","Above ₹1 Lakh"]},
+    {k:"eqFreq", h:"आप कितनी बार ट्रेड करेंगे?", l:"How often will you trade?", whenNot:["eqInterest","No"], o:["Rarely","Few times a month","Weekly","Daily"]},
+    {k:"eqHolding", h:"आम तौर पर शेयर कितने समय रखते हैं?", l:"Usual holding period", whenNot:["eqInterest","No"], o:["Same day","Few days – weeks","Few months","1 year or more"]},
+    {k:"eqLoss", h:"ट्रेडिंग पूंजी पर कितना नुकसान सह सकते हैं?", l:"Maximum loss you can bear on trading capital", whenNot:["eqInterest","No"], o:["Up to 5%","5 – 10%","10 – 25%","More than 25%"]},
+    {k:"eqSupport", h:"हमसे किस तरह की मदद चाहिए? (जो लागू हों, सभी पर टिक करें)", l:"What help do you want from us?", hint:"(tick all that apply)", multi:true, whenNot:["eqInterest","No"], o:["Research / Stock ideas","Portfolio review","Calls / Alerts","IPO alerts","Margin / MTF","Only execution (I decide myself)"]}
   ],
   riskCard: [
     {k:"r1", h:"1. आपकी आय कितनी नियमित है?", risk:true, l:"1. How regular is your income?", o:["Irregular","Fairly regular","Very regular"]},
@@ -248,20 +261,27 @@ const OH = {"Salary":"वेतन","Business":"व्यवसाय","Professi
   "No":"नहीं","Yes":"हाँ","None":"कोई नहीं",
   "PPF / EPF":"PPF / EPF","LIC / Insurance Plans":"LIC / बीमा पॉलिसी","Gold / SGB":"सोना / SGB","NPS":"NPS","Real Estate":"प्रॉपर्टी","Post Office Schemes":"पोस्ट ऑफिस योजनाएँ",
   "Wealth Creation":"धन निर्माण","Child Education":"बच्चों की पढ़ाई","Retirement":"रिटायरमेंट","House / Car":"घर / गाड़ी","Tax Saving":"टैक्स बचत",
-  "Monthly SIP":"मासिक SIP","SIP + Top-up when surplus":"SIP + पैसा बचने पर टॉप-अप","Lumpsum when surplus":"पैसा बचने पर एकमुश्त","Lumpsum + SIP":"एकमुश्त + SIP",
+  "Monthly SIP":"मासिक SIP","SIP + Top-up when surplus":"SIP + पैसा बचने पर टॉप-अप","Lumpsum when surplus":"पैसा बचने पर एकमुश्त","Lumpsum + SIP":"एकमुश्त + SIP","Equity (Direct Shares)":"इक्विटी (सीधे शेयर)","IPO":"IPO में आवेदन",
   "No SIP":"SIP नहीं","3 – 5 years":"3 – 5 साल","5 – 10 years":"5 – 10 साल","10+ years":"10+ साल",
   "Irregular":"अनियमित","Fairly regular":"काफ़ी हद तक नियमित","Very regular":"बहुत नियमित",
   "Sell":"बेच दूँगा","Hold":"रुका रहूँगा","Invest more":"और निवेश करूँगा",
   "Up to 2 years":"2 साल तक","More than 2 years":"2 साल से ज़्यादा",
   "Capital safety":"पूंजी की सुरक्षा","Balanced growth":"संतुलित बढ़त","High growth":"ऊँची बढ़त",
-  "Above 55":"55 से ऊपर","Below 35":"35 से कम"};
+  "Above 55":"55 से ऊपर","Below 35":"35 से कम",
+  "Yes — Long-term Investing":"हाँ — लंबी अवधि का निवेश","Yes — Trading":"हाँ — ट्रेडिंग","Both":"दोनों",
+  "Delivery (Long term)":"डिलीवरी (लंबी अवधि)","Swing (days – weeks)":"स्विंग (कुछ दिन – हफ़्ते)","Intraday":"इंट्राडे (उसी दिन)","F&O (Futures & Options)":"F&O (फ्यूचर्स और ऑप्शंस)","Commodity / Currency":"कमोडिटी / करेंसी",
+  "New / Beginner":"नया / शुरुआत","Below 1 year":"1 साल से कम","1 – 3 years":"1 – 3 साल","More than 3 years":"3 साल से ज़्यादा",
+  "Rarely":"कभी-कभी","Few times a month":"महीने में कुछ बार","Weekly":"हर हफ़्ते","Daily":"रोज़",
+  "Same day":"उसी दिन","Few days – weeks":"कुछ दिन – हफ़्ते","Few months":"कुछ महीने","1 year or more":"1 साल या ज़्यादा",
+  "Up to 5%":"5% तक","5 – 10%":"5 – 10%","10 – 25%":"10 – 25%","More than 25%":"25% से ज़्यादा",
+  "Research / Stock ideas":"रिसर्च / शेयर सुझाव","Portfolio review":"पोर्टफोलियो समीक्षा","Calls / Alerts":"कॉल / अलर्ट","IPO alerts":"IPO अलर्ट","Margin / MTF":"मार्जिन / MTF","Only execution (I decide myself)":"सिर्फ़ ऑर्डर (फ़ैसला मैं खुद लूँगा)"};
 
 // render
 for (const [card, qs] of Object.entries(SECTIONS)) {
   const el = document.getElementById(card);
   qs.forEach(q => {
     const d = document.createElement("div");
-    d.className = "q" + (q.when ? " sub hide" : ""); d.id = "q_"+q.k;
+    d.className = "q" + ((q.when||q.whenNot) ? " sub hide" : ""); d.id = "q_"+q.k;
     d.innerHTML = `<div class="ql">${q.l} *${q.hint?` <em>${q.hint}</em>`:""}${q.h?`<span class="hi qh">${q.h}</span>`:""}</div><div class="opts${q.o.length===3?' c3':''}">` + q.o.map((o,i)=>{
       const id = q.k+"_"+i;
       return `<input type="${q.multi?'checkbox':'radio'}" name="${q.k}" id="${id}" value="${o}"><label for="${id}"><span>${o}${OH[o]&&OH[o]!==o?`<span class="hi oh">${OH[o]}</span>`:""}</span></label>`;
@@ -315,11 +335,16 @@ const SEG = QS.get("seg")==="eq" ? "eq" : "mf";
   if (n) f.elements.name.value = n;
   if (m) f.elements.mobile.value = m;
 })();
-const visible = q => !q.when || (new FormData(f).get(q.when[0]) === q.when[1]);
+const visible = q => {
+  const fd = new FormData(f);
+  if (q.when && fd.get(q.when[0]) !== q.when[1]) return false;
+  if (q.whenNot){ const v = fd.get(q.whenNot[0]); if (!v || v === q.whenNot[1]) return false; }   // pehle "Yes" jaisa jawab chahiye
+  return true;
+};
 
 function refresh(){
   const fd = new FormData(f);
-  ALL.forEach(q => { if (q.when) document.getElementById("q_"+q.k).classList.toggle("hide", !visible(q)); });
+  ALL.forEach(q => { if (q.when || q.whenNot) document.getElementById("q_"+q.k).classList.toggle("hide", !visible(q)); });
   const qs = ALL.filter(visible);
   let done = qs.filter(q => q.multi ? fd.getAll(q.k).length : fd.get(q.k)).length;
   if ((fd.get("name")||"").trim()) done++;
@@ -328,7 +353,14 @@ function refresh(){
   document.getElementById("fill").style.width = pct + "%";
   document.getElementById("plbl").textContent = pct + "% complete";
 }
-f.addEventListener("change", e => { e.target.closest(".q")?.classList.remove("bad"); refresh(); });
+f.addEventListener("change", e => {
+  e.target.closest(".q")?.classList.remove("bad");
+  // MF section me "Equity (Direct Shares)" / "IPO" tick kiya aur Equity section khaali hai → "Yes" pehle se chun do
+  if (e.target.name==="mode" && e.target.checked && /Equity|IPO/.test(e.target.value) && !new FormData(f).get("eqInterest")){
+    const y=document.getElementById("eqInterest_1"); if(y){ y.checked=true; }
+  }
+  refresh();
+});
 f.addEventListener("input", refresh);
 
 const profileFor = s => s<=8 ? "Conservative" : s<=12 ? "Moderate" : "Aggressive";
@@ -406,7 +438,9 @@ function sendWhatsApp(d){
     "", "*Investments Elsewhere*",
     "Equity: "+d.oEquity, "MF: "+d.oMf, "SIP: "+d.oSip, "FD / Bonds: "+d.oFd, "Others: "+(d.oOther||[]).join(", ") + (d.otherDetails ? " ("+d.otherDetails+")" : ""),
     "", "*Investment Plan*",
-    "Goal: "+d.goal.join(", "), "Mode: "+d.mode, "SIP: "+d.sipAmount, "Period: "+d.period,
+    "Goal: "+d.goal.join(", "), "Mode: "+[].concat(d.mode||[]).join(", "), "SIP: "+d.sipAmount, "Period: "+d.period,
+    "", "*Share Market / Equity*",
+    "Interest: "+(d.eqInterest||"—") + (d.eqInterest && d.eqInterest!=="No" ? "\nType: "+[].concat(d.eqStyle||[]).join(", ")+"\nExperience: "+d.eqExp+"\nCapital: "+d.eqCapital+" | Monthly: "+d.eqMonthly+"\nFrequency: "+d.eqFreq+" | Holding: "+d.eqHolding+"\nMax loss: "+d.eqLoss+"\nHelp: "+[].concat(d.eqSupport||[]).join(", ") : ""),
     "", "Risk Score: "+d.riskScore+"/15 – *"+d.riskProfile+"*",
     d.rm ? "RM: "+d.rm : ""
   ].join("\n").trim();
