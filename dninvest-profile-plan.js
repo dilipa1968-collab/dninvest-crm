@@ -214,11 +214,11 @@ window.PLAN = (function(){
     let lvl = li<0 ? 1 : Math.min(2,li);   // purani profile me risk na ho to Moderate
     const period = K(p.period);
     const H = period===K('3 – 5 years') ? 0 : period===K('10+ years') ? 2 : 1;
-    if(old && lvl>1){ lvl=1; notes.push('Age 55+ → Aggressive se Moderate kiya'); }
-    if(K(p.r2)===K('Sell') && lvl>1){ lvl=1; notes.push('20% girawat par bechne wala → Moderate combo'); }
+    if(old && lvl>1){ lvl=1; notes.push('Age 55+ → capped at Moderate'); }
+    if(K(p.r2)===K('Sell') && lvl>1){ lvl=1; notes.push('Would sell on a 20% fall → capped at Moderate'); }
     if(retired && has(p,'goal','Retirement') && lvl>0){ lvl=Math.min(lvl,1); }
     const shortGoal = (has(p,'goal','House / Car')||has(p,'goal','Child Education')) && H===0;
-    if(shortGoal && lvl>0){ lvl--; notes.push('3–5 saal me ghar / gaadi / padhai ka goal → ek level safe'); }
+    if(shortGoal && lvl>0){ lvl--; notes.push('House / car / education goal within 3–5 years → one level safer'); }
 
     // ── Amount ──
     const planned = band(p,'sipAmount');
@@ -237,11 +237,11 @@ window.PLAN = (function(){
     if(bigEq && slots.some(s=>s.k==='small')){
       const sm=slots.find(s=>s.k==='small'); slots=slots.filter(s=>s!==sm);
       add(slots.some(s=>s.k==='multi')?'multi':slots[0].k, sm.w);
-      notes.push('Direct shares pehle se ₹5 L+ → Small Cap hata kar diversification badhaya');
+      notes.push('Already holds ₹5 L+ in direct shares → Small Cap removed for better diversification');
     }
     // Gold: client ke paas Gold / SGB nahi aur combo me koi gold / multi-asset nahi → 10% gold (₹15k+ SIP par)
     const hasGold = has(p,'oOther','Gold / SGB') || slots.some(s=>s.k==='gold'||s.k==='multi');
-    if(!hasGold && sip>=15000 && lvl>0 && (combo==='rec'||combo==='multicap')){ slots.forEach(s=>s.w*=0.9); slots.push({k:'gold',w:10}); notes.push('Gold / SGB nahi hai → 10% Gold Fund diversification ke liye'); }
+    if(!hasGold && sip>=15000 && lvl>0 && (combo==='rec'||combo==='multicap')){ slots.forEach(s=>s.w*=0.9); slots.push({k:'gold',w:10}); notes.push('No Gold / SGB holding → 10% Gold Fund added for diversification'); }
     // Tax Saving: ELSS core fund ki JAGAH (ELSS bhi flexi-cap jaisa hi hai → dono rakhne se overlap)
     const tax = has(p,'goal','Tax Saving');
     let elssCapNote='';
@@ -264,30 +264,30 @@ window.PLAN = (function(){
     const diff = sip - slots.reduce((a,s)=>a+s.amt,0); slots.reduce((a,s)=>s.amt>a.amt?s:a,slots[0]).amt += diff;
     // ELSS: 80C limit ₹1.5 L/saal = ₹12,500/month — upar ka flexi me
     const el=slots.find(s=>s.k==='elss');
-    if(el && el.amt>12500){ const extra=el.amt-12500; el.amt=12500; slots.push({k:'flexi',amt:extra}); elssCapNote='ELSS ₹12,500/month tak (80C limit), baaki Flexi Cap me'; notes.push(elssCapNote); }
+    if(el && el.amt>12500){ const extra=el.amt-12500; el.amt=12500; slots.push({k:'flexi',amt:extra}); elssCapNote='ELSS capped at ₹12,500/month (80C limit); the rest goes to Flexi Cap'; notes.push(elssCapNote); }
     slots = slots.filter(s=>s.amt>0);
     const alloc = slots.map(s=>({k:s.k, amt:s.amt, ...CAT[s.k]}));
     if(efPart) alloc.push({k:'liquid', amt:efPart, ...CAT.liquid});
 
     // ── RM Talking Points (internal) ──
     const curSip = r.c ? (+r.c.sip_amount||0) : 0;
-    if(curSip) talk.push(`Client ki current SIP hamare saath ${inr(curSip)} hai — confirm karein ye savings me shamil hai ya nahi. Suggested ${inr(total)} ${total>curSip?`→ ${inr(total-curSip)} badhana`:'— current SIP kaafi hai'}.`);
-    if(planned && !noSip && sip>planned[1]) talk.push(`Client ne ${p.sipAmount} socha hai, savings ke hisab se ${inr(sip)} ho sakta hai — dheere se upar le jaayein.`);
-    if(noSip) talk.push(`Client SIP nahi chahta (${p.mode||'Lumpsum'}) — yahi split lumpsum par % me lagayein.`);
-    if(tax) talk.push('Tax regime confirm karein — NEW regime me ELSS ka faayda nahi, wo hissa Flexi Cap me daalein. PPF/EPF se 80C pehle hi bhar sakta hai.');
-    if(efS==='r' && (BIG_EQ.includes(K(p.oEquity)) || K(p.oFd)!=='none' && p.oFd)) talk.push('Emergency fund jaldi banane ke liye shares / FD se ek lumpsum Liquid Fund me rakhwayein.');
-    if(efPart) talk.push(`Emergency target (${big(efTarget)}) pura hone par ${inr(efPart)} wala hissa equity SIP me shift karein.`);
-    if(lcS==='r'||lcS==='a') talk.push('Term plan ki baat karein — LIC endowment / money-back se cover kam milta hai.');
-    if(has(p,'oOther','LIC / Insurance Plans')) talk.push('LIC / insurance plans ka review — premium, maturity aur cover dekhein.');
-    if(p.oMf && K(p.oMf)!=='none') talk.push(`Dusri jagah MF ${p.oMf} hai — consolidation / portfolio review offer karein.`);
-    if(p.oSip && K(p.oSip)!=='none') talk.push(`Dusri jagah SIP ${p.oSip} chal rahi hai — total equity exposure dhyan me rakhein.`);
-    if((has(p,'goal','Child Education')||has(p,'goal','House / Car')) && period===K('3 – 5 years')) talk.push('Short-term goal (padhai / ghar / gaadi) ke liye us hisse ko equity ki jagah hybrid / debt me rakhein.');
-    if(K(p.r2)===K('Sell')) talk.push('Client 20% girawat par bechna chahta hai — volatility samjhayein, SIP band na kare.');
+    if(curSip) talk.push(`Current SIP with us is ${inr(curSip)} — confirm whether it is already counted in the savings figure. Suggested ${inr(total)}${total>curSip?` → increase by ${inr(total-curSip)}`:' — current SIP is sufficient'}.`);
+    if(planned && !noSip && sip>planned[1]) talk.push(`Client planned ${p.sipAmount}; savings allow about ${inr(sip)} — increase gradually.`);
+    if(noSip) talk.push(`Client does not want a SIP (${p.mode||'Lumpsum'}) — apply the same split as % of the lumpsum.`);
+    if(tax) talk.push('Confirm the tax regime — ELSS gives no benefit under the NEW regime (move that part to Flexi Cap). PPF / EPF may already fill the 80C limit.');
+    if(efS==='r' && (BIG_EQ.includes(K(p.oEquity)) || K(p.oFd)!=='none' && p.oFd)) talk.push('To build the emergency fund faster, suggest moving a lumpsum from shares / FD into a Liquid Fund.');
+    if(efPart) talk.push(`Once the emergency target (${big(efTarget)}) is reached, shift the ${inr(efPart)} Liquid SIP to equity.`);
+    if(lcS==='r'||lcS==='a') talk.push('Discuss a term plan — LIC endowment / money-back policies give low cover.');
+    if(has(p,'oOther','LIC / Insurance Plans')) talk.push('Review existing LIC / insurance plans — premium, maturity value and cover.');
+    if(p.oMf && K(p.oMf)!=='none') talk.push(`Holds MF ${p.oMf} elsewhere — offer consolidation / portfolio review.`);
+    if(p.oSip && K(p.oSip)!=='none') talk.push(`Running SIP ${p.oSip} elsewhere — keep total equity exposure in mind.`);
+    if((has(p,'goal','Child Education')||has(p,'goal','House / Car')) && period===K('3 – 5 years')) talk.push('For the short-term goal (education / house / car), keep that portion in hybrid / debt instead of equity.');
+    if(K(p.r2)===K('Sell')) talk.push('Client would sell on a 20% fall — explain volatility and advise not to stop SIPs.');
     const stepUp = !old && !retired && K(p.r1)!==K('Irregular');
-    if(irregular && !noSip) talk.push('Income irregular / business hai — base SIP chhoti rakhein aur achhe mahine me top-up karwayein.');
-    if(/lumpsum/i.test(p.mode||'')) talk.push('Lumpsum aaye to ek saath equity me nahi — Liquid / Arbitrage me rakh kar 6–12 mahine STP se isi split me daalein.');
-    if(old) talk.push('Age 55+ — retirement ke baad ke liye SWP plan ki baat karein.');
-    if(p.oMf && BIG_EQ.includes(K(p.oMf))) talk.push('Bahar ka MF bada hai — uska portfolio mangwa kar overlap check karein, warna same type ke fund dobara ho jayenge.');
+    if(irregular && !noSip) talk.push('Irregular / business income — keep a smaller base SIP and top up in good months.');
+    if(/lumpsum/i.test(p.mode||'')) talk.push('Do not put a lumpsum into equity at once — park it in Liquid / Arbitrage and STP over 6–12 months into this split.');
+    if(old) talk.push('Age 55+ — discuss an SWP plan for post-retirement income.');
+    if(p.oMf && BIG_EQ.includes(K(p.oMf))) talk.push('Large MF holding elsewhere — get the statement and check overlap to avoid duplicate fund types.');
 
     return {checks, total, sip, efPart, efTarget, alloc, lvlName:LVL[lvl], talk, notes, stepUp, noSip, tax, auto, curSip, combo, comboEn:COMBO[combo].en, comboHi:COMBO[combo].hi, comboWhy:COMBO[combo].why, comboWhyHi:COMBO[combo].whyHi};
   }
@@ -326,7 +326,7 @@ window.PLAN = (function(){
   const btnS='padding:5px 10px;font-size:.72rem';
   function html(i){
     const r=(window._profRows||[])[i]; if(!r||!r.p) return '';
-    let F; try{ F=final(r); }catch(e){ console.error('PLAN error',e); return `<div style="color:var(--red);font-size:.75rem;margin:8px 0">⚠️ Suggested plan nahi ban paya — ${esc(e.message)}</div>`; }
+    let F; try{ F=final(r); }catch(e){ console.error('PLAN error',e); return `<div style="color:var(--red);font-size:.75rem;margin:8px 0">⚠️ Could not build the suggested plan — ${esc(e.message)}</div>`; }
     if(_editing[r.p._id]) return editorHtml(i, r, F);
     const red=F.checks.filter(c=>c.s==='r').length, amb=F.checks.filter(c=>c.s==='a').length;
     const chk = F.checks.map(c=>{ const s=ST[c.s]||ST.n; return `<div style="background:${s.bg};border-left:4px solid ${s.c};border-radius:8px;padding:7px 9px">
@@ -347,7 +347,7 @@ window.PLAN = (function(){
       </div>
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Financial Health Check</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-bottom:12px">${chk}</div>
-      ${F.edited?'':`<div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Fund Combination <small style="text-transform:none;font-weight:600">— client ke hisab se chunein</small></div>
+      ${F.edited?'':`<div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Fund Combination <small style="text-transform:none;font-weight:600">— choose what suits the client</small></div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">${COMBOS.map(k=>`<button class="btn ${k===F.combo?'':'btn-outline'}" style="${btnS};${k===F.combo?'background:var(--navy);color:#f5d98a;border:1px solid var(--navy)':''}" onclick="PLAN.setCombo(${i},'${k}')">${COMBO[k].short}</button>`).join('')}</div>
       <div style="font-size:.7rem;color:var(--gray);margin-bottom:10px">${esc(F.comboWhy)}</div>`}
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">
@@ -357,30 +357,30 @@ window.PLAN = (function(){
         ${F.edited?'':`<div style="display:flex;gap:4px;align-items:center">
           <input id="plan-amt" type="number" step="500" min="500" value="${F.total}" style="width:95px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;font-size:.78rem">
           <button class="btn btn-outline" style="${btnS}" onclick="PLAN.setAmt(${i})">↻ Recalc</button>
-          ${_over[r.p._id]?`<button class="btn btn-outline" style="${btnS}" title="Auto amount (${inr(F.auto)}) wapas" onclick="PLAN.setAmt(${i},true)">Auto</button>`:''}</div>`}
+          ${_over[r.p._id]?`<button class="btn btn-outline" style="${btnS}" title="Back to auto amount (${inr(F.auto)})" onclick="PLAN.setAmt(${i},true)">Auto</button>`:''}</div>`}
       </div>
       <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin-bottom:6px">${bar}</div>
       <table style="width:100%;font-size:.76rem;margin-bottom:6px"><tbody>${rows}</tbody></table>
-      ${F.stepUp?'<div style="font-size:.72rem;color:#0f7a45;font-weight:700;margin-bottom:6px">📈 Har saal 10% step-up lagwayein</div>':''}
+      ${F.stepUp?'<div style="font-size:.72rem;color:#0f7a45;font-weight:700;margin-bottom:6px">📈 Set up a 10% annual step-up</div>':''}
       ${F.note?`<div style="background:#fdf6e3;border:1px solid #f5d98a;border-radius:8px;padding:6px 9px;font-size:.74rem;margin-bottom:6px;white-space:pre-wrap"><b>📝 Note for client:</b> ${esc(F.note)}</div>`:''}
       ${F.notes.length&&!F.edited?`<div style="font-size:.68rem;color:var(--gray);margin-bottom:6px">ℹ️ ${F.notes.map(esc).join(' · ')}</div>`:''}
       ${F.talk.length?`<div style="background:#eef3fc;border-radius:8px;padding:8px 10px;margin-bottom:8px">
-        <div style="font-size:.68rem;font-weight:800;color:#1a56db;text-transform:uppercase;margin-bottom:3px">🗣️ RM Talking Points <small style="font-weight:600;text-transform:none;color:var(--gray)">(sirf aapke liye — client ko nahi jaata)</small></div>
+        <div style="font-size:.68rem;font-weight:800;color:#1a56db;text-transform:uppercase;margin-bottom:3px">🗣️ RM Talking Points <small style="font-weight:600;text-transform:none;color:var(--gray)">(internal — not sent to the client)</small></div>
         <ul style="margin:0;padding-left:16px;font-size:.73rem;line-height:1.45">${F.talk.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn" style="background:#25D366;color:#fff;border:none" onclick="PLAN.sendImage(${i})" title="Rangeen image banakar WhatsApp par">🖼️ Send Colorful Plan (WhatsApp)</button>
-        <button class="btn btn-outline" onclick="PLAN.wa(${i})" title="Sirf text message">💬 Send as Text</button>
+        <button class="btn" style="background:#25D366;color:#fff;border:none" onclick="PLAN.sendImage(${i})" title="Creates a colourful image and opens WhatsApp">🖼️ Send Colorful Plan (WhatsApp)</button>
+        <button class="btn btn-outline" onclick="PLAN.wa(${i})" title="Plain text message only">💬 Send as Text</button>
         <button class="btn btn-outline" onclick="PLAN.downloadImage(${i})">⬇️ Image</button>
         <button class="btn btn-outline" onclick="PLAN.print(${i})">🖨️ PDF</button>
       </div>
-      <div style="font-size:.62rem;color:var(--gray);margin-top:6px">Suggestion fixed rules par hai — scheme aur final amount client se baat karke RM tay karein.</div>
+      <div style="font-size:.62rem;color:var(--gray);margin-top:6px">Rule-based suggestion — the RM finalises schemes and amounts after discussing with the client.</div>
     </div>`;
   }
 
   function setAmt(i, reset){
     const r=(window._profRows||[])[i]; if(!r) return;
     if(reset) delete _over[r.p._id];
-    else { const v=r500(+(document.getElementById('plan-amt')||{}).value||0); if(v<500){ toast&&toast('Amount kam se kam ₹500','error'); return; } _over[r.p._id]=v; }
+    else { const v=r500(+(document.getElementById('plan-amt')||{}).value||0); if(v<500){ toast&&toast('Minimum amount is ₹500','error'); return; } _over[r.p._id]=v; }
     redraw(i);
   }
   function setCombo(i,k){
@@ -404,7 +404,7 @@ window.PLAN = (function(){
         <b style="font-size:.72rem">${esc(c.en)}</b>
         <select id="pe-cs-${n}" style="${inS}">${stOpts(c.s)}</select>
         <div style="display:grid;gap:3px"><input id="pe-ca-${n}" value="${esc(c.adv)}" placeholder="Advice (English)" style="${inS}">
-        <input id="pe-ch-${n}" value="${esc(c.advHi)}" placeholder="सलाह (हिंदी) — खाली छोड़ सकते हैं" style="${inS}"></div></div>`).join('');
+        <input id="pe-ch-${n}" value="${esc(c.advHi)}" placeholder="Advice in Hindi (optional)" style="${inS}"></div></div>`).join('');
     const al=D.alloc.map((a,n)=>`<div style="display:grid;grid-template-columns:1.1fr 1.3fr 90px 28px;gap:5px;align-items:center;margin-bottom:5px">
         <select id="pe-k-${n}" style="${inS}" onchange="PLAN.edCat(${n})">${catOpts(a.k)}</select>
         <div><input id="pe-sc-${n}" list="pe-dl-${n}" value="${esc(a.scheme)}" placeholder="Scheme name — type / pick (optional)" autocomplete="off" style="${inS};width:100%">
@@ -413,13 +413,13 @@ window.PLAN = (function(){
         <button class="btn-icon" title="Remove" style="color:var(--red)" onclick="PLAN.edDel(${i},${n})">✖</button></div>`).join('');
     const sum=D.alloc.reduce((s,a)=>s+(+a.amt||0),0);
     return `<div id="planCard" style="border:2px dashed var(--blue);border-radius:14px;padding:12px;margin:4px 0 14px;background:#f8fbff">
-      <div style="font-weight:900;color:var(--navy);margin-bottom:8px">✏️ Edit Plan <small style="font-weight:600;color:var(--gray);font-size:.68rem">— jo client ko jayega wahi yahan badlein</small></div>
+      <div style="font-weight:900;color:var(--navy);margin-bottom:8px">✏️ Edit Plan <small style="font-weight:600;color:var(--gray);font-size:.68rem">— changes here are what the client receives</small></div>
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:5px">Health Check</div>${ck}
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:10px 0 5px">Funds / SIP Split</div>${al}
       <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 10px">
         <button class="btn btn-outline" style="${btnS}" onclick="PLAN.edAdd(${i})">➕ Add Fund</button>
         <b style="font-size:.85rem;color:var(--navy)">Total: <span id="pe-sum">${inr(sum)}</span></b></div>
-      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:4px">📝 Note for client <small style="text-transform:none;font-weight:600">(optional — Hindi / English, image aur message me jayega)</small></div>
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin-bottom:4px">📝 Note for client <small style="text-transform:none;font-weight:600">(optional — Hindi or English; included in the image and message)</small></div>
       <textarea id="pe-note" rows="2" style="${inS};width:100%;resize:vertical">${esc(D.note)}</textarea>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-primary" onclick="PLAN.edSave(${i})">✅ Save Plan</button>
@@ -449,7 +449,7 @@ window.PLAN = (function(){
   function edSave(i){
     const r=rowOf(i); const D=edRead(i); if(!r||!D) return;
     const alloc=D.alloc.filter(a=>+a.amt>0);
-    if(!alloc.length){ toast&&toast('Kam se kam ek fund me amount daalein','error'); return; }
+    if(!alloc.length){ toast&&toast('Enter an amount for at least one fund','error'); return; }
     const checks={}; D.checks.forEach(c=>checks[c.key]={s:c.s,adv:c.adv,advHi:c.advHi});
     _edit[r.p._id]={checks, alloc, note:(D.note||'').trim(), by:(typeof CU!=='undefined'&&CU&&CU.name)||'', at:new Date().toISOString()};
     saveEdits();
@@ -458,7 +458,7 @@ window.PLAN = (function(){
   }
   function edReset(i){
     const r=rowOf(i); if(!r) return;
-    if(!confirm('Edits hata kar auto plan wapas laayein?')) return;
+    if(!confirm('Discard your edits and go back to the auto plan?')) return;
     delete _edit[r.p._id]; saveEdits(); delete _editing[r.p._id]; delete _draft[r.p._id]; redraw(i);
   }
 
@@ -613,11 +613,11 @@ window.PLAN = (function(){
   async function downloadImage(i){
     const r=rowOf(i); if(!r) return;
     try{ const b=await toBlob(await makeCanvas(i)); dl(b,fileName(r.p)); toast&&toast('Image downloaded ✓','success'); }
-    catch(e){ console.error(e); toast&&toast('⚠️ Image nahi bani — '+(e.message||e),'error'); }
+    catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); }
   }
   async function sendImage(i){
     const r=rowOf(i); if(!r) return;
-    let blob; try{ blob=await toBlob(await makeCanvas(i)); }catch(e){ console.error(e); toast&&toast('⚠️ Image nahi bani — '+(e.message||e),'error'); return; }
+    let blob; try{ blob=await toBlob(await makeCanvas(i)); }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); return; }
     const name=fileName(r.p), cap=caption(i);
     // 1) Mobile (Android / iPhone): seedha share sheet → WhatsApp → contact chunein
     try{
@@ -631,7 +631,7 @@ window.PLAN = (function(){
     try{ if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){ console.warn('clipboard image failed',e); }
     dl(blob,name);
     window.open(waUrl(r.p, cap),'_blank');
-    toast&&toast(copied ? '🖼️ Image copied — WhatsApp chat me message bhejne se pehle Ctrl+V dabayein' : '🖼️ Image downloaded — WhatsApp me 📎 se attach karein', 'success');
+    toast&&toast(copied ? '🖼️ Image copied — press Ctrl+V in the WhatsApp chat, then send' : '🖼️ Image downloaded — attach it in WhatsApp with 📎', 'success');
   }
 
   // ══════════════ PRINT / PDF ══════════════

@@ -3430,7 +3430,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <select id="prof-risk" onchange="PROF.render()" style="padding:7px 8px;border:1px solid var(--border);border-radius:8px"><option value="">All Risk Profiles</option><option>Aggressive</option><option>Conservative</option><option>Moderate</option></select>
         <button class="btn btn-outline" onclick="PROF.open(true)" title="Reload all profiles from the server">🔄 Refresh</button>
         <span id="prof-sync" style="font-size:.72rem;color:var(--teal);font-weight:700"></span>
-        <button class="btn btn-outline" style="border-color:#1a56db;color:#1a56db" onclick="PROF.summary()" title="RM-wise: kitne link bheje, kitne bhare, kitne baaki">📊 RM-wise Sent</button>
+        <button class="btn btn-outline" style="border-color:#1a56db;color:#1a56db" onclick="PROF.summary()" title="RM-wise: forms sent, filled and pending">📊 RM-wise Summary</button>
         <button class="btn btn-outline" onclick="PROF.exportXlsx()">⬇️ Export</button>
         <button class="btn btn-outline" style="border-color:#0f766e;color:#0f766e" onclick="PROF.blank('wa')" title="Blank form for a NEW client (not in CRM yet) — opens WhatsApp, you pick the contact">🆕 Blank Form (WhatsApp)</button>
         <button class="btn btn-outline" style="border-color:#0f766e;color:#0f766e" onclick="PROF.blank('copy')" title="Copy the blank form link">🔗 Copy Blank Link</button>
@@ -3450,7 +3450,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 </div>
 <div class="modal-overlay" id="profSumModal" onclick="if(event.target===this)closeModal('profSumModal')">
   <div class="modal" style="width:min(1050px,96vw);max-width:96vw">
-    <div class="modal-hdr"><h3>📊 Profile Form — RM-wise Sent / Filled / Pending</h3><button class="modal-close" onclick="closeModal('profSumModal')">×</button></div>
+    <div class="modal-hdr"><h3>📊 Profile Forms — RM-wise Summary</h3><button class="modal-close" onclick="closeModal('profSumModal')">×</button></div>
     <div class="modal-body" id="profSumBody"></div>
   </div>
 </div>
@@ -3472,8 +3472,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <script src="dninvest-backoffice.js?v=2026-11-19-v1"></script>
 
-<script src="dninvest-profiles.js?v=2026-11-20-v7"></script>
-<script src="dninvest-profile-plan.js?v=2026-11-20-v4"></script>
+<script src="dninvest-profiles.js?v=2026-11-20-v8"></script>
+<script src="dninvest-profile-plan.js?v=2026-11-20-v5"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">

@@ -268,7 +268,7 @@ window.PROF = (function(){
       const d=subDate(r.p);
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
         <td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
-        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client CRM me ${esc(r.other)} ke paas mapped hai — investment details unhe / Admin ko dikhti hain">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
+        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client is mapped to ${esc(r.other)} in the CRM — investment details are visible to them and Admin">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
         <td>${esc(r.p.mobile)}</td><td>${(()=>{ const R=rmOf(r); return `<b>${esc(R.main||'—')}</b>${R.sub.length?`<br><small style="color:var(--gray);white-space:nowrap" title="EQ = equity RM · 📤 = form sent by">${esc(R.sub.join(' · '))}</small>`:''}`; })()}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
@@ -344,7 +344,7 @@ window.PROF = (function(){
   // ── 🔗 Manual link: profile ↔ CRM client ──
   function linkBox(i, r){
     const mob=cleanMobile(r.p.mobile), L=_links[mob];
-    if(r.other) return `<div style="background:#ede9fe;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:.74rem;color:#4c1d95">🔒 Ye client CRM me <b>${esc(r.other)}</b> ke paas mapped hai. Form aapne bheja tha isliye profile aur plan aapko dikh rahe hain — client ki investment (SIP / MF / Equity) sirf ${esc(r.other)} aur Admin ko dikhti hai.</div>`;
+    if(r.other) return `<div style="background:#ede9fe;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:.74rem;color:#4c1d95">🔒 This client is mapped to <b>${esc(r.other)}</b> in the CRM. You can see the profile and plan because you sent the form — the client's investments (SIP / MF / Equity) are visible only to ${esc(r.other)} and Admin.</div>`;
     if(r.c||r.e){
       if(!L) return '';
       const nm=(r.c||r.e).name||'';
@@ -392,7 +392,7 @@ window.PROF = (function(){
     try{ await fdb.collection('crm_data').doc(LINK_KEY).set({links:{[mob]:rec}},{merge:true}); }
     catch(e){ toast('⚠️ Not linked — '+(e.message||e),'error'); return; }
     _links[mob]=rec; writeCache();
-    toast('Linked ✓ — investment ab dikhega','success');
+    toast('Linked ✓ — investments are now shown','success');
     reopen(r.p._id);
   }
   async function unlink(i){
@@ -455,7 +455,7 @@ window.PROF = (function(){
   function openById(pid, what){
     let list=window._profRows||[]; let j=list.findIndex(r=>r.p._id===pid);
     if(j<0){ const sr=$('prof-search'), rk=$('prof-risk'); if(sr) sr.value=''; if(rk) rk.value=''; render(); list=window._profRows||[]; j=list.findIndex(r=>r.p._id===pid); }
-    if(j<0){ toast('Profile list me nahi mili (naya record aaya ho to 🔄 Refresh karein)','error'); return; }
+    if(j<0){ toast('Profile not found in the list — click 🔄 Refresh','error'); return; }
     try{ closeModal('profSumModal'); }catch(_){}
     if(what==='plan') plan(j); else detail(j);
   }
@@ -464,50 +464,82 @@ window.PROF = (function(){
   function renderSummary(){
     const body=$('profSumBody'); if(!body) return;
     const L=sumData();
-    const T=L.reduce((t,x)=>{ t.sent+=x.sent; t.cl+=x.clients.size; t.pend+=x.pend.size; t.blank+=x.blank; t.bf+=x.blankFilled; t.f+=x.filled; return t; },{sent:0,cl:0,pend:0,blank:0,bf:0,f:0});
-    const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
-    const pc=v=>{ const n=parseInt(v); return isNaN(n)?'var(--gray)':n>=60?'#0f7a45':n>=30?'#b45309':'#c0392b'; };
+    const T=L.reduce((t,x)=>{ t.cl+=x.clients.size; t.pend+=x.pend.size; t.blank+=x.blank; t.bf+=x.blankFilled; t.f+=x.filled; return t; },{cl:0,pend:0,blank:0,bf:0,f:0});
+    const pctN=(a,b)=>b?Math.round(a/b*100):null;
+    const pcol=n=>n==null?'#94a3b8':n>=60?'#0f7a45':n>=30?'#b45309':'#c0392b';
+    const fillCell=n=>n==null?'<span style="color:#94a3b8">—</span>':`<div style="display:flex;align-items:center;gap:6px;justify-content:center"><div style="width:54px;height:7px;background:#e5e7eb;border-radius:4px;overflow:hidden"><div style="width:${n}%;height:100%;background:${pcol(n)}"></div></div><b style="color:${pcol(n)};min-width:34px;text-align:right">${n}%</b></div>`;
+    const fdt=iso=>iso?new Date(iso).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
     const rng=[['all','All time'],['month','This month'],['30','Last 30 days'],['7','Last 7 days']].map(([v,l])=>`<option value="${v}"${v===_sumRange?' selected':''}>${l}</option>`).join('');
-    let h=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <select onchange="PROF.sumRange(this.value)" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px">${rng}</select>
-      <span style="font-size:.74rem;color:var(--gray)">Row par click karein → us RM ke baaki (not filled) clients + 💬 Resend</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
-        ${[['📤 Clients Sent',T.cl,'#1a56db'],['✅ Filled (from sent)',T.cl-T.pend,'#0f7a45'],['⏳ Pending',T.pend,'#b45309'],['📊 Fill %',pct(T.cl-T.pend,T.cl),pc(pct(T.cl-T.pend,T.cl))],['🆕 Blank Links',T.blank,'#0f766e'],['📋 Total Profiles',T.f,'#0f1f3d']]
-          .map(([l,v,c])=>`<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:900;color:${c};font-size:1.25rem">${v}</div></div>`).join('')}
-      </div>
-      <div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr><th>RM</th><th title="Unique clients ko CRM se link bheja">Clients Sent</th><th title="Kul baar bheja (resend sahit)">Links (incl. resend)</th><th>Filled</th><th>Pending</th><th>Fill %</th><th>Blank Links</th><th>Blank Filled</th><th title="Is RM ke naam ki saari profiles (blank + CRM)">Total Profiles</th><th>Last Sent</th></tr></thead><tbody>`;
-    if(!L.length) h+=`<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:14px">No forms sent in this period</td></tr>`;
-    L.forEach((x,n)=>{
-      const cl=x.clients.size, f=cl-x.pend.size, pr=pct(f,cl), open=_sumOpen===x.name;
-      h+=`<tr style="cursor:pointer;${open?'background:#F0F5FB':''}" onclick="PROF.sumToggle('${esc(x.name).replace(/'/g,"\\'")}')">
-        <td><b>${open?'▾':'▸'} ${esc(x.name)}</b></td><td><b>${cl}</b></td><td>${x.sent}</td>
-        <td style="color:#0f7a45;font-weight:700">${f}</td><td style="color:#b45309;font-weight:700">${x.pend.size}</td>
-        <td><b style="color:${pc(pr)}">${pr}</b></td><td>${x.blank}</td><td>${x.blankFilled}</td><td><b>${x.filled}</b></td>
-        <td>${x.last?fmtDate(x.last.slice(0,10)):'—'}</td></tr>`;
-      if(open){
-        const P=[...x.pend.values()].sort((a,b)=>String(a.at).localeCompare(String(b.at)));
-        const pendH = P.length?`<div style="font-size:.72rem;font-weight:800;color:#b45309;margin-bottom:4px">⏳ Not filled yet (${P.length}) — purane pehle</div>
-          <table style="font-size:.74rem;margin-bottom:10px"><tbody>${P.map(s=>{ const days=Math.floor((Date.now()-Date.parse(s.at))/864e5);
-            return `<tr><td><b>${esc(s.name)}</b> <span class="badge ${s.seg==='equity'?'b-eq':'b-mf'}" style="font-size:.55rem">${s.seg==='equity'?'EQ':'MF'}</span></td><td>${esc(s.mobile||'—')}</td>
-            <td>${fmtDate(String(s.at).slice(0,10))} <small style="color:${days>=7?'#c0392b':'var(--gray)'}">(${days}d ago${s.times>1?` · sent ${s.times}×`:''})</small></td>
-            <td style="text-align:right"><button class="btn btn-outline" style="padding:3px 9px;font-size:.7rem" onclick="event.stopPropagation();PROF.send('${esc(s.cid)}','wa','${s.seg==='equity'?'equity':'mf'}')">💬 Resend</button></td></tr>`; }).join('')}</tbody></table>`
-          : (x.clients.size?'<div style="font-size:.74rem;color:#0f7a45;margin-bottom:8px">✅ Bheje gaye sab links bhar diye gaye</div>':'');
-        // Bhari gayi profiles ki list (blank / sent)
-        const filledTbl=(list,title,col)=> list.length ? `<div style="font-size:.72rem;font-weight:800;color:${col};margin-bottom:4px">${title} (${list.length})</div>
-          <table style="font-size:.74rem;margin-bottom:10px"><tbody>${list.slice().sort((a,b)=>(b._ms||0)-(a._ms||0)).map(p=>{
-            const pr=pairForProfile(p), c=pr.mf||pr.eq, d=subDate(p);
-            const tag = c ? `<span style="color:#0f7a45;font-weight:700">✓ CRM: ${esc(c.name)}${c.rm?` <small style="color:var(--gray)">(${pr.mf?'MF':'EQ'} RM ${esc(c.rm)})</small>`:''}</span>` : (p.blankForm?'<span style="color:#0f766e;font-weight:700">🆕 New — not in CRM</span>':'<span style="color:#b45309">⚠️ not in CRM</span>');
-            const pid=esc(p._id).replace(/'/g,"\\'");
-            return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.mobile||'—')}</td><td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
-              <td><b style="color:${{Conservative:'#0369a1',Moderate:'#b45309',Aggressive:'#b91c1c'}[p.riskProfile]||'var(--navy)'}">${esc(p.riskProfile||'—')}</b></td><td>${tag}</td>
-              <td style="text-align:right;white-space:nowrap"><button class="btn-icon" title="View profile" onclick="event.stopPropagation();PROF.openById('${pid}','detail')">👁️</button>${window.PLAN?`<button class="btn-icon" title="Suggested Plan" onclick="event.stopPropagation();PROF.openById('${pid}','plan')">💡</button>`:''}</td></tr>`; }).join('')}</tbody></table>` : '';
-        const inner = pendH + filledTbl(x.blankList,'🆕 Blank form bhara','#0f766e') + filledTbl(x.sentList,'✅ Bheje gaye link se bhara','#0f7a45');
-        h+=`<tr><td colspan="10" style="background:#fafcff;padding:6px 10px">${inner||'<div style="font-size:.74rem;color:var(--gray)">Kuch nahi</div>'}</td></tr>`;
-      }
+    const tFill=pctN(T.cl-T.pend,T.cl);
+    const C='text-align:center'; const TH=`style="${C};white-space:nowrap"`;
+    let h=`<style>
+      #profSumBody .sumT{width:100%;border-collapse:separate;border-spacing:0;font-size:.8rem;table-layout:fixed}
+      #profSumBody .sumT th{background:var(--navy);color:#fff;font-size:.66rem;letter-spacing:.4px;text-transform:uppercase;padding:9px 6px;line-height:1.25}
+      #profSumBody .sumT th:first-child{border-radius:10px 0 0 0;text-align:left;padding-left:12px} #profSumBody .sumT th:last-child{border-radius:0 10px 0 0}
+      #profSumBody .sumT td{padding:9px 6px;border-bottom:1px solid var(--border)}
+      #profSumBody .sumT tr.rmrow:hover td{background:#F0F5FB}
+      #profSumBody .sub{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:4px 0 10px;background:#fff}
+      #profSumBody .sub h4{margin:0;padding:7px 10px;font-size:.72rem;text-transform:uppercase;letter-spacing:.4px}
+      #profSumBody .sub table{width:100%;border-collapse:collapse;font-size:.76rem;table-layout:fixed}
+      #profSumBody .sub th{background:#f4f6fa;color:var(--gray);font-size:.62rem;text-transform:uppercase;letter-spacing:.3px;padding:6px 8px;text-align:left}
+      #profSumBody .sub td{padding:6px 8px;border-top:1px solid #eef1f6;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    </style>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <select onchange="PROF.sumRange(this.value)" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-weight:600">${rng}</select>
+      <span style="font-size:.76rem;color:var(--gray)">Click an RM row to see pending, filled and blank-form clients.</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">
+      ${[['Clients Sent',T.cl,'#1a56db','Unique clients sent a form from the CRM'],['Filled',T.cl-T.pend,'#0f7a45','Clients who filled the form they were sent'],['Pending',T.pend,'#b45309','Sent but not filled yet'],['Fill Rate',tFill==null?'—':tFill+'%',pcol(tFill),'Filled ÷ Clients Sent'],['Blank Forms Sent',T.blank,'#0f766e','Blank form links shared'],['Total Profiles',T.f,'#0f1f3d','All profiles received in this period']]
+        .map(([l,v,c,t])=>`<div title="${t}" style="background:#fff;border:1px solid var(--border);border-top:4px solid ${c};border-radius:10px;padding:9px 12px"><div style="font-size:.64rem;color:var(--gray);font-weight:800;text-transform:uppercase;letter-spacing:.4px">${l}</div><div style="font-weight:900;color:${c};font-size:1.4rem;line-height:1.3">${v}</div></div>`).join('')}
+    </div>
+    <div style="overflow-x:auto"><table class="sumT"><colgroup><col style="width:17%"><col><col><col><col><col style="width:14%"><col><col><col><col style="width:12%"></colgroup>
+      <thead><tr><th>RM</th>
+        <th ${TH} title="Unique clients sent a form from the CRM">Clients<br>Sent</th>
+        <th ${TH} title="Total links sent, including resends">Total<br>Links</th>
+        <th ${TH}>Filled</th><th ${TH}>Pending</th><th ${TH}>Fill Rate</th>
+        <th ${TH} title="Blank form links shared">Blank<br>Sent</th><th ${TH} title="Profiles received through a blank form">Blank<br>Filled</th>
+        <th ${TH} title="All profiles credited to this RM (sent + blank)">Total<br>Profiles</th><th ${TH}>Last<br>Sent</th></tr></thead><tbody>`;
+    if(!L.length) h+=`<tr><td colspan="10" style="${C};color:var(--gray);padding:16px">No forms sent in this period</td></tr>`;
+    L.forEach(x=>{
+      const cl=x.clients.size, f=cl-x.pend.size, open=_sumOpen===x.name;
+      const nm=esc(x.name).replace(/'/g,"\\'");
+      const num=(v,c)=>`<td style="${C};font-weight:700;${v&&c?'color:'+c:v?'':'color:#94a3b8'}">${v}</td>`;
+      h+=`<tr class="rmrow" style="cursor:pointer;${open?'background:#F0F5FB':''}" onclick="PROF.sumToggle('${nm}')">
+        <td style="padding-left:12px"><span style="display:inline-block;width:14px;color:var(--gray)">${open?'▾':'▸'}</span><b>${esc(x.name)}</b></td>
+        ${num(cl,'#1a56db')}${num(x.sent)}${num(f,'#0f7a45')}${num(x.pend.size,'#b45309')}
+        <td>${fillCell(pctN(f,cl))}</td>
+        ${num(x.blank,'#0f766e')}${num(x.blankFilled,'#0f766e')}${num(x.filled,'#0f1f3d')}
+        <td style="${C};color:var(--gray);font-size:.74rem;white-space:nowrap">${x.last?fdt(x.last):'—'}</td></tr>`;
+      if(!open) return;
+      const P=[...x.pend.values()].sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+      const segB=sg=>`<span class="badge ${sg==='equity'?'b-eq':'b-mf'}" style="font-size:.55rem;margin-left:4px">${sg==='equity'?'EQ':'MF'}</span>`;
+      let inner='';
+      if(P.length) inner+=`<div class="sub"><h4 style="background:#fff4e5;color:#b45309">⏳ Pending — sent, not filled (${P.length}) · oldest first</h4>
+        <table><colgroup><col style="width:34%"><col style="width:16%"><col style="width:16%"><col style="width:18%"><col style="width:16%"></colgroup>
+        <thead><tr><th>Client</th><th>Mobile</th><th>Sent On</th><th>Waiting</th><th style="text-align:right">Action</th></tr></thead><tbody>
+        ${P.map(s=>{ const days=Math.floor((Date.now()-Date.parse(s.at))/864e5);
+          return `<tr><td title="${esc(s.name)}"><b>${esc(s.name)}</b>${segB(s.seg)}</td><td>${esc(s.mobile||'—')}</td><td>${fdt(s.at)}</td>
+          <td><b style="color:${days>=7?'#c0392b':days>=3?'#b45309':'var(--gray)'}">${days===0?'Today':days+' day'+(days>1?'s':'')}</b>${s.times>1?` <small style="color:var(--gray)">· sent ${s.times}×</small>`:''}</td>
+          <td style="text-align:right"><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="event.stopPropagation();PROF.send('${esc(s.cid)}','wa','${s.seg==='equity'?'equity':'mf'}')">💬 Resend</button></td></tr>`; }).join('')}
+        </tbody></table></div>`;
+      else if(cl) inner+=`<div class="sub"><h4 style="background:#e3f7ee;color:#0f7a45">✅ All forms sent from the CRM have been filled</h4></div>`;
+      const filledTbl=(list,title,bg,col)=> !list.length ? '' : `<div class="sub"><h4 style="background:${bg};color:${col}">${title} (${list.length}) · newest first</h4>
+        <table><colgroup><col style="width:26%"><col style="width:14%"><col style="width:14%"><col style="width:13%"><col style="width:23%"><col style="width:10%"></colgroup>
+        <thead><tr><th>Client</th><th>Mobile</th><th>Filled On</th><th>Risk</th><th>CRM Match</th><th style="text-align:right">Open</th></tr></thead><tbody>
+        ${list.slice().sort((a,b)=>(b._ms||0)-(a._ms||0)).map(p=>{
+          const pr=pairForProfile(p), c=pr.mf||pr.eq, d=subDate(p);
+          const tag = c ? `<span style="color:#0f7a45;font-weight:700" title="${esc(c.name)} · ${pr.mf?'MF':'EQ'} RM ${esc(c.rm||'—')}">✓ ${pr.mf?'MF':'EQ'} · RM ${esc(c.rm||'—')}</span>`
+                        : (p.blankForm?'<span style="color:#0f766e;font-weight:700">🆕 New — not in CRM</span>':'<span style="color:#b45309;font-weight:700">⚠️ Not in CRM</span>');
+          const pid=esc(p._id).replace(/'/g,"\\'");
+          return `<tr><td title="${esc(p.name)}"><b>${esc(p.name)}</b></td><td>${esc(p.mobile||'—')}</td><td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
+            <td><b style="color:${{Conservative:'#0369a1',Moderate:'#b45309',Aggressive:'#b91c1c'}[p.riskProfile]||'var(--navy)'}">${esc(p.riskProfile||'—')}</b></td><td>${tag}</td>
+            <td style="text-align:right"><button class="btn-icon" title="View profile" onclick="event.stopPropagation();PROF.openById('${pid}','detail')">👁️</button>${window.PLAN?`<button class="btn-icon" title="Suggested plan" onclick="event.stopPropagation();PROF.openById('${pid}','plan')">💡</button>`:''}</td></tr>`; }).join('')}
+        </tbody></table></div>`;
+      inner += filledTbl(x.blankList,'🆕 Filled via blank form','#e0f7f4','#0f766e') + filledTbl(x.sentList,'✅ Filled via CRM link','#e3f7ee','#0f7a45');
+      h+=`<tr><td colspan="10" style="background:#f8fafc;padding:8px 12px 4px">${inner||'<div style="font-size:.76rem;color:var(--gray);padding:6px">No activity in this period</div>'}</td></tr>`;
     });
-    body.innerHTML=h+'</tbody></table></div></div><p style="font-size:.68rem;color:var(--gray);margin-top:8px">Blank links ki ginti aaj (20-Nov-2026) ke update ke baad se shuru hai — usse pehle ke blank forms "Blank Filled" me gine jaate hain par "Blank Links" me nahi.</p>';
+    body.innerHTML=h+`</tbody></table></div><p style="font-size:.7rem;color:var(--gray);margin-top:10px">Note: blank-form links are counted from 20-Nov-2026 onwards. Earlier blank forms still appear under "Blank Filled" and "Total Profiles".</p>`;
   }
-  // 💡 Suggested Plan — alag popup (profile detail se alag) — 20-Nov-2026
+  // 💡 Suggested Plan — separate popup (not inside the profile detail) — 20-Nov-2026
   function plan(i){
     const r=(window._profRows||[])[i]; if(!r || !window.PLAN) return;
     try{ closeModal('profDetailModal'); }catch(_){}
