@@ -10,6 +10,7 @@
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
    Access: Admin sab; RM sirf apne clients ke profiles.
+   ⚡ Profiles login ke baad peeche se pehle hi load (prefetch) — Clear Cache ke baad bhi popup jaldi.
    📊 RM-wise Sent / Filled / Pending (toolbar button + ⏳ par click), blank form bhi log hota hai.
    👤 RM ko wo profiles bhi dikhti hain jo form usne khud bheja (client CRM me na ho /
       MF hamare yahan na ho). Kisi aur RM ka client nikle to uski investment chhupi rehti hai.
@@ -153,7 +154,15 @@ window.PROF = (function(){
     catch(_){ try{ localStorage.setItem(CACHE, JSON.stringify({p:_profiles, s:[], l:_links, at:Date.now()})); }catch(__){ /* quota — memory me to hai */ } }
     try{ localStorage.removeItem(OLD_CACHE); }catch(_){}
   }
-  async function load(full){
+  // Ek hi waqt me ek hi load (prefetch chal raha ho to popup usi ka intezaar kare, dobara na mangaye)
+  let _loadP=null, _loadFull=false;
+  function load(full){
+    if(_loadP && (_loadFull || !full)) return _loadP;
+    _loadFull=!!full;
+    _loadP=loadNow(full).finally(()=>{ _loadP=null; _loadFull=false; });
+    return _loadP;
+  }
+  async function loadNow(full){
     if(typeof fdb==='undefined'){ await window.waitForFdb?.(8000); }
     const newest = (!full && _profiles.length) ? Math.max(..._profiles.map(p=>p._ms||0)) : 0;
     // Har server request par 15 sec ki seema — warna "Loading…" hamesha atka reh sakta tha
@@ -280,7 +289,7 @@ window.PROF = (function(){
         <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client is mapped to ${esc(r.other)} in the CRM — investment details are visible to them and Admin">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
         <td>${esc(r.p.mobile)}</td><td>${(()=>{ const R=rmOf(r); return `<b>${esc(R.main||'—')}</b>${R.sub.length?`<br><small style="color:var(--gray);white-space:nowrap" title="EQ = equity RM · 📤 = form sent by">${esc(R.sub.join(' · '))}</small>`:''}`; })()}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
-        <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
+        <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc([].concat(r.p.mode||[]).join(', ')||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
         <td><b>${r.c?money(r.c.sip_amount):'—'}</b>${r.c&&r.c.sip_count?` <small>(${r.c.sip_count})</small>`:''}</td>
         <td><b>${r.c&&investedOf(r.c)?money(investedOf(r.c)):'—'}</b></td>
         <td><b>${r.c?money(r.c.aum):'—'}</b></td>
@@ -642,5 +651,21 @@ window.PROF = (function(){
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
+  // ⚡ Prefetch (20-Nov-2026): login ke baad CRM ka data aate hi profiles PEECHE se load ho jaati hain
+  // → 🧹 Clear Cache / naye browser ke baad bhi "📋 Client Profiles" kholte hi list taiyaar milti hai.
+  (function prefetch(){
+    let tries=0;
+    const tick=()=>{
+      tries++;
+      const ready = typeof CU!=='undefined' && CU && typeof fdb!=='undefined' && fdb && typeof DB!=='undefined' && (DB.get('mf_clients')||[]).length;
+      if(!ready){ if(tries<60) setTimeout(tick,3000); return; }   // max ~3 min wait
+      let need=!_profiles.length;
+      try{ if(!localStorage.getItem(OK_MARK)) need=true; }catch(_){}
+      if(!_profiles.length){ const c=readCache(); if(c){ _profiles=c.p; _sends=c.s||[]; _links=c.l||{}; } }
+      const go=()=>load(need).then(()=>{ if($('profModal')?.classList.contains('open')) render(); }).catch(e=>console.warn('profile prefetch failed',e));
+      (window.requestIdleCallback ? requestIdleCallback(go,{timeout:8000}) : setTimeout(go,2000));
+    };
+    setTimeout(tick,4000);
+  })();
   return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink, summary, sumRange, sumToggle, plan, openById };
 })();

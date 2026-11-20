@@ -157,6 +157,8 @@ window.PLAN = (function(){
     const retired = has(p,'incomeSource','Retired / Pension');
     const old = K(p.r5)===K('Above 55');
     const loan = K(p.loan)==='yes';
+    const modeTxt = [].concat(p.mode||[]).join(', ');
+    const wantsEq = has(p,'mode','Equity (Direct Shares)'), wantsIpo = has(p,'mode','IPO');
     const checks=[], talk=[], notes=[];
 
     // 1. Emergency Fund
@@ -273,7 +275,7 @@ window.PLAN = (function(){
     const curSip = r.c ? (+r.c.sip_amount||0) : 0;
     if(curSip) talk.push(`Current SIP with us is ${inr(curSip)} — confirm whether it is already counted in the savings figure. Suggested ${inr(total)}${total>curSip?` → increase by ${inr(total-curSip)}`:' — current SIP is sufficient'}.`);
     if(planned && !noSip && sip>planned[1]) talk.push(`Client planned ${p.sipAmount}; savings allow about ${inr(sip)} — increase gradually.`);
-    if(noSip) talk.push(`Client does not want a SIP (${p.mode||'Lumpsum'}) — apply the same split as % of the lumpsum.`);
+    if(noSip) talk.push(`Client does not want a SIP (${modeTxt||'Lumpsum'}) — apply the same split as % of the lumpsum.`);
     if(tax) talk.push('Confirm the tax regime — ELSS gives no benefit under the NEW regime (move that part to Flexi Cap). PPF / EPF may already fill the 80C limit.');
     if(efS==='r' && (BIG_EQ.includes(K(p.oEquity)) || K(p.oFd)!=='none' && p.oFd)) talk.push('To build the emergency fund faster, suggest moving a lumpsum from shares / FD into a Liquid Fund.');
     if(efPart) talk.push(`Once the emergency target (${big(efTarget)}) is reached, shift the ${inr(efPart)} Liquid SIP to equity.`);
@@ -285,7 +287,8 @@ window.PLAN = (function(){
     if(K(p.r2)===K('Sell')) talk.push('Client would sell on a 20% fall — explain volatility and advise not to stop SIPs.');
     const stepUp = !old && !retired && K(p.r1)!==K('Irregular');
     if(irregular && !noSip) talk.push('Irregular / business income — keep a smaller base SIP and top up in good months.');
-    if(/lumpsum/i.test(p.mode||'')) talk.push('Do not put a lumpsum into equity at once — park it in Liquid / Arbitrage and STP over 6–12 months into this split.');
+    if(wantsEq||wantsIpo) talk.push(`Client is interested in ${[wantsEq&&'direct equity (shares)',wantsIpo&&'IPOs'].filter(Boolean).join(' and ')} — ${r.e?`existing equity client (RM ${r.e.rm||'—'}); coordinate with them`:'check demat / trading account with us; open one if needed'}${wantsIpo?'. Share upcoming IPOs and help apply via UPI / ASBA':''}.`);
+    if(/lumpsum/i.test(modeTxt)) talk.push('Do not put a lumpsum into equity at once — park it in Liquid / Arbitrage and STP over 6–12 months into this split.');
     if(old) talk.push('Age 55+ — discuss an SWP plan for post-retirement income.');
     if(p.oMf && BIG_EQ.includes(K(p.oMf))) talk.push('Large MF holding elsewhere — get the statement and check overlap to avoid duplicate fund types.');
 
