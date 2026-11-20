@@ -10,6 +10,8 @@
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
    Access: Admin sab; RM sirf apne clients ke profiles.
+   👤 RM ko wo profiles bhi dikhti hain jo form usne khud bheja (client CRM me na ho /
+      MF hamare yahan na ho). Kisi aur RM ka client nikle to uski investment chhupi rehti hai.
    🔗 Mobile alag ho to detail popup → "Link to CRM Client" (20-Nov-2026).
    💡 Detail popup me "Suggested Plan" (dninvest-profile-plan.js) apne aap banta hai (20-Nov-2026).
    Depends on app-1.js: DB, CU, fdb, uid, today, fmtDate, fmtNum, toast,
@@ -216,21 +218,31 @@ window.PROF = (function(){
     // Ek client ne do baar form bhara ho → sirf sabse naya (mobile se pehchaan; _profiles pehle se naya→purana sorted)
     const seenMob=new Set();
     const latest=_profiles.filter(p=>{ const k=cleanMobile(p.mobile)||('id:'+p._id); if(seenMob.has(k)) return false; seenMob.add(k); return true; });
-    return latest.map(p=>{ const pr=pairForProfile(p); return {p, c:pr.mf, e:pr.eq, s:sendOf(p,pr)}; })
+    const me=String(CU.name||'').trim().toLowerCase(), same=v=>String(v||'').trim().toLowerCase()===me;
+    return latest.map(p=>{
+        const pr=pairForProfile(p), s=sendOf(p,pr);
+        if(CU.role==='admin') return {p, c:pr.mf, e:pr.eq, s};
+        // RM ko dikhe: (1) client CRM me uska hai, YA (2) form usi ne bheja (send log me "by",
+        // ya link / blank form me uska naam) — chahe client ka MF / equity hamare yahan ho ya na ho.
+        // (2) me client CRM me kisi AUR RM ka nikla → profile dikhegi, par us client ki
+        // investment (SIP / MF / Equity) nahi — sirf "🔒 mapped to <RM>". (20-Nov-2026)
+        const own = canSeePair(pr);
+        const sentByMe = (s && same(s.by)) || same(p.rm);
+        if(own) return {p, c:pr.mf, e:pr.eq, s};
+        if(!sentByMe) return null;
+        const o=pr.mf||pr.eq;
+        return {p, c:null, e:null, s:(s && same(s.by))?s:null, other: o ? (o.rm||'another RM') : ''};
+      })
       .filter(r=>{
-        // RM: apne clients ki profiles + jo form usne khud bheja (blank form / naya client — link me RM ka naam)
-        if(CU.role!=='admin'){
-          const mineByLink = String(r.p.rm||'').trim().toLowerCase()===String(CU.name||'').trim().toLowerCase() && !(r.c||r.e);
-          if(!mineByLink && !canSeePair({eq:r.e, mf:r.c})) return false;
-        }
+        if(!r) return false;
         if(rf && r.p.riskProfile!==rf) return false;
-        if(q && !([r.p.name,r.p.mobile,r.c&&r.c.rm,r.e&&r.e.rm,r.p.rm].join(' ').toLowerCase().includes(q))) return false;
+        if(q && !([r.p.name,r.p.mobile,r.c&&r.c.rm,r.e&&r.e.rm,r.p.rm,r.other].join(' ').toLowerCase().includes(q))) return false;
         return true;
       });
   }
   function render(){
     const list=rows();
-    const pend=(CU.role==='admin' ? _sends : _sends.filter(s=>{ const sg=s.seg==='equity'?'equity':'mf'; const c=sg==='equity'?eqClient(s.cid):mfClient(s.cid); return c && canSeeClient(c, sg); }))
+    const pend=(CU.role==='admin' ? _sends : _sends.filter(s=>{ if(String(s.by||'').trim().toLowerCase()===String(CU.name||'').trim().toLowerCase()) return true; const sg=s.seg==='equity'?'equity':'mf'; const c=sg==='equity'?eqClient(s.cid):mfClient(s.cid); return c && canSeeClient(c, sg); }))
       .filter(s=>!_profiles.some(p=>p.sendId===s.id || (p.cid && p.cid===s.cid && subDate(p) && subDate(p).toISOString()>=s.at)));
     const pc=$('prof-pending'); if(pc) pc.textContent = pend.length ? `⏳ ${pend.length} sent, not filled yet` : '';
     $('prof-count').textContent=list.length+' profile'+(list.length===1?'':'s');
@@ -242,7 +254,7 @@ window.PROF = (function(){
       const d=subDate(r.p);
       h+=`<tr style="cursor:pointer" onclick="PROF.detail(${i})">
         <td>${d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td>
-        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
+        <td><b>${esc(r.p.name)}</b> ${r.e?'<span class="badge b-eq" style="font-size:.55rem">EQ</span>':''}${r.c?'<span class="badge b-mf" style="font-size:.55rem">MF</span>':''}${r.other?` <small style="color:#6d28d9;font-weight:700" title="Client CRM me ${esc(r.other)} ke paas mapped hai — investment details unhe / Admin ko dikhti hain">🔒 ${esc(r.other)}</small>`:(r.c||r.e)?'':(r.p.blankForm?' <small style="color:#0f766e;font-weight:700" title="Blank form — not matched to CRM. Existing client? Open 👁️ → 🔗 Link to CRM Client">🆕 NEW</small>':' <small style="color:#b45309" title="Not matched to any client in CRM — open 👁️ → 🔗 Link to CRM Client">⚠️ not in CRM</small>')}</td>
         <td>${esc(r.p.mobile)}</td><td>${esc((r.c&&r.c.rm)||(r.e&&r.e.rm)||r.p.rm||'—')}</td>
         <td><b style="color:${riskC[r.p.riskProfile]||'var(--navy)'}">${esc(r.p.riskProfile||'—')}</b> <small>(${esc(r.p.riskScore??'')}/15)</small></td>
         <td>${esc(r.p.monthlySavings||'—')}</td><td>${esc(r.p.mode||'—')}</td><td>${esc(r.p.sipAmount||'—')}</td>
@@ -318,6 +330,7 @@ window.PROF = (function(){
   // ── 🔗 Manual link: profile ↔ CRM client ──
   function linkBox(i, r){
     const mob=cleanMobile(r.p.mobile), L=_links[mob];
+    if(r.other) return `<div style="background:#ede9fe;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:.74rem;color:#4c1d95">🔒 Ye client CRM me <b>${esc(r.other)}</b> ke paas mapped hai. Form aapne bheja tha isliye profile aur plan aapko dikh rahe hain — client ki investment (SIP / MF / Equity) sirf ${esc(r.other)} aur Admin ko dikhti hai.</div>`;
     if(r.c||r.e){
       if(!L) return '';
       const nm=(r.c||r.e).name||'';
