@@ -3442,6 +3442,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="profPlanModal" onclick="if(event.target===this)closeModal('profPlanModal')">
+  <div class="modal" style="width:800px;max-width:96vw">
+    <div class="modal-hdr"><h3 id="profPlanTitle">💡 Suggested Plan</h3><button class="modal-close" onclick="closeModal('profPlanModal')">×</button></div>
+    <div class="modal-body" id="profPlanBody"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="profSumModal" onclick="if(event.target===this)closeModal('profSumModal')">
   <div class="modal" style="width:min(1050px,96vw);max-width:96vw">
     <div class="modal-hdr"><h3>📊 Profile Form — RM-wise Sent / Filled / Pending</h3><button class="modal-close" onclick="closeModal('profSumModal')">×</button></div>
@@ -3449,7 +3455,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
   </div>
 </div>
 <div class="modal-overlay" id="profDetailModal" onclick="if(event.target===this)closeModal('profDetailModal')">
-  <div class="modal" style="width:800px;max-width:96vw">
+  <div class="modal" style="width:660px;max-width:96vw">
     <div class="modal-hdr"><h3 id="profDetailTitle">Client Profile</h3><button class="modal-close" onclick="closeModal('profDetailModal')">×</button></div>
     <div class="modal-body" id="profDetailBody"></div>
   </div>
@@ -3466,7 +3472,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 
 <script src="dninvest-backoffice.js?v=2026-11-19-v1"></script>
 
-<script src="dninvest-profiles.js?v=2026-11-20-v5"></script>
+<script src="dninvest-profiles.js?v=2026-11-20-v6"></script>
 <script src="dninvest-profile-plan.js?v=2026-11-20-v4"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->

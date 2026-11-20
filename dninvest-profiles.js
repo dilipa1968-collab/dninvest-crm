@@ -278,7 +278,7 @@ window.PROF = (function(){
         <td><b>${r.e&&eqVal(r.e)?money(eqVal(r.e)):'—'}</b></td>
         <td>${r.s?`${money(r.s.sip)} / ${money(r.s.aum)} / ${r.s.eq?money(r.s.eq):'—'}<br><small style="color:var(--gray)">${fmtDate(String(r.s.at).slice(0,10))} by ${esc(r.s.by)}</small>`:'—'}</td>
         <td title="${esc(elsewhereText(r.p))}" style="max-width:220px;font-size:.62rem">${esc(elsewhereText(r.p))||'—'}</td>
-        <td style="white-space:nowrap"><button class="btn-icon" title="View full profile">👁️</button>${CU.role==='admin'?`<button class="btn-icon" title="Delete this profile" style="color:var(--red)" onclick="event.stopPropagation();PROF.del(${i})">🗑️</button>`:''}</td></tr>`;
+        <td style="white-space:nowrap"><button class="btn-icon" title="View full profile">👁️</button>${window.PLAN?`<button class="btn-icon" title="Suggested Plan" onclick="event.stopPropagation();PROF.plan(${i})">💡</button>`:''}${CU.role==='admin'?`<button class="btn-icon" title="Delete this profile" style="color:var(--red)" onclick="event.stopPropagation();PROF.del(${i})">🗑️</button>`:''}</td></tr>`;
     });
     $('prof-table').innerHTML=h+'</tbody></table>';
     window._profRows=list;
@@ -335,7 +335,7 @@ window.PROF = (function(){
       </div>
       <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc((()=>{ const R=rmOf(r); return [R.mf&&('MF: '+R.mf), R.eq&&('EQ: '+R.eq)].filter(Boolean).join(' · ') || R.main || '—'; })())}</b>${senderOf(r)?` · Form sent by: <b>${esc(senderOf(r))}</b>`:''} · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
       ${linkBox(i, r)}
-      ${window.PLAN ? PLAN.html(i) : ''}
+      ${window.PLAN ? `<div style="text-align:right;margin:-4px 0 8px"><button class="btn" style="background:var(--navy);color:#f5d98a;border:none" onclick="PROF.plan(${i})">💡 Open Suggested Plan</button></div>` : ''}
       <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 4px">Client's Answers</div>
       <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>
       ${CU.role==='admin'?`<div style="text-align:right;margin-top:12px"><button class="btn btn-danger" onclick="PROF.del(${i})">🗑️ Delete Profile</button></div>`:''}`;
@@ -488,6 +488,16 @@ window.PROF = (function(){
     });
     body.innerHTML=h+'</tbody></table></div></div><p style="font-size:.68rem;color:var(--gray);margin-top:8px">Blank links ki ginti aaj (20-Nov-2026) ke update ke baad se shuru hai — usse pehle ke blank forms "Blank Filled" me gine jaate hain par "Blank Links" me nahi.</p>';
   }
+  // 💡 Suggested Plan — alag popup (profile detail se alag) — 20-Nov-2026
+  function plan(i){
+    const r=(window._profRows||[])[i]; if(!r || !window.PLAN) return;
+    try{ closeModal('profDetailModal'); }catch(_){}
+    const p=r.p, R=rmOf(r);
+    $('profPlanTitle').textContent='💡 Plan — '+(p.name||'Client');
+    $('profPlanBody').innerHTML=`<div style="font-size:.76rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc(R.main||'—')}</b>${R.sub.length?' <small>('+esc(R.sub.join(' · '))+')</small>':''} · Risk: <b>${esc(p.riskProfile||'—')}</b>
+      <button class="btn btn-outline" style="padding:3px 9px;font-size:.7rem;margin-left:6px" onclick="closeModal('profPlanModal');PROF.detail(${i})">👁️ View Profile</button></div>${PLAN.html(i)}`;
+    $('profPlanModal').classList.add('open');
+  }
   function box(l,v){ return `<div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div style="font-size:.62rem;color:var(--gray);font-weight:700;text-transform:uppercase">${l}</div><div style="font-weight:800;color:var(--navy);font-size:.9rem">${esc(v)}</div></div>`; }
   function exportXlsx(){
     const list=rows();
@@ -556,5 +566,5 @@ window.PROF = (function(){
     await open();
     const s=$('prof-search'); if(s && c){ s.value=cleanMobile(c.mobile)||c.name; render(); }
   }
-  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink, summary, sumRange, sumToggle };
+  return { send, open, openFor, render, detail, exportXlsx, menuHtml, del, blank, linkSearch, link, unlink, summary, sumRange, sumToggle, plan };
 })();
