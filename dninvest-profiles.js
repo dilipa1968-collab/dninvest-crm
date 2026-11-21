@@ -356,6 +356,29 @@ window.PROF = (function(){
     ['goal','Goals'],['mode','Investment Mode'],
     ['sipAmount','Planned SIP'],['period','Investment Period'],
     ['eqInterest','Equity — Interested'],['eqStyle','Equity — Type'],['ipoApply','IPO — Applies'],['eqExp','Equity — Experience'],['eqCapital','Equity — Capital'],['eqLoss','Equity — Max Loss Bearable'],['eqSupport','Equity — Help Wanted'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
+  // 21-Nov-2026: jawab form ki tarah section-wise (form ke number 2–7), chhote labels, 2 column cards
+  const ANS_SECTIONS=[
+    ['💼','Income & Savings','#1a56db',[['incomeSource','Income Source'],['monthlyIncome','Monthly Income'],['monthlySavings','Monthly Savings']]],
+    ['🛡️','Loans & Protection','#b45309',[['loan','Loan'],['loanAmount','Loan Outstanding'],['emiAmount','Monthly EMI'],['emergencyFund','Emergency Fund'],['healthCover','Health Cover'],['lifeCover','Life Cover']]],
+    ['🏦','Investments Elsewhere','#0f766e',[['oEquity','Shares / Equity'],['oMf','MF Holding'],['oSip','Monthly SIP'],['oFd','FD / Bonds'],['oOther','Other Investments'],['otherDetails','Broker / Details']]],
+    ['📊','Mutual Fund Investment Plan','#6d28d9',[['goal','Goals'],['mode','Investment Mode'],['sipAmount','Planned SIP'],['period','Investment Period']]],
+    ['📈','Share Market — Equity & IPO','#c2185b',[['eqInterest','Interested'],['eqStyle','Type'],['ipoApply','IPO'],['eqExp','Experience'],['eqCapital','Capital'],['eqLoss','Max Loss Bearable'],['eqSupport','Help Wanted'],
+      ['eqMonthly','Monthly Amount'],['eqFreq','Trading Frequency'],['eqHolding','Holding Period'],['ipoAmount','IPO — Amount'],['ipoAccounts','IPO — Family Accounts'],['ipoGoal','IPO — Purpose'],['ipoUpi','IPO — UPI'],['ipoHelp','IPO — Help']]],
+    ['🎯','Risk Profile','#0f1f3d',[['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']]]
+  ];
+  function answersHtml(p){
+    const v=k=>Array.isArray(p[k])?p[k].join(', '):(p[k]||'');
+    const cards=ANS_SECTIONS.map(([ic,title,col,fields],n)=>{
+      const rows=fields.filter(([k])=>v(k));
+      if(!rows.length) return '';
+      const extra = title==='Risk Profile' && p.riskProfile ? `<span style="margin-left:auto;font-size:.68rem;color:${col}">${esc(p.riskProfile)} (${esc(p.riskScore??'')}/15)</span>` : '';
+      return `<div style="border:1px solid var(--border);border-top:3px solid ${col};border-radius:10px;overflow:hidden;background:#fff">
+        <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:#f8fafc;font-size:.72rem;font-weight:800;color:${col};text-transform:uppercase;letter-spacing:.3px">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${col};color:#fff;font-size:.62rem">${n+2}</span>${ic} ${title}${extra}</div>
+        <table style="width:100%;font-size:.76rem;border-collapse:collapse"><tbody>${rows.map(([k,l])=>`<tr><td style="color:var(--gray);padding:5px 10px;width:44%;border-top:1px solid #f0f2f6;vertical-align:top">${l}</td><td style="font-weight:700;color:var(--navy);padding:5px 10px;border-top:1px solid #f0f2f6">${esc(v(k))}</td></tr>`).join('')}</tbody></table></div>`;
+    }).filter(Boolean);
+    return cards.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">${cards.join('')}</div>` : '<div style="color:var(--gray);font-size:.8rem">No answers</div>';
+  }
   function detail(i){
     const r=(window._profRows||[])[i]; if(!r) return;
     const p=r.p, d=subDate(p);
@@ -373,8 +396,8 @@ window.PROF = (function(){
       <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc((()=>{ const R=rmOf(r); return [R.mf&&('MF: '+R.mf), R.eq&&('EQ: '+R.eq)].filter(Boolean).join(' · ') || R.main || '—'; })())}</b>${senderOf(r)?` · Form sent by: <b>${esc(senderOf(r))}</b>`:''} · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
       ${linkBox(i, r)}
       ${window.PLAN ? `<div style="text-align:right;margin:-4px 0 8px"><button class="btn" style="background:var(--navy);color:#f5d98a;border:none" onclick="PROF.plan(${i})">💡 Open Suggested Plan</button></div>` : ''}
-      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 4px">Client's Answers</div>
-      <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 6px">Client's Answers</div>
+      ${answersHtml(p)}
       ${CU.role==='admin'?`<div style="text-align:right;margin-top:12px"><button class="btn btn-danger" onclick="PROF.del(${i})">🗑️ Delete Profile</button></div>`:''}`;
     $('profDetailModal').classList.add('open');
   }
