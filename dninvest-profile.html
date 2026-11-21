@@ -51,6 +51,16 @@
   .opts.chips label{min-height:0!important;padding:7px 12px!important;border-radius:20px!important;font-size:12.5px!important;gap:0!important;white-space:nowrap}
   .opts.chips label::before{display:none!important}
   .opts.chips .oh{display:inline!important;margin-left:4px}
+  /* 21-Nov-2026: "row" sawaal — naam baayein, chips daayein, ek line me (Loans & Protection, Investments Elsewhere) */
+  .q.row{display:grid;grid-template-columns:78px 1fr;gap:8px;align-items:center;margin-bottom:0;padding:7px 0;border-bottom:1px dashed #262626}
+  .q.row:last-of-type{border-bottom:none}
+  .q.row .ql{font-size:12px;margin:0;line-height:1.2}
+  .q.row .ql em{display:block;font-size:10px;margin-top:1px}
+  .q.row .qh{font-size:10.5px;margin-top:1px}
+  .q.row .opts.chips{gap:3px}
+  .q.row .opts.chips label{padding:5px 7px!important;font-size:11px!important;letter-spacing:-.1px}
+  .q.row .oh{display:none!important}
+  .q.row.sub{margin-left:0;padding:7px 8px;border-radius:8px}
   .opts.chips input[type=checkbox]:checked+label>span::before{content:"✓ ";font-weight:900}
   .opts.chips label{white-space:normal!important;text-align:left}
   .opts input{display:none}
@@ -158,7 +168,7 @@
       </div>
 
       <div class="card" id="incomeCard"><div class="sh"><div class="num">2</div><h3>Income &amp; Savings<small>Monthly figures</small><small class="hi">आय और बचत (मासिक आँकड़े)</small></h3></div></div>
-      <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Emergency fund and insurance cover</small><small class="hi">लोन और सुरक्षा — इमरजेंसी फंड और बीमा</small></h3></div></div>
+      <div class="card" id="safetyCard"><div class="sh"><div class="num">3</div><h3>Loans &amp; Protection<small>Loan, emergency fund and insurance (approximate)</small><small class="hi">लोन, इमरजेंसी फंड और बीमा (अनुमानित)</small></h3></div></div>
       <div class="card" id="otherCard"><div class="sh"><div class="num">4</div><h3>Investments Elsewhere<small>With other brokers, banks or platforms (approximate value)</small><small class="hi">अन्य जगह निवेश — दूसरे ब्रोकर, बैंक या प्लेटफ़ॉर्म पर (अनुमानित राशि)</small></h3></div></div>
       <div class="card" id="planCard"><div class="sh"><div class="num">5</div><h3>Mutual Fund Investment Plan<small class="hi">म्यूचुअल फंड निवेश योजना</small></h3></div></div>
       <div class="card" id="eqCard"><div class="sh"><div class="num">6</div><h3>Share Market — Equity, Trading &amp; IPO<small>Shares, trading and IPO</small><small class="hi">शेयर बाज़ार — शेयर, ट्रेडिंग और IPO</small></h3></div></div>
@@ -224,17 +234,17 @@ const SECTIONS = {
     {k:"monthlySavings", h:"मासिक बचत (सभी खर्चों के बाद बची राशि)", l:"Monthly Savings", hint:"(amount left after all expenses)", o:["Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","₹25,000 – 50,000","Above ₹50,000"]}
   ],
   safetyCard: [
-    {k:"loanAmount", h:"कुल बकाया लोन", l:"Total Loan Outstanding", o:["No loan","Below ₹5 Lakh","₹5 – 20 Lakh","₹20 – 50 Lakh","Above ₹50 Lakh"]},
-    {k:"emiAmount", h:"कुल मासिक EMI", l:"Total Monthly EMI", show:fd=>{ const v=fd.get("loanAmount"); return !!v && v!=="No loan"; }, o:["Below ₹5,000","₹5,000 – 15,000","₹15,000 – 30,000","Above ₹30,000"]},
-    {k:"emergencyFund", h:"इमरजेंसी फंड (आपात स्थिति के लिए बैंक / FD में रखी राशि)", l:"Emergency Fund", hint:"(money kept aside in bank / FD for emergencies)", o:["None","Below ₹1 Lakh","₹1 – 3 Lakh","₹3 – 5 Lakh","Above ₹5 Lakh"]},
-    {k:"healthCover", h:"स्वास्थ्य बीमा कवर (पूरे परिवार का)", l:"Health Insurance Cover", hint:"(family total)", o:["None","Below ₹5 Lakh","₹5 – 10 Lakh","Above ₹10 Lakh"]},
-    {k:"lifeCover", h:"जीवन / टर्म बीमा कवर", l:"Life / Term Insurance Cover", o:["None","Below ₹50 Lakh","₹50 Lakh – 1 Crore","Above ₹1 Crore"]}
+    {k:"loanAmount", row:true, sl:"Loan", sh:"लोन", sn:"total outstanding", h:"कुल बकाया लोन", l:"Total Loan Outstanding", o:["No loan","Below ₹5 Lakh","₹5 – 20 Lakh","₹20 – 50 Lakh","Above ₹50 Lakh"]},
+    {k:"emiAmount", row:true, sl:"EMI", sh:"EMI", sn:"per month", h:"कुल मासिक EMI", l:"Total Monthly EMI", show:fd=>{ const v=fd.get("loanAmount"); return !!v && v!=="No loan"; }, o:["Below ₹5,000","₹5,000 – 15,000","₹15,000 – 30,000","Above ₹30,000"]},
+    {k:"emergencyFund", row:true, sl:"Emergency", sh:"इमरजेंसी फंड", sn:"fund in bank / FD", h:"इमरजेंसी फंड (आपात स्थिति के लिए बैंक / FD में रखी राशि)", l:"Emergency Fund", hint:"(money kept aside in bank / FD for emergencies)", o:["None","Below ₹1 Lakh","₹1 – 3 Lakh","₹3 – 5 Lakh","Above ₹5 Lakh"]},
+    {k:"healthCover", row:true, sl:"Health", sh:"स्वास्थ्य बीमा", sn:"insurance (family)", h:"स्वास्थ्य बीमा कवर (पूरे परिवार का)", l:"Health Insurance Cover", hint:"(family total)", o:["None","Below ₹5 Lakh","₹5 – 10 Lakh","Above ₹10 Lakh"]},
+    {k:"lifeCover", row:true, sl:"Life Cover", sh:"जीवन / टर्म बीमा", sn:"term insurance", h:"जीवन / टर्म बीमा कवर", l:"Life / Term Insurance Cover", o:["None","Below ₹50 Lakh","₹50 Lakh – 1 Crore","Above ₹1 Crore"]}
   ],
   otherCard: [
-    {k:"oEquity", h:"शेयर / इक्विटी (दूसरे ब्रोकर के डीमैट में)", l:"Shares / Equity (Demat with other broker)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
-    {k:"oMf", h:"म्यूचुअल फंड होल्डिंग (दूसरे डिस्ट्रीब्यूटर / डायरेक्ट)", l:"Mutual Fund Holding (other distributor / direct)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
-    {k:"oSip", h:"दूसरी जगह चल रही मासिक SIP", l:"Monthly SIP Running Elsewhere", o:["None","Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000"]},
-    {k:"oFd", h:"फिक्स्ड डिपॉज़िट / बॉन्ड", l:"Fixed Deposits / Bonds", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oEquity", row:true, sl:"Shares", sh:"शेयर", sn:"other broker", h:"शेयर / इक्विटी (दूसरे ब्रोकर के डीमैट में)", l:"Shares / Equity (Demat with other broker)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oMf", row:true, sl:"MF", sh:"म्यूचुअल फंड", sn:"other / direct", h:"म्यूचुअल फंड होल्डिंग (दूसरे डिस्ट्रीब्यूटर / डायरेक्ट)", l:"Mutual Fund Holding (other distributor / direct)", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
+    {k:"oSip", row:true, sl:"SIP", sh:"मासिक SIP", sn:"monthly", h:"दूसरी जगह चल रही मासिक SIP", l:"Monthly SIP Running Elsewhere", o:["None","Below ₹5,000","₹5,000 – 10,000","₹10,000 – 25,000","Above ₹25,000"]},
+    {k:"oFd", row:true, sl:"FD / Bonds", sh:"FD / बॉन्ड", sn:"", h:"फिक्स्ड डिपॉज़िट / बॉन्ड", l:"Fixed Deposits / Bonds", o:["None","Below ₹1 Lakh","₹1 – 5 Lakh","₹5 – 25 Lakh","Above ₹25 Lakh"]},
     {k:"oOther", h:"अन्य निवेश (जो लागू हों, सभी पर टिक करें)", l:"Other Investments", hint:"(tick all that apply)", multi:true, o:["PPF / EPF","LIC / Insurance Plans","Gold / SGB","NPS","Real Estate","Post Office Schemes","None"]}
   ],
   planCard: [
@@ -297,12 +307,15 @@ for (const [card, qs] of Object.entries(SECTIONS)) {
   const el = document.getElementById(card);
   qs.forEach(q => {
     const d = document.createElement("div");
-    d.className = "q" + ((q.when||q.whenNot||q.show) ? " sub hide" : ""); d.id = "q_"+q.k;
+    d.className = "q" + (q.row ? " row" : "") + ((q.when||q.whenNot||q.show) ? " sub hide" : ""); d.id = "q_"+q.k;
     const chip = isChip(q);
-    d.innerHTML = `<div class="ql">${q.l} *${q.hint?` <em>${q.hint}</em>`:""}${q.h?`<span class="hi qh">${q.h}</span>`:""}</div><div class="opts${chip?' chips':q.o.length===3?' c3':''}">` + q.o.map((o,i)=>{
+    const head = q.row
+      ? `<div class="ql">${q.sl} *${q.sn?`<em>${q.sn}</em>`:""}<span class="hi qh">${q.sh}</span></div>`
+      : `<div class="ql">${q.l} *${q.hint?` <em>${q.hint}</em>`:""}${q.h?`<span class="hi qh">${q.h}</span>`:""}</div>`;
+    d.innerHTML = head + `<div class="opts${chip?' chips':q.o.length===3?' c3':''}">` + q.o.map((o,i)=>{
       const id = q.k+"_"+i;
       // value hamesha poora text (CRM / plan same rehte hain) — sirf dikhne wala label chhota
-      return `<input type="${q.multi?'checkbox':'radio'}" name="${q.k}" id="${id}" value="${o}"><label for="${id}"><span>${chip?shortLbl(o):o}${OH[o]&&OH[o]!==o?`<span class="hi oh">${OH[o]}</span>`:""}</span></label>`;
+      return `<input type="${q.multi?'checkbox':'radio'}" name="${q.k}" id="${id}" value="${o}"><label for="${id}"><span>${q.row?shortLbl(o).replace(/ – /g,'–').replace(/^([<>]) /,'$1'):chip?shortLbl(o):o}${OH[o]&&OH[o]!==o?`<span class="hi oh">${OH[o]}</span>`:""}</span></label>`;
     }).join("") + `</div>`;
     el.appendChild(d);
   });
