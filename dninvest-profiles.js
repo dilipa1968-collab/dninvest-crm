@@ -355,9 +355,7 @@ window.PROF = (function(){
     ['oEquity','Elsewhere — Shares / Equity'],['oMf','Elsewhere — MF Holding'],['oSip','Elsewhere — Monthly SIP'],['oFd','Elsewhere — FD / Bonds'],['oOther','Elsewhere — Other Investments'],['otherDetails','Elsewhere — Broker / Details'],
     ['goal','Goals'],['mode','Investment Mode'],
     ['sipAmount','Planned SIP'],['period','Investment Period'],
-    ['eqInterest','Equity — Interested'],['eqStyle','Equity — Trading Type'],['eqExp','Equity — Experience'],['eqCapital','Equity — Capital'],
-    ['eqMonthly','Equity — Monthly Amount'],['eqFreq','Equity — Trading Frequency'],['eqHolding','Equity — Holding Period'],['eqLoss','Equity — Max Loss Bearable'],['eqSupport','Equity — Help Wanted'],
-    ['ipoApply','IPO — Interested'],['ipoAmount','IPO — Amount per IPO'],['ipoAccounts','IPO — Family Demat Accounts'],['ipoGoal','IPO — Purpose'],['ipoUpi','IPO — UPI Linked'],['ipoHelp','IPO — Help Wanted'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
+    ['eqInterest','Equity — Interested'],['eqStyle','Equity — Type'],['ipoApply','IPO — Applies'],['eqExp','Equity — Experience'],['eqCapital','Equity — Capital'],['eqLoss','Equity — Max Loss Bearable'],['eqSupport','Equity — Help Wanted'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
   function detail(i){
     const r=(window._profRows||[])[i]; if(!r) return;
     const p=r.p, d=subDate(p);
