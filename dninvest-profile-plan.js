@@ -703,35 +703,7 @@ window.PLAN = (function(){
   const toBlob = cv => new Promise(res=>cv.toBlob(res,'image/png'));
   function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
 
-  // ══ 22-Nov-2026: WhatsApp lambi image ko chhota (dhundla) kar deta hai → 2–3 pages me kaato (har page ≤ 1300px,
-  // WhatsApp use resize nahi karta) + PDF (document compress nahi hota, 2x sharp). ══
-  function splitPages(cv){
-    const SC=cv._scale||1, H=cv._h||cv.height/SC, MAX=1300, MIN=500, BR=(cv._breaks||[]).slice().sort((a,b)=>a-b);
-    // Barabar hisse: kitne page chahiye, phir har kaat target ke sabse paas wale break par
-    const cuts=[0]; let start=0, left=Math.ceil(H/MAX);
-    while(left>1 && H-start>MAX*0.6){
-      const target=start+(H-start)/left;
-      const cand=BR.filter(b=>b>start+MIN && b<=start+MAX && H-b>MIN*0.6);
-      const end=cand.length ? cand.reduce((a,b)=>Math.abs(b-target)<Math.abs(a-target)?b:a) : Math.min(start+MAX,H);
-      cuts.push(end); start=end; left--;
-      if(left===1 && H-start>MAX){ left=Math.ceil((H-start)/MAX)+0; }
-    }
-    cuts.push(H);
-    const pages=[];
-    for(let n=0;n<cuts.length-1;n++){
-      const y0=cuts[n], y1=cuts[n+1], top=n?14:0, bottom=cuts.length>2?44:0;
-      const pc=document.createElement('canvas'); pc.width=cv.width; pc.height=(y1-y0+top+bottom)*SC;
-      const g=pc.getContext('2d');
-      g.fillStyle='#f7f3ea'; g.fillRect(0,0,pc.width,pc.height);
-      if(top){ const gl=g.createLinearGradient(0,0,pc.width,0); gl.addColorStop(0,'#c9942a'); gl.addColorStop(.5,'#f5d98a'); gl.addColorStop(1,'#c9942a'); g.fillStyle=gl; g.fillRect(0,0,pc.width,7*SC); }
-      g.drawImage(cv,0,y0*SC,cv.width,(y1-y0)*SC,0,top*SC,cv.width,(y1-y0)*SC);
-      if(bottom && n<cuts.length-2){ g.fillStyle='#8a6d2f'; g.font=`700 ${18*SC}px ${FONT}`; g.textAlign='center'; g.textBaseline='middle';
-        g.fillText(`Page ${n+1} of ${cuts.length-1} — continued in next image  ·  अगली इमेज में जारी`, pc.width/2, pc.height-22*SC); }
-      else if(bottom){ g.fillStyle='#8a6d2f'; g.font=`700 ${18*SC}px ${FONT}`; g.textAlign='center'; g.textBaseline='middle'; g.fillText(`Page ${n+1} of ${cuts.length-1}`, pc.width/2, (top+y1-y0)*SC+22*SC); }
-      pages.push(pc);
-    }
-    return pages;
-  }
+  // ══ 22-Nov-2026: WhatsApp image ko chhota kar deta hai → image 2x resolution me (HD me saaf) + PDF (document compress nahi hota) ══
   // Chhota PDF writer (koi library nahi) — har page ek JPEG, page size image ke anupaat me (ek lambi page)
   async function makePdf(canvases){
     const enc=new TextEncoder(), parts=[], offs=[]; let len=0;
@@ -764,29 +736,27 @@ window.PLAN = (function(){
     return '';
   }
 
+  // 22-Nov-2026 v2: EK hi PNG (pages me nahi kaatte) — double resolution (2160px) taaki WhatsApp HD me saaf rahe
+  const IMG_SC = 2;
   async function downloadImage(i){
     const r=rowOf(i); if(!r) return;
-    try{
-      const pages=splitPages(await makeCanvas(i));
-      for(let k=0;k<pages.length;k++){ dl(await toBlob(pages[k]), fileName(r.p).replace(/\.png$/, pages.length>1?`_${k+1}.png`:'.png')); }
-      toast&&toast(`Image${pages.length>1?'s':''} downloaded ✓ (${pages.length})`,'success');
-    }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); }
+    try{ dl(await toBlob(await makeCanvas(i,IMG_SC)), fileName(r.p)); toast&&toast('Image downloaded ✓','success'); }
+    catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); }
   }
   async function sendImage(i){
     const r=rowOf(i); if(!r) return;
-    let pages; try{ pages=splitPages(await makeCanvas(i)); }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); return; }
-    const cap=caption(i), base=fileName(r.p).replace(/\.png$/,'');
-    const blobs=await Promise.all(pages.map(toBlob));
-    const files=blobs.map((b,k)=>new File([b], blobs.length>1?`${base}_${k+1}.png`:`${base}.png`, {type:'image/png'}));
-    // 1) Mobile: share sheet → WhatsApp (saare pages ek saath)
-    const sh=await shareFiles(files, cap); if(sh) return;
-    // 2) Computer: pehla page clipboard me, saare pages download, client ka chat khule
+    let blob; try{ blob=await toBlob(await makeCanvas(i,IMG_SC)); }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); return; }
+    const cap=caption(i), file=new File([blob], fileName(r.p), {type:'image/png'});
+    // 1) Mobile: share sheet → WhatsApp
+    const sh=await shareFiles([file], cap);
+    if(sh==='shared'){ toast&&toast('Tip: in WhatsApp tap "HD" before sending for a sharp image','success'); return; }
+    if(sh==='cancel') return;
+    // 2) Computer: clipboard me copy + download, client ka chat khule → Ctrl+V
     let copied=false;
-    try{ if(blobs.length===1 && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'image/png':blobs[0]})]); copied=true; } }catch(e){ console.warn('clipboard image failed',e); }
-    files.forEach((f,k)=>setTimeout(()=>dl(f,f.name),k*400));
+    try{ if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){ console.warn('clipboard image failed',e); }
+    dl(file, file.name);
     window.open(waUrl(r.p, cap),'_blank');
-    toast&&toast(copied ? '🖼️ Image copied — press Ctrl+V in the WhatsApp chat, then send'
-      : `🖼️ ${files.length} images downloaded — attach them in WhatsApp with 📎 (in order 1, 2${files.length>2?', 3':''})`, 'success');
+    toast&&toast((copied ? '🖼️ Image copied — press Ctrl+V in the WhatsApp chat' : '🖼️ Image downloaded — attach it in WhatsApp with 📎')+'. Choose "HD" before sending for a sharp image.', 'success');
   }
   // 📄 PDF — sabse saaf (WhatsApp document compress nahi karta), double resolution
   async function sendPdf(i, onlyDownload){
