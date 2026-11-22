@@ -402,8 +402,9 @@ window.PLAN = (function(){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn" style="background:#25D366;color:#fff;border:none" onclick="PLAN.sendImage(${i})" title="Creates a colourful image and opens WhatsApp">🖼️ Send Colorful Plan (WhatsApp)</button>
         <button class="btn btn-outline" onclick="PLAN.wa(${i})" title="Plain text message only">💬 Send as Text</button>
+        <button class="btn" style="background:#0f1f3d;color:#f5d98a;border:none" onclick="PLAN.sendPdf(${i})" title="Sharpest — WhatsApp does not compress documents">📄 Send PDF (sharpest)</button>
         <button class="btn btn-outline" onclick="PLAN.downloadImage(${i})">⬇️ Image</button>
-        <button class="btn btn-outline" onclick="PLAN.print(${i})">🖨️ PDF</button>
+        <button class="btn btn-outline" onclick="PLAN.print(${i})">⬇️ PDF</button>
       </div>
       <div style="font-size:.62rem;color:var(--gray);margin-top:6px">Rule-based suggestion — the RM finalises schemes and amounts after discussing with the client.</div>
     </div>`;
@@ -546,13 +547,15 @@ window.PLAN = (function(){
   function txt(ctx, t, x, y, maxW, font, color, lh){ const ls=lines(ctx,t,font,maxW); ctx.fillStyle=color; ctx.textBaseline='top'; ls.forEach((l,n)=>ctx.fillText(l,x,y+n*lh)); return y+ls.length*lh; }
 
   // ══ 🎨 Client image v2 (22-Nov-2026): premium navy-gold design, donut chart, fund cards, next steps ══
-  async function makeCanvas(i){
+  // SC = resolution multiplier (PDF ke liye 2 = double sharp). BR = jahan image kaat sakte hain (card ke beech nahi)
+  async function makeCanvas(i, SC){
+    SC = SC || 1; const BR=[];
     const r=rowOf(i); const F=final(r), p=r.p;
     const W=1080, P=52, IW=W-2*P;
     const NAVY='#0f1f3d', GOLD='#c9942a', GOLD2='#f5d98a', INK='#14213d', MUTE='#64748b', HIC='#8a6d2f', BG='#f7f3ea';
-    const cv=document.createElement('canvas'); cv.width=W; cv.height=5200;
-    const c=cv.getContext('2d');
-    c.fillStyle=BG; c.fillRect(0,0,W,cv.height);
+    const cv=document.createElement('canvas'); cv.width=W*SC; cv.height=5200*SC;
+    const c=cv.getContext('2d'); c.scale(SC,SC);
+    c.fillStyle=BG; c.fillRect(0,0,W,5200);
     const shadow=(on)=>{ if(on){ c.shadowColor='rgba(15,31,61,.13)'; c.shadowBlur=26; c.shadowOffsetY=8; } else { c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetY=0; } };
     const card=(x,y,w,h,fill)=>{ shadow(true); c.fillStyle=fill||'#fff'; rr(c,x,y,w,h,22); c.fill(); shadow(false); };
     const tw=(t,f)=>{ c.font=f; return c.measureText(t).width; };
@@ -590,7 +593,7 @@ window.PLAN = (function(){
       txt(c,l.toUpperCase(),x+64,y+22,chW-80,fnt(15,800),MUTE,20);
       txt(c,v,x+64,y+44,chW-80,fnt(22,900),NAVY,26);
       if(h) txt(c,h,x+64,y+72,chW-80,fnt(16),HIC,20); });
-    y+=104+28;
+    y+=104+28; BR.push(y-14);
 
     // ── Hero: donut + legend ──
     const tot=F.total||1, rows=F.alloc;
@@ -621,7 +624,7 @@ window.PLAN = (function(){
       ly+=rowH(f);
       c.fillStyle='#eef1f6'; c.fillRect(lx,ly-10,lw,2);
     });
-    y+=heroH+26;
+    y+=heroH+26; BR.push(y-13);
 
     // ── Why this combination ──
     if(!F.edited){
@@ -631,7 +634,7 @@ window.PLAN = (function(){
       txt(c,'✨ '+F.comboEn,P+34,y+24,IW-60,fnt(24,900),GOLD2,30);
       let yy=txt(c,F.comboWhy,P+34,y+64,IW-80,fnt(20),'#e5e7eb',28);
       txt(c,F.comboWhyHi,P+34,yy+2,IW-80,fnt(19),'#e9cf86',27);
-      y+=tH+30;
+      y+=tH+30; BR.push(y-15);
     }
 
     // ── Health check ──
@@ -650,7 +653,7 @@ window.PLAN = (function(){
         yy=txt(c,x.adv,X+92,yy+2,ci,fnt(21,700),INK,27);
         if(x.advHi) txt(c,x.advHi,X+92,yy,ci,fnt(18),HIC,25);
       });
-      y+=h+16;
+      y+=h+16; BR.push(y-8);
     }
     y+=14;
 
@@ -665,7 +668,7 @@ window.PLAN = (function(){
     tips.forEach(([ic,en,hi,col])=>{ const w=IW-110; const h=26+lines(c,en,fnt(21,700),w).length*28+(hi?lines(c,hi,fnt(19),w).length*26:0)+20;
       card(P,y,IW,h); c.fillStyle=col; rr(c,P,y,8,h,4); c.fill();
       txt(c,ic,P+30,y+20,50,fnt(32),col,36);
-      let yy=txt(c,en,P+84,y+24,w,fnt(21,700),INK,28); if(hi) txt(c,hi,P+84,yy,w,fnt(19),HIC,26); y+=h+14; });
+      let yy=txt(c,en,P+84,y+24,w,fnt(21,700),INK,28); if(hi) txt(c,hi,P+84,yy,w,fnt(19),HIC,26); y+=h+14; BR.push(y-7); });
     y+=16;
 
     // ── Next steps ──
@@ -678,7 +681,7 @@ window.PLAN = (function(){
       c.textAlign='center'; txt(c,String(k+1),x+42,y+29,48,fnt(26,900),NAVY,30); c.textAlign='left';
       txt(c,t,x+78,y+30,sw-90,fnt(22,900),NAVY,28);
       let yy=txt(c,en,x+22,y+82,sw-40,fnt(18,600),INK,24); txt(c,hi,x+22,yy+2,sw-40,fnt(17),HIC,23); });
-    y+=sh+30;
+    y+=sh+30; BR.push(y-15);
 
     // ── Disclaimer ──
     y=txt(c,'This is a suggestion based on the information you provided. Your Relationship Manager will discuss specific schemes and the final plan with you.',P,y,IW,fnt(17),MUTE,24);
@@ -691,51 +694,112 @@ window.PLAN = (function(){
     txt(c,rmName()?`Your Relationship Manager: ${rmName()}`:'D N Investment',P,y+28,IW,fnt(25,900),GOLD2,32);
     txt(c,'D N Investment · Bistupur, Jamshedpur · Mutual Funds · Equity · IPO',P,y+66,IW,fnt(18),'#c8d3e6',24);
     y+=120;
-    const out=document.createElement('canvas'); out.width=W; out.height=Math.min(y,cv.height);
+    const out=document.createElement('canvas'); out.width=W*SC; out.height=Math.min(y,5200)*SC;
     out.getContext('2d').drawImage(cv,0,0);
+    out._breaks=BR; out._scale=SC; out._h=Math.min(y,5200);
     return out;
   }
   const fileName = p => 'Investment_Plan_'+String(p.name||'Client').trim().replace(/[^a-z0-9]+/gi,'_')+'.png';
   const toBlob = cv => new Promise(res=>cv.toBlob(res,'image/png'));
   function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
 
+  // ══ 22-Nov-2026: WhatsApp lambi image ko chhota (dhundla) kar deta hai → 2–3 pages me kaato (har page ≤ 1300px,
+  // WhatsApp use resize nahi karta) + PDF (document compress nahi hota, 2x sharp). ══
+  function splitPages(cv){
+    const SC=cv._scale||1, H=cv._h||cv.height/SC, MAX=1300, MIN=500, BR=(cv._breaks||[]).slice().sort((a,b)=>a-b);
+    // Barabar hisse: kitne page chahiye, phir har kaat target ke sabse paas wale break par
+    const cuts=[0]; let start=0, left=Math.ceil(H/MAX);
+    while(left>1 && H-start>MAX*0.6){
+      const target=start+(H-start)/left;
+      const cand=BR.filter(b=>b>start+MIN && b<=start+MAX && H-b>MIN*0.6);
+      const end=cand.length ? cand.reduce((a,b)=>Math.abs(b-target)<Math.abs(a-target)?b:a) : Math.min(start+MAX,H);
+      cuts.push(end); start=end; left--;
+      if(left===1 && H-start>MAX){ left=Math.ceil((H-start)/MAX)+0; }
+    }
+    cuts.push(H);
+    const pages=[];
+    for(let n=0;n<cuts.length-1;n++){
+      const y0=cuts[n], y1=cuts[n+1], top=n?14:0, bottom=cuts.length>2?44:0;
+      const pc=document.createElement('canvas'); pc.width=cv.width; pc.height=(y1-y0+top+bottom)*SC;
+      const g=pc.getContext('2d');
+      g.fillStyle='#f7f3ea'; g.fillRect(0,0,pc.width,pc.height);
+      if(top){ const gl=g.createLinearGradient(0,0,pc.width,0); gl.addColorStop(0,'#c9942a'); gl.addColorStop(.5,'#f5d98a'); gl.addColorStop(1,'#c9942a'); g.fillStyle=gl; g.fillRect(0,0,pc.width,7*SC); }
+      g.drawImage(cv,0,y0*SC,cv.width,(y1-y0)*SC,0,top*SC,cv.width,(y1-y0)*SC);
+      if(bottom && n<cuts.length-2){ g.fillStyle='#8a6d2f'; g.font=`700 ${18*SC}px ${FONT}`; g.textAlign='center'; g.textBaseline='middle';
+        g.fillText(`Page ${n+1} of ${cuts.length-1} — continued in next image  ·  अगली इमेज में जारी`, pc.width/2, pc.height-22*SC); }
+      else if(bottom){ g.fillStyle='#8a6d2f'; g.font=`700 ${18*SC}px ${FONT}`; g.textAlign='center'; g.textBaseline='middle'; g.fillText(`Page ${n+1} of ${cuts.length-1}`, pc.width/2, (top+y1-y0)*SC+22*SC); }
+      pages.push(pc);
+    }
+    return pages;
+  }
+  // Chhota PDF writer (koi library nahi) — har page ek JPEG, page size image ke anupaat me (ek lambi page)
+  async function makePdf(canvases){
+    const enc=new TextEncoder(), parts=[], offs=[]; let len=0;
+    const push=x=>{ const b=typeof x==='string'?enc.encode(x):x; parts.push(b); len+=b.length; };
+    const objs=[]; // [n, builder]
+    const imgs=await Promise.all(canvases.map(cv=>new Promise(res=>cv.toBlob(b=>b.arrayBuffer().then(ab=>res({d:new Uint8Array(ab),w:cv.width,h:cv.height})),'image/jpeg',0.9))));
+    const n=imgs.length, PW=595;
+    push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    const obj=(id,body)=>{ offs[id]=len; push(`${id} 0 obj\n`); body(); push('\nendobj\n'); };
+    const kids=imgs.map((_,k)=>`${3+k*3} 0 R`).join(' ');
+    obj(1,()=>push('<< /Type /Catalog /Pages 2 0 R >>'));
+    obj(2,()=>push(`<< /Type /Pages /Kids [${kids}] /Count ${n} >>`));
+    imgs.forEach((im,k)=>{
+      const pid=3+k*3, cid=pid+1, iid=pid+2, PH=+(PW*im.h/im.w).toFixed(2);
+      obj(pid,()=>push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im${k} ${iid} 0 R >> >> /Contents ${cid} 0 R >>`));
+      const cs=`q ${PW} 0 0 ${PH} 0 0 cm /Im${k} Do Q`;
+      obj(cid,()=>{ push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`); });
+      obj(iid,()=>{ push(`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.d.length} >>\nstream\n`); push(im.d); push('\nendstream'); });
+    });
+    const total=3+n*3, xref=len;
+    let x=`xref\n0 ${total}\n0000000000 65535 f \n`; for(let id=1;id<total;id++) x+=String(offs[id]).padStart(10,'0')+' 00000 n \n';
+    push(x); push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+    return new Blob(parts,{type:'application/pdf'});
+  }
+  const pdfName = p => fileName(p).replace(/\.png$/,'.pdf');
+  const isMobile = () => /Android|iPhone|iPad/i.test(navigator.userAgent);
+  async function shareFiles(files, cap){
+    try{ if(navigator.canShare && navigator.canShare({files}) && isMobile()){ await navigator.share({files, text:cap}); return 'shared'; } }
+    catch(e){ if(e && e.name==='AbortError') return 'cancel'; console.warn('share failed',e); }
+    return '';
+  }
+
   async function downloadImage(i){
     const r=rowOf(i); if(!r) return;
-    try{ const b=await toBlob(await makeCanvas(i)); dl(b,fileName(r.p)); toast&&toast('Image downloaded ✓','success'); }
-    catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); }
+    try{
+      const pages=splitPages(await makeCanvas(i));
+      for(let k=0;k<pages.length;k++){ dl(await toBlob(pages[k]), fileName(r.p).replace(/\.png$/, pages.length>1?`_${k+1}.png`:'.png')); }
+      toast&&toast(`Image${pages.length>1?'s':''} downloaded ✓ (${pages.length})`,'success');
+    }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); }
   }
   async function sendImage(i){
     const r=rowOf(i); if(!r) return;
-    let blob; try{ blob=await toBlob(await makeCanvas(i)); }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); return; }
-    const name=fileName(r.p), cap=caption(i);
-    // 1) Mobile (Android / iPhone): seedha share sheet → WhatsApp → contact chunein
-    try{
-      const file=new File([blob],name,{type:'image/png'});
-      if(navigator.canShare && navigator.canShare({files:[file]}) && /Android|iPhone|iPad/i.test(navigator.userAgent)){
-        await navigator.share({files:[file], text:cap}); return;
-      }
-    }catch(e){ if(e && e.name==='AbortError') return; console.warn('share failed',e); }
-    // 2) Computer: image clipboard me copy + download, aur client ka WhatsApp chat khule → Ctrl+V
+    let pages; try{ pages=splitPages(await makeCanvas(i)); }catch(e){ console.error(e); toast&&toast('⚠️ Could not create image — '+(e.message||e),'error'); return; }
+    const cap=caption(i), base=fileName(r.p).replace(/\.png$/,'');
+    const blobs=await Promise.all(pages.map(toBlob));
+    const files=blobs.map((b,k)=>new File([b], blobs.length>1?`${base}_${k+1}.png`:`${base}.png`, {type:'image/png'}));
+    // 1) Mobile: share sheet → WhatsApp (saare pages ek saath)
+    const sh=await shareFiles(files, cap); if(sh) return;
+    // 2) Computer: pehla page clipboard me, saare pages download, client ka chat khule
     let copied=false;
-    try{ if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){ console.warn('clipboard image failed',e); }
-    dl(blob,name);
+    try{ if(blobs.length===1 && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'image/png':blobs[0]})]); copied=true; } }catch(e){ console.warn('clipboard image failed',e); }
+    files.forEach((f,k)=>setTimeout(()=>dl(f,f.name),k*400));
     window.open(waUrl(r.p, cap),'_blank');
-    toast&&toast(copied ? '🖼️ Image copied — press Ctrl+V in the WhatsApp chat, then send' : '🖼️ Image downloaded — attach it in WhatsApp with 📎', 'success');
+    toast&&toast(copied ? '🖼️ Image copied — press Ctrl+V in the WhatsApp chat, then send'
+      : `🖼️ ${files.length} images downloaded — attach them in WhatsApp with 📎 (in order 1, 2${files.length>2?', 3':''})`, 'success');
   }
-
-  // ══════════════ PRINT / PDF ══════════════
-  async function print(i){
+  // 📄 PDF — sabse saaf (WhatsApp document compress nahi karta), double resolution
+  async function sendPdf(i, onlyDownload){
     const r=rowOf(i); if(!r) return;
-    const w=window.open('','_blank'); if(!w){ toast&&toast('Popup blocked — allow popups','error'); return; }
-    w.document.write('<p style="font-family:sans-serif;padding:20px">Preparing plan…</p>');
-    let url; try{ url=(await makeCanvas(i)).toDataURL('image/png'); }catch(e){ w.document.body.innerHTML='⚠️ '+esc(e.message||e); return; }
-    w.document.open();
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Investment Plan – ${esc(r.p.name)}</title>
-<style>body{margin:0;background:#eee;text-align:center} img{width:100%;max-width:800px;display:block;margin:0 auto;background:#fff} button{margin:14px;padding:10px 22px;border:none;border-radius:8px;background:#c9942a;color:#fff;font-weight:700;cursor:pointer}
-@page{size:A4;margin:8mm} @media print{body{background:#fff} button{display:none} img{max-width:100%}}</style></head>
-<body><button onclick="print()">🖨️ Print / Save as PDF</button><img src="${url}"></body></html>`);
-    w.document.close();
+    toast&&toast('Preparing PDF…','success');
+    let blob; try{ blob=await makePdf([await makeCanvas(i,2)]); }catch(e){ console.error(e); toast&&toast('⚠️ Could not create PDF — '+(e.message||e),'error'); return; }
+    const file=new File([blob], pdfName(r.p), {type:'application/pdf'});
+    if(!onlyDownload){ const sh=await shareFiles([file], caption(i)); if(sh) return; }
+    dl(file, file.name);
+    if(!onlyDownload){ window.open(waUrl(r.p, caption(i)),'_blank'); toast&&toast('📄 PDF downloaded — attach it in WhatsApp with 📎 → Document','success'); }
+    else toast&&toast('📄 PDF downloaded ✓','success');
   }
+  function print(i){ return sendPdf(i,true); }
 
-  return { analyse, final, html, setAmt, setCombo, text, wa, copy, print, sendImage, downloadImage, edit, edCat, edSum, edAdd, edDel, edCancel, edSave, edReset };
+  return { analyse, final, html, setAmt, setCombo, text, wa, copy, print, sendImage, sendPdf, downloadImage, edit, edCat, edSum, edAdd, edDel, edCancel, edSave, edReset };
 })();
