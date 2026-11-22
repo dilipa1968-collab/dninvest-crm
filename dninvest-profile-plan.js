@@ -531,95 +531,152 @@ window.PLAN = (function(){
   }
   function txt(ctx, t, x, y, maxW, font, color, lh){ const ls=lines(ctx,t,font,maxW); ctx.fillStyle=color; ctx.textBaseline='top'; ls.forEach((l,n)=>ctx.fillText(l,x,y+n*lh)); return y+ls.length*lh; }
 
+  // ══ 🎨 Client image v2 (22-Nov-2026): premium navy-gold design, donut chart, fund cards, next steps ══
   async function makeCanvas(i){
     const r=rowOf(i); const F=final(r), p=r.p;
-    const W=1080, P=48, IW=W-2*P;
-    const cv=document.createElement('canvas'); cv.width=W; cv.height=4200;
+    const W=1080, P=52, IW=W-2*P;
+    const NAVY='#0f1f3d', GOLD='#c9942a', GOLD2='#f5d98a', INK='#14213d', MUTE='#64748b', HIC='#8a6d2f', BG='#f7f3ea';
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=5200;
     const c=cv.getContext('2d');
-    c.fillStyle='#ffffff'; c.fillRect(0,0,W,cv.height);
-    // Header
-    const g=c.createLinearGradient(0,0,W,0); g.addColorStop(0,'#0f1f3d'); g.addColorStop(1,'#1e3a6e');
-    c.fillStyle=g; c.fillRect(0,0,W,180);
-    c.fillStyle='#c9942a'; c.fillRect(0,180,W,6);
+    c.fillStyle=BG; c.fillRect(0,0,W,cv.height);
+    const shadow=(on)=>{ if(on){ c.shadowColor='rgba(15,31,61,.13)'; c.shadowBlur=26; c.shadowOffsetY=8; } else { c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetY=0; } };
+    const card=(x,y,w,h,fill)=>{ shadow(true); c.fillStyle=fill||'#fff'; rr(c,x,y,w,h,22); c.fill(); shadow(false); };
+    const tw=(t,f)=>{ c.font=f; return c.measureText(t).width; };
+    const dt=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+    // ── Header ──
+    const hg=c.createLinearGradient(0,0,W,260); hg.addColorStop(0,'#0b1730'); hg.addColorStop(1,'#1e3a6e');
+    c.fillStyle=hg; c.fillRect(0,0,W,250);
+    c.save(); c.beginPath(); c.rect(0,0,W,250); c.clip(); c.globalAlpha=.08; c.fillStyle=GOLD2; c.beginPath(); c.arc(W-60,40,190,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(W-230,250,120,0,Math.PI*2); c.fill(); c.restore();
+    const gl=c.createLinearGradient(0,0,W,0); gl.addColorStop(0,GOLD); gl.addColorStop(.5,GOLD2); gl.addColorStop(1,GOLD);
+    c.fillStyle=gl; c.fillRect(0,250,W,7);
     const im=await logo(); let hx=P;
-    if(im){ const h=120, w=im.width*h/im.height; c.fillStyle='#fff'; rr(c,P-8,22,w+16,h+16,14); c.fill(); c.drawImage(im,P,30,w,h); hx=P+w+30; }
-    txt(c,'D N INVESTMENT',hx,40,W-hx-P,fnt(50,900),'#f5d98a',58);
-    txt(c,'TRUSTED WEALTH PARTNER',hx,100,W-hx-P,fnt(20,700),'#c9942a',26);
-    txt(c,'Mutual Fund Distributor · ARN-67217 · Bistupur, Jamshedpur',hx,130,W-hx-P,fnt(19),'#c8d3e6',24);
-    let y=216;
-    // Title
-    y=txt(c,'Your Investment Plan',P,y,IW,fnt(44,900),'#0f1f3d',52);
-    y=txt(c,'आपका निवेश प्लान',P,y,IW,fnt(30,700),'#9a7a2a',40);
-    const d=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    y=txt(c,`Prepared for ${p.name||''} · ${d}`,P,y+6,IW,fnt(24,600),'#5d6e8a',32)+14;
-    // Risk pill
-    const pill=`Risk Profile: ${F.lvlName}  ·  ${LVL_HI[F.lvlName]||''}`; c.font=fnt(24,800); const pw=c.measureText(pill).width+44;
-    c.fillStyle='#0f1f3d'; rr(c,P,y,pw,50,25); c.fill(); txt(c,pill,P+22,y+11,pw,fnt(24,800),'#f5d98a',30); y+=74;
-    // Health check
-    const sec=(en,hi)=>{ c.fillStyle='#c9942a'; c.fillRect(P,y+6,8,30); txt(c,en,P+20,y,IW,fnt(26,900),'#0f1f3d',34); c.font=fnt(26,900); const w=c.measureText(en).width; txt(c,'· '+hi,P+30+w,y+3,IW,fnt(22,600),'#9a7a2a',30); y+=50; };
+    if(im){ const h=112, w=im.width*h/im.height; c.fillStyle='#fff'; rr(c,P-10,34,w+20,h+20,18); c.fill(); c.drawImage(im,P,44,w,h); hx=P+w+34; }
+    txt(c,'D N INVESTMENT',hx,46,W-hx-P,fnt(48,900),GOLD2,56);
+    txt(c,'TRUSTED WEALTH PARTNER',hx,104,W-hx-P,fnt(19,800),GOLD,24);
+    txt(c,'Mutual Fund Distributor · ARN-67217 · Bistupur, Jamshedpur',hx,134,W-hx-P,fnt(18),'#c8d3e6',24);
+    c.fillStyle='rgba(245,217,138,.14)'; rr(c,P,184,IW,46,23); c.fill();
+    txt(c,'YOUR PERSONAL INVESTMENT PLAN  ·  आपका निवेश प्लान',P+24,195,IW-200,fnt(20,800),GOLD2,26);
+    c.textAlign='right'; txt(c,dt,W-P-24,196,200,fnt(19,700),'#e5e7eb',24); c.textAlign='left';
+    let y=290;
+
+    // ── Greeting ──
+    const nm=String(p.name||'').trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+    y=txt(c,`Dear ${nm},`,P,y,IW,fnt(40,900),INK,48);
+    y=txt(c,'Based on your profile, here is a plan designed around your goals, time horizon and comfort with risk.',P,y+4,IW,fnt(22),MUTE,30);
+    y=txt(c,'आपकी प्रोफ़ाइल के आधार पर, आपके लक्ष्य, समय और जोखिम के हिसाब से बनाया गया प्लान।',P,y+2,IW,fnt(21),HIC,30)+22;
+
+    // ── Info chips: Risk · Period · Goal ──
+    const goals=[].concat(p.goal||[]).filter(Boolean);
+    const chips=[['🎯','Risk Profile',F.lvlName,LVL_HI[F.lvlName]||''],['⏳','Investment Period',p.period||'—',''],['🏁','Goal',goals.slice(0,2).join(', ')||'Wealth Creation','']];
+    const chW=(IW-2*16)/3;
+    chips.forEach(([ic,l,v,h],k)=>{ const x=P+k*(chW+16); card(x,y,chW,104);
+      c.fillStyle=GOLD; rr(c,x,y,chW,6,3); c.fill();
+      txt(c,ic,x+20,y+22,40,fnt(28),INK,32);
+      txt(c,l.toUpperCase(),x+64,y+22,chW-80,fnt(15,800),MUTE,20);
+      txt(c,v,x+64,y+44,chW-80,fnt(22,900),NAVY,26);
+      if(h) txt(c,h,x+64,y+72,chW-80,fnt(16),HIC,20); });
+    y+=104+28;
+
+    // ── Hero: donut + legend ──
+    const tot=F.total||1, rows=F.alloc;
+    const lx=P+400, lw=W-P-34-lx;
+    const rowH = f => lines(c,f.en,fnt(23,800),lw-160).length*28 + 30 + (f.scheme?24:0) + 8;
+    const legendH = rows.reduce((a,f)=>a+rowH(f),0);
+    const heroH=Math.max(440, 120+legendH);
+    card(P,y,IW,heroH);
+    txt(c,`MONTHLY ${F.noSip?'INVESTMENT':'SIP'} PLAN`,P+34,y+28,IW,fnt(18,900),GOLD,24);
+    txt(c,'मासिक निवेश योजना',P+34,y+52,IW,fnt(17,700),HIC,22);
+    const cx=P+200, cy=y+70+175, R=150, R2=96;
+    let ang=-Math.PI/2;
+    rows.forEach(f=>{ const a2=ang+Math.PI*2*f.amt/tot; c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,R,ang,a2); c.closePath(); c.fillStyle=f.c; c.fill();
+      c.strokeStyle='#fff'; c.lineWidth=4; c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+R*Math.cos(ang),cy+R*Math.sin(ang)); c.stroke(); ang=a2; });
+    c.fillStyle='#fff'; c.beginPath(); c.arc(cx,cy,R2,0,Math.PI*2); c.fill();
+    c.textAlign='center';
+    txt(c,inr(F.total),cx,cy-30,R2*2,fnt(F.total>=100000?34:40,900),NAVY,44);
+    txt(c,'per month',cx,cy+18,R2*2,fnt(18,700),MUTE,22);
+    txt(c,'प्रति माह',cx,cy+40,R2*2,fnt(17),HIC,22);
+    c.textAlign='left';
+    let ly=y+96;
+    rows.forEach(f=>{
+      c.fillStyle=f.c; rr(c,lx,ly+6,16,16,4); c.fill();
+      let yy=txt(c,f.en,lx+28,ly,lw-160,fnt(23,800),INK,28);
+      c.textAlign='right'; txt(c,inr(f.amt),lx+lw,ly,160,fnt(23,900),NAVY,28); c.textAlign='left';
+      yy=txt(c,`${f.hi}  ·  ${Math.round(f.amt/tot*100)}%`,lx+28,yy+2,lw-28,fnt(17,600),HIC,22);
+      if(f.scheme) txt(c,f.scheme,lx+28,yy+2,lw-28,fnt(18,700),'#1a56db',22);
+      ly+=rowH(f);
+      c.fillStyle='#eef1f6'; c.fillRect(lx,ly-10,lw,2);
+    });
+    y+=heroH+26;
+
+    // ── Why this combination ──
+    if(!F.edited){
+      const tH=34+lines(c,F.comboWhy,fnt(20),IW-80).length*28+lines(c,F.comboWhyHi,fnt(19),IW-80).length*27+58;
+      const g2=c.createLinearGradient(P,0,W-P,0); g2.addColorStop(0,'#0f1f3d'); g2.addColorStop(1,'#1e3a6e');
+      shadow(true); c.fillStyle=g2; rr(c,P,y,IW,tH,22); c.fill(); shadow(false);
+      txt(c,'✨ '+F.comboEn,P+34,y+24,IW-60,fnt(24,900),GOLD2,30);
+      let yy=txt(c,F.comboWhy,P+34,y+64,IW-80,fnt(20),'#e5e7eb',28);
+      txt(c,F.comboWhyHi,P+34,yy+2,IW-80,fnt(19),'#e9cf86',27);
+      y+=tH+30;
+    }
+
+    // ── Health check ──
+    const sec=(en,hi)=>{ c.fillStyle=GOLD; rr(c,P,y+4,8,32,4); c.fill(); txt(c,en,P+22,y,IW,fnt(26,900),INK,34); const w=tw(en,fnt(26,900)); txt(c,'· '+hi,P+34+w,y+4,IW,fnt(21,700),HIC,30); y+=52; };
     sec('FINANCIAL HEALTH CHECK','वित्तीय स्वास्थ्य जाँच');
-    const cw=(IW-20)/2, ci=cw-46;
-    const cardH=ch=>{ let h=18; h+=lines(c,ch.en,fnt(23,800),ci).length*30; h+=lines(c,ch.have,fnt(19),ci).length*25; h+=4+lines(c,ch.adv,fnt(23,700),ci).length*30; if(ch.advHi) h+=lines(c,ch.advHi,fnt(21),ci).length*29; return h+18; };
+    const ICON={g:'✓',a:'!',r:'✕',n:'–'};
+    const cw=(IW-18)/2, ci=cw-96;
+    const ch=x=>{ let h=26+lines(c,x.en,fnt(19,900),ci).length*24+lines(c,x.adv,fnt(21,700),ci).length*27; if(x.advHi) h+=lines(c,x.advHi,fnt(18),ci).length*25; return Math.max(h+22,110); };
     for(let n=0;n<F.checks.length;n+=2){
-      const pair=F.checks.slice(n,n+2), h=Math.max(...pair.map(cardH));
-      pair.forEach((ch,k)=>{ const s=ST[ch.s]||ST.n, x=P+k*(cw+20);
-        c.fillStyle=s.bg; rr(c,x,y,cw,h,16); c.fill(); c.fillStyle=s.c; rr(c,x,y,10,h,5); c.fill();
-        c.beginPath(); c.arc(x+36,y+33,11,0,Math.PI*2); c.fill();
-        let yy=txt(c,ch.en.toUpperCase(),x+56,y+18,ci-30,fnt(23,800),s.c,30);
-        yy=txt(c,ch.hi+' · '+ch.have,x+26,yy+2,ci,fnt(19),'#5d6e8a',25);
-        yy=txt(c,ch.adv,x+26,yy+4,ci,fnt(23,700),'#0f1f3d',30);
-        if(ch.advHi) txt(c,ch.advHi,x+26,yy,ci,fnt(21),'#7a6a3a',29);
+      const pair=F.checks.slice(n,n+2), h=Math.max(...pair.map(ch));
+      pair.forEach((x,k)=>{ const S=ST[x.s]||ST.n, X=P+k*(cw+18);
+        card(X,y,cw,h); c.fillStyle=S.c; rr(c,X,y,8,h,4); c.fill();
+        c.fillStyle=S.bg; c.beginPath(); c.arc(X+52,y+50,26,0,Math.PI*2); c.fill();
+        c.textAlign='center'; txt(c,ICON[x.s]||'–',X+52,y+33,52,fnt(28,900),S.c,34); c.textAlign='left';
+        let yy=txt(c,x.en.toUpperCase(),X+92,y+24,ci,fnt(19,900),S.c,24);
+        yy=txt(c,x.adv,X+92,yy+2,ci,fnt(21,700),INK,27);
+        if(x.advHi) txt(c,x.advHi,X+92,yy,ci,fnt(18),HIC,25);
       });
       y+=h+16;
     }
     y+=14;
-    // SIP
-    sec(`SUGGESTED MONTHLY ${F.noSip?'INVESTMENT':'SIP'}`,'सुझाया गया मासिक निवेश');
-    const bg=c.createLinearGradient(P,0,W-P,0); bg.addColorStop(0,'#fdf6e3'); bg.addColorStop(1,'#fff');
-    c.fillStyle=bg; rr(c,P,y,IW,110,18); c.fill(); c.strokeStyle='#f5d98a'; c.lineWidth=2; c.stroke();
-    txt(c,inr(F.total),P+28,y+18,IW,fnt(64,900),'#0f1f3d',72);
-    txt(c,'per month · प्रति माह',P+30+ (c.font=fnt(64,900), c.measureText(inr(F.total)).width)+16,y+30,IW,fnt(22,700),'#5d6e8a',28);
-    if(F.efPart) txt(c,`${inr(F.sip)} equity + ${inr(F.efPart)} emergency fund`,P+30+(c.font=fnt(64,900),c.measureText(inr(F.total)).width)+16,y+62,IW,fnt(20,600),'#9a7a2a',26);
-    y+=130;
-    if(!F.edited){
-      c.fillStyle='#0f1f3d'; c.font=fnt(22,800); const cl=F.comboEn; const cw2=c.measureText(cl).width+36;
-      rr(c,P,y,cw2,40,20); c.fill(); txt(c,cl,P+18,y+8,cw2,fnt(22,800),'#f5d98a',26);
-      txt(c,F.comboHi,P+cw2+14,y+10,IW-cw2-14,fnt(21,700),'#9a7a2a',26); y+=50;
-      y=txt(c,F.comboWhy,P,y,IW,fnt(20),'#5d6e8a',26); y=txt(c,F.comboWhyHi,P,y,IW,fnt(20),'#7a6a3a',27)+12;
-    }
-    // bar
-    const tot=F.total||1; let bx=P; c.save(); rr(c,P,y,IW,36,18); c.clip();
-    F.alloc.forEach(a=>{ const w=IW*a.amt/tot; c.fillStyle=a.c; c.fillRect(bx,y,w+1,36); bx+=w; }); c.restore(); y+=56;
-    // rows
-    F.alloc.forEach(a=>{
-      const tx=P+50, tw=IW-50-230; let yy=y+10;
-      c.fillStyle=a.c; rr(c,P,y+12,30,30,7); c.fill();
-      yy=txt(c,a.en,tx,yy,tw,fnt(26,800),'#0f1f3d',33);
-      yy=txt(c,a.hi,tx,yy,tw,fnt(22,600),'#9a7a2a',29);
-      if(a.scheme) yy=txt(c,a.scheme,tx,yy+2,tw,fnt(23,700),'#1a56db',30);
-      yy=txt(c,a.why,tx,yy+2,tw,fnt(19),'#5d6e8a',25);
-      c.textAlign='right'; txt(c,inr(a.amt),W-P,y+12,230,fnt(32,900),'#0f1f3d',38); txt(c,Math.round(a.amt/tot*100)+'%',W-P,y+54,230,fnt(21,700),a.c,26); c.textAlign='left';
-      y=Math.max(yy,y+90)+12; c.fillStyle='#e3e8f0'; c.fillRect(P,y,IW,2); y+=10;
-    });
-    y+=12;
-    // boxes
-    const box=(icon,en,hi,col,bgc)=>{ const w=IW-80; const h=20+lines(c,en,fnt(22,700),w).length*30+(hi?lines(c,hi,fnt(21),w).length*29:0)+18;
-      c.fillStyle=bgc; rr(c,P,y,IW,h,14); c.fill(); c.fillStyle=col; rr(c,P,y,8,h,4); c.fill();
-      txt(c,icon,P+22,y+18,40,fnt(28),col,32); let yy=txt(c,en,P+66,y+20,w,fnt(22,700),'#0f1f3d',30); if(hi) txt(c,hi,P+66,yy,w,fnt(21),'#7a6a3a',29); y+=h+12; };
-    if(F.efPart) box('💰',`${inr(F.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(F.efTarget)}) is built; then it moves to equity.`,`${inr(F.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(F.efTarget)}) न बन जाए; फिर ये इक्विटी में।`,'#64748b','#f1f5f9');
-    if(F.tax) box('🧾','ELSS gives tax benefit only under the Old Tax Regime.','ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था में मिलता है।','#b91c1c','#fdf0ee');
-    if(F.stepUp) box('📈','Increase your SIP by 10% every year — small step-ups make a big difference over time.','हर साल SIP 10% बढ़ाएँ — छोटी बढ़त लंबे समय में बड़ा फ़र्क लाती है।','#0f7a45','#e3f7ee');
-    if(F.note) box('📝','Note from your RM: '+F.note,'','#c9942a','#fdf6e3');
-    y+=8;
-    y=txt(c,'This is a suggestion based on the information you provided. Your Relationship Manager will discuss specific schemes and the final plan with you.',P,y,IW,fnt(19),'#5d6e8a',25);
-    y=txt(c,'यह आपके द्वारा दी गई जानकारी पर आधारित सुझाव है। आपके रिलेशनशिप मैनेजर स्कीम और अंतिम प्लान पर आपसे बात करेंगे।',P,y+2,IW,fnt(19),'#7a6a3a',26);
-    y=txt(c,'Mutual Fund investments are subject to market risks, read all scheme related documents carefully.',P,y+10,IW,fnt(19,700),'#0f1f3d',25);
-    y=txt(c,'म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ें।',P,y+2,IW,fnt(19,600),'#7a6a3a',26)+22;
-    // footer
-    c.fillStyle=g; c.fillRect(0,y,W,96); c.fillStyle='#c9942a'; c.fillRect(0,y,W,5);
-    txt(c,rmName()?`Your RM: ${rmName()}`:'D N Investment',P,y+22,IW/2,fnt(26,800),'#f5d98a',32);
-    txt(c,'D N Investment · Bistupur, Jamshedpur',P,y+56,IW,fnt(19),'#c8d3e6',24);
-    y+=96;
+
+    // ── Smart tips ──
+    const tips=[];
+    if(F.efPart) tips.push(['💰',`${inr(F.efPart)}/month goes to a Liquid Fund until your emergency fund (~${big(F.efTarget)}) is ready — then it moves to equity.`,`${inr(F.efPart)} हर महीने लिक्विड फंड में, जब तक इमरजेंसी फंड (~${bigHi(F.efTarget)}) न बन जाए; फिर इक्विटी में।`,'#64748b']);
+    if(F.tax) tips.push(['🧾','ELSS gives tax benefit only under the Old Tax Regime.','ELSS का टैक्स लाभ सिर्फ़ पुरानी टैक्स व्यवस्था में मिलता है।','#b91c1c']);
+    if(F.stepUp) tips.push(['📈','Increase your SIP by 10% every year — small step-ups make a big difference over time.','हर साल SIP 10% बढ़ाएँ — छोटी बढ़त लंबे समय में बड़ा फ़र्क लाती है।','#0f7a45']);
+    tips.push(['🧘','Stay invested through ups and downs — do not stop your SIP when markets fall.','बाज़ार गिरे तब भी SIP बंद न करें — लंबे समय में यही फ़ायदा देता है।','#6d28d9']);
+    if(F.note) tips.push(['📝','Note from your RM: '+F.note,'',GOLD]);
+    sec('SMART TIPS','ज़रूरी सलाह');
+    tips.forEach(([ic,en,hi,col])=>{ const w=IW-110; const h=26+lines(c,en,fnt(21,700),w).length*28+(hi?lines(c,hi,fnt(19),w).length*26:0)+20;
+      card(P,y,IW,h); c.fillStyle=col; rr(c,P,y,8,h,4); c.fill();
+      txt(c,ic,P+30,y+20,50,fnt(32),col,36);
+      let yy=txt(c,en,P+84,y+24,w,fnt(21,700),INK,28); if(hi) txt(c,hi,P+84,yy,w,fnt(19),HIC,26); y+=h+14; });
+    y+=16;
+
+    // ── Next steps ──
+    sec('NEXT STEPS','आगे क्या करें');
+    const steps=[['Discuss','Talk to your RM and confirm the plan','RM से बात कर प्लान तय करें'],['KYC & Mandate','Complete KYC and auto-debit mandate','KYC और ऑटो-डेबिट पूरा करें'],['Start SIP','Your SIPs start — track them with us','SIP शुरू — हमारे साथ निगरानी']];
+    const sw=(IW-2*16)/3, sh=170;
+    steps.forEach(([t,en,hi],k)=>{ const x=P+k*(sw+16); card(x,y,sw,sh);
+      const g3=c.createLinearGradient(x,y,x+60,y+60); g3.addColorStop(0,GOLD); g3.addColorStop(1,GOLD2);
+      c.fillStyle=g3; c.beginPath(); c.arc(x+42,y+44,24,0,Math.PI*2); c.fill();
+      c.textAlign='center'; txt(c,String(k+1),x+42,y+29,48,fnt(26,900),NAVY,30); c.textAlign='left';
+      txt(c,t,x+78,y+30,sw-90,fnt(22,900),NAVY,28);
+      let yy=txt(c,en,x+22,y+82,sw-40,fnt(18,600),INK,24); txt(c,hi,x+22,yy+2,sw-40,fnt(17),HIC,23); });
+    y+=sh+30;
+
+    // ── Disclaimer ──
+    y=txt(c,'This is a suggestion based on the information you provided. Your Relationship Manager will discuss specific schemes and the final plan with you.',P,y,IW,fnt(17),MUTE,24);
+    y=txt(c,'यह आपके द्वारा दी गई जानकारी पर आधारित सुझाव है। आपके रिलेशनशिप मैनेजर स्कीम और अंतिम प्लान पर आपसे बात करेंगे।',P,y+2,IW,fnt(17),HIC,24);
+    y=txt(c,'Mutual Fund investments are subject to market risks, read all scheme related documents carefully.',P,y+10,IW,fnt(17,800),INK,24);
+    y=txt(c,'म्यूचुअल फंड निवेश बाज़ार जोखिमों के अधीन हैं, योजना से जुड़े सभी दस्तावेज़ ध्यान से पढ़ें।',P,y+2,IW,fnt(17,700),HIC,24)+28;
+
+    // ── Footer ──
+    c.fillStyle=hg; c.fillRect(0,y,W,120); c.fillStyle=gl; c.fillRect(0,y,W,6);
+    txt(c,rmName()?`Your Relationship Manager: ${rmName()}`:'D N Investment',P,y+28,IW,fnt(25,900),GOLD2,32);
+    txt(c,'D N Investment · Bistupur, Jamshedpur · Mutual Funds · Equity · IPO',P,y+66,IW,fnt(18),'#c8d3e6',24);
+    y+=120;
     const out=document.createElement('canvas'); out.width=W; out.height=Math.min(y,cv.height);
     out.getContext('2d').drawImage(cv,0,0);
     return out;
