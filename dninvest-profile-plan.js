@@ -8,8 +8,8 @@
    - RM ke liye "Talking Points" (sirf CRM me — client ko nahi jaate).
    - 🖼️ Colorful image (PNG) WhatsApp par — mobile par share sheet, computer par
      copy + Ctrl+V. 💬 Text bhi, 🖨️ PDF bhi (Hindi + English, DN Investment logo).
-   - 4 Fund Combinations (Recommended / Simple / Low Cost Index / Multi Cap) —
-     risk × horizon ke hisab se, bina overlap, ELSS core ki jagah, gold diversifier.
+   - 22-Nov-2026: SIRF 5 categories — Large & Mid, Mid, Multi Cap, Flexi, Small (Large Cap nahi).
+     4 combos (Recommended / Simple / Mid & Small Focus / Multi Cap). Long-term → Mid + Small zaroor.
    - 26 categories (Equity / Hybrid / Debt / Others) + scheme naam suggestion
      (FUND_NAME_LIST + clients ki schemes, category ke hisab se).
    - ✏️ Edit Plan: RM health-check advice, funds, scheme naam, amount, note badal sakta
@@ -94,54 +94,48 @@ window.PLAN = (function(){
   }
   const dlOpts = k => namesFor(k).map(n=>`<option value="${esc(n)}"></option>`).join('');
 
-  // ══ FUND COMBINATIONS (20-Nov-2026 v2) ══
+  // ══ FUND COMBINATIONS (22-Nov-2026 v3) ══
+  // SIRF 5 equity categories (Dilip ji ka rule): Large & Mid, Mid, Multi Cap, Flexi, Small.
+  // Large Cap / Index / Value / BAF / Multi Asset / Gold / Debt auto-plan me NAHI (RM edit me chahe to daal sakta hai).
+  // Long-term (5–10 / 10+ saal) client → Mid Cap + Small Cap ZAROOR.
   // TPL[combo][risk 0-2][horizon 0-2] — order = priority (chhoti SIP me peeche wale hat-te hain)
-  // risk: 0 Conservative, 1 Moderate, 2 Aggressive · horizon: 0 = 3–5 saal, 1 = 5–10, 2 = 10+
-  // Rules: ek hi style ke 2 fund nahi (Flexi + Multi Cap + L&M ek saath nahi = overlap);
-  // har combo me "core" (Flexi / Index) + "growth" (Mid / Small) + "style" (Value) + "cushion" (BAF / Multi Asset).
   const TPL = {
     rec: [
-      [ [['eqsav',30],['bal',30],['debt',25],['multi',15]],
-        [['bal',35],['large',25],['multi',25],['debt',15]],
-        [['bal',30],['large',25],['multi',25],['flexi',20]] ],
-      [ [['bal',35],['large',25],['multi',25],['eqsav',15]],
-        [['flexi',30],['bal',25],['large',20],['value',15],['multi',10]],
-        [['flexi',30],['large',20],['mid',20],['value',15],['bal',15]] ],
-      [ [['flexi',30],['bal',30],['large',20],['multi',20]],
-        [['flexi',30],['mid',25],['large',15],['value',15],['multi',15]],
-        [['flexi',25],['mid',25],['small',15],['value',15],['large',10],['multi',10]] ]
+      [ [['lm',55],['flexi',45]], [['flexi',40],['lm',35],['mid',15],['small',10]], [['flexi',35],['lm',30],['mid',20],['small',15]] ],
+      [ [['flexi',45],['lm',35],['mid',20]], [['flexi',30],['lm',25],['mid',25],['small',20]], [['flexi',25],['mid',30],['small',25],['lm',20]] ],
+      [ [['flexi',40],['lm',30],['mid',30]], [['flexi',25],['mid',30],['small',25],['lm',20]], [['mid',30],['small',30],['flexi',25],['lm',15]] ]
     ],
     simple: [
-      [ [['eqsav',50],['bal',50]], [['bal',60],['large',40]], [['bal',50],['large',50]] ],
-      [ [['bal',60],['large',40]], [['flexi',55],['bal',45]], [['flexi',45],['mid',25],['bal',30]] ],
-      [ [['flexi',50],['bal',50]], [['flexi',60],['mid',40]], [['flexi',45],['mid',30],['small',25]] ]
+      [ [['lm',60],['flexi',40]], [['flexi',50],['mid',30],['small',20]], [['flexi',45],['mid',30],['small',25]] ],
+      [ [['flexi',60],['lm',40]], [['flexi',45],['mid',30],['small',25]], [['flexi',40],['mid',30],['small',30]] ],
+      [ [['flexi',50],['mid',50]], [['flexi',40],['mid',30],['small',30]], [['mid',40],['small',35],['flexi',25]] ]
     ],
-    index: [
-      [ [['eqsav',40],['large',30],['debt',30]], [['large',40],['bal',40],['debt',20]], [['large',45],['bal',35],['gold',20]] ],
-      [ [['large',45],['bal',35],['gold',20]], [['large',50],['index',25],['multi',25]], [['large',45],['index',35],['multi',20]] ],
-      [ [['large',50],['bal',30],['gold',20]], [['large',45],['index',40],['gold',15]], [['large',40],['index',45],['gold',15]] ]
+    growth: [
+      [ [['lm',50],['mid',50]], [['lm',35],['mid',40],['small',25]], [['mid',40],['lm',30],['small',30]] ],
+      [ [['lm',45],['mid',55]], [['mid',40],['small',35],['lm',25]], [['mid',40],['small',40],['lm',20]] ],
+      [ [['mid',50],['lm',30],['small',20]], [['mid',40],['small',40],['flexi',20]], [['small',45],['mid',40],['flexi',15]] ]
     ],
     multicap: [
-      [ [['bal',45],['multi',35],['large',20]], [['bal',40],['multicap',30],['multi',30]], [['multicap',40],['bal',35],['multi',25]] ],
-      [ [['bal',40],['multicap',35],['multi',25]], [['multicap',45],['bal',30],['value',25]], [['multicap',45],['value',25],['bal',30]] ],
-      [ [['multicap',45],['bal',30],['multi',25]], [['multicap',50],['mid',25],['value',25]], [['multicap',45],['mid',25],['small',15],['value',15]] ]
+      [ [['multicap',50],['lm',50]], [['multicap',45],['lm',25],['mid',15],['small',15]], [['multicap',40],['lm',20],['mid',20],['small',20]] ],
+      [ [['multicap',55],['lm',45]], [['multicap',40],['mid',25],['small',20],['lm',15]], [['multicap',35],['mid',30],['small',25],['lm',10]] ],
+      [ [['multicap',50],['mid',50]], [['multicap',35],['mid',30],['small',35]], [['multicap',30],['mid',35],['small',35]] ]
     ]
   };
   const COMBO = {
-    rec:{en:'Recommended — Core + Satellite',hi:'सुझाया गया — कोर + सैटेलाइट',short:'⭐ Recommended',
-      why:'A strong core fund plus growth and value funds, with a hybrid cushion — spread across styles without overlap.',
-      whyHi:'मज़बूत कोर फंड + ग्रोथ और वैल्यू फंड, साथ में हाइब्रिड सहारा — अलग-अलग स्टाइल, बिना दोहराव।'},
+    rec:{en:'Recommended — Balanced Growth',hi:'सुझाया गया — संतुलित ग्रोथ',short:'⭐ Recommended',
+      why:'Flexi Cap and Large & Mid Cap as the core, with Mid and Small Cap for long-term growth.',
+      whyHi:'फ्लेक्सी कैप और लार्ज एंड मिड कैप मुख्य फंड, लंबी अवधि की बढ़त के लिए मिड और स्मॉल कैप।'},
     simple:{en:'Simple — 2 to 3 Funds',hi:'सरल — 2 से 3 फंड',short:'🎯 Simple',
-      why:'Just 2–3 well-diversified funds — easy to track, nothing overlapping.',
-      whyHi:'सिर्फ़ 2–3 अच्छे फंड — आसान निगरानी, कोई दोहराव नहीं।'},
-    index:{en:'Low Cost — Index Based',hi:'कम खर्च — इंडेक्स आधारित',short:'💰 Low Cost Index',
-      why:'Index funds with very low expense ratio, plus a hybrid / gold cushion.',
-      whyHi:'बहुत कम खर्च वाले इंडेक्स फंड, साथ में हाइब्रिड / गोल्ड सहारा।'},
+      why:'Just 2–3 funds — a Flexi Cap core with Mid and Small Cap for growth. Easy to track.',
+      whyHi:'सिर्फ़ 2–3 फंड — फ्लेक्सी कैप मुख्य, बढ़त के लिए मिड और स्मॉल कैप। आसान निगरानी।'},
+    growth:{en:'High Growth — Mid & Small Focus',hi:'ऊँची बढ़त — मिड और स्मॉल कैप',short:'🚀 Mid & Small Focus',
+      why:'Higher share in Mid and Small Cap for maximum long-term growth, balanced with Large & Mid Cap.',
+      whyHi:'लंबी अवधि में ज़्यादा बढ़त के लिए मिड और स्मॉल कैप में बड़ा हिस्सा, साथ में लार्ज एंड मिड कैप।'},
     multicap:{en:'Multi Cap Based',hi:'मल्टी कैप आधारित',short:'🧩 Multi Cap',
-      why:'Multi Cap as the core (min. 25% each in large, mid & small) with value / hybrid support.',
-      whyHi:'मल्टी कैप मुख्य फंड (लार्ज, मिड, स्मॉल में कम से कम 25%), साथ में वैल्यू / हाइब्रिड।'}
+      why:'Multi Cap as the core (min. 25% each in large, mid & small), with Mid and Small Cap added for long-term growth.',
+      whyHi:'मल्टी कैप मुख्य फंड (लार्ज, मिड, स्मॉल में कम से कम 25%), लंबी अवधि के लिए मिड और स्मॉल कैप।'}
   };
-  const COMBOS=['rec','simple','index','multicap'];
+  const COMBOS=['rec','simple','growth','multicap'];
   const LVL = ['Conservative','Moderate','Aggressive'];
   const LVL_HI = {Conservative:'सुरक्षित (Conservative)',Moderate:'संतुलित (Moderate)',Aggressive:'आक्रामक (Aggressive)'};
 
@@ -234,16 +228,7 @@ window.PLAN = (function(){
     // ── Allocation (chuna hua combination) ──
     combo = COMBO[combo] ? combo : 'rec';
     let slots = TPL[combo][lvl][H].map(([k,w])=>({k,w}));
-    const add=(k,w)=>{ const x=slots.find(s=>s.k===k); if(x) x.w+=w; else slots.push({k,w}); };
-    const bigEq = BIG_EQ.includes(K(p.oEquity)) || (r.e && +r.e.asset_value>=5e5);
-    if(bigEq && slots.some(s=>s.k==='small')){
-      const sm=slots.find(s=>s.k==='small'); slots=slots.filter(s=>s!==sm);
-      add(slots.some(s=>s.k==='multi')?'multi':slots[0].k, sm.w);
-      notes.push('Already holds ₹5 L+ in direct shares → Small Cap removed for better diversification');
-    }
-    // Gold: client ke paas Gold / SGB nahi aur combo me koi gold / multi-asset nahi → 10% gold (₹15k+ SIP par)
-    const hasGold = has(p,'oOther','Gold / SGB') || slots.some(s=>s.k==='gold'||s.k==='multi');
-    if(!hasGold && sip>=15000 && lvl>0 && (combo==='rec'||combo==='multicap')){ slots.forEach(s=>s.w*=0.9); slots.push({k:'gold',w:10}); notes.push('No Gold / SGB holding → 10% Gold Fund added for diversification'); }
+    const LONG = H>=1;   // 5–10 / 10+ saal
     // Tax Saving: ELSS core fund ki JAGAH (ELSS bhi flexi-cap jaisa hi hai → dono rakhne se overlap)
     const tax = has(p,'goal','Tax Saving');
     let elssCapNote='';
@@ -252,17 +237,31 @@ window.PLAN = (function(){
       if(core){ core.k='elss'; }
       else { slots.forEach(s=>s.w*=0.8); slots.splice(1,0,{k:'elss',w:20}); }
     }
+    // Zaroori funds: long-term → Mid + Small; tax → ELSS
+    const must = [...(LONG?['mid','small']:[]), ...(tax?['elss']:[])];
+    must.forEach(k=>{ if(!slots.some(s=>s.k===k)) slots.push({k,w:15}); });
     // Fund count — SIP ke size se (bahut funds = overlap + tracking mushkil)
-    const maxN = sip<2000 ? 1 : sip<5000 ? 2 : sip<10000 ? 3 : sip<20000 ? 4 : sip<40000 ? 5 : 6;
-    if(slots.length>maxN){
-      const keep=slots.slice(0,maxN);
-      if(tax && !keep.some(s=>s.k==='elss')) keep[keep.length-1]=slots.find(s=>s.k==='elss');
+    let maxN = sip<2000 ? 1 : sip<5000 ? 2 : sip<10000 ? 3 : sip<20000 ? 4 : 5;
+    if(LONG && !tax && sip<3000) maxN=1;          // chhoti long-term SIP → ek Multi Cap (mid + small dono andar)
+    if(LONG && sip>=3000) maxN=Math.max(maxN,3);   // core + Mid + Small
+    if(maxN===1){
+      // Ek hi fund: long-term → Multi Cap (usme mid + small dono 25%+), tax → ELSS
+      slots=[{k: tax?'elss' : LONG?'multicap' : slots[0].k, w:1}];
+      if(LONG && !tax) notes.push('Small SIP — one Multi Cap fund gives Mid + Small exposure (min. 25% each)');
+    } else {
+      maxN = Math.max(maxN, Math.min(must.length, Math.floor(sip/1000)));
+      let keep=slots.slice(0,maxN);
+      must.forEach(k=>{ if(keep.some(s=>s.k===k)) return;
+        let j=-1; for(let x=keep.length-1;x>=0;x--){ if(!must.includes(keep[x].k)){ j=x; break; } }
+        const add=slots.find(s=>s.k===k); if(j>=0) keep[j]=add; else if(keep.length<maxN) keep.push(add); });
       slots=keep;
     }
+    if(LONG && slots.some(s=>s.k==='small') && (BIG_EQ.includes(K(p.oEquity)) || (r.e && +r.e.asset_value>=5e5)))
+      notes.push('Client already holds ₹5 L+ in direct shares — check overlap with Mid / Small Cap stocks');
     const W=slots.reduce((a,s)=>a+s.w,0);
     slots.forEach(s=>{ s.amt=r500(sip*s.w/W); });
     // ₹1,000 se kam wala fund hata kar sabse bade me jodo
-    let tiny; while(slots.length>1 && (tiny=slots.find(s=>s.amt<1000))){ slots=slots.filter(s=>s!==tiny); slots.reduce((a,s)=>s.amt>a.amt?s:a,slots[0]).amt+=tiny.amt; }
+    let tiny; while(slots.length>1 && (tiny=slots.find(s=>s.amt<1000 && !must.includes(s.k)) || (slots.every(s=>s.amt<1000||must.includes(s.k)) && slots.find(s=>s.amt<500)))){ slots=slots.filter(s=>s!==tiny); slots.reduce((a,s)=>s.amt>a.amt?s:a,slots[0]).amt+=tiny.amt; }
     const diff = sip - slots.reduce((a,s)=>a+s.amt,0); slots.reduce((a,s)=>s.amt>a.amt?s:a,slots[0]).amt += diff;
     // ELSS: 80C limit ₹1.5 L/saal = ₹12,500/month — upar ka flexi me
     const el=slots.find(s=>s.k==='elss');
