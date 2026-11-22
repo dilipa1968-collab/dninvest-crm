@@ -86,10 +86,21 @@ window.PLAN = (function(){
     // Pehle CRM ki saaf fund list, phir clients ki asli schemes (jo list me na ho)
     try{ if(typeof FUND_NAME_LIST!=='undefined') L=L.concat(FUND_NAME_LIST); }catch(_){}
     try{ if(typeof getCrmSchemeNames==='function') L=L.concat(getCrmSchemeNames()||[]); }catch(_){}
-    // 22-Nov-2026: ek hi fund alag spelling me na aaye — "Mid Cap"/"Midcap", "&"/"and", "Regular Plan"/"Regular", case
-    const key = n => n.toLowerCase().replace(/&/g,' and ').replace(/\b(fund|plan|option|the|scheme|regular)\b/g,' ').replace(/[^a-z0-9]/g,'');
-    const seen=new Set(); _names=[];
-    L.forEach(n=>{ n=String(n||'').replace(/\s+/g,' ').trim(); if(!n) return; const k=key(n); if(!seen.has(k)){ seen.add(k); _names.push(n); } });
+    // 22-Nov-2026: ek hi fund alag spelling / purane-naye naam me na aaye. Milte-julte naam me CHHOTA naam rakho.
+    const key = n => n.toLowerCase().replace(/&/g,' and ').replace(/-/g,' ')
+      .replace(/\b(mid|small|large|flexi|multi) cap\b/g,'$1cap')
+      .replace(/\belss\b/g,' ').replace(/\bequity tax saver\b/g,'tax saver')                 // "Tax Saver" = "ELSS Tax Saver"
+      .replace(/\bopportunities\b/g,' ')                                                     // HDFC Mid-Cap Opportunities = HDFC Mid Cap
+      .replace(/\bfocused (equity|25)\b/g,'focused')                                         // Focused Equity / Focused 25 = Focused
+      .replace(/\b(value discovery|capital builder value|sterling value)\b/g,'value')       // purane naam → Value
+      .replace(/\bmagnum midcap\b/g,'midcap')                                                // SBI Magnum Midcap = SBI Mid Cap
+      .replace(/\b(ultra short|short|medium|low|long) (term|duration)\b/g,(m,a)=>a==='long'?m:a)   // Ultra Short Term = Ultra Short (Long Term Equity alag hi rehta hai)
+      .replace(/\b(fund|plan|option|the|scheme|regular)\b/g,' ').replace(/[^a-z0-9]/g,'');
+    const score = n => n.length + (n===n.toUpperCase() ? 1000 : 0);   // chhota naam behtar; SAB-CAPITAL wala aakhri choice
+    const at=new Map(); _names=[];
+    L.forEach(n=>{ n=String(n||'').replace(/\s+/g,' ').trim(); if(!n) return; const k=key(n);
+      if(!at.has(k)){ at.set(k,_names.length); _names.push(n); }
+      else { const j=at.get(k); if(score(n)<score(_names[j])) _names[j]=n; } });
     return _names;
   }
   function namesFor(k){
