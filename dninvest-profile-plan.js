@@ -83,15 +83,18 @@ window.PLAN = (function(){
   function allNames(){
     if(_names) return _names;
     let L=[];
-    try{ if(typeof getCrmSchemeNames==='function') L=L.concat(getCrmSchemeNames()||[]); }catch(_){}
+    // Pehle CRM ki saaf fund list, phir clients ki asli schemes (jo list me na ho)
     try{ if(typeof FUND_NAME_LIST!=='undefined') L=L.concat(FUND_NAME_LIST); }catch(_){}
+    try{ if(typeof getCrmSchemeNames==='function') L=L.concat(getCrmSchemeNames()||[]); }catch(_){}
+    // 22-Nov-2026: ek hi fund alag spelling me na aaye — "Mid Cap"/"Midcap", "&"/"and", "Regular Plan"/"Regular", case
+    const key = n => n.toLowerCase().replace(/&/g,' and ').replace(/\b(fund|plan|option|the|scheme|regular)\b/g,' ').replace(/[^a-z0-9]/g,'');
     const seen=new Set(); _names=[];
-    L.forEach(n=>{ n=String(n||'').trim(); const k=n.toLowerCase(); if(n && !seen.has(k)){ seen.add(k); _names.push(n); } });
+    L.forEach(n=>{ n=String(n||'').replace(/\s+/g,' ').trim(); if(!n) return; const k=key(n); if(!seen.has(k)){ seen.add(k); _names.push(n); } });
     return _names;
   }
   function namesFor(k){
     const C=CAT[k]; if(!C||!C.kw) return [];
-    return allNames().filter(n=>C.kw.test(n) && !(C.nk&&C.nk.test(n)) && !/idcw|dividend payout|dividend reinvest/i.test(n) || (k==='divy' && C.kw.test(n)))
+    return allNames().filter(n=>C.kw.test(n) && !(C.nk&&C.nk.test(n)) && !/idcw|dividend payout|dividend reinvest|\bdirect\b/i.test(n) || (k==='divy' && C.kw.test(n)))
       .sort((a,b)=>(/growth/i.test(b)-/growth/i.test(a)) || a.localeCompare(b)).slice(0,300);
   }
   const dlOpts = k => namesFor(k).map(n=>`<option value="${esc(n)}"></option>`).join('');
