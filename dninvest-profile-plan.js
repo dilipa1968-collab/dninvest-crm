@@ -8,6 +8,8 @@
    - RM ke liye "Talking Points" (sirf CRM me — client ko nahi jaate).
    - 🖼️ Colorful image (PNG) WhatsApp par — mobile par share sheet, computer par
      copy + Ctrl+V. 💬 Text bhi, 🖨️ PDF bhi (Hindi + English, DN Investment logo).
+   - 22-Nov-2026 v2: ELSS auto-plan se hata (Edit me RM daale). 50+ / retired → Balanced Advantage /
+     Aggressive Hybrid (Conservative 50%, Moderate 35%, Aggressive 25%), Small max 10%.
    - 22-Nov-2026: SIRF 5 categories — Large & Mid, Mid, Multi Cap, Flexi, Small (Large Cap nahi).
      4 combos (Recommended / Simple / Mid & Small Focus / Multi Cap). Long-term → Mid + Small zaroor.
    - 26 categories (Equity / Hybrid / Debt / Others) + scheme naam suggestion
@@ -95,7 +97,7 @@ window.PLAN = (function(){
   const dlOpts = k => namesFor(k).map(n=>`<option value="${esc(n)}"></option>`).join('');
 
   // ══ FUND COMBINATIONS (22-Nov-2026 v3) ══
-  // SIRF 5 equity categories (Dilip ji ka rule): Large & Mid, Mid, Multi Cap, Flexi, Small.
+  // SIRF 5 equity categories (Dilip ji ka rule) + 50+ ke liye BAF / Aggressive Hybrid: Large & Mid, Mid, Multi Cap, Flexi, Small.
   // Large Cap / Index / Value / BAF / Multi Asset / Gold / Debt auto-plan me NAHI (RM edit me chahe to daal sakta hai).
   // Long-term (5–10 / 10+ saal) client → Mid Cap + Small Cap ZAROOR.
   // TPL[combo][risk 0-2][horizon 0-2] — order = priority (chhoti SIP me peeche wale hat-te hain)
@@ -149,7 +151,7 @@ window.PLAN = (function(){
     const savMid = sav ? mid(sav) : 0;
     const irregular = K(p.r1)===K('Irregular') || has(p,'incomeSource','Business') || has(p,'incomeSource','Professional');
     const retired = has(p,'incomeSource','Retired / Pension');
-    const old = K(p.r5)===K('Above 55');
+    const old = K(p.r5)===K('Above 55') || K(p.r5)===K('Above 50');   // 22-Nov-2026: form ab 'Above 50' poochta hai
     const loan = K(p.loan)==='yes';
     const modeTxt = [].concat(p.mode||[]).join(', ');
     const wantsEq = has(p,'mode','Equity (Direct Shares)'), wantsIpo = has(p,'mode','IPO');
@@ -210,7 +212,7 @@ window.PLAN = (function(){
     let lvl = li<0 ? 1 : Math.min(2,li);   // purani profile me risk na ho to Moderate
     const period = K(p.period);
     const H = period===K('3 – 5 years') ? 0 : period===K('10+ years') ? 2 : 1;
-    if(old && lvl>1){ lvl=1; notes.push('Age 55+ → capped at Moderate'); }
+    if(old && lvl>1){ lvl=1; notes.push('Age 50+ → capped at Moderate'); }
     if(K(p.r2)===K('Sell') && lvl>1){ lvl=1; notes.push('Would sell on a 20% fall → capped at Moderate'); }
     if(retired && has(p,'goal','Retirement') && lvl>0){ lvl=Math.min(lvl,1); }
     const shortGoal = (has(p,'goal','House / Car')||has(p,'goal','Child Education')) && H===0;
@@ -230,23 +232,32 @@ window.PLAN = (function(){
     let slots = TPL[combo][lvl][H].map(([k,w])=>({k,w}));
     const LONG = H>=1;   // 5–10 / 10+ saal
     // Tax Saving: ELSS core fund ki JAGAH (ELSS bhi flexi-cap jaisa hi hai → dono rakhne se overlap)
-    const tax = has(p,'goal','Tax Saving');
+    // ELSS auto-plan me NAHI (22-Nov-2026) — tax goal ho to RM ✏️ Edit me khud daale (talking point aata hai)
+    const tax = false, taxGoal = has(p,'goal','Tax Saving');
     let elssCapNote='';
-    if(tax){
-      const core = slots.find(s=>s.k==='flexi' || (s.k==='multicap' && combo!=='multicap'));   // Multi Cap combo me Multi Cap rehta hai
-      if(core){ core.k='elss'; }
-      else { slots.forEach(s=>s.w*=0.8); slots.splice(1,0,{k:'elss',w:20}); }
+    // 50+ / retired: stability ke liye Balanced Advantage / Aggressive Hybrid (risk ke hisab se hissa)
+    const senior = old || retired;
+    let hyb=[];
+    if(senior){
+      const share = lvl===0 ? 50 : lvl===1 ? 35 : 25;
+      hyb = lvl===0 ? [['bal',30],['aggh',20]] : lvl===1 ? [['aggh',20],['bal',15]] : [['aggh',25]];
+      slots.forEach(s=>s.w*=(100-share)/100);
+      // Small Cap 50+ me max 10% — baaki core / mid me
+      const sm=slots.find(s=>s.k==='small'); if(sm && sm.w>10){ const x=sm.w-10; sm.w=10; (slots.find(s=>s.k==='mid')||slots[0]).w+=x; }
+      const pos = lvl===0 ? 0 : 1;   // conservative me hybrid sabse aage
+      slots.splice(pos,0,...hyb.map(([k,w])=>({k,w})));
     }
-    // Zaroori funds: long-term → Mid + Small; tax → ELSS
-    const must = [...(LONG?['mid','small']:[]), ...(tax?['elss']:[])];
+    // Zaroori funds: long-term → Mid + Small; 50+ → pehla hybrid
+    const must = [...(senior?[hyb[0][0]]:[]), ...(LONG?['mid','small']:[])];
     must.forEach(k=>{ if(!slots.some(s=>s.k===k)) slots.push({k,w:15}); });
     // Fund count — SIP ke size se (bahut funds = overlap + tracking mushkil)
     let maxN = sip<2000 ? 1 : sip<5000 ? 2 : sip<10000 ? 3 : sip<20000 ? 4 : 5;
-    if(LONG && !tax && sip<3000) maxN=1;          // chhoti long-term SIP → ek Multi Cap (mid + small dono andar)
-    if(LONG && sip>=3000) maxN=Math.max(maxN,3);   // core + Mid + Small
+    if(LONG && !senior && sip<3000) maxN=1;          // chhoti long-term SIP → ek Multi Cap (mid + small dono andar)
+    if(LONG && sip>=3000) maxN=Math.max(maxN, senior && sip>=4000 ? 4 : 3);   // core + Mid + Small (+ hybrid 50+)
+    if(combo==='simple') maxN=Math.min(maxN,3);   // Simple = max 3 fund
     if(maxN===1){
       // Ek hi fund: long-term → Multi Cap (usme mid + small dono 25%+), tax → ELSS
-      slots=[{k: tax?'elss' : LONG?'multicap' : slots[0].k, w:1}];
+      slots=[{k: senior ? hyb[0][0] : LONG?'multicap' : slots[0].k, w:1}];
       if(LONG && !tax) notes.push('Small SIP — one Multi Cap fund gives Mid + Small exposure (min. 25% each)');
     } else {
       maxN = Math.max(maxN, Math.min(must.length, Math.floor(sip/1000)));
@@ -258,6 +269,11 @@ window.PLAN = (function(){
     }
     if(LONG && slots.some(s=>s.k==='small') && (BIG_EQ.includes(K(p.oEquity)) || (r.e && +r.e.asset_value>=5e5)))
       notes.push('Client already holds ₹5 L+ in direct shares — check overlap with Mid / Small Cap stocks');
+    // 50+: final funds me Mid max 20%, Small max 10% — bacha hissa hybrid (ya core) me
+    if(senior && slots.length>1){
+      const W0=slots.reduce((a,s)=>a+s.w,0); const to=slots.find(s=>s.k==='aggh'||s.k==='bal') || slots.find(s=>!['mid','small'].includes(s.k));
+      [['small',0.10],['mid',0.20]].forEach(([k,cap])=>{ const x=slots.find(s=>s.k===k); if(x && to && x.w>cap*W0){ to.w+=x.w-cap*W0; x.w=cap*W0; } });
+    }
     const W=slots.reduce((a,s)=>a+s.w,0);
     slots.forEach(s=>{ s.amt=r500(sip*s.w/W); });
     // ₹1,000 se kam wala fund hata kar sabse bade me jodo
@@ -266,7 +282,8 @@ window.PLAN = (function(){
     // ELSS: 80C limit ₹1.5 L/saal = ₹12,500/month — upar ka flexi me
     const el=slots.find(s=>s.k==='elss');
     if(el && el.amt>12500){ const extra=el.amt-12500; el.amt=12500; slots.push({k:'flexi',amt:extra}); elssCapNote='ELSS capped at ₹12,500/month (80C limit); the rest goes to Flexi Cap'; notes.push(elssCapNote); }
-    slots = slots.filter(s=>s.amt>0);
+    slots = slots.filter(s=>s.amt>0).sort((a,b)=>b.amt-a.amt);   // bada amount upar
+    if(senior){ const h=slots.filter(s=>s.k==='bal'||s.k==='aggh').map(s=>CAT[s.k].en); if(h.length) notes.push(`Age 50+ → ${h.join(' + ')} added for stability`); }
     const alloc = slots.map(s=>({k:s.k, amt:s.amt, ...CAT[s.k]}));
     if(efPart) alloc.push({k:'liquid', amt:efPart, ...CAT.liquid});
 
@@ -275,7 +292,7 @@ window.PLAN = (function(){
     if(curSip) talk.push(`Current SIP with us is ${inr(curSip)} — confirm whether it is already counted in the savings figure. Suggested ${inr(total)}${total>curSip?` → increase by ${inr(total-curSip)}`:' — current SIP is sufficient'}.`);
     if(planned && !noSip && sip>planned[1]) talk.push(`Client planned ${p.sipAmount}; savings allow about ${inr(sip)} — increase gradually.`);
     if(noSip) talk.push(`Client does not want a SIP (${modeTxt||'Lumpsum'}) — apply the same split as % of the lumpsum.`);
-    if(tax) talk.push('Confirm the tax regime — ELSS gives no benefit under the NEW regime (move that part to Flexi Cap). PPF / EPF may already fill the 80C limit.');
+    if(taxGoal) talk.push('Tax saving goal — ELSS is not in the auto plan. If the client is in the OLD tax regime and 80C is not full (PPF / EPF / LIC), add ELSS via ✏️ Edit Plan.');
     if(efS==='r' && (BIG_EQ.includes(K(p.oEquity)) || K(p.oFd)!=='none' && p.oFd)) talk.push('To build the emergency fund faster, suggest moving a lumpsum from shares / FD into a Liquid Fund.');
     if(efPart) talk.push(`Once the emergency target (${big(efTarget)}) is reached, shift the ${inr(efPart)} Liquid SIP to equity.`);
     if(lcS==='r'||lcS==='a') talk.push('Discuss a term plan — LIC endowment / money-back policies give low cover.');
@@ -288,7 +305,7 @@ window.PLAN = (function(){
     if(irregular && !noSip) talk.push('Irregular / business income — keep a smaller base SIP and top up in good months.');
     if(wantsEq||wantsIpo) talk.push(`Client is interested in ${[wantsEq&&'direct equity (shares)',wantsIpo&&'IPOs'].filter(Boolean).join(' and ')} — ${r.e?`existing equity client (RM ${r.e.rm||'—'}); coordinate with them`:'check demat / trading account with us; open one if needed'}${wantsIpo?'. Share upcoming IPOs and help apply via UPI / ASBA':''}.`);
     if(/lumpsum/i.test(modeTxt)) talk.push('Do not put a lumpsum into equity at once — park it in Liquid / Arbitrage and STP over 6–12 months into this split.');
-    if(old) talk.push('Age 55+ — discuss an SWP plan for post-retirement income.');
+    if(old) talk.push('Age 50+ — discuss an SWP plan for post-retirement income.');
     if(p.oMf && BIG_EQ.includes(K(p.oMf))) talk.push('Large MF holding elsewhere — get the statement and check overlap to avoid duplicate fund types.');
 
     return {checks, total, sip, efPart, efTarget, alloc, lvlName:LVL[lvl], talk, notes, stepUp, noSip, tax, auto, curSip, combo, comboEn:COMBO[combo].en, comboHi:COMBO[combo].hi, comboWhy:COMBO[combo].why, comboWhyHi:COMBO[combo].whyHi};
