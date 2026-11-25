@@ -15,7 +15,7 @@
   <script>
   // APP VERSION — update this timestamp on every deployment to force PWA cache refresh.
   // When this value changes, the app detects a new version and reloads automatically.
-  const APP_VERSION = '2026-11-19-v10';
+  const APP_VERSION = '2026-11-25-v1';
 
   // Inject PWA manifest dynamically (inline for single-file deployment)
   (function(){
@@ -3430,7 +3430,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
         <select id="prof-risk" onchange="PROF.render()" style="padding:7px 8px;border:1px solid var(--border);border-radius:8px"><option value="">All Risk Profiles</option><option>Aggressive</option><option>Conservative</option><option>Moderate</option></select>
         <button class="btn btn-outline" onclick="PROF.open(true)" title="Reload all profiles from the server">🔄 Refresh</button>
         <span id="prof-sync" style="font-size:.72rem;color:var(--teal);font-weight:700"></span>
-        <button class="btn btn-outline" style="border-color:#1a56db;color:#1a56db" onclick="PROF.summary()" title="RM-wise: forms sent, filled and pending">📊 RM-wise Summary</button>
         <button class="btn btn-outline" onclick="PROF.exportXlsx()">⬇️ Export</button>
         <button class="btn btn-outline" style="border-color:#0f766e;color:#0f766e" onclick="PROF.blank('wa')" title="Blank form for a NEW client (not in CRM yet) — opens WhatsApp, you pick the contact">🆕 Blank Form (WhatsApp)</button>
         <button class="btn btn-outline" style="border-color:#0f766e;color:#0f766e" onclick="PROF.blank('copy')" title="Copy the blank form link">🔗 Copy Blank Link</button>
@@ -3442,20 +3441,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
     </div>
   </div>
 </div>
-<div class="modal-overlay" id="profPlanModal" onclick="if(event.target===this)closeModal('profPlanModal')">
-  <div class="modal" style="width:800px;max-width:96vw">
-    <div class="modal-hdr"><h3 id="profPlanTitle">💡 Suggested Plan</h3><button class="modal-close" onclick="closeModal('profPlanModal')">×</button></div>
-    <div class="modal-body" id="profPlanBody"></div>
-  </div>
-</div>
-<div class="modal-overlay" id="profSumModal" onclick="if(event.target===this)closeModal('profSumModal')">
-  <div class="modal" style="width:min(1050px,96vw);max-width:96vw">
-    <div class="modal-hdr"><h3>📊 Profile Forms — RM-wise Summary</h3><button class="modal-close" onclick="closeModal('profSumModal')">×</button></div>
-    <div class="modal-body" id="profSumBody"></div>
-  </div>
-</div>
 <div class="modal-overlay" id="profDetailModal" onclick="if(event.target===this)closeModal('profDetailModal')">
-  <div class="modal" style="width:820px;max-width:96vw">
+  <div class="modal" style="width:620px;max-width:96vw">
     <div class="modal-hdr"><h3 id="profDetailTitle">Client Profile</h3><button class="modal-close" onclick="closeModal('profDetailModal')">×</button></div>
     <div class="modal-body" id="profDetailBody"></div>
   </div>
@@ -3466,14 +3453,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
 <div id="syncBanner" style="display:none;position:fixed;top:50px;left:0;right:0;z-index:9999;background:#0d9488;color:#fff;text-align:center;font-size:.78rem;padding:4px 8px;font-weight:600">🔄 Syncing latest data from server…</div>
 
 
-<script src="dninvest-app-1.js?v=2026-11-19-v5"></script>
+<script src="dninvest-app-1.js?v=2026-11-25-v1"></script>
 
 <script src="dninvest-app-2.js?v=2026-10-13-v2"></script>
 
 <script src="dninvest-backoffice.js?v=2026-11-19-v1"></script>
 
-<script src="dninvest-profiles.js?v=2026-11-21-v2"></script>
-<script src="dninvest-profile-plan.js?v=2026-11-22-v7"></script>
+<script src="dninvest-profiles.js?v=2026-11-19-v8"></script>
 
 <!-- ══ OTHER PRODUCTS MODAL ══ -->
 <div class="modal-overlay" id="op-modal" onclick="if(event.target===this)closeOpModal()">

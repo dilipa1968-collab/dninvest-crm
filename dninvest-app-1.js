@@ -10217,7 +10217,8 @@ function getFilteredEqDemat(){
   const toD=document.getElementById('eqdemat-to-date')?.value||'';
 
   if(q) entries=entries.filter(e=>(e.client_name||'').toLowerCase().includes(q)||(e.rm||'').toLowerCase().includes(q)||(e.opening_rm||'').toLowerCase().includes(q)||(e.client_code||'').toLowerCase().includes(q));
-  if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF||(e.opening_rm||'')===rmF);
+  // RM ke liye RM-filter apne naam pe lock rehta hai — par bina-claim (naye) accounts sab RMs ko dikhne chahiye (25-Nov-2026 fix)
+  if(rmF) entries=entries.filter(e=>(e.rm||'')===rmF||(e.opening_rm||'')===rmF||(CU.role!=='admin' && isUnclaimedDemat(e)));
   if(statusF==='__UNCLAIMED__') entries=entries.filter(isUnclaimedDemat);
   else if(statusF) entries=entries.filter(e=>(e.status||'Pending')===statusF);
   if(monthF) entries=entries.filter(e=>(e.date||'').slice(0,7)===monthF);
