@@ -9974,13 +9974,14 @@ function renderEqDematPage(){
   // instead of the read-only box. RM users keep the read-only box.
   const tradeSel=document.getElementById('eqdemat-rm-select');
   const tradeRO=document.getElementById('eqdemat-client-rm');
+  // 25-Nov-2026: RM/dealer ko bhi Trading RM chunne ka option (default = client ka RM).
   if(tradeSel){
-    if(CU.role==='admin'){
-      tradeSel.innerHTML=getSegRMs('equity').map(r=>`<option>${escapeHtml(r)}</option>`).join('');
-      tradeSel.style.display=''; if(tradeRO) tradeRO.style.display='none';
-    } else {
-      tradeSel.style.display='none'; if(tradeRO) tradeRO.style.display='';
-    }
+    const tr=getSegRMs('equity');
+    if(CU.name && !tr.includes(CU.name)) tr.push(CU.name);
+    tr.sort((a,b)=>a.localeCompare(b));
+    tradeSel.innerHTML=tr.map(r=>`<option>${escapeHtml(r)}</option>`).join('');
+    tradeSel.value = CU.name && tr.includes(CU.name) ? CU.name : (tr[0]||'');
+    tradeSel.style.display=''; if(tradeRO) tradeRO.style.display='none';
   }
 
   populateEqDematMonths();
@@ -10065,6 +10066,8 @@ function toggleEqDematNewClient(on){
     if(srch){ srch.value=''; srch.disabled=true; srch.placeholder='New account — fill the details below'; }
     const sel=document.getElementById('eqdemat-client-selected'); if(sel) sel.value='(New account)';
     const rmEl=document.getElementById('eqdemat-client-rm'); if(rmEl) rmEl.value=CU.role==='admin'?'(Opening RM)':(CU.name||'');
+    const ts=document.getElementById('eqdemat-rm-select');
+    if(ts && CU.role!=='admin' && [...ts.options].some(o=>o.value===CU.name)) ts.value=CU.name;
     if(nm) setTimeout(()=>nm.focus(),0);
   } else {
     if(srch){ srch.disabled=false; srch.placeholder='🔍 Search by Name / Code / mobile...'; }
@@ -10081,13 +10084,14 @@ function selectEqDematClient(clientId){
   eqDematSelectedClient = {id:c.id, name:c.name, rm:c.rm||''};
   document.getElementById('eqdemat-client-selected').value=c.name;
   document.getElementById('eqdemat-client-rm').value=c.rm||'—';
-  // Admin: default the Opening RM to the client's RM (can change if a different RM opened it)
-  if(CU.role==='admin'){
-    const tradeSel=document.getElementById('eqdemat-rm-select');
+  // Trading RM default = client ka RM (sab users ke liye; zarurat ho to badal sakte hain)
+  { const tradeSel=document.getElementById('eqdemat-rm-select');
     if(tradeSel && c.rm){
       if(![...tradeSel.options].some(o=>o.value===c.rm)) tradeSel.add(new Option(c.rm,c.rm));
       tradeSel.value=c.rm;
-    }
+    } }
+  // Admin: default the Opening RM to the client's RM (can change if a different RM opened it)
+  if(CU.role==='admin'){
     const openSel=document.getElementById('eqdemat-opening-rm');
     if(openSel && c.rm){
       if(![...openSel.options].some(o=>o.value===c.rm)) openSel.add(new Option(c.rm,c.rm));
@@ -10134,9 +10138,10 @@ async function _saveEqDematEntry(){
     if(c){
       toast(`Client Code ${ncode} already exists — "${c.name}". Using that client.`,'success');
     } else {
-      // RM khud RM banega; Admin ke case me Opening RM dropdown wala RM
+      // Naye client ka RM = chuna hua Trading RM (na ho to Opening RM / khud)
       const openSel=document.getElementById('eqdemat-opening-rm');
-      const rm = CU.role==='admin' ? ((openSel&&openSel.value)||CU.name) : CU.name;
+      const tSel=document.getElementById('eqdemat-rm-select');
+      const rm = (tSel && tSel.style.display!=='none' && tSel.value) || (CU.role==='admin' ? ((openSel&&openSel.value)||CU.name) : CU.name);
       let newId=uid(); while(all.some(x=>x.id===newId)) newId=uid();
       c={ id:newId, code:ncode, name:nm, mobile:mob, email:'', pan, dob:'',
           rm, status:'Active', asset_value:null, revenue:null,
@@ -10168,10 +10173,11 @@ async function _saveEqDematEntry(){
   const openingRm=(document.getElementById('eqdemat-opening-rm')?.value||CU.name||'').trim();
   if(!openingRm){ toast('Please select the Opening RM','error'); return; }
 
-  // Admin may credit the brokerage (Trading RM) to any RM via the dropdown.
+  // Trading RM (brokerage) — Admin aur RM dono dropdown se chun sakte hain.
   let tradingRm = eqDematSelectedClient.rm;
   const tradeSel=document.getElementById('eqdemat-rm-select');
-  if(CU.role==='admin' && tradeSel && tradeSel.style.display!=='none' && tradeSel.value){ tradingRm = tradeSel.value; }
+  if(tradeSel && tradeSel.style.display!=='none' && tradeSel.value){ tradingRm = tradeSel.value; }
+  if(!String(tradingRm||'').trim()){ toast('Please select the Trading RM','error'); return; }
 
   const newEqEntry = {
     id: uid(),
@@ -10195,6 +10201,7 @@ async function _saveEqDematEntry(){
   eqDematSelectedClient=null;
   document.getElementById('eqdemat-client-selected').value='';
   document.getElementById('eqdemat-client-rm').value='';
+  { const ts=document.getElementById('eqdemat-rm-select'); if(ts && [...ts.options].some(o=>o.value===CU.name)) ts.value=CU.name; }
   document.getElementById('eqdemat-client-search').value='';
   document.getElementById('eqdemat-code').value='';
   document.getElementById('eqdemat-remarks').value='';
