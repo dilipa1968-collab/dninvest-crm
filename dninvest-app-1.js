@@ -5652,6 +5652,25 @@ function addEquityToMf(eqId){
   setTimeout(()=>document.getElementById('atm-pan').focus(),100);
 }
 
+// 25-Nov-2026: MF me pehle se record ho to sirf toast nahi — batao kahan hai (RM / Status / DNC)
+// aur dekhne ka option do. Pehle RM ko pata nahi chalta tha ki record kisi aur RM ke paas
+// ya DNC (default hidden) me pada hai.
+function _showMfDup(d, why){
+  const mine = CU.role==='admin' || getMyMfClients().some(x=>x.id===d.id);
+  const where=[];
+  where.push('MF RM: '+(d.rm||'(blank)'));
+  where.push('Status: '+(d.status||'—'));
+  if(d.do_not_call) where.push('🚫 DNC — hidden in MF Investors unless Status = DNC is selected');
+  if(!mine) where.push('This client is in another RM\'s MF list, so you cannot see it. Ask Admin to transfer if needed.');
+  let msg=`"${d.name}" is already in Mutual Fund (${why}).\n\n`+where.join('\n');
+  if(mine){
+    msg+='\n\nOpen that MF record now?';
+    if(confirm(msg)){ closeModal('addToMfModal'); try{ viewClient(d.id,'mf'); }catch(_){} }
+  } else {
+    alert(msg);
+  }
+}
+
 async function confirmAddEquityToMf(){
   const eqId=_atmEqId;
   const eqClients=DB.get('eq_clients')||[];
@@ -5672,11 +5691,11 @@ async function confirmAddEquityToMf(){
   // For a minor the PAN may be the guardian's (already used) — skip the PAN block.
   if(pan && !isMinor){
     const dupPan=mfClients.find(c=>c.pan && c.pan.trim().toUpperCase()===pan);
-    if(dupPan){ toast(`⚠️ Already an MF Investor: "${dupPan.name}" (PAN: ${dupPan.pan})`,'error'); return; }
+    if(dupPan){ _showMfDup(dupPan, 'same PAN '+dupPan.pan); return; }
   }
   const mob=cleanMob(eq.mobile);
   const dupOther=mfClients.find(c=>(mob && cleanMob(c.mobile)===mob) || (c.name||'').trim().toUpperCase()===(eq.name||'').trim().toUpperCase());
-  if(dupOther){ toast(`⚠️ "${dupOther.name}" already exists in Mutual Fund`,'error'); return; }
+  if(dupOther){ _showMfDup(dupOther, (mob && cleanMob(dupOther.mobile)===mob)?'same mobile':'same name'); return; }
 
   let newId=uid();
   while(mfClients.some(x=>x.id===newId)) newId=uid();
