@@ -10293,7 +10293,7 @@ function renderEqDematTable(){
             ${status!=='Declined'?`<button class="btn-icon" onclick="declineEqDematEntry('${e.id}')" title="Decline" style="color:var(--red)">❌</button>`:''}
             ${status!=='Pending'?`<button class="btn-icon" onclick="markPendingEqDematEntry('${e.id}')" title="Mark Pending" style="color:var(--gray)">↩️</button>`:''}
             <button class="btn-icon" onclick="editEqDematEntry('${e.id}')" title="Edit">✏️</button>
-            <button class="btn-icon" onclick="deleteEqDematEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:''}</td>
+            <button class="btn-icon" onclick="deleteEqDematEntry('${e.id}')" title="Delete" style="color:var(--red)">🗑️</button>`:(canRmEditDemat(e)?`<button class="btn-icon" onclick="editEqDematEntry('${e.id}')" title="Edit (until Admin approves)">✏️</button>`:'')}</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -10346,8 +10346,15 @@ async function deleteEqDematEntry(id){
 
 let editingDematId = null;
 
+// 25-Nov-2026: RM apni (Opening RM = khud) entry edit kar sakta hai jab tak Admin ne Approve nahi kiya.
+function canRmEditDemat(e){
+  if(!e || CU.role==='admin') return CU.role==='admin';
+  const me=(CU.name||'').trim().toLowerCase();
+  return (e.status||'Pending')!=='Approved' && !isUnclaimedDemat(e) && String(e.opening_rm||'').trim().toLowerCase()===me;
+}
 function editEqDematEntry(id){
-  if(CU.role!=='admin') return;
+  const _e0=getEqDematEntries().find(x=>x.id===id);
+  if(CU.role!=='admin' && !canRmEditDemat(_e0)) return;
   const entries = getEqDematEntries();
   const e = entries.find(x=>x.id===id);
   if(!e) return;
@@ -10376,6 +10383,7 @@ function editEqDematEntry(id){
   if(curOpen && !allRMs.includes(curOpen)){
     sel.innerHTML = `<option value="${escapeHtml(curOpen)}" selected>${escapeHtml(curOpen)}</option>` + sel.innerHTML;
   }
+  sel.disabled = CU.role!=='admin';   // RM apna Opening RM nahi badal sakta
   document.getElementById('dematEditModal').classList.add('open');
 }
 
@@ -10384,7 +10392,7 @@ function onDematEditRmChange(){
   const tsel=document.getElementById('demat_edit_rm'); if(!tsel) return;
   const wrap=document.getElementById('demat_edit_rm_sync_wrap'), cb=document.getElementById('demat_edit_rm_sync'), txt=document.getElementById('demat_edit_rm_sync_txt');
   const nv=tsel.value, crm=tsel.dataset.clientRm||'';
-  const show = !!tsel.dataset.hasClient && !!nv && nv!==crm;
+  const show = !!tsel.dataset.hasClient && !!nv && nv!==crm && (CU.role==='admin' || !crm);
   wrap.style.display = show ? '' : 'none';
   if(show){
     txt.textContent = crm ? `Also change the client's RM in Equity Clients (currently: ${crm} → ${nv})` : `Also set ${nv} as the client's RM in Equity Clients (currently blank)`;
@@ -10392,8 +10400,9 @@ function onDematEditRmChange(){
   } else cb.checked=false;
 }
 function saveDematEdit(){
-  if(CU.role!=='admin') return;
   if(!editingDematId) return;
+  const isAdm=CU.role==='admin';
+  if(!isAdm && !canRmEditDemat(getEqDematEntries().find(x=>x.id===editingDematId))){ toast('This entry can no longer be edited (already approved)','error'); return; }
   const date = document.getElementById('demat_edit_date').value;
   if(!date){ toast('Date is required','error'); return; }
   const code=document.getElementById('demat_edit_code').value.trim().toUpperCase();
@@ -10406,7 +10415,7 @@ function saveDematEdit(){
   // Equity client ka RM bhi (sirf jab user ne tick kiya)
   if(syncClient && entry && entry.client_id && tradeRm){
     const c=(DB.get('eq_clients')||[]).find(x=>x.id===entry.client_id);
-    if(c && c.rm!==tradeRm){
+    if(c && c.rm!==tradeRm && (isAdm || !String(c.rm||'').trim())){
       const oldRm=c.rm||'';
       DB.setClient('eq_clients', {...c, rm:tradeRm, updated:today()}).then(r=>{
         if(r && r.ok===false){ toast('⚠️ Client RM not saved — '+(r.error||'please retry'),'error'); return; }
@@ -10415,11 +10424,20 @@ function saveDematEdit(){
       });
     }
   }
+  if(!isAdm && !tradeRm){ toast('Please select the Trading RM','error'); return; }
   DB.updateMfBizEntry('eq_entries', id, f=>{
+    if(!isAdm){
+      // server pe latest check: abhi bhi meri entry hai aur approve nahi hui
+      if((f.status||'Pending')==='Approved' || String(f.opening_rm||'').trim().toLowerCase()!==(CU.name||'').trim().toLowerCase()) return false;
+      f.client_code=code; f.date=date; f.remarks=remarks; f.rm=tradeRm;
+      if(f.status==='Declined'){ f.status='Pending'; f.decline_reason=''; }   // dobara bheja
+      f.edited_by=CU.name; f.edited_at=new Date().toISOString();
+      return;
+    }
     f.client_code=code; f.date=date; f.remarks=remarks; f.rm=tradeRm;
     if((f.opening_rm||'')!==openRm){ f.opening_rm=openRm; if(openRm){ f.claimed_by=f.claimed_by||('Admin: '+CU.name); f.claimed_at=f.claimed_at||new Date().toISOString(); } }
   }).then(r=>{
-    if(!r.ok){ toast('⚠️ Not saved — '+(r.error||'please retry'),'error'); return; }
+    if(!r.ok || r.aborted){ toast('⚠️ Not saved — '+(r.error||'entry was approved / changed meanwhile'),'error'); renderEqDematTable(); return; }
     toast('Demat entry updated!','success');
     renderEqDematTable(); try{ updateBadges(); }catch(_){}
   });
