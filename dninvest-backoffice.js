@@ -149,7 +149,12 @@ window.BO = (function(){
   }
   function clientRm(r){
     const list=DB.get(r.seg==='equity'?'eq_clients':'mf_clients')||[];
-    const c=list.find(x=>x.id===r.client_id);
+    let c=r.client_id ? list.find(x=>x.id===r.client_id) : null;
+    // 25-Nov-2026: naya account (CRM me nahi tha) — baad me client aa jaye to Code / PAN se uska RM
+    if(!c && r.new_client){
+      const code=String(r.client_code||'').trim().toUpperCase(), pan=String(r.pan||'').trim().toUpperCase();
+      c=list.find(x=>(code && String(r.seg==='equity'?x.code:x.client_id||'').trim().toUpperCase()===code) || (pan && String(x.pan||'').trim().toUpperCase()===pan && !x.is_minor));
+    }
     return (c && c.rm) || r.rm || '';
   }
   function ageDays(r){
@@ -367,7 +372,7 @@ window.BO = (function(){
       const age=ageDays(r), od=isOpen(r)&&age>OVERDUE_DAYS, mg=canSeg(r.seg);
       h+=`<tr${od?' style="background:#fff1f2"':''}>
         <td>${fmtDate(r.date)}</td>
-        <td title="${esc(r.client_name)}"><b>${esc(r.client_name)}</b>${r.pan?`<br><small style="color:var(--gray)">${esc(r.pan)}</small>`:''}</td>
+        <td title="${esc(r.client_name)}"><b>${esc(r.client_name)}</b>${r.new_client?' <span title="New account — client was not in the CRM when this request was entered" style="font-size:.55rem;font-weight:800;color:#b45309;background:#fff4e5;border-radius:6px;padding:1px 5px">🆕 NEW</span>':''}${r.pan?`<br><small style="color:var(--gray)">${esc(r.pan)}</small>`:''}</td>
         <td><span class="badge ${r.seg==='equity'?'b-eq':'b-mf'}">${r.seg==='equity'?'EQ':'MF'}</span></td>
         <td>${esc(r.client_code||'')}${r.folio?`<br><small style="color:var(--gray)">F: ${esc(r.folio)}</small>`:''}</td>
         <td><b>${esc(r.type)}</b></td>
@@ -440,6 +445,21 @@ window.BO = (function(){
         </div>
         <div class="form-field"><label>Selected Client</label><input type="text" id="bo_client_sel" readonly style="background:#f7f7f7" placeholder="No client selected"></div>
       </div>
+      ${r?'':`<a href="#" id="bo_new_link" onclick="event.preventDefault();BO.newClient(true)" style="display:inline-block;margin:-2px 0 6px;font-size:.76rem;font-weight:700;color:var(--teal)">➕ New account — client not in CRM yet</a>
+      <div id="bo_new_wrap" style="display:none;margin:0 0 8px;padding:8px 10px;background:#fff7ed;border:1.5px dashed #f59e0b;border-radius:10px">
+        <div style="font-size:.76rem;font-weight:700;color:#b45309;margin-bottom:6px">➕ New account (not in CRM yet) — only the request is saved; the client is NOT added to Equity / MF.
+          <a href="#" onclick="event.preventDefault();BO.newClient(false)" style="margin-left:8px;color:var(--gray)">✕ Cancel</a></div>
+        <div class="form-row three" style="margin-bottom:0">
+          <div class="form-field"><label>Segment *</label><select id="bo_new_seg" onchange="BO.newSegChange()">${canSeg('equity')?'<option value="equity">Equity</option>':''}${canSeg('mf')?'<option value="mf">Mutual Fund</option>':''}</select></div>
+          <div class="form-field"><label>Client Name *</label><input type="text" id="bo_new_name" placeholder="Full name"></div>
+          <div class="form-field"><label>RM</label><select id="bo_new_rm"></select></div>
+        </div>
+        <div class="form-row three" style="margin-bottom:0">
+          <div class="form-field"><label>Mobile</label><input type="text" id="bo_new_mobile" maxlength="10" inputmode="numeric" placeholder="10 digit mobile" oninput="this.value=this.value.replace(/\\D/g,'')"></div>
+          <div class="form-field"><label>PAN</label><input type="text" id="bo_new_pan" maxlength="10" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
+          <div class="form-field"><label>Client Code / UCC (if known)</label><input type="text" id="bo_new_code" placeholder="Optional"></div>
+        </div>
+      </div>`}
       ${r?`<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem"><b>${esc(r.client_name)}</b> · ${r.seg==='equity'?'Equity':'MF'} · ${esc(r.client_code||'')} · Client RM: ${esc(clientRm(r)||'—')} · Entry By: ${esc(r.created_by||'—')}</div>`:''}
       <div class="form-row three">
         <div class="form-field"><label>Request Type * <span id="bo_seg_label" style="color:var(--teal)"></span></label><select id="bo_type"></select></div>
@@ -462,7 +482,7 @@ window.BO = (function(){
   }
   function openAdd(){
     if(!canAddAny()){ toast('You do not have Back Office entry permission. Please contact Admin.','error'); return; }
-    editingId=null; picked=null;
+    editingId=null; picked=null; newMode=false;
     $('boModalTitle').textContent='➕ New Back Office Request';
     $('boModalBody').innerHTML=modalHtml(null);
     fillSegOptions(defaultSeg(null));
@@ -485,7 +505,7 @@ window.BO = (function(){
     out.innerHTML = m.length ? m.map(c=>`<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'" onclick="BO.pick('${c.seg}','${c.id}')">
         <div style="font-weight:600;font-size:.85rem"><span class="badge ${c.seg==='equity'?'b-eq':'b-mf'}">${c.seg==='equity'?'EQ':'MF'}</span> ${esc(c.name)}</div>
         <div style="font-size:.74rem;color:var(--gray)">${esc(c.code||'—')} · ${esc(c.pan||'—')} · ${esc(c.mobile||'—')} · RM: ${esc(c.rm||'—')}</div></div>`).join('')
-      : '<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found</div>';
+      : '<div style="padding:10px;color:var(--gray);font-size:.85rem">No client found — <a href="#" onclick="event.preventDefault();BO.newClient(true)" style="color:var(--teal);font-weight:700">➕ add as a new account</a></div>';
     out.style.display='block';
   }
   function pick(seg,id){
@@ -499,8 +519,55 @@ window.BO = (function(){
     $('bo_client_search').value='';
     const out=$('bo_client_results'); out.style.display='none'; out.innerHTML='';
   }
+  // ── 25-Nov-2026: naya account (client CRM me nahi) ──
+  let newMode=false;
+  function newSegChange(){
+    const seg=($('bo_new_seg')||{}).value||'equity';
+    const sel=$('bo_new_rm');
+    if(sel){
+      let rms=[]; try{ rms=getSegRMs(seg)||[]; }catch(_){}
+      if(CU && CU.name && !rms.includes(CU.name)) rms.push(CU.name);
+      rms=sortList(rms.filter(x=>x!=='Other'));
+      const cur=sel.value || (CU&&CU.name) || '';
+      sel.innerHTML=rms.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
+    }
+    fillSegOptions(seg, $('bo_type')?.value, $('bo_mode')?.value);
+  }
+  function newClient(on){
+    newMode=!!on;
+    const w=$('bo_new_wrap'), lk=$('bo_new_link'), srch=$('bo_client_search'), sel=$('bo_client_sel');
+    if(w) w.style.display=on?'':'none';
+    if(lk) lk.style.display=on?'none':'inline-block';
+    const out=$('bo_client_results'); if(out){ out.style.display='none'; out.innerHTML=''; }
+    if(on){
+      picked=null;
+      if(srch){ const q=srch.value.trim(); const nm=$('bo_new_name');
+        if(q){ if(/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(q)) $('bo_new_pan').value=q.toUpperCase();
+               else if(/^\d{10}$/.test(q)) $('bo_new_mobile').value=q;
+               else if(nm && !nm.value) nm.value=q.toUpperCase(); }
+        srch.value=''; srch.disabled=true; srch.placeholder='New account — fill the details below'; }
+      if(sel) sel.value='(New account)';
+      newSegChange();
+      setTimeout(()=>$('bo_new_name')?.focus(),0);
+    } else {
+      if(srch){ srch.disabled=false; srch.placeholder='🔍 Name / Code / PAN / Mobile...'; }
+      if(sel && sel.value==='(New account)') sel.value='';
+      fillSegOptions(defaultSeg(null));
+    }
+  }
   let _saving=false;
   async function save(){
+    // Naya account → form se "picked" banao (client_id khaali, new_client:true)
+    if(!editingId && newMode){
+      const seg=($('bo_new_seg')||{}).value;
+      const name=($('bo_new_name')?.value||'').trim().toUpperCase().replace(/\s+/g,' ');
+      const mob=($('bo_new_mobile')?.value||'').trim(), pan=($('bo_new_pan')?.value||'').trim().toUpperCase();
+      if(!seg || !canSeg(seg)){ toast('Please select the segment','error'); return; }
+      if(!name){ toast('Please enter the client name','error'); $('bo_new_name')?.focus(); return; }
+      if(mob && !/^[0-9]{10}$/.test(mob)){ toast('Mobile must be 10 digits','error'); return; }
+      if(pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)){ toast('PAN format looks wrong (e.g. ABCDE1234F)','error'); return; }
+      picked={seg, id:'', name, code:($('bo_new_code')?.value||'').trim().toUpperCase(), pan, mobile:mob, rm:($('bo_new_rm')?.value||CU.name||''), isNew:true};
+    }
     if(_saving) return;
     const editRec = editingId ? all().find(x=>x.id===editingId) : null;
     const segOf = editRec ? editRec.seg : (picked ? picked.seg : null);
@@ -538,7 +605,7 @@ window.BO = (function(){
       });
     } else {
       const rec={id:uid(), seg:picked.seg, client_id:picked.id, client_name:picked.name, client_code:picked.code,
-        pan:picked.pan, rm:picked.rm, ...fields, created_by:CU.name, created_at:now,
+        pan:picked.pan, rm:picked.rm, ...(picked.isNew?{new_client:true, mobile:picked.mobile||''}:{}), ...fields, created_by:CU.name, created_at:now,
         history:[{at:now,by:CU.name,status:fields.status,note:'Request created'}]};
       res=await mutate(arr=>{ if(arr.some(x=>x.id===rec.id)) return false; arr.push(rec); });
     }
@@ -546,7 +613,7 @@ window.BO = (function(){
     if(!res.ok){ toast('⚠️ NOT SAVED — '+(res.error||'server error')+'. Please check your internet and click Save again.','error'); return; }
     closeModal('boModal');
     toast(editingId?'Request updated successfully ✓':'Request added successfully ✓','success');
-    editingId=null; picked=null;
+    editingId=null; picked=null; newMode=false;
     afterChange();
   }
   async function quickStatus(id,status){
@@ -691,7 +758,7 @@ window.BO = (function(){
     render, filter, go, quickFilter, resetFilters,
     openAdd:()=>{ resetSaveBtn(); _openAdd(); },
     openEdit:id=>{ resetSaveBtn(); _openEdit(id); },
-    openView, searchClient, pick, save, quickStatus, del,
+    openView, searchClient, pick, save, quickStatus, del, newClient, newSegChange,
     openTypes, saveTypesFromModal, exportXlsx,
     defaultTypes:()=>{ Object.keys(DEFAULTS).forEach(k=>{ const t=document.getElementById('bo_list_'+k); if(t) t.value=DEFAULTS[k].join('\n'); }); },
     updateBadge, renderDashCard, clientHistoryHtml, restick,
