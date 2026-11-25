@@ -364,6 +364,33 @@ window.PROF = (function(){
     ['goal','Goals'],['mode','Investment Mode'],
     ['sipAmount','Planned SIP'],['period','Investment Period'],
     ['eqInterest','Equity — Interested'],['eqStyle','Equity — Type'],['ipoApply','IPO — Applies'],['eqExp','Equity — Experience'],['eqCapital','Equity — Capital'],['eqLoss','Equity — Max Loss Bearable'],['eqSupport','Equity — Help Wanted'],['r1','Income Regularity'],['r2','If Market Falls 20%'],['r3','Equity / MF Experience'],['r4','Expectation'],['r5','Age']];
+  // 25-Nov-2026: Client's Answers section-wise, har section ka apna rang (form ke sections jaisa)
+  const ANS_SECTIONS=[
+    {t:'💰 Income & Savings',c:'#0f7a45',bg:'#e3f7ee',k:['incomeSource','monthlyIncome','monthlySavings']},
+    {t:'🛡️ Loans & Protection',c:'#c0392b',bg:'#fdf0ee',k:['loan','loanAmount','emiAmount','emergencyFund','healthCover','lifeCover']},
+    {t:'🏦 Investments Elsewhere',c:'#6d28d9',bg:'#ede9fe',k:['oEquity','oMf','oSip','oFd','oOther','otherDetails']},
+    {t:'🎯 Mutual Fund Plan',c:'#1a56db',bg:'#eef3fc',k:['goal','mode','sipAmount','period']},
+    {t:'📈 Share Market & IPO',c:'#c2600a',bg:'#fff4e5',k:['eqInterest','eqStyle','ipoApply','eqExp','eqCapital','eqLoss','eqSupport']},
+    {t:'⚖️ Risk Profile',c:'#0891b2',bg:'#e0f7fc',k:['r1','r2','r3','r4','r5']}
+  ];
+  function answersHtml(p){
+    const v=k=>Array.isArray(p[k])?p[k].join(', '):(p[k]||'');
+    const lab=k=>((LABELS.find(x=>x[0]===k)||[k,k])[1]).replace(/^(Elsewhere|Equity|IPO) — /,'');
+    const used=new Set();
+    const card=(S,keys)=>{
+      const rws=keys.filter(k=>v(k)); if(!rws.length) return '';
+      rws.forEach(k=>used.add(k));
+      const extra = S.t.indexOf('Risk')>=0 && p.riskProfile ? `<span style="margin-left:auto;background:#fff;color:${S.c};border-radius:10px;padding:1px 8px;font-size:.66rem">${esc(p.riskProfile)} · ${esc(p.riskScore??'')}/15</span>` : '';
+      return `<div style="border:1px solid ${S.c}33;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:${S.c};color:#fff;font-weight:800;font-size:.74rem;padding:6px 10px;display:flex;align-items:center;gap:6px">${S.t}${extra}</div>
+        ${rws.map((k,n)=>`<div style="display:flex;gap:8px;padding:5px 10px;font-size:.74rem;${n%2?`background:${S.bg}`:''}"><span style="color:var(--gray);flex:0 0 46%">${esc(lab(k))}</span><b style="color:var(--navy)">${esc(v(k))}</b></div>`).join('')}
+      </div>`;
+    };
+    let h=ANS_SECTIONS.map(S=>card(S,S.k)).join('');
+    const rest=LABELS.map(x=>x[0]).filter(k=>!used.has(k));
+    h+=card({t:'📝 Other',c:'#5d6e8a',bg:'#f4f6fa'},rest);
+    return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${h}</div>`;
+  }
   function detail(i){
     const r=(window._profRows||[])[i]; if(!r) return;
     const p=r.p, d=subDate(p);
@@ -381,8 +408,8 @@ window.PROF = (function(){
       <div style="font-size:.78rem;color:var(--gray);margin-bottom:8px">Mobile: <b>${esc(p.mobile)}</b> · RM: <b>${esc((()=>{ const R=rmOf(r); return [R.mf&&('MF: '+R.mf), R.eq&&('EQ: '+R.eq)].filter(Boolean).join(' · ') || R.main || '—'; })())}</b>${senderOf(r)?` · Form sent by: <b>${esc(senderOf(r))}</b>`:''} · Submitted: <b>${d?d.toLocaleString('en-IN'):'—'}</b></div>
       ${linkBox(i, r)}
       ${window.PLAN ? `<div style="text-align:right;margin:-4px 0 8px"><button class="btn" style="background:var(--navy);color:#f5d98a;border:none" onclick="PROF.plan(${i})">💡 Open Suggested Plan</button></div>` : ''}
-      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 4px">Client's Answers</div>
-      <table><tbody>${LABELS.filter(([k])=>v(k)).map(([k,l])=>`<tr><td style="color:var(--gray);width:42%">${l}</td><td style="font-weight:600">${esc(v(k))}</td></tr>`).join('')}</tbody></table>
+      <div style="font-size:.7rem;font-weight:800;color:var(--gray);text-transform:uppercase;margin:4px 0 6px">Client's Answers</div>
+      ${answersHtml(p)}
       ${CU.role==='admin'?`<div style="text-align:right;margin-top:12px"><button class="btn btn-danger" onclick="PROF.del(${i})">🗑️ Delete Profile</button></div>`:''}`;
     $('profDetailModal').classList.add('open');
   }
