@@ -9,7 +9,7 @@
      SIP aur MF value (aur bhejte waqt ka bhi) — Excel export ke saath.
    Equity clients ko bhi bhej sakte hain (Equity Clients → naam par right-click).
    Client Equity + MF dono me ho (PAN se match) to form me dono ki value dikhti hai.
-   Access: Admin sab; RM sirf apne clients ke profiles.
+   Access: Admin sab; RM sirf apne clients ke profiles. Admin "All Profiles" tick de to RM ko bhi sab (25-Nov-2026).
    🆕 IPO section (ipo* fields) — detail, Excel, list me IPO badge.
    📈 Form me Equity / Trading section (eq* fields) — detail, Excel aur list me 📈 badge.
    ⚡ Profiles login ke baad peeche se pehle hi load (prefetch) — Clear Cache ke baad bhi popup jaldi.
@@ -77,6 +77,14 @@ window.PROF = (function(){
       const mine = seg==='equity' ? getMyEqClients() : getMyMfClients();
       return mine.some(x=>x.id===c.id);
     }catch(_){ return (c.rm||'').toLowerCase()===(CU.name||'').toLowerCase(); }
+  }
+  // 25-Nov-2026: Admin jise "All Profiles" permission de (Users → prof_all_access) use saari profiles
+  // dikhti hain — Admin jaisi list (sirf dekhna; delete sirf Admin).
+  function seeAll(){
+    if(!CU) return false;
+    if(CU.role==='admin') return true;
+    const u=((typeof DB!=='undefined'&&DB.get('users'))||[]).find(x=>x.id===CU.id) || CU;
+    return u.prof_all_access===true;
   }
   function canSeePair(pr){ return canSeeClient(pr.eq,'equity') || canSeeClient(pr.mf,'mf'); }
   function linkFor(c, seg, sendId){
@@ -255,7 +263,7 @@ window.PROF = (function(){
     const me=String(CU.name||'').trim().toLowerCase(), same=v=>String(v||'').trim().toLowerCase()===me;
     return latest.map(p=>{
         const pr=pairForProfile(p), s=sendOf(p,pr);
-        if(CU.role==='admin') return {p, c:pr.mf, e:pr.eq, s};
+        if(seeAll()) return {p, c:pr.mf, e:pr.eq, s};
         // RM ko dikhe: (1) client CRM me uska hai, YA (2) form usi ne bheja (send log me "by",
         // ya link / blank form me uska naam) — chahe client ka MF / equity hamare yahan ho ya na ho.
         // (2) me client CRM me kisi AUR RM ka nikla → profile dikhegi, par us client ki
@@ -276,7 +284,7 @@ window.PROF = (function(){
   }
   function render(){
     const list=rows();
-    const pend=(CU.role==='admin' ? _sends : _sends.filter(s=>{ if(String(s.by||'').trim().toLowerCase()===String(CU.name||'').trim().toLowerCase()) return true; const sg=s.seg==='equity'?'equity':'mf'; const c=sg==='equity'?eqClient(s.cid):mfClient(s.cid); return c && canSeeClient(c, sg); }))
+    const pend=(seeAll() ? _sends : _sends.filter(s=>{ if(String(s.by||'').trim().toLowerCase()===String(CU.name||'').trim().toLowerCase()) return true; const sg=s.seg==='equity'?'equity':'mf'; const c=sg==='equity'?eqClient(s.cid):mfClient(s.cid); return c && canSeeClient(c, sg); }))
       .filter(s=>!s.blank && !filledFor(s));
     const pc=$('prof-pending'); if(pc){ pc.textContent = pend.length ? `⏳ ${pend.length} sent, not filled yet` : ''; pc.style.cursor='pointer'; pc.title='Click — RM-wise sent / filled / pending'; pc.onclick=()=>PROF.summary(); }
     $('prof-count').textContent=list.length+' profile'+(list.length===1?'':'s');
@@ -462,7 +470,7 @@ window.PROF = (function(){
     return true;
   }
   function sumData(){
-    const isAdmin=CU.role==='admin', me=nk(CU.name);
+    const isAdmin=seeAll(), me=nk(CU.name);
     const R={}; const row=n=>{ const k=nk(n)||'(unknown)'; return R[k]||(R[k]={name:n||'(unknown)',sent:0,clients:new Set(),pend:new Map(),blank:0,blankFilled:0,filled:0,last:'',blankList:[],sentList:[]}); };
     // Bheje gaye links
     _sends.filter(s=>inRange(s.at)).forEach(s=>{
